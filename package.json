@@ -1,0 +1,19 @@
+{
+  "name": "com.latios.latiosframework",
+  "displayName": "Latios Framework for DOTS",
+  "version": "0.1.0",
+  "unity": "2019.3",
+  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Physics\n\nYou may also install these packages individually.",
+  "dependencies": {
+    "com.unity.entities": "0.4.0-preview.10"
+  },
+  "unityRelease": "0f1",
+  "keywords": [
+    "dots",
+    "latios",
+    "framework"
+  ],
+  "author": {
+    "name": "Dreaming I'm Latios"
+  }
+}

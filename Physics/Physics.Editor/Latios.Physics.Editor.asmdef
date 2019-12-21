@@ -1,0 +1,22 @@
+{
+    "name": "Latios.Physics.Editor",
+    "references": [
+        "Latios.Physics",
+        "Unity.Entities",
+        "Unity.Build",
+        "Unity.Build.Common",
+        "Unity.Burst",
+        "Unity.Jobs"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
