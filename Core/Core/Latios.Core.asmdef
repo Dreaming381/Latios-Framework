@@ -2,6 +2,7 @@
     "name": "Latios.Core",
     "references": [
         "Unity.Entities",
+        "Unity.InputSystem",
         "Unity.Jobs",
         "Unity.Mathematics",
         "Unity.Rendering.Hybrid",

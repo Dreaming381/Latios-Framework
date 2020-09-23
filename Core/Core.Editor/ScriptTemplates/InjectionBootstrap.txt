@@ -1,0 +1,41 @@
+using System;
+using System.Collections.Generic;
+using Unity.Collections;
+using Unity.Entities;
+using Latios;
+
+public class LatiosBootstrap : ICustomBootstrap
+{
+    public bool Initialize(string defaultWorldName)
+    {
+        var world                             = new LatiosWorld(defaultWorldName);
+        World.DefaultGameObjectInjectionWorld = world;
+
+        var initializationSystemGroup = world.GetExistingSystem<InitializationSystemGroup>();
+        var simulationSystemGroup     = world.GetExistingSystem<SimulationSystemGroup>();
+        var presentationSystemGroup   = world.GetExistingSystem<PresentationSystemGroup>();
+        var systems                   = new List<Type>(DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+
+        systems.RemoveSwapBack(typeof(InitializationSystemGroup));
+		systems.RemoveSwapBack(typeof(SimulationSystemGroup));
+		systems.RemoveSwapBack(typeof(PresentationSystemGroup));
+		
+		for (int i = 0; i < systems.Count; i++)
+        {
+            if (systems[i].Namespace.Contains("Latios"))
+            {
+                systems.RemoveSwapBack(systems[i]);
+                i--;
+            }
+        }
+
+        DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systems);
+
+        initializationSystemGroup.SortSystems();
+        simulationSystemGroup.SortSystems();
+        presentationSystemGroup.SortSystems();
+
+        ScriptBehaviourUpdateOrder.AddWorldToCurrentPlayerLoop(world);
+        return true;
+    }
+}

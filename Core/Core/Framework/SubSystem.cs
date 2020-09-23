@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -6,12 +7,14 @@ using Unity.Jobs;
 namespace Latios
 {
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public abstract class SubSystemBase : ComponentSystem, ILatiosSystem
+    public abstract class SubSystemBase : SystemBase, ILatiosSystem
     {
         public LatiosWorld latiosWorld { get; private set; }
 
         public ManagedEntity sceneGlobalEntity => latiosWorld.sceneGlobalEntity;
         public ManagedEntity worldGlobalEntity => latiosWorld.worldGlobalEntity;
+
+        public FluentQuery Fluent => this.Fluent();
 
         public virtual bool ShouldUpdateSystem()
         {
@@ -33,8 +36,9 @@ namespace Latios
 
         protected sealed override void OnUpdate()
         {
+            latiosWorld.BeginCollectionTracking(this);
             OnUpdateInternal();
-            latiosWorld.CheckMissingDependenciesForCollections(this);
+            latiosWorld.EndCollectionTracking(Dependency);
         }
 
         protected sealed override void OnDestroy()
@@ -47,6 +51,14 @@ namespace Latios
         internal abstract void OnDestroyInternal();
 
         internal abstract void OnUpdateInternal();
+
+        public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
+
+        internal JobHandle SystemBaseDependency
+        {
+            get => Dependency;
+            set => Dependency = value;
+        }
     }
 
     public abstract class SubSystem : SubSystemBase

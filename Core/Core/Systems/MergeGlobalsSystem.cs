@@ -3,22 +3,22 @@ using System.Reflection;
 using Unity.Entities;
 using Unity.Jobs;
 
-namespace Latios
+namespace Latios.Systems
 {
     [AlwaysSynchronizeSystem]
-    public class MergeGlobalsSystem : JobSubSystem
+    public class MergeGlobalsSystem : SubSystem
     {
         private EntityDataCopyKit m_copyKit;
+        private EntityQuery       m_query;
 
         protected override void OnCreate()
         {
             m_copyKit = new EntityDataCopyKit(EntityManager);
         }
 
-        protected override JobHandle OnUpdate(JobHandle inputDeps)
+        protected override void OnUpdate()
         {
-            inputDeps.Complete();
-            Entities.WithStructuralChanges().ForEach((Entity entity, ref GlobalEntityData globalEntityData) =>
+            Entities.WithStoreEntityQueryInField(ref m_query).WithStructuralChanges().ForEach((Entity entity, ref GlobalEntityData globalEntityData) =>
             {
                 var types        = EntityManager.GetComponentTypes(entity, Unity.Collections.Allocator.TempJob);
                 var targetEntity = globalEntityData.globalScope == GlobalScope.World ? worldGlobalEntity : sceneGlobalEntity;
@@ -27,6 +27,8 @@ namespace Latios
                 bool          error     = false;
                 foreach (var type in types)
                 {
+                    if (type.TypeIndex == ComponentType.ReadWrite<GlobalEntityData>().TypeIndex)
+                        continue;
                     if (globalEntityData.mergeMethod == MergeMethod.Overwrite || !targetEntity.HasComponent(type))
                         m_copyKit.CopyData(entity, targetEntity, type);
                     else if (globalEntityData.mergeMethod == MergeMethod.ErrorOnConflict)
@@ -42,7 +44,7 @@ namespace Latios
                         $"Entity {entity} could not copy component {errorType.GetManagedType()} onto {(globalEntityData.globalScope == GlobalScope.World ? "world" : "scene")} entity because the component already exists and the MergeMethod was set to ErrorOnConflict.");
                 }
             }).Run();
-            return inputDeps;
+            EntityManager.DestroyEntity(m_query);
         }
 
         /*private EntityQuery group;

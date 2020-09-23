@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -8,37 +9,73 @@ namespace Latios.PhysicsEngine
     // The concrete type of a collider
     public enum ColliderType : byte
     {
-        // Convex types
+        //Convex Primitive types
         Sphere = 0,
         Capsule = 1,
         //Box = 2,
         //Triangle = 3,
         //Quad = 4,
-        //Convex = ,
-        //Cylinder = ,
-        // Composite types
-        //Mesh = 7,
-        //Compound = 8,
-        //Terrain = 9,
-        // Dynamic types
+        //Cylinder = 5
+        //Cone = 6
+
+        //Beveled Convex Primitive Types
+        //BeveledBox = 32
+
+        //Concave Primitive Types
+        //Torus = 64
+
+        //Complex Convex Types
+        //ConvexMesh = 128
+
+        //Complex Concave types
+        //Mesh = 160,
+        Compound = 161,
+        //Terrain = 162,
+
+        //192+ ?
     }
 
     [Serializable]
-    public unsafe partial struct Collider : IComponentData, ICollider
+    [StructLayout(LayoutKind.Explicit)]
+    public unsafe partial struct Collider : IComponentData
     {
-        private ColliderType m_type;
-        private byte         reserved1;
-        private byte         reserved2;
-        private byte         reserved3;
-        private Storage      m_storage;
+        [FieldOffset(0)]
+        Storage m_storage;
+
+        [FieldOffset(0)]
+        SphereCollider m_sphere;
+
+        [FieldOffset(0)]
+        CapsuleCollider m_capsule;
+
+        //Todo: Make this a BlobAssetReference for all generic collider blobs.
+        [FieldOffset(48)]
+        BlobAssetReference<CompoundColliderBlob> m_blobRef;
+
+        [FieldOffset(56)]
+        float m_reservedFloat;
+
+        [FieldOffset(60)]
+        byte m_reservedByte1;
+
+        [FieldOffset(61)]
+        byte m_reservedByte2;
+
+        [FieldOffset(62)]
+        byte m_reservedByte3;
+
+        [FieldOffset(63)]
+        ColliderType m_type;
 
         public ColliderType type => m_type;
 
         private struct Storage
         {
+#pragma warning disable CS0649  //variable never assigned
             public float4 a;
             public float4 b;
             public float4 c;
+#pragma warning restore CS0649
         }
     }
 }

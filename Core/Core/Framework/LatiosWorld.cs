@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Debug = UnityEngine.Debug;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
-using UnityEngine;
+
+using Latios.Systems;
 
 namespace Latios
 {
@@ -17,17 +19,24 @@ namespace Latios
 
         private List<CollectionDependency> m_collectionDependencies = new List<CollectionDependency>();
 
+        //Todo: Disposal of collection storage is currently done in ManagedStructStorageCleanupSystems.cs.
+        //This is because overriding World doesn't give us an opportunity to override the Dispose method.
+        //In the future it may be worth creating a DisposeTool system that Dispose events can be registered to.
         private ManagedStructComponentStorage m_componentStorage   = new ManagedStructComponentStorage();
         private CollectionComponentStorage    m_collectionsStorage = new CollectionComponentStorage();
-        private InitializationSystemGroup     m_initializationSystemGroup;
-        private SimulationSystemGroup         m_simulationSystemGroup;
-        private PresentationSystemGroup       m_presentationSystemGroup;
+
+        private InitializationSystemGroup m_initializationSystemGroup;
+        private SimulationSystemGroup     m_simulationSystemGroup;
+        private PresentationSystemGroup   m_presentationSystemGroup;
+
+        private bool m_paused          = false;
+        private bool m_resumeNextFrame = false;
 
         public LatiosWorld(string name) : base(name)
         {
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentTag<>),               typeof(IComponent));
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentSystemStateTag<>),    typeof(IComponent));
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
+            //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentTag<>),               typeof(IManagedComponent));
+            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentSystemStateTag<>),    typeof(IManagedComponent));
+            //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentSystemStateTag<>), typeof(ICollectionComponent));
 
             worldGlobalEntity = new ManagedEntity(EntityManager.CreateEntity(), EntityManager);
@@ -35,21 +44,74 @@ namespace Latios
             worldGlobalEntity.AddComponentData(new WorldGlobalTag());
             sceneGlobalEntity.AddComponentData(new SceneGlobalTag());
 
-            m_initializationSystemGroup = GetOrCreateSystem<MyInitializationSystemGroup>();
-            m_simulationSystemGroup     = GetOrCreateSystem<SimulationSystemGroup>();
-            m_presentationSystemGroup   = GetOrCreateSystem<PresentationSystemGroup>();
+#if UNITY_EDITOR
+            EntityManager.SetName(worldGlobalEntity, "World Global Entity");
+            EntityManager.SetName(sceneGlobalEntity, "Scene Global Entity");
+#endif
+
+            m_initializationSystemGroup = GetOrCreateSystem<LatiosInitializationSystemGroup>();
+            m_simulationSystemGroup     = GetOrCreateSystem<LatiosSimulationSystemGroup>();
+            m_presentationSystemGroup   = GetOrCreateSystem<LatiosPresentationSystemGroup>();
+        }
+
+        //Todo: Make this API public in the future.
+        internal void Pause() => m_paused                    = true;
+        internal void ResumeNextFrame() => m_resumeNextFrame = true;
+        internal bool paused => m_paused;
+        internal bool willResumeNextFrame => m_resumeNextFrame;
+
+        internal void FrameStart()
+        {
+            if (m_resumeNextFrame)
+            {
+                m_paused          = false;
+                m_resumeNextFrame = false;
+            }
         }
 
         internal void CreateNewSceneGlobalEntity()
         {
-            if (!EntityManager.Exists(sceneGlobalEntity))
+            if (!EntityManager.Exists(sceneGlobalEntity) || !sceneGlobalEntity.HasComponentData<SceneGlobalTag>())
             {
                 sceneGlobalEntity = new ManagedEntity(EntityManager.CreateEntity(), EntityManager);
                 sceneGlobalEntity.AddComponentData(new SceneGlobalTag());
+#if UNITY_EDITOR
+                EntityManager.SetName(sceneGlobalEntity, "Scene Global Entity");
+#endif
             }
         }
 
         #region CollectionDependencies
+        private SubSystemBase m_activeSystem;
+
+        internal void UpdateOrCompleteDependency(JobHandle readHandle, JobHandle writeHandle)
+        {
+            if (m_activeSystem != null)
+            {
+                var jh                              = m_activeSystem.SystemBaseDependency;
+                jh                                  = JobHandle.CombineDependencies(readHandle, writeHandle, jh);
+                m_activeSystem.SystemBaseDependency = jh;
+            }
+            else
+            {
+                JobHandle.CombineDependencies(readHandle, writeHandle).Complete();
+            }
+        }
+
+        internal void UpdateOrCompleteDependency(JobHandle jobHandle)
+        {
+            if (m_activeSystem != null)
+            {
+                var jh                              = m_activeSystem.SystemBaseDependency;
+                jh                                  = JobHandle.CombineDependencies(jobHandle, jh);
+                m_activeSystem.SystemBaseDependency = jh;
+            }
+            else
+            {
+                jobHandle.Complete();
+            }
+        }
+
         internal void MarkCollectionDirty<T>(Entity entity, bool isReadOnly) where T : struct, ICollectionComponent
         {
             m_collectionDependencies.Add(new CollectionDependency(entity, typeof(T), isReadOnly));
@@ -67,7 +129,28 @@ namespace Latios
             }
         }
 
-        internal void SetJobHandleForCollections(JobHandle handle) => UpdateCollectionDependencies(handle);
+        internal void BeginCollectionTracking(SubSystemBase sys)
+        {
+            if (m_activeSystem != null)
+            {
+                throw new InvalidOperationException("Error: Calling Update on a SubSystem from within another SubSystem is not allowed!");
+            }
+            m_activeSystem = sys;
+        }
+
+        internal void EndCollectionTracking(JobHandle outputDeps)
+        {
+            m_activeSystem = null;
+            if (outputDeps.IsCompleted)
+            {
+                //Todo: Is this necessary? And what are the performance impacts? Is there a better way to figure out that all jobs were using .Run()?
+                outputDeps.Complete();
+            }
+            else
+            {
+                UpdateCollectionDependencies(outputDeps);
+            }
+        }
 
         internal void CheckMissingDependenciesForCollections(SubSystemBase sys)
         {
@@ -130,6 +213,26 @@ namespace Latios
             }
         }
         #endregion
+    }
+
+    public class LatiosSimulationSystemGroup : SimulationSystemGroup
+    {
+        protected override void OnUpdate()
+        {
+            LatiosWorld lw = World as LatiosWorld;
+            if (!lw.paused)
+                base.OnUpdate();
+        }
+    }
+
+    public class LatiosPresentationSystemGroup : PresentationSystemGroup
+    {
+        protected override void OnUpdate()
+        {
+            LatiosWorld lw = World as LatiosWorld;
+            if (!lw.paused)
+                base.OnUpdate();
+        }
     }
 }
 

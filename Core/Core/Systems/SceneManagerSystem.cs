@@ -1,75 +1,63 @@
-﻿using Unity.Collections;
+﻿using System.Diagnostics;
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine.SceneManagement;
 
-namespace Latios
+namespace Latios.Systems
 {
     [AlwaysUpdateSystem]
     public class SceneManagerSystem : SubSystem
     {
         private EntityQuery m_rlsQuery;
+        private bool        m_paused = false;
 
         protected override void OnCreate()
         {
             CurrentScene curr = new CurrentScene
             {
-                currentScene      = new NativeString128(),
-                previousScene     = new NativeString128(),
+                currentScene      = new FixedString128(),
+                previousScene     = new FixedString128(),
                 isSceneFirstFrame = false
             };
             worldGlobalEntity.AddOrSetComponentData(curr);
-
-            m_rlsQuery = GetEntityQuery(typeof(RequestLoadScene));
-        }
-
-        //ScheduleSingle
-        public struct CheckScenesJob : IJobForEach<RequestLoadScene>
-        {
-            public NativeArray<NativeString128> targetScene;
-            public NativeArray<bool>            isInvalid;
-
-            public void Execute(ref RequestLoadScene rls)
-            {
-                if (rls.newScene.LengthInBytes == 0)
-                    return;
-                if (targetScene[0].LengthInBytes == 0)
-                    targetScene[0] = rls.newScene;
-                else if (!rls.newScene.Equals(targetScene[0]))
-                    isInvalid[0] = true;
-            }
         }
 
         protected override void OnUpdate()
         {
             if (m_rlsQuery.CalculateChunkCount() > 0)
             {
-                var checkScenesJob = new CheckScenesJob
+                FixedString128 targetScene = new FixedString128();
+                bool           isInvalid   = false;
+
+                Entities.WithStoreEntityQueryInField(ref m_rlsQuery).ForEach((ref RequestLoadScene rls) =>
                 {
-                    targetScene = new NativeArray<NativeString128>(1, Allocator.TempJob),
-                    isInvalid   = new NativeArray<bool>(1, Allocator.TempJob)
-                };
+                    if (rls.newScene.Length == 0)
+                        return;
+                    if (targetScene.Length == 0)
+                        targetScene = rls.newScene;
+                    else if (rls.newScene != targetScene)
+                        isInvalid = true;
+                }).Run();
 
-                checkScenesJob.Run(this);
-
-                var targetScene = checkScenesJob.targetScene[0];
-                var isInvalid   = checkScenesJob.isInvalid[0];
-                checkScenesJob.isInvalid.Dispose();
-                checkScenesJob.targetScene.Dispose();
-
-                if (targetScene.LengthInBytes > 0)
+                if (targetScene.Length > 0)
                 {
-                    if (!isInvalid)
+                    if (isInvalid)
                     {
                         UnityEngine.Debug.LogError("Multiple scenes were requested to load during the previous frame.");
+                        EntityManager.RemoveComponent<RequestLoadScene>(m_rlsQuery);
                     }
                     else
                     {
                         var curr           = worldGlobalEntity.GetComponentData<CurrentScene>();
                         curr.previousScene = curr.currentScene;
+                        UnityEngine.Debug.Log("Loading scene: " + targetScene);
                         SceneManager.LoadScene(targetScene.ToString());
+                        latiosWorld.Pause();
+                        m_paused               = true;
                         curr.currentScene      = targetScene;
                         curr.isSceneFirstFrame = true;
                         worldGlobalEntity.SetComponentData(curr);
+                        EntityManager.RemoveComponent<RequestLoadScene>(m_rlsQuery);
                         return;
                     }
                 }
@@ -77,13 +65,19 @@ namespace Latios
 
             //Handle case where initial scene loads or set firstFrame to false
             var currentScene = worldGlobalEntity.GetComponentData<CurrentScene>();
-            if (currentScene.currentScene.LengthInBytes == 0)
+            if (currentScene.currentScene.Length == 0)
             {
-                currentScene.currentScene      = new NativeString128(SceneManager.GetActiveScene().name);
+                currentScene.currentScene      = SceneManager.GetActiveScene().name;
                 currentScene.isSceneFirstFrame = true;
             }
+            else if (m_paused)
+            {
+                m_paused = false;
+            }
             else
+            {
                 currentScene.isSceneFirstFrame = false;
+            }
             worldGlobalEntity.SetComponentData(currentScene);
         }
     }

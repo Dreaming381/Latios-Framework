@@ -25,10 +25,10 @@ namespace Latios.PhysicsEngine
     var allTypes = new string[] 
 	{
         "Sphere",
-		"Capsule" //,
-		//"Box",
-		//"Triangle",
-		//"Quad"
+		"Capsule",
+		"Box",
+		"Triangle",
+		"Quad"
     };
 #>
 		public static bool Raycast(Ray ray, Collider collider, RigidTransform colliderTransform, out RaycastResult result)

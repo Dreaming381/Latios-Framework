@@ -1,11 +1,12 @@
 {
   "name": "com.latios.latiosframework",
   "displayName": "Latios Framework for DOTS",
-  "version": "0.1.0",
-  "unity": "2019.3",
-  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Physics\n\nYou may also install these packages individually.",
+  "version": "0.2.0",
+  "unity": "2020.1",
+  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Physics\n\nComplete game examples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.2.0 \n",
   "dependencies": {
-    "com.unity.entities": "0.4.0-preview.10"
+    "com.unity.entities": "0.14.0-preview.18",
+    "com.unity.code-analysis": "0.1.2-preview"
   },
   "unityRelease": "0f1",
   "keywords": [
@@ -15,5 +16,19 @@
   ],
   "author": {
     "name": "Dreaming I'm Latios"
-  }
+  },
+   "samples": [
+   {
+     "displayName": "Optimization Adventures",
+     "description": "Tests for the Optimization Adventures article series in the Documentation",
+     "path": "Samples~/OptimizationAdventures"
+   },
+   {
+     "displayName": "Find Pairs Examples",
+     "description": "Simple scenes and logic showcasing Physics.FindPairs capabilities",
+     "path": "Samples~/FindPairsExamples"
+
+   }
+
+ ]
 }

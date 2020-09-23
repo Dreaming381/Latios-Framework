@@ -6,6 +6,9 @@ using Unity.Entities;
 
 namespace Latios
 {
+    /// <summary>
+    /// A toolkit for copying components based on ComponentType.
+    /// </summary>
     public unsafe class EntityDataCopyKit
     {
         private EntityManager m_em;
@@ -53,7 +56,14 @@ namespace Latios
             emGetBufferLength           = methodInfo.CreateDelegate(typeof(EmGetBufferLength), m_em) as EmGetBufferLength;
         }
 
-        public void CopyData(Entity src, Entity dst, ComponentType componentType)
+        /// <summary>
+        /// Copies the data stored in the componentType from the src entity to the dst entity.>
+        /// </summary>
+        /// <param name="src">The source entity</param>
+        /// <param name="dst">The destination entity</param>
+        /// <param name="componentType">The type of data to be copied</param>
+        /// <param name="copyCollections">Should collection components be shallow copied (true) or ignored (false)?</param>
+        public void CopyData(Entity src, Entity dst, ComponentType componentType, bool copyCollections = false)
         {
             //Check to ensure dst has componentType
             if (!m_em.HasComponent(dst, componentType))
@@ -64,43 +74,43 @@ namespace Latios
                 CopyBuffer(src, dst, componentType);
             else
             {
-                bool handled = false;
-                var  type    = componentType.GetManagedType();
-                if (type.IsConstructedGenericType)
+                if (copyCollections)
                 {
-                    var genType = type.GetGenericTypeDefinition();
-                    if (genType == typeof(ManagedComponentTag<>))
+                    var type = componentType.GetManagedType();
+                    if (type.IsConstructedGenericType)
                     {
-                        if (!m_typeTagsToTypesCache.TryGetValue(type, out Type managedType))
+                        var genType = type.GetGenericTypeDefinition();
+                        if (genType == typeof(ManagedComponentSystemStateTag<>))
                         {
-                            managedType                  = type.GenericTypeArguments[0];
-                            m_typeTagsToTypesCache[type] = managedType;
+                            if (!m_typeTagsToTypesCache.TryGetValue(type, out Type managedType))
+                            {
+                                managedType                  = type.GenericTypeArguments[0];
+                                m_typeTagsToTypesCache[type] = managedType;
+                            }
+                            LatiosWorld lw = m_em.World as LatiosWorld;
+                            lw.ManagedStructStorage.CopyComponent(src, dst, managedType);
                         }
-                        LatiosWorld lw = m_em.World as LatiosWorld;
-                        lw.ManagedStructStorage.CopyComponent(src, dst, managedType);
-                        handled = true;
-                    }
-                    else if (genType == typeof(CollectionComponentTag<>))
-                    {
-                        if (!m_typeTagsToTypesCache.TryGetValue(type, out Type managedType))
+                        else if (genType == typeof(CollectionComponentSystemStateTag<>))
                         {
-                            managedType                  = type.GenericTypeArguments[0];
-                            m_typeTagsToTypesCache[type] = managedType;
+                            if (!m_typeTagsToTypesCache.TryGetValue(type, out Type managedType))
+                            {
+                                managedType                  = type.GenericTypeArguments[0];
+                                m_typeTagsToTypesCache[type] = managedType;
+                            }
+                            LatiosWorld lw = m_em.World as LatiosWorld;
+                            lw.CollectionComponentStorage.CopyComponent(src, dst, managedType);
                         }
-                        LatiosWorld lw = m_em.World as LatiosWorld;
-                        lw.CollectionComponentStorage.CopyComponent(src, dst, managedType);
-                        handled = true;
                     }
-                    else if (genType == typeof(ManagedComponentSystemStateTag<>) || genType == typeof(CollectionComponentSystemStateTag<>))
-                        handled = true;
                 }
-                if (!handled)
-                    CopyIcd(src, dst, componentType);
+                CopyIcd(src, dst, componentType);
             }
         }
 
         private void CopyIcd(Entity src, Entity dst, ComponentType componentType)
         {
+            if (componentType.IsZeroSized)
+                return;
+
             var typeInfo = TypeManager.GetTypeInfo(componentType.TypeIndex);
             var size     = typeInfo.SizeInChunk;
             var data     = emGetComponentDataRawRO(src, componentType.TypeIndex);
@@ -125,6 +135,7 @@ namespace Latios
             var dstBufferPtr = emGetBufferRawRW(dst, componentType.TypeIndex);
             var srcBufferPtr = emGetBufferRawRO(src, componentType.TypeIndex);
             UnsafeUtility.MemCpy(dstBufferPtr, srcBufferPtr, elementSize * length);
+            dstHeader->Length = length;
         }
 
         private MethodInfo GetMethod(string methodName, int numOfArgs)

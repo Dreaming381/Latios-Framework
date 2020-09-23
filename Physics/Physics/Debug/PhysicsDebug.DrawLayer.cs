@@ -26,7 +26,7 @@ namespace Latios.PhysicsEngine
                 var   slices      = layer.GetBucketSlices(bucketI);
                 for (int i = 0; i < slices.count; i++)
                 {
-                    AABB aabb = new AABB(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
+                    Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
                     DrawAabb(aabb, choiceColor);
                 }
             }
@@ -34,7 +34,7 @@ namespace Latios.PhysicsEngine
                 var slices = layer.GetBucketSlices(layer.BucketCount - 1);
                 for (int i = 0; i < slices.count; i++)
                 {
-                    AABB aabb = new AABB(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
+                    Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
                     DrawAabb(aabb, crossColor);
                 }
             }
@@ -57,7 +57,7 @@ namespace Latios.PhysicsEngine
             results.Dispose();
         }
 
-        private static void DrawAabb(AABB aabb, Color color)
+        private static void DrawAabb(Aabb aabb, Color color)
         {
             float3 leftTopFront     = new float3(aabb.min.x, aabb.max.y, aabb.min.z);
             float3 rightTopFront    = new float3(aabb.max.x, aabb.max.y, aabb.min.z);
@@ -111,7 +111,7 @@ namespace Latios.PhysicsEngine
 
         private struct DebugFindPairsHitResult
         {
-            public AABB aabb;
+            public Aabb aabb;
             public bool hit;
         }
 
@@ -128,7 +128,7 @@ namespace Latios.PhysicsEngine
                 {
                     var res = new DebugFindPairsHitResult
                     {
-                        aabb = new AABB(new float3(layer.xmins[i], layer.yzminmaxs[i].xy), new float3(layer.xmaxs[i], layer.yzminmaxs[i].zw)),
+                        aabb = new Aabb(new float3(layer.xmins[i], layer.yzminmaxs[i].xy), new float3(layer.xmaxs[i], layer.yzminmaxs[i].zw)),
                         hit  = hits.ContainsKey(layer.bodies[i].entity),
                     };
                     results[i] = res;

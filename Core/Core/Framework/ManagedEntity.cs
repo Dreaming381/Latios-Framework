@@ -76,55 +76,40 @@ namespace Latios
             return em.GetSharedComponentData<T>(entity);
         }
 
-        /*public void AddCollectionComponent<T>(T value) where T : struct, ICollectionComponent
-           {
+        public void AddCollectionComponent<T>(T value) where T : struct, ICollectionComponent
+        {
             em.AddCollectionComponent<T>(entity, value);
-           }
+        }
 
-           public T GetCollectionComponent<T>(bool readOnly, out JobHandle handle) where T : struct, ICollectionComponent
-           {
+        public T GetCollectionComponent<T>(bool readOnly, out JobHandle handle) where T : struct, ICollectionComponent
+        {
             return em.GetCollectionComponent<T>(entity, readOnly, out handle);
-           }
+        }
 
-           public T GetCollectionComponent<T>(bool readOnly) where T : struct, ICollectionComponent
-           {
+        public T GetCollectionComponent<T>(bool readOnly = false) where T : struct, ICollectionComponent
+        {
             return em.GetCollectionComponent<T>(entity, readOnly);
-           }
+        }
 
-           public T GetCollectionComponent<T>(out JobHandle handle) where T : struct, ICollectionComponent
-           {
-            return em.GetCollectionComponent<T>(entity, out handle);
-           }
-
-           public T GetCollectionComponent<T>() where T : struct, ICollectionComponent
-           {
-            return em.GetCollectionComponent<T>(entity);
-           }
-
-           public bool HasCollectionComponent<T>() where T : struct, ICollectionComponent
-           {
+        public bool HasCollectionComponent<T>() where T : struct, ICollectionComponent
+        {
             return em.HasCollectionComponent<T>(entity);
-           }
+        }
 
-           public void RemoveCollectionComponent<T>() where T : struct, ICollectionComponent
-           {
-            em.RemoveCollectionComponent<T>(entity);
-           }
+        public void RemoveCollectionComponentAndDispose<T>() where T : struct, ICollectionComponent
+        {
+            em.RemoveCollectionComponentAndDispose<T>(entity);
+        }
 
-           public void SetCollectionComponent<T>(T value) where T : struct, ICollectionComponent
-           {
-            em.SetCollectionComponent(entity, value);
-           }
+        public void SetCollectionComponentAndDisposeOld<T>(T value) where T : struct, ICollectionComponent
+        {
+            em.SetCollectionComponentAndDisposeOld(entity, value);
+        }
 
-           public void UpdateJobDependency<T>(JobHandle handle, bool wasReadOnly) where T : struct, ICollectionComponent
-           {
-            em.UpdateJobDependency<T>(entity, handle, wasReadOnly);
-           }
-
-           public void UpdateJobDependency<T>(JobHandle handle) where T : struct, ICollectionComponent
-           {
-            em.UpdateJobDependency<T>(entity, handle);
-           }*/
+        public void UpdateJobDependency<T>(JobHandle handle, bool wasReadOnly) where T : struct, ICollectionComponent
+        {
+            em.UpdateCollectionComponentDependency<T>(entity, handle, wasReadOnly);
+        }
     }
 }
 

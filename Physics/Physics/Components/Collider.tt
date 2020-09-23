@@ -29,10 +29,10 @@ namespace Latios.PhysicsEngine
     var allTypes = new string[] 
 	{
         "Sphere",
-		"Capsule" //,
-		//"Box",
-		//"Triangle",
-		//"Quad"
+		"Capsule",
+		"Box",
+		"Triangle",
+		"Quad"
     };
 	
 	foreach (var type in allTypes) 

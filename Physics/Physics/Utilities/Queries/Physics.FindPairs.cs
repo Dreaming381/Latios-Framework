@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -12,12 +13,17 @@ namespace Latios.PhysicsEngine
         void Execute(FindPairsResult result);
     }
 
+    [NativeContainer]
     public struct FindPairsResult
     {
         public ColliderBody bodyA;
         public ColliderBody bodyB;
         public int          bodyAIndex;
         public int          bodyBIndex;
+        public int          jobIndex;
+
+        public SafeEntity entityA => new SafeEntity { entity = bodyA.entity };
+        public SafeEntity entityB => new SafeEntity { entity = bodyB.entity };
         //Todo: Shorthands for calling narrow phase distance and manifold queries
     }
 

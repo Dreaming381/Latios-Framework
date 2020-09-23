@@ -7,6 +7,8 @@ using Unity.Entities;
 using UnityEngine.LowLevel;
 using UnityEngine.PlayerLoop;
 
+using Latios.Systems;
+
 namespace Latios
 {
     public static class BootstrapTools
@@ -31,6 +33,34 @@ namespace Latios
                     continue;
                 }
                 else if (!type.Namespace.Contains(namespaceSubstring))
+                    continue;
+
+                InjectSystem(type, world, defaultGroup);
+            }
+        }
+
+        /// <summary>
+        /// Injects all systems made by Unity (or systems that use "Unity" in their namespace or assembly).
+        /// Automatically creates parent ComponentSystemGroups if necessary.
+        /// Use this instead of InjectSystemsFromNamespace because Unity sometimes forgets to put namespaces on things.
+        /// </summary>
+        /// <param name="systems"></param>
+        /// <param name="world"></param>
+        /// <param name="defaultGroup"></param>
+        public static void InjectUnitySystems(List<Type> systems, World world, ComponentSystemGroup defaultGroup = null)
+        {
+            foreach (var type in systems)
+            {
+                if (type.Namespace == null)
+                {
+                    if (type.Assembly.FullName.Contains("Unity"))
+                    {
+                        Debug.LogWarning("Hey Unity Devs! You forget a namespace for " + type.ToString());
+                    }
+                    else
+                        continue;
+                }
+                else if (!type.Namespace.Contains("Unity"))
                     continue;
 
                 InjectSystem(type, world, defaultGroup);
@@ -195,76 +225,45 @@ namespace Latios
         #endregion
 
         #region PlayerLoop
-        //Mostly copied from ScriptBehaviourUpdateOrder
 
         /// <summary>
         /// Update the player loop with a world's root-level systems including FixedUpdate
         /// </summary>
         /// <param name="world">World with root-level systems that need insertion into the player loop</param>
-        /// <param name="existingPlayerLoop">Optional parameter to preserve existing player loops (e.g. ScriptBehaviourUpdateOrder.CurrentPlayerLoop)</param>
-        public static void UpdatePlayerLoopWithFixedUpdate(World world, PlayerLoopSystem? existingPlayerLoop = null)
+        public static void AddWorldToCurrentPlayerLoopWithFixedUpdate(World world)
         {
-            //Use reflection to snag the private delegate needed for this
-            var insertMethodInfo = typeof(ScriptBehaviourUpdateOrder).GetMethod("InsertManagerIntoSubsystemList",
-                                                                                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-            var simMethod   = insertMethodInfo.MakeGenericMethod(typeof(SimulationSystemGroup));
-            var presMethod  = insertMethodInfo.MakeGenericMethod(typeof(PresentationSystemGroup));
-            var initMethod  = insertMethodInfo.MakeGenericMethod(typeof(InitializationSystemGroup));
-            var fixedMethod = insertMethodInfo.MakeGenericMethod(typeof(FixedSimulationSystemGroup));
-
-            var playerLoop = existingPlayerLoop ?? PlayerLoop.GetDefaultPlayerLoop();
+            var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
 
             if (world != null)
             {
-                // Insert the root-level systems into the appropriate PlayerLoopSystem subsystems:
-                for (var i = 0; i < playerLoop.subSystemList.Length; ++i)
-                {
-                    int subsystemListLength = playerLoop.subSystemList[i].subSystemList.Length;
-                    if (playerLoop.subSystemList[i].type == typeof(Update))
-                    {
-                        var newSubsystemList = new PlayerLoopSystem[subsystemListLength + 1];
-                        for (var j = 0; j < subsystemListLength; ++j)
-                            newSubsystemList[j] = playerLoop.subSystemList[i].subSystemList[j];
-                        simMethod.Invoke(null, new object[] {newSubsystemList,
-                                                             subsystemListLength + 0, world.GetOrCreateSystem<SimulationSystemGroup>() });
-                        playerLoop.subSystemList[i].subSystemList = newSubsystemList;
-                    }
-                    else if (playerLoop.subSystemList[i].type == typeof(PreLateUpdate))
-                    {
-                        var newSubsystemList = new PlayerLoopSystem[subsystemListLength + 1];
-                        for (var j = 0; j < subsystemListLength; ++j)
-                            newSubsystemList[j] = playerLoop.subSystemList[i].subSystemList[j];
-                        presMethod.Invoke(null, new object[] {newSubsystemList,
-                                                              subsystemListLength + 0, world.GetOrCreateSystem<PresentationSystemGroup>() });
-                        playerLoop.subSystemList[i].subSystemList = newSubsystemList;
-                    }
-                    else if (playerLoop.subSystemList[i].type == typeof(Initialization))
-                    {
-                        var newSubsystemList = new PlayerLoopSystem[subsystemListLength + 1];
-                        for (var j = 0; j < subsystemListLength; ++j)
-                            newSubsystemList[j] = playerLoop.subSystemList[i].subSystemList[j];
-                        initMethod.Invoke(null, new object[] {newSubsystemList,
-                                                              subsystemListLength + 0, world.GetOrCreateSystem<InitializationSystemGroup>() });
-                        playerLoop.subSystemList[i].subSystemList = newSubsystemList;
-                    }
-                    else if (playerLoop.subSystemList[i].type == typeof(FixedUpdate))
-                    {
-                        var newSubsystemList = new PlayerLoopSystem[subsystemListLength + 1];
-                        for (var j = 0; j < subsystemListLength; ++j)
-                            newSubsystemList[j] = playerLoop.subSystemList[i].subSystemList[j];
-                        fixedMethod.Invoke(null, new object[] {newSubsystemList,
-                                                               subsystemListLength + 0, world.GetOrCreateSystem<FixedSimulationSystemGroup>() });
-                        playerLoop.subSystemList[i].subSystemList = newSubsystemList;
-                    }
-                }
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<InitializationSystemGroup>(),  ref playerLoop, typeof(Initialization));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<SimulationSystemGroup>(),      ref playerLoop, typeof(PostLateUpdate));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<PresentationSystemGroup>(),    ref playerLoop, typeof(PreLateUpdate));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<FixedSimulationSystemGroup>(), ref playerLoop, typeof(FixedUpdate));
             }
+            PlayerLoop.SetPlayerLoop(playerLoop);
+        }
 
-            ScriptBehaviourUpdateOrder.SetPlayerLoop(playerLoop);
+        /// <summary>
+        /// Update the PlayerLoop to run simulation after rendering.
+        /// </summary>
+        /// <param name="world">World with root-level systems that need insertion into the player loop</param>
+        public static void AddWorldToCurrentPlayerLoopWithDelayedSimulation(World world)
+        {
+            var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
+
+            if (world != null)
+            {
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<InitializationSystemGroup>(), ref playerLoop, typeof(Initialization));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<SimulationSystemGroup>(),     ref playerLoop, typeof(PostLateUpdate));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoopList(world.GetExistingSystem<PresentationSystemGroup>(),   ref playerLoop, typeof(PreLateUpdate));
+            }
+            PlayerLoop.SetPlayerLoop(playerLoop);
         }
         #endregion
 
         #region TypeManager
-        private delegate void TmAddTypeInfoToTables(Type type, TypeManager.TypeInfo typeInfo);
+        private delegate void TmAddTypeInfoToTables(Type type, TypeManager.TypeInfo typeInfo, string name);
         private delegate TypeManager.TypeInfo TmBuildComponentType(Type type);
 
         //Todo: Replace with codegen
@@ -274,8 +273,16 @@ namespace Latios
                 throw new ArgumentException($"{genericWrapperIcdType} is not a valid struct IComponentData");
 
             //Snag methods from TypeManager
-            var tmAddTypeInfoToTables = GetStaticMethod("AddTypeInfoToTables", 2).CreateDelegate(typeof(TmAddTypeInfoToTables)) as TmAddTypeInfoToTables;
+            //var tmAddTypeInfoToTables = GetStaticMethod("AddTypeInfoToTables", 2).CreateDelegate(typeof(TmAddTypeInfoToTables)) as TmAddTypeInfoToTables;
+            var tmAddTypeInfoToTables = GetStaticMethod("AddTypeInfoToTables", 3).CreateDelegate(typeof(TmAddTypeInfoToTables)) as TmAddTypeInfoToTables;
             var tmBuildComponentType  = GetStaticMethod("BuildComponentType", 1).CreateDelegate(typeof(TmBuildComponentType)) as TmBuildComponentType;
+
+            //Create a hashset of all types so far so we don't dupe types.
+            HashSet<Type> typesHash = new HashSet<Type>();
+            foreach (var t in TypeManager.GetAllTypes())
+            {
+                typesHash.Add(t.Type);
+            }
 
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var assembly in assemblies)
@@ -288,7 +295,7 @@ namespace Latios
                     if (type.GetCustomAttribute(typeof(DisableAutoTypeRegistration)) != null)
                         continue;
 
-                    if (type == interfaceType)
+                    if (type.IsInterface)
                         continue;
 
                     if (interfaceType.IsAssignableFrom(type))
@@ -297,8 +304,12 @@ namespace Latios
                             throw new InvalidOperationException($"{type} implements {interfaceType} but is not a struct type");
 
                         var concrete = genericWrapperIcdType.MakeGenericType(type);
-                        var info     = tmBuildComponentType(concrete);
-                        tmAddTypeInfoToTables(concrete, info);
+
+                        if (typesHash.Contains(concrete))
+                            continue;
+
+                        var info = tmBuildComponentType(concrete);
+                        tmAddTypeInfoToTables(concrete, info, concrete.FullName);
                     }
                 }
             }

@@ -9,8 +9,9 @@ namespace Latios.PhysicsEngine
     internal static class FindPairsInternal
     {
         #region Jobs
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerSelfSingle<T> : IJob where T : struct, IFindPairsProcessor
+        public struct LayerSelfSingle<T> : IJob where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layer;
             public T                         processor;
@@ -21,8 +22,9 @@ namespace Latios.PhysicsEngine
             }
         }
 
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerLayerSingle<T> : IJob where T : struct, IFindPairsProcessor
+        public struct LayerLayerSingle<T> : IJob where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layerA;
             [ReadOnly] public CollisionLayer layerB;
@@ -34,8 +36,9 @@ namespace Latios.PhysicsEngine
             }
         }
 
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerSelfPart1<T> : IJobParallelFor where T : struct, IFindPairsProcessor
+        public struct LayerSelfPart1<T> : IJobParallelFor where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layer;
             public T                         processor;
@@ -43,12 +46,13 @@ namespace Latios.PhysicsEngine
             public void Execute(int index)
             {
                 var bucket = layer.GetBucketSlices(index);
-                SelfSweep(bucket, processor);
+                SelfSweep(bucket, index, processor);
             }
         }
 
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerSelfPart2<T> : IJob where T : struct, IFindPairsProcessor
+        public struct LayerSelfPart2<T> : IJob where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layer;
             public T                         processor;
@@ -59,13 +63,14 @@ namespace Latios.PhysicsEngine
                 for (int i = 0; i < layer.BucketCount - 1; i++)
                 {
                     var bucket = layer.GetBucketSlices(i);
-                    BipartiteSweep(bucket, crossBucket, processor);
+                    BipartiteSweep(bucket, crossBucket, layer.BucketCount + i, processor);
                 }
             }
         }
 
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerLayerPart1<T> : IJobParallelFor where T : struct, IFindPairsProcessor
+        public struct LayerLayerPart1<T> : IJobParallelFor where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layerA;
             [ReadOnly] public CollisionLayer layerB;
@@ -75,12 +80,13 @@ namespace Latios.PhysicsEngine
             {
                 var bucketA = layerA.GetBucketSlices(index);
                 var bucketB = layerB.GetBucketSlices(index);
-                BipartiteSweep(bucketA, bucketB, processor);
+                BipartiteSweep(bucketA, bucketB, index, processor);
             }
         }
 
+        [BurstPatcher(typeof(IFindPairsProcessor))]
         [BurstCompile]
-        internal struct LayerLayerPart2<T> : IJobParallelFor where T : struct, IFindPairsProcessor
+        public struct LayerLayerPart2<T> : IJobParallelFor where T : struct, IFindPairsProcessor
         {
             [ReadOnly] public CollisionLayer layerA;
             [ReadOnly] public CollisionLayer layerB;
@@ -94,7 +100,7 @@ namespace Latios.PhysicsEngine
                     for (int i = 0; i < layerB.BucketCount - 1; i++)
                     {
                         var bucket = layerB.GetBucketSlices(i);
-                        BipartiteSweep(crossBucket, bucket, processor);
+                        BipartiteSweep(crossBucket, bucket, layerA.BucketCount + i, processor);
                     }
                 }
                 else if (index == 1)
@@ -103,7 +109,7 @@ namespace Latios.PhysicsEngine
                     for (int i = 0; i < layerA.BucketCount - 1; i++)
                     {
                         var bucket = layerA.GetBucketSlices(i);
-                        BipartiteSweep(bucket, crossBucket, processor);
+                        BipartiteSweep(bucket, crossBucket, layerA.BucketCount + layerB.BucketCount + i, processor);
                     }
                 }
             }
@@ -113,47 +119,49 @@ namespace Latios.PhysicsEngine
         #region ImmediateMethods
         public static void RunImmediate<T>(CollisionLayer layer, T processor) where T : struct, IFindPairsProcessor
         {
+            int jobIndex = 0;
             for (int i = 0; i < layer.BucketCount; i++)
             {
                 var bucket = layer.GetBucketSlices(i);
-                SelfSweep(bucket, processor);
+                SelfSweep(bucket, jobIndex++, processor);
             }
 
             var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
             for (int i = 0; i < layer.BucketCount - 1; i++)
             {
                 var bucket = layer.GetBucketSlices(i);
-                BipartiteSweep(bucket, crossBucket, processor);
+                BipartiteSweep(bucket, crossBucket, jobIndex++, processor);
             }
         }
 
         public static void RunImmediate<T>(CollisionLayer layerA, CollisionLayer layerB, T processor) where T : struct, IFindPairsProcessor
         {
+            int jobIndex = 0;
             for (int i = 0; i < layerA.BucketCount; i++)
             {
                 var bucketA = layerA.GetBucketSlices(i);
                 var bucketB = layerB.GetBucketSlices(i);
-                BipartiteSweep(bucketA, bucketB, processor);
+                BipartiteSweep(bucketA, bucketB, jobIndex++, processor);
             }
 
             var crossBucketA = layerA.GetBucketSlices(layerA.BucketCount - 1);
             for (int i = 0; i < layerA.BucketCount - 1; i++)
             {
                 var bucket = layerB.GetBucketSlices(i);
-                BipartiteSweep(crossBucketA, bucket, processor);
+                BipartiteSweep(crossBucketA, bucket, jobIndex++, processor);
             }
 
             var crossBucketB = layerB.GetBucketSlices(layerB.BucketCount - 1);
             for (int i = 0; i < layerA.BucketCount - 1; i++)
             {
                 var bucket = layerA.GetBucketSlices(i);
-                BipartiteSweep(bucket, crossBucketB, processor);
+                BipartiteSweep(bucket, crossBucketB, jobIndex++, processor);
             }
         }
         #endregion
 
         #region SweepMethods
-        internal static void SelfSweep<T>(BucketSlices bucket, T processor) where T : struct, IFindPairsProcessor
+        private static void SelfSweep<T>(BucketSlices bucket, int jobIndex, T processor) where T : struct, IFindPairsProcessor
         {
             int count = bucket.xmins.Length;
             for (int i = 0; i < count - 1; i++)
@@ -172,13 +180,14 @@ namespace Latios.PhysicsEngine
                             bodyB      = bucket.bodies[j],
                             bodyAIndex = i,
                             bodyBIndex = j,
+                            jobIndex   = jobIndex
                         });
                     }
                 }
             }
         }
 
-        internal static void BipartiteSweep<T>(BucketSlices bucketA, BucketSlices bucketB, T processor) where T : struct, IFindPairsProcessor
+        private static void BipartiteSweep<T>(BucketSlices bucketA, BucketSlices bucketB, int jobIndex, T processor) where T : struct, IFindPairsProcessor
         {
             int countA = bucketA.xmins.Length;
             int countB = bucketB.xmins.Length;
@@ -211,6 +220,7 @@ namespace Latios.PhysicsEngine
                             bodyB      = bucketB.bodies[j],
                             bodyAIndex = i,
                             bodyBIndex = j,
+                            jobIndex   = jobIndex
                         });
                     }
                 }
@@ -242,6 +252,7 @@ namespace Latios.PhysicsEngine
                             bodyB      = bucketB.bodies[i],
                             bodyAIndex = i,
                             bodyBIndex = j,
+                            jobIndex   = jobIndex
                         });
                     }
                 }

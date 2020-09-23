@@ -1,48 +1,36 @@
 ﻿using System;
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.PhysicsEngine
 {
-    public enum CollisionLayerType
-    {
-        Static,
-        Discrete,
-        Simulated,
-        Continuous,
-        StaticTrigger,
-        DiscreteTrigger,
-        ContinuousTrigger
-    }
-
     public struct CollisionLayerSettings
     {
-        public AABB               worldAABB;
-        public int3               worldBucketCountPerAxis;
-        public CollisionLayerType layerType;
+        public Aabb worldAABB;
+        public int3 worldSubdivisionsPerAxis;
     }
 
     public struct CollisionLayer : IDisposable
     {
-        internal NativeArray<int2>                                              bucketStartsAndCounts;
-        [NativeDisableParallelForRestriction] internal NativeArray<float>       xmins;
-        [NativeDisableParallelForRestriction] internal NativeArray<float>       xmaxs;
-        [NativeDisableParallelForRestriction] internal NativeArray<float4>      yzminmaxs;
-        [NativeDisableParallelForRestriction] internal NativeArray<ColliderBody> bodies;
-        internal float3                                                         worldMin;
-        internal float3                                                         worldAxisStride;
-        internal int3                                                           worldBucketCountPerAxis;
-        internal CollisionLayerType                                             layerType;
+        [NoAlias] internal NativeArray<int2>                                              bucketStartsAndCounts;
+        [NoAlias, NativeDisableParallelForRestriction] internal NativeArray<float>        xmins;
+        [NoAlias, NativeDisableParallelForRestriction] internal NativeArray<float>        xmaxs;
+        [NoAlias, NativeDisableParallelForRestriction] internal NativeArray<float4>       yzminmaxs;
+        [NoAlias, NativeDisableParallelForRestriction] internal NativeArray<ColliderBody> bodies;
+        internal float3                                                                   worldMin;
+        internal float3                                                                   worldAxisStride;
+        internal int3                                                                     worldSubdivisionsPerAxis;
 
         //Todo: World settings?
         internal CollisionLayer(int bodyCount, CollisionLayerSettings settings, Allocator allocator)
         {
-            worldMin                = settings.worldAABB.min;
-            worldAxisStride         = (settings.worldAABB.max - worldMin) / settings.worldBucketCountPerAxis;
-            worldBucketCountPerAxis = settings.worldBucketCountPerAxis;
-            layerType               = settings.layerType;
+            worldMin                 = settings.worldAABB.min;
+            worldAxisStride          = (settings.worldAABB.max - worldMin) / settings.worldSubdivisionsPerAxis;
+            worldSubdivisionsPerAxis = settings.worldSubdivisionsPerAxis;
 
-            bucketStartsAndCounts = new NativeArray<int2>(settings.worldBucketCountPerAxis.x * settings.worldBucketCountPerAxis.y * settings.worldBucketCountPerAxis.z + 1,
+            bucketStartsAndCounts = new NativeArray<int2>(settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 1,
                                                           allocator,
                                                           NativeArrayOptions.UninitializedMemory);
             xmins     = new NativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
@@ -53,10 +41,9 @@ namespace Latios.PhysicsEngine
 
         public CollisionLayer(CollisionLayer sourceLayer, Allocator allocator)
         {
-            worldMin                = sourceLayer.worldMin;
-            worldAxisStride         = sourceLayer.worldAxisStride;
-            worldBucketCountPerAxis = sourceLayer.worldBucketCountPerAxis;
-            layerType               = sourceLayer.layerType;
+            worldMin                 = sourceLayer.worldMin;
+            worldAxisStride          = sourceLayer.worldAxisStride;
+            worldSubdivisionsPerAxis = sourceLayer.worldSubdivisionsPerAxis;
 
             bucketStartsAndCounts = new NativeArray<int2>(sourceLayer.bucketStartsAndCounts, allocator);
             xmins                 = new NativeArray<float>(sourceLayer.xmins, allocator);
@@ -74,8 +61,23 @@ namespace Latios.PhysicsEngine
             bodies.Dispose();
         }
 
+        public unsafe JobHandle Dispose(JobHandle inputDeps)
+        {
+            JobHandle* deps = stackalloc JobHandle[5]
+            {
+                bucketStartsAndCounts.Dispose(inputDeps),
+                xmins.Dispose(inputDeps),
+                xmaxs.Dispose(inputDeps),
+                yzminmaxs.Dispose(inputDeps),
+                bodies.Dispose(inputDeps)
+            };
+            return Unity.Jobs.LowLevel.Unsafe.JobHandleUnsafeUtility.CombineDependencies(deps, 5);
+        }
+
         public int Count => xmins.Length;
         public int BucketCount => bucketStartsAndCounts.Length;
+
+        public bool IsCreated => bucketStartsAndCounts.IsCreated;
 
         internal BucketSlices GetBucketSlices(int bucketIndex)
         {
@@ -84,21 +86,23 @@ namespace Latios.PhysicsEngine
 
             return new BucketSlices
             {
-                xmins     = xmins.Slice(start, count),
-                xmaxs     = xmaxs.Slice(start, count),
-                yzminmaxs = yzminmaxs.Slice(start, count),
-                bodies    = bodies.Slice(start, count)
+                xmins       = xmins.Slice(start, count),
+                xmaxs       = xmaxs.Slice(start, count),
+                yzminmaxs   = yzminmaxs.Slice(start, count),
+                bodies      = bodies.Slice(start, count),
+                bucketIndex = bucketIndex
             };
         }
     }
 
     internal struct BucketSlices
     {
-        public NativeSlice<float>       xmins;
-        public NativeSlice<float>       xmaxs;
-        public NativeSlice<float4>      yzminmaxs;
+        public NativeSlice<float>        xmins;
+        public NativeSlice<float>        xmaxs;
+        public NativeSlice<float4>       yzminmaxs;
         public NativeSlice<ColliderBody> bodies;
         public int count => xmins.Length;
+        public int bucketIndex;
     }
 
     /*public struct RayQueryLayer : IDisposable

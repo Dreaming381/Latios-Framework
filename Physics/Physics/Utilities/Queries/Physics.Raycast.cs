@@ -25,6 +25,24 @@ namespace Latios.PhysicsEngine
             result.distance        = math.distance(ray.start, result.position);
             return hit;
         }
+
+        public static bool Raycast(Ray ray, CompoundCollider compound, RigidTransform compoundTransform, out RaycastResult result)
+        {
+            result                     = default;
+            result.distance            = float.MaxValue;
+            bool    hit                = false;
+            var     rayInCompoundSpace = Ray.TransformRay(math.inverse(compoundTransform), ray);
+            var     scaledRay          = new Ray(rayInCompoundSpace.start / compound.scale, rayInCompoundSpace.end / compound.scale);
+            ref var blob               = ref compound.compoundColliderBlob.Value;
+            for (int i = 0; i < blob.colliders.Length; i++)
+            {
+                var newHit  = Raycast(scaledRay, blob.colliders[i], blob.transforms[i], out var newResult);
+                newHit     &= newResult.distance < result.distance;
+                hit        |= newHit;
+                result      = newHit ? newResult : result;
+            }
+            return hit;
+        }
     }
 }
 

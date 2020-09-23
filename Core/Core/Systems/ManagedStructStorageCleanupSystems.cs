@@ -1,30 +1,56 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Reflection;
+using Debug = UnityEngine.Debug;
 using Unity.Collections;
 using Unity.Entities;
 
-namespace Latios
+namespace Latios.Systems
 {
-    public class ManagedStructStorageCleanupSystemGroup : SuperSystem
+    internal interface ManagedComponentsReactiveSystem
     {
-        private EntityQuery m_anythingNeedsUpdateQuery;
+        EntityQuery Query { get; }
+    }
+
+    [DisableAutoCreation]
+    public class ManagedComponentsReactiveSystemGroup : RootSuperSystem
+    {
+        struct AssociatedTypeSysStateTagTypePair : IEquatable<AssociatedTypeSysStateTagTypePair>
+        {
+            public ComponentType associatedType;
+            public ComponentType sysStateTagType;
+
+            public bool Equals(AssociatedTypeSysStateTagTypePair other)
+            {
+                return associatedType == other.associatedType && sysStateTagType == other.sysStateTagType;
+            }
+        }
+
+        private EntityQuery m_allSystemsQuery;
 
         public override bool ShouldUpdateSystem()
         {
-            return m_anythingNeedsUpdateQuery.CalculateChunkCount() > 0;
+            foreach (var sys in m_systemsToUpdate)
+            {
+                var mcrs = sys as ManagedComponentsReactiveSystem;
+                if (!mcrs.Query.IsEmptyIgnoreFilter)
+                    return true;
+            }
+            return false;
+
+            //return m_allSystemsQuery.IsEmptyIgnoreFilter == false;
         }
 
         protected override void CreateSystems()
         {
-            var managedType            = typeof(ManagedComponentCleanupSystem<>);
-            var collectionType         = typeof(CollectionComponentCleanupSystem<>);
-            var managedTagType         = typeof(ManagedComponentTag<>);
-            var managedSysStateType    = typeof(ManagedComponentSystemStateTag<>);
-            var collectionTagType      = typeof(CollectionComponentTag<>);
-            var collectionSysStateType = typeof(CollectionComponentSystemStateTag<>);
+            var managedCreateType         = typeof(ManagedComponentCreateSystem<>);
+            var managedDestroyType        = typeof(ManagedComponentDestroySystem<>);
+            var collectionCreateType      = typeof(CollectionComponentCreateSystem<>);
+            var collectionDestroyType     = typeof(CollectionComponentDestroySystem<>);
+            var managedSysStateTagType    = typeof(ManagedComponentSystemStateTag<>);
+            var collectionSysStateTagType = typeof(CollectionComponentSystemStateTag<>);
 
-            var componentTypesAny  = new NativeList<ComponentType>(Allocator.TempJob);
-            var componentTypesNone = new NativeList<ComponentType>(Allocator.TempJob);
+            var typePairs = new NativeHashSet<AssociatedTypeSysStateTagTypePair>(128, Allocator.TempJob);
 
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var assembly in assemblies)
@@ -37,47 +63,98 @@ namespace Latios
                     if (type.GetCustomAttribute(typeof(DisableAutoTypeRegistration)) != null)
                         continue;
 
-                    if (type == typeof(IComponent) || type == typeof(ICollectionComponent))
+                    if (type == typeof(IManagedComponent) || type == typeof(ICollectionComponent))
                         continue;
 
-                    if (typeof(IComponent).IsAssignableFrom(type))
+                    if (typeof(IManagedComponent).IsAssignableFrom(type))
                     {
-                        GetOrCreateAndAddSystem(managedType.MakeGenericType(type));
-                        componentTypesAny.Add(ComponentType.ReadOnly(managedSysStateType.MakeGenericType(type)));
-                        componentTypesNone.Add(ComponentType.ReadOnly(managedTagType.MakeGenericType(type)));
+                        GetOrCreateAndAddSystem(managedCreateType.MakeGenericType(type));
+                        GetOrCreateAndAddSystem(managedDestroyType.MakeGenericType(type));
+                        typePairs.Add(new AssociatedTypeSysStateTagTypePair
+                        {
+                            sysStateTagType = ComponentType.ReadOnly(managedSysStateTagType.MakeGenericType(type)),
+                            associatedType  = ComponentType.ReadOnly((Activator.CreateInstance(type) as IManagedComponent).AssociatedComponentType)
+                        });
                     }
                     else if (typeof(ICollectionComponent).IsAssignableFrom(type))
                     {
-                        GetOrCreateAndAddSystem(collectionType.MakeGenericType(type));
-                        componentTypesAny.Add(ComponentType.ReadOnly(collectionSysStateType.MakeGenericType(type)));
-                        componentTypesNone.Add(ComponentType.ReadOnly(collectionTagType.MakeGenericType(type)));
+                        GetOrCreateAndAddSystem(collectionCreateType.MakeGenericType(type));
+                        GetOrCreateAndAddSystem(collectionDestroyType.MakeGenericType(type));
+                        typePairs.Add(new AssociatedTypeSysStateTagTypePair
+                        {
+                            sysStateTagType = ComponentType.ReadOnly(collectionSysStateTagType.MakeGenericType(type)),
+                            associatedType  = ComponentType.ReadOnly((Activator.CreateInstance(type) as ICollectionComponent).AssociatedComponentType)
+                        });
                     }
                 }
             }
 
-            EntityQueryDesc desc = new EntityQueryDesc
+            //Todo: Bug in Unity prevents iterating over NativeHashSet (value is defaulted).
+            var               typePairsArr = typePairs.ToNativeArray(Allocator.TempJob);
+            EntityQueryDesc[] descs        = new EntityQueryDesc[typePairsArr.Length * 2];
+            int               i            = 0;
+            foreach (var pair in typePairsArr)
             {
-                Any  = componentTypesAny.ToArray(),
-                None = componentTypesNone.ToArray()
-            };
-            m_anythingNeedsUpdateQuery = GetEntityQuery(desc);
-            componentTypesAny.Dispose();
-            componentTypesNone.Dispose();
+                descs[i] = new EntityQueryDesc
+                {
+                    All  = new ComponentType[] { pair.associatedType },
+                    None = new ComponentType[] { pair.sysStateTagType }
+                };
+                i++;
+                descs[i] = new EntityQueryDesc
+                {
+                    All  = new ComponentType[] { pair.sysStateTagType },
+                    None = new ComponentType[] { pair.associatedType }
+                };
+                i++;
+            }
+            //Bug in Unity prevents constructing this EntityQuery because the scratch buffer is hardcoded to a size of 1024 which is not enough.
+            //m_allSystemsQuery = GetEntityQuery(descs);
+            typePairsArr.Dispose();
+            typePairs.Dispose();
+        }
+
+        protected override void OnDestroy()
+        {
+            base.OnDestroy();
+            latiosWorld.CollectionComponentStorage.Dispose();
         }
     }
 
-    public class ManagedComponentCleanupSystem<T> : SubSystem where T : struct, IComponent
+    internal class ManagedComponentCreateSystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, IManagedComponent
     {
         private EntityQuery m_query;
+        public EntityQuery Query => m_query;
 
         protected override void OnCreate()
         {
-            m_query = GetEntityQuery(ComponentType.ReadOnly<ManagedComponentSystemStateTag<T> >(), ComponentType.Exclude<ManagedComponentTag<T> >());
+            m_query = GetEntityQuery(ComponentType.Exclude<ManagedComponentSystemStateTag<T> >(), ComponentType.ReadOnly(new T().AssociatedComponentType));
         }
 
         protected override void OnUpdate()
         {
-            var entities = m_query.ToEntityArray(Unity.Collections.Allocator.TempJob);
+            var entities = m_query.ToEntityArray(Allocator.TempJob);
+            foreach (var e in entities)
+            {
+                EntityManager.AddManagedComponent(e, new T());
+            }
+            entities.Dispose();
+        }
+    }
+
+    internal class ManagedComponentDestroySystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, IManagedComponent
+    {
+        private EntityQuery m_query;
+        public EntityQuery Query => m_query;
+
+        protected override void OnCreate()
+        {
+            m_query = GetEntityQuery(ComponentType.ReadOnly<ManagedComponentSystemStateTag<T> >(), ComponentType.Exclude(new T().AssociatedComponentType));
+        }
+
+        protected override void OnUpdate()
+        {
+            var entities = m_query.ToEntityArray(Allocator.TempJob);
             foreach(var e in entities)
             {
                 EntityManager.RemoveManagedComponent<T>(e);
@@ -86,18 +163,40 @@ namespace Latios
         }
     }
 
-    public class CollectionComponentCleanupSystem<T> : SubSystem where T : struct, ICollectionComponent
+    internal class CollectionComponentCreateSystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, ICollectionComponent
     {
         private EntityQuery m_query;
+        public EntityQuery Query => m_query;
 
         protected override void OnCreate()
         {
-            m_query = GetEntityQuery(ComponentType.ReadOnly<CollectionComponentSystemStateTag<T> >(), ComponentType.Exclude<CollectionComponentTag<T> >());
+            m_query = GetEntityQuery(ComponentType.Exclude<CollectionComponentSystemStateTag<T> >(), ComponentType.ReadOnly(new T().AssociatedComponentType));
         }
 
         protected override void OnUpdate()
         {
-            var entities = m_query.ToEntityArray(Unity.Collections.Allocator.TempJob);
+            var entities = m_query.ToEntityArray(Allocator.TempJob);
+            foreach (var e in entities)
+            {
+                EntityManager.AddCollectionComponent(e, new T(), false);
+            }
+            entities.Dispose();
+        }
+    }
+
+    internal class CollectionComponentDestroySystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, ICollectionComponent
+    {
+        private EntityQuery m_query;
+        public EntityQuery Query => m_query;
+
+        protected override void OnCreate()
+        {
+            m_query = GetEntityQuery(ComponentType.ReadOnly<CollectionComponentSystemStateTag<T> >(), ComponentType.Exclude(new T().AssociatedComponentType));
+        }
+
+        protected override void OnUpdate()
+        {
+            var entities = m_query.ToEntityArray(Allocator.TempJob);
             foreach (var e in entities)
             {
                 EntityManager.RemoveCollectionComponentAndDispose<T>(e);

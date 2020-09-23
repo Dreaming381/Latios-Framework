@@ -1,45 +1,37 @@
-﻿using Unity.Entities;
+﻿using Debug = UnityEngine.Debug;
+using Unity.Entities;
 using UnityEngine.SceneManagement;
 
-namespace Latios
+namespace Latios.Systems
 {
     internal struct LatiosSceneChangeDummyTag : IComponentData { }
 
     [AlwaysUpdateSystem]
     public class DestroyEntitiesOnSceneChangeSystem : SubSystem
     {
-        private EntityQuery destroyQuery = null;
+        private EntityQuery m_destroyQuery = default;
 
         protected override void OnCreate()
         {
-            EntityQueryDesc desc = new EntityQueryDesc
-            {
-                All = new ComponentType[]
-                {
-                    typeof(LatiosSceneChangeDummyTag)
-                },
-                None = new ComponentType[]
-                {
-                    typeof(WorldGlobalTag),
-                    typeof(DontDestroyOnSceneChangeTag)
-                }
-            };
-            destroyQuery                = GetEntityQuery(desc);
-            SceneManager.sceneUnloaded += RealUpdateOnSceneChange;
+            m_destroyQuery =
+                Fluent.WithAll<LatiosSceneChangeDummyTag>().Without<WorldGlobalTag>().Without<DontDestroyOnSceneChangeTag>().IncludePrefabs().IncludeDisabled().Build();
+            SceneManager.activeSceneChanged += RealUpdateOnSceneChange;
+        }
+
+        protected override void OnDestroy()
+        {
+            SceneManager.activeSceneChanged -= RealUpdateOnSceneChange;
         }
 
         protected override void OnUpdate()
         {
         }
 
-        private void RealUpdateOnSceneChange(Scene unloaded)
+        private void RealUpdateOnSceneChange(Scene unloaded, Scene loaded)
         {
-            if (unloaded.isSubScene)
-                return;
-
-            //Why are add and remove inconsistent?
-            EntityManager.AddComponent(EntityManager.UniversalQuery, typeof(LatiosSceneChangeDummyTag));
-            EntityManager.DestroyEntity(destroyQuery);
+            latiosWorld.ResumeNextFrame();
+            EntityManager.AddComponent<LatiosSceneChangeDummyTag>(EntityManager.UniversalQuery);
+            EntityManager.DestroyEntity(m_destroyQuery);
             EntityManager.RemoveComponent<LatiosSceneChangeDummyTag>(EntityManager.UniversalQuery);
             latiosWorld.CreateNewSceneGlobalEntity();
         }

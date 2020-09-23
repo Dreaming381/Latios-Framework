@@ -1,17 +1,31 @@
 ﻿using System;
 using System.ComponentModel;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 
 namespace Latios
 {
     public abstract class RootSuperSystem : SuperSystem
     {
+        bool m_recursiveContext = false;
+
         protected override void OnUpdate()
         {
-            if (ShouldUpdateSystem())
+            if (m_recursiveContext)
+                return;
+
+            bool shouldUpdate = ShouldUpdateSystem();
+            if (!shouldUpdate)
+            {
+                Enabled            = false;
+                m_recursiveContext = true;
+                Update();
+                m_recursiveContext = false;
+                Enabled            = true;
+            }
+            else
+            {
                 base.OnUpdate();
+            }
         }
     }
 
@@ -22,6 +36,8 @@ namespace Latios
         public ManagedEntity sceneGlobalEntity => latiosWorld.sceneGlobalEntity;
         public ManagedEntity worldGlobalEntity => latiosWorld.worldGlobalEntity;
 
+        public FluentQuery Fluent => this.Fluent();
+
         public virtual bool ShouldUpdateSystem()
         {
             return Enabled;
@@ -30,6 +46,7 @@ namespace Latios
         [EditorBrowsable(EditorBrowsableState.Never)]
         protected sealed override void OnCreate()
         {
+            base.OnCreate();
             if (World is LatiosWorld lWorld)
             {
                 latiosWorld = lWorld;
@@ -44,7 +61,7 @@ namespace Latios
         [EditorBrowsable(EditorBrowsableState.Never)]
         protected override void OnUpdate()
         {
-            foreach (var sys in m_systemsToUpdate)
+            foreach (var sys in Systems)
             {
                 try
                 {
@@ -53,6 +70,12 @@ namespace Latios
                         if (latiosSys.ShouldUpdateSystem())
                         {
                             sys.Enabled = true;
+                            sys.Update();
+                        }
+                        else if (sys.Enabled)
+                        {
+                            sys.Enabled = false;
+                            //Update to invoke OnStopRunning().
                             sys.Update();
                         }
                         else
@@ -81,6 +104,8 @@ namespace Latios
             // Do nothing.
         }
 
+        public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
+
         #region API
 
         protected abstract void CreateSystems();
@@ -95,13 +120,6 @@ namespace Latios
         public T GetOrCreateAndAddSystem<T>() where T : ComponentSystemBase
         {
             var system = World.GetOrCreateSystem<T>();
-            AddSystemToUpdateList(system);
-            return system;
-        }
-
-        public T CreateAndAddSystem<T>(params object[] constructorArgs) where T : ComponentSystemBase
-        {
-            var system = World.CreateSystem<T>(constructorArgs);
             AddSystemToUpdateList(system);
             return system;
         }

@@ -1,5 +1,4 @@
-Latios Framework Packages for DOTS
-==================================
+# Latios Framework Packages for DOTS
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -9,37 +8,40 @@ License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages licensed under the Unity Companion License may contain code borrowed
 from official Unity packages and therefore may be seen as derivative works.
 
-Packages
---------
+## Packages
 
--   Core – General-purpose utilities and bootstrap
+-   [Core](Documentation~/Core/README.md) – General-purpose utilities and
+    bootstrap
 
--   Physics – Collision and Physics building blocks using an alternate runtime
-    representation
+-   [Physics](Documentation~/Physics/README.md) – Collision and Physics building
+    blocks using an alternate runtime representation
 
--   Life FX – VFX simulations which add immersion to stylized worlds
+-   Life FX – VFX simulations which add immersion to stylized worlds (No public
+    release)
 
 -   Kinemation – IK over FK animation authoring and runtime with post-sample
-    oscillations
+    oscillations (No public release)
 
-Getting Started
----------------
+## Getting Started
 
-The packages are distributed in multiple forms across multiple branches. Master
-contains the full framework, while the other branches each contain an individual
-package for those who do not wish to use the full framework.
+There are three methods to install the framework package (contains all publicly
+released packages).
 
-Chose the SHA of the package you desire or clone or download the packages into
-your packages folder of your project and modify your manifest.json. In the
-future Unity may support nested package directories in a GitHub repository. (Let
-me know if that time comes!)
+-   Add package via PackageManager-\>Add package from git URL
+
+-   Add via [OpenUPM](https://openupm.com/packages/com.latios.latiosframework/)
+
+-   Clone or submodule this repository into your project’s Packages folder
+
+If you wish to use Latios.Core without Latios.Physics but do not want to clone
+or submodule the repo, please let me know and I will create a dedicated
+Latios.Core release.
 
 Getting Started pages and documentation are provided with each package.
 
-Support
--------
+## Support
 
-I develop these packages in a separate private repository. I will provide the
+I develop these packages separately from this repository. I will provide the
 current snapshot of that code upon request. I promise the code will be terrible.
 This may be useful to you if you desire to contribute in an area I am actively
 developing. See Contributing for more information.
@@ -52,8 +54,8 @@ developing. See Contributing for more information.
 
         -   I don’t spend time heavily testing this framework as it is a hobby
             and not my full time job. I probably will only notice issues when I
-            try to use something in a game jam and it breaks, unless you alert
-            me.
+            try to use something in a game jam or personal project and it
+            breaks, unless you alert me.
 
         -   Repros and test cases will increase the chances of me publishing a
             fix quickly.
@@ -90,6 +92,10 @@ developing. See Contributing for more information.
             family. Of course it will have to meet API standards, but I can help
             you with that.
 
+        -   By far the best way to get me to work on a new package or major
+            feature is to collab with me in a game jam project where such work
+            is required. I’m almost always looking for new collab opportunities!
+
     -   Consider prioritizing planned features upon request.
 
         -   If one of the features on my near-term roadmap is a feature you
@@ -114,10 +120,10 @@ developing. See Contributing for more information.
 
     -   Pull pull requests directly.
 
-        -   See the Contributing page for details about my workflow.
+        -   See the [Contributing](Documentation~/Contributing.md) page for details about my
+            workflow.
 
-A Word of Caution
------------------
+## A Word of Caution
 
 If you choose to modify any of the packages here licensed under the Unity
 Companion License, my understanding is that any modifications, including new

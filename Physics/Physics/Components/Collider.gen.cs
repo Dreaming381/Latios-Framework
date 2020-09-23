@@ -10,133 +10,74 @@
 //------------------------------------------------------------------------------
 
 using System;
+using System.Diagnostics;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.PhysicsEngine
 {
-    public unsafe partial struct Collider : IComponentData, ICollider
-	{
-		#region TypeCasting
-		public unsafe static implicit operator Collider(SphereCollider sphereCollider)
+    public unsafe partial struct Collider : IComponentData
+    {
+        #region TypeCasting
+        public unsafe static implicit operator Collider(SphereCollider sphereCollider)
         {
             Collider collider = default;
             collider.m_type   = ColliderType.Sphere;
-            UnsafeUtility.CopyStructureToPtr(ref sphereCollider, &collider.m_storage);
+            collider.m_sphere = sphereCollider;
             return collider;
         }
 
         public unsafe static implicit operator SphereCollider(Collider collider)
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (collider.m_type != ColliderType.Sphere)
-                throw new InvalidOperationException("Error: Collider is not a ConvexCollider but is being casted to one.");
-#endif
-
-            SphereCollider sphere = default;
-            UnsafeUtility.CopyPtrToStructure(&collider.m_storage, out sphere);
-            return sphere;
+            CheckColliderIsCastTargetType(collider, ColliderType.Sphere);
+            return collider.m_sphere;
         }
 
-		public unsafe static implicit operator Collider(CapsuleCollider capsuleCollider)
+        public unsafe static implicit operator Collider(CapsuleCollider capsuleCollider)
         {
-            Collider collider = default;
-            collider.m_type   = ColliderType.Capsule;
-            UnsafeUtility.CopyStructureToPtr(ref capsuleCollider, &collider.m_storage);
+            Collider collider  = default;
+            collider.m_type    = ColliderType.Capsule;
+            collider.m_capsule = capsuleCollider;
             return collider;
         }
 
         public unsafe static implicit operator CapsuleCollider(Collider collider)
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (collider.m_type != ColliderType.Capsule)
-                throw new InvalidOperationException("Error: Collider is not a ConvexCollider but is being casted to one.");
-#endif
-
-            CapsuleCollider capsule = default;
-            UnsafeUtility.CopyPtrToStructure(&collider.m_storage, out capsule);
-            return capsule;
+            CheckColliderIsCastTargetType(collider, ColliderType.Capsule);
+            return collider.m_capsule;
         }
 
-		#endregion TypeCasting
-
-		#region ICollider		
-		public AABB CalculateAABB(RigidTransform transform)
+        public unsafe static implicit operator Collider(CompoundCollider compoundCollider)
         {
-            switch (m_type)
-            {
-				case ColliderType.Sphere:
-                    SphereCollider sphere = this;
-                    return sphere.CalculateAABB(transform);
-				case ColliderType.Capsule:
-                    CapsuleCollider capsule = this;
-                    return capsule.CalculateAABB(transform);
-				default:
-					throw new InvalidOperationException("Type not supported yet");
-			}
-		}
+            Collider collider      = default;
+            collider.m_type        = ColliderType.Compound;
+            collider.m_storage.a.x = compoundCollider.scale;
+            collider.m_blobRef     = compoundCollider.compoundColliderBlob;
+            return collider;
+        }
 
-		public GjkSupportPoint GetSupportPoint(float3 direction)
+        public unsafe static implicit operator CompoundCollider(Collider collider)
         {
-            switch (m_type)
-            {
-				case ColliderType.Sphere:
-                    SphereCollider sphere = this;
-                    return sphere.GetSupportPoint(direction);
-				case ColliderType.Capsule:
-                    CapsuleCollider capsule = this;
-                    return capsule.GetSupportPoint(direction);
-				default:
-					throw new InvalidOperationException("Type not supported yet");
-			}
-		}
+            CheckColliderIsCastTargetType(collider, ColliderType.Compound);
+            return new CompoundCollider(collider.m_blobRef, collider.m_storage.a.x);
+        }
 
-		public GjkSupportPoint GetSupportPoint(float3 direction, RigidTransform bInASpace)
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void CheckColliderIsCastTargetType(Collider c, ColliderType targetType)
         {
-            switch (m_type)
+            if (c.m_type != targetType)
             {
-				case ColliderType.Sphere:
-                    SphereCollider sphere = this;
-                    return sphere.GetSupportPoint(direction, bInASpace);
-				case ColliderType.Capsule:
-                    CapsuleCollider capsule = this;
-                    return capsule.GetSupportPoint(direction, bInASpace);
-				default:
-					throw new InvalidOperationException("Type not supported yet");
-			}
-		}
+                switch (targetType)
+                {
+                    case ColliderType.Sphere: throw new InvalidOperationException("Collider is not a SphereCollider but is being casted to one.");
+                    case ColliderType.Capsule: throw new InvalidOperationException("Collider is not a CapsuleCollider but is being casted to one.");
+                    case ColliderType.Compound: throw new InvalidOperationException("Collider is not a CompoundCollider but is being casted to one.");
+                }
+            }
+        }
 
-		public float3 GetPointBySupportIndex(int index)
-        {
-            switch (m_type)
-            {
-				case ColliderType.Sphere:
-                    SphereCollider sphere = this;
-                    return sphere.GetPointBySupportIndex(index);
-				case ColliderType.Capsule:
-                    CapsuleCollider capsule = this;
-                    return capsule.GetPointBySupportIndex(index);
-				default:
-					throw new InvalidOperationException("Type not supported yet");
-			}
-		}
-
-		public AABB GetSupportAabb()
-        {
-            switch (m_type)
-            {
-				case ColliderType.Sphere:
-                    SphereCollider sphere = this;
-                    return sphere.GetSupportAabb();
-				case ColliderType.Capsule:
-                    CapsuleCollider capsule = this;
-                    return capsule.GetSupportAabb();
-				default:
-					throw new InvalidOperationException("Type not supported yet");
-			}
-		}
-
-		#endregion ICollider
-	}
+        #endregion TypeCasting
+    }
 }
+

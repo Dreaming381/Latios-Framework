@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using System.Diagnostics;
+using Unity.Mathematics;
 
 namespace Latios
 {
@@ -167,9 +168,15 @@ namespace Latios
                     case 1: return b;
                     case 2: return c;
                     case 3: return d;
-                    default: throw new System.InvalidOperationException("simdFloat3 indexer must be in the range of 0 - 3");
+                    default: ThrowIndexerRangeException(i); return new float3();
                 }
             }
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTION_CHECKS")]
+        private void ThrowIndexerRangeException(int i)
+        {
+            throw new System.ArgumentException($"simdFloat3 indexer must be in the range of 0 - 3. Was {i}");
         }
     }
 }

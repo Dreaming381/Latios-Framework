@@ -12,6 +12,10 @@ namespace Latios
         ManagedEntity sceneGlobalEntity { get; }
 
         bool ShouldUpdateSystem();
+
+        EntityQuery GetEntityQuery(EntityQueryDesc desc);
+
+        FluentQuery Fluent { get; }
     }
 }
 

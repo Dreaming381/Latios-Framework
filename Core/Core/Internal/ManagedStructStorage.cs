@@ -11,7 +11,7 @@ namespace Latios
     {
         private Dictionary<Type, TypedManagedStructStorageBase> m_typeMap = new Dictionary<Type, TypedManagedStructStorageBase>();
 
-        public void AddComponent<T>(Entity entity, T value) where T : struct, IComponent
+        public void AddComponent<T>(Entity entity, T value) where T : struct, IManagedComponent
         {
             var tmss = GetTypedManagedStructStorage<T>();
 
@@ -19,7 +19,7 @@ namespace Latios
             tmss.storage.Add(entity, value);
         }
 
-        public T GetComponent<T>(Entity entity) where T : struct, IComponent
+        public T GetComponent<T>(Entity entity) where T : struct, IManagedComponent
         {
             var tmss = GetTypedManagedStructStorage<T>();
 
@@ -33,13 +33,13 @@ namespace Latios
             }
         }
 
-        public bool HasComponent<T>(Entity entity) where T : struct, IComponent
+        public bool HasComponent<T>(Entity entity) where T : struct, IManagedComponent
         {
             var tmss = GetTypedManagedStructStorage<T>();
             return tmss.storage.ContainsKey(entity);
         }
 
-        public void RemoveComponent<T>(Entity entity) where T : struct, IComponent
+        public void RemoveComponent<T>(Entity entity) where T : struct, IManagedComponent
         {
             var tmss = GetTypedManagedStructStorage<T>();
 
@@ -47,7 +47,7 @@ namespace Latios
             tmss.storage.Remove(entity);
         }
 
-        public void SetComponent<T>(Entity entity, T value) where T : struct, IComponent
+        public void SetComponent<T>(Entity entity, T value) where T : struct, IManagedComponent
         {
             var tmss = GetTypedManagedStructStorage<T>();
 
@@ -64,7 +64,7 @@ namespace Latios
             }
         }
 
-        private TypedManagedStructStorage<T> GetTypedManagedStructStorage<T>() where T : struct, IComponent
+        private TypedManagedStructStorage<T> GetTypedManagedStructStorage<T>() where T : struct, IManagedComponent
         {
             var ttype = typeof(T);
             if (!m_typeMap.ContainsKey(ttype))
@@ -79,7 +79,7 @@ namespace Latios
             public abstract void CopyComponent(Entity src, Entity dst);
         }
 
-        private class TypedManagedStructStorage<T> : TypedManagedStructStorageBase where T : struct, IComponent
+        private class TypedManagedStructStorage<T> : TypedManagedStructStorageBase where T : struct, IManagedComponent
         {
             public Dictionary<Entity, T> storage = new Dictionary<Entity, T>();
 
@@ -98,7 +98,7 @@ namespace Latios
     {
         private Dictionary<Type, TypedCollectionStorageBase> m_typeMap = new Dictionary<Type, TypedCollectionStorageBase>();
 
-        public void AddCollectionComponent<T>(Entity entity, T value) where T : struct, ICollectionComponent
+        public void AddCollectionComponent<T>(Entity entity, T value, bool isNotInitialized = false) where T : struct, ICollectionComponent
         {
             var tcs = GetTypedCollectionStorage<T>();
 
@@ -106,6 +106,7 @@ namespace Latios
             tcs.storage.Add(entity, value);
             tcs.writeHandles.Add(entity, new JobHandle());
             tcs.readHandles.Add(entity, new JobHandle());
+            tcs.isNotInitialized.Add(entity, isNotInitialized);
         }
 
         public T GetCollectionComponent<T>(Entity entity, bool readOnly, out JobHandle handle) where T : struct, ICollectionComponent
@@ -146,7 +147,8 @@ namespace Latios
             return tcs.storage.ContainsKey(entity);
         }
 
-        public void RemoveCollectionComponent<T>(Entity entity, out JobHandle oldReadHandle, out JobHandle oldWriteHandle, out T component) where T : struct, ICollectionComponent
+        //Returns true if the component can be safely disposed.
+        public bool RemoveCollectionComponent<T>(Entity entity, out JobHandle oldReadHandle, out JobHandle oldWriteHandle, out T component) where T : struct, ICollectionComponent
         {
             var tcs = GetTypedCollectionStorage<T>();
 
@@ -155,14 +157,18 @@ namespace Latios
                 throw new InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T)}");
             }
 
-            oldReadHandle  = tcs.readHandles[entity];
-            oldWriteHandle = tcs.writeHandles[entity];
+            oldReadHandle      = tcs.readHandles[entity];
+            oldWriteHandle     = tcs.writeHandles[entity];
+            bool canBeDisposed = !tcs.isNotInitialized[entity];
             tcs.storage.Remove(entity);
             tcs.readHandles.Remove(entity);
             tcs.writeHandles.Remove(entity);
+            tcs.isNotInitialized.Remove(entity);
+            return canBeDisposed;
         }
 
-        public void SetCollectionComponent<T>(Entity entity, T value, out JobHandle oldReadHandle, out JobHandle oldWriteHandle, out T oldComponent) where T : struct,
+        //Returns true if the old component can be safely disposed.
+        public bool SetCollectionComponent<T>(Entity entity, T value, out JobHandle oldReadHandle, out JobHandle oldWriteHandle, out T oldComponent) where T : struct,
         ICollectionComponent
         {
             var tcs = GetTypedCollectionStorage<T>();
@@ -172,12 +178,14 @@ namespace Latios
                 throw new InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T)}");
             }
 
-            Assert.IsTrue(HasCollectionComponent<T>(entity));
-            oldReadHandle            = tcs.readHandles[entity];
-            oldWriteHandle           = tcs.writeHandles[entity];
-            tcs.storage[entity]      = value;
-            tcs.writeHandles[entity] = new JobHandle();
-            tcs.readHandles[entity]  = new JobHandle();
+            oldReadHandle                = tcs.readHandles[entity];
+            oldWriteHandle               = tcs.writeHandles[entity];
+            bool canBeDisposed           = !tcs.isNotInitialized[entity];
+            tcs.storage[entity]          = value;
+            tcs.writeHandles[entity]     = new JobHandle();
+            tcs.readHandles[entity]      = new JobHandle();
+            tcs.isNotInitialized[entity] = false;
+            return canBeDisposed;
         }
 
         public void UpdateReadHandle(Entity entity, Type type, JobHandle readHandle)
@@ -223,8 +231,9 @@ namespace Latios
 
         private abstract class TypedCollectionStorageBase : IDisposable
         {
-            public Dictionary<Entity, JobHandle> readHandles  = new Dictionary<Entity, JobHandle>();
-            public Dictionary<Entity, JobHandle> writeHandles = new Dictionary<Entity, JobHandle>();
+            public Dictionary<Entity, JobHandle> readHandles      = new Dictionary<Entity, JobHandle>();
+            public Dictionary<Entity, JobHandle> writeHandles     = new Dictionary<Entity, JobHandle>();
+            public Dictionary<Entity, bool>      isNotInitialized = new Dictionary<Entity, bool>();
 
             public abstract void Dispose();
             public abstract void CopyComponent(Entity src, Entity dst);
@@ -239,9 +248,10 @@ namespace Latios
                 bool success = storage.TryGetValue(src, out T srcVal);
                 if (success)
                 {
-                    storage[dst]      = srcVal;
-                    readHandles[dst]  = readHandles[src];
-                    writeHandles[dst] = writeHandles[src];
+                    storage[dst]          = srcVal;
+                    readHandles[dst]      = readHandles[src];
+                    writeHandles[dst]     = writeHandles[src];
+                    isNotInitialized[dst] = isNotInitialized[src];
                 }
             }
 
@@ -262,10 +272,17 @@ namespace Latios
                 JobHandle.CompleteAll(jhs);
                 jhs.Dispose();
 
-                foreach (var collection in storage.Values)
+                var djhs = new NativeList<JobHandle>(isNotInitialized.Count, Allocator.TempJob);
+
+                foreach (var pair in isNotInitialized)
                 {
-                    collection.Dispose();
+                    if (!pair.Value)
+                    {
+                        djhs.AddNoResize(storage[pair.Key].Dispose(default));
+                    }
                 }
+                JobHandle.CompleteAll(djhs.AsArray());
+                djhs.Dispose();
             }
         }
     }

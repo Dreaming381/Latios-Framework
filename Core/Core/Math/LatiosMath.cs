@@ -11,9 +11,20 @@ namespace Latios
             return t * t;
         }
 
+        public static float2 SmoothStart(float2 t)
+        {
+            return t * t;
+        }
+
         public static float SmoothStop(float t)
         {
             float mt = 1f - t;
+            return 1f - mt * mt;
+        }
+
+        public static float2 SmoothStop(float2 t)
+        {
+            float2 mt = 1f - t;
             return 1f - mt * mt;
         }
 

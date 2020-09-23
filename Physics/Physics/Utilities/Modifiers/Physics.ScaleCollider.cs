@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using Unity.Mathematics;
 
 namespace Latios.PhysicsEngine
@@ -11,16 +12,14 @@ namespace Latios.PhysicsEngine
             {
                 case ColliderType.Sphere: return ScaleCollider((SphereCollider)collider, scale);
                 case ColliderType.Capsule: return ScaleCollider((CapsuleCollider)collider, scale);
-                default: throw new InvalidOperationException("Collider type not supported yet.");
+                case ColliderType.Compound: return ScaleCollider((CompoundCollider)collider, scale);
+                default: ThrowUnsupportedType(); return new Collider();
             }
         }
 
         public static SphereCollider ScaleCollider(SphereCollider sphere, PhysicsScale scale)
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (scale.state == PhysicsScale.State.NonComputable | scale.state == PhysicsScale.State.NonUniform)
-                throw new InvalidOperationException("Error: Sphere Collider must be scaled with no scale or uniform scale.");
-#endif
+            CheckNoOrUniformScale(scale, ColliderType.Sphere);
             sphere.center *= scale.scale.x;
             sphere.radius *= scale.scale.x;
             return sphere;
@@ -28,14 +27,33 @@ namespace Latios.PhysicsEngine
 
         public static CapsuleCollider ScaleCollider(CapsuleCollider capsule, PhysicsScale scale)
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (scale.state == PhysicsScale.State.NonComputable | scale.state == PhysicsScale.State.NonUniform)
-                throw new InvalidOperationException("Error: Capsule Collider must be scaled with no scale or uniform scale.");
-#endif
+            CheckNoOrUniformScale(scale, ColliderType.Capsule);
             capsule.pointA *= scale.scale.x;
             capsule.pointB *= scale.scale.x;
             capsule.radius *= scale.scale.x;
             return capsule;
+        }
+
+        public static CompoundCollider ScaleCollider(CompoundCollider compound, PhysicsScale scale)
+        {
+            CheckNoOrUniformScale(scale, ColliderType.Compound);
+            compound.scale *= scale.scale.x;
+            return compound;
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTION_CHECKS")]
+        private static void CheckNoOrUniformScale(PhysicsScale scale, ColliderType type)
+        {
+            if (scale.state == PhysicsScale.State.NonComputable | scale.state == PhysicsScale.State.NonUniform)
+            {
+                switch (type)
+                {
+                    case ColliderType.Sphere: throw new InvalidOperationException("Sphere Collider must be scaled with no scale or uniform scale.");
+                    case ColliderType.Capsule: throw new InvalidOperationException("Capsule Collider must be scaled with no scale or uniform scale.");
+                    case ColliderType.Compound: throw new InvalidOperationException("Compound Collider must be scaled with no scale or uniform scale.");
+                    default: throw new InvalidOperationException("Failed to scale unknown collider type.");
+                }
+            }
         }
     }
 }

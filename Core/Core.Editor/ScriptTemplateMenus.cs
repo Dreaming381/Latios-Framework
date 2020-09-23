@@ -8,17 +8,28 @@ internal class ScriptTemplateMenus
     public const string TemplatesRootFramework = "Packages/com.latios.latiosframework/Core/Core.Editor/ScriptTemplates";
     public const string TemplatesRootAssets    = "Assets/_Code/Core.Editor/ScriptTemplates";
 
-    [MenuItem("Assets/Create/Latios/Bootstrap")]
-    public static void CreateRuntimeComponentType()
+    [MenuItem("Assets/Create/Latios/Bootstrap - Injection Workflow")]
+    public static void CreateInjectionBootstrap()
+    {
+        CreateScriptFromTemplate("InjectionBootstrap.txt", "LatiosBootstrap.cs");
+    }
+
+    [MenuItem("Assets/Create/Latios/Bootstrap - Explicit Workflow")]
+    public static void CreateExplicitBootstrap()
+    {
+        CreateScriptFromTemplate("ExplicitBootstrap.txt", "LatiosBootstrap.cs");
+    }
+
+    public static void CreateScriptFromTemplate(string templateName, string defaultScriptName)
     {
         bool success = true;
         try
         {
             ProjectWindowUtil.CreateScriptAssetFromTemplateFile(
-                $"{TemplatesRootFramework}/Bootstrap.txt",
-                "LatiosBootstrap.cs");
+                $"{TemplatesRootFramework}/{templateName}",
+                defaultScriptName);
         }
-        catch(System.IO.FileNotFoundException e)
+        catch (System.IO.FileNotFoundException)
         {
             success = false;
         }
@@ -28,26 +39,26 @@ internal class ScriptTemplateMenus
             try
             {
                 ProjectWindowUtil.CreateScriptAssetFromTemplateFile(
-                    $"{TemplatesRootSolo}/Bootstrap.txt",
-                    "LatiosBootstrap.cs");
+                    $"{TemplatesRootSolo}/{templateName}",
+                    defaultScriptName);
             }
-            catch (System.IO.FileNotFoundException e)
+            catch (System.IO.FileNotFoundException)
             {
                 success = false;
             }
         }
         if (!success)
         {
-            success = true;
+            //success = true;
             try
             {
                 ProjectWindowUtil.CreateScriptAssetFromTemplateFile(
-                    $"{TemplatesRootAssets}/Bootstrap.txt",
-                    "LatiosBootstrap.cs");
+                    $"{TemplatesRootAssets}/{templateName}",
+                    defaultScriptName);
             }
-            catch (System.IO.FileNotFoundException e)
+            catch (System.IO.FileNotFoundException)
             {
-                success = false;
+                //success = false;
             }
         }
     }
