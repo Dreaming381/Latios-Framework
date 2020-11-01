@@ -30,7 +30,7 @@ namespace Latios.Systems
 
         public override bool ShouldUpdateSystem()
         {
-            foreach (var sys in m_systemsToUpdate)
+            foreach (var sys in Systems)
             {
                 var mcrs = sys as ManagedComponentsReactiveSystem;
                 if (!mcrs.Query.IsEmptyIgnoreFilter)

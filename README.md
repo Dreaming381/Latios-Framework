@@ -16,6 +16,9 @@ from official Unity packages and therefore may be seen as derivative works.
 -   [Physics](Documentation~/Physics/README.md) – Collision and Physics building
     blocks using an alternate runtime representation
 
+-   Audio – Simple, scalable, spatialized sounds and music streaming (No public
+    release)
+
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public
     release)
 
@@ -120,8 +123,8 @@ developing. See Contributing for more information.
 
     -   Pull pull requests directly.
 
-        -   See the [Contributing](Documentation~/Contributing.md) page for details about my
-            workflow.
+        -   See the [Contributing](Documentation~/Contributing.md) page for
+            details about my workflow.
 
 ## A Word of Caution
 

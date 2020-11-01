@@ -173,7 +173,7 @@ namespace Latios
             {
                 if (group.Item1 == typeof(T))
                 {
-                    group.Item2.SortSystemUpdateList();
+                    group.Item2.SortSystems();
                     return group.Item2 as T;
                 }
             }
