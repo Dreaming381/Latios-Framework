@@ -19,12 +19,22 @@ namespace Latios.PhysicsEngine
         }
     }
 
+    internal struct BlobCollider
+    {
+#pragma warning disable CS0649
+        internal float4x4 storage;
+#pragma warning restore CS0649
+    }
+
     //Todo: Use some acceleration structure in a future version
     public struct CompoundColliderBlob
     {
-        public BlobArray<Collider>       colliders;
+        internal BlobArray<BlobCollider> blobColliders;
         public BlobArray<RigidTransform> transforms;
         public Aabb                      localAabb;
+
+        public unsafe ref BlobArray<Collider> colliders => ref UnsafeUtility.AsRef<BlobArray<Collider> >(UnsafeUtility.AddressOf(ref blobColliders));
+        //ref UnsafeUtility.As<BlobArray<BlobCollider>, BlobArray<Collider>>(ref blobColliders);
     }
 }
 

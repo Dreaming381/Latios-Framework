@@ -22,7 +22,7 @@ public class LatiosBootstrap : ICustomBootstrap
 		
 		for (int i = 0; i < systems.Count; i++)
         {
-            if (systems[i].Namespace.Contains("Latios"))
+            if (systems[i].Namespace != null && systems[i].Namespace.Contains("Latios"))
             {
                 systems.RemoveSwapBack(systems[i]);
                 i--;

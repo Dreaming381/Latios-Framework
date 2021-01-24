@@ -28,12 +28,12 @@ See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 
 ### Explicit Top-Down Hierarchical System Ordering
 
-Do the `[UpdateBefore/After]` attributes confuse you? Would you rather just
-see the systems ordered explicitly in your code within the group as they do in
-the editor windows? Would you like to decouple the systems so that they don’t
+Do the `[UpdateBefore/After]` attributes confuse you? Would you rather just see
+the systems ordered explicitly in your code within the group as they do in the
+editor windows? Would you like to decouple the systems so that they don’t
 reference each other? Well there’s a new way to order systems in the framework.
-You can specify the system order explicitly using the `GetOrCreateAndAdd` API
-in `SuperSystem.CreateSystems()`. It is opt-in so if you prefer the injection
+You can specify the system order explicitly using the `GetOrCreateAndAdd` API in
+`SuperSystem.CreateSystems()`. It is opt-in so if you prefer the injection
 approach you can do things that way too.
 
 See more: [Super Systems](Super%20Systems.md)
@@ -41,8 +41,8 @@ See more: [Super Systems](Super%20Systems.md)
 ### EntityDataCopyKit
 
 Ever want to copy a component from one Entity to another using its
-`ComponentType`, perhaps obtained by comparing two entities’ archetypes? I
-did. So I wrote this. It uses evil reflection hacking magic to invade the ECS
+`ComponentType`, perhaps obtained by comparing two entities’ archetypes? I did.
+So I wrote this. It uses evil reflection hacking magic to invade the ECS
 internals. But it also caches what it does so hopefully no GC.
 
 ### Conditional System Updates
@@ -64,9 +64,9 @@ See more: [Super Systems](Super%20Systems.md)
 
 ### Global Entities
 
-Unity’s solution to singletons is to create an `EntityQuery` every time you
-want a new one and also make every singleton component live in its own 16 kB
-mansion. These singletons are so spoiled!
+Unity’s solution to singletons is to create an `EntityQuery` every time you want
+a new one and also make every singleton component live in its own 16 kB mansion.
+These singletons are so spoiled!
 
 Well I am done spoiling singletons, so I asked myself:
 
@@ -109,17 +109,17 @@ stuff to be additive, use subscenes. And yes, having multiple scenes each with a
 bunch of subscenes is totally supported and works exactly as you would expect it
 to *(hopefully)*.
 
-You can request a new scene using the `RequestLoadScene` component, and you
-can get useful scene info from the `CurrentScene` component attached to the
+You can request a new scene using the `RequestLoadScene` component, and you can
+get useful scene info from the `CurrentScene` component attached to the
 `worldGlobalEntity`.
 
 If you want an entity to stick around (besides the `worldGlobalEntity` which
 always sticks around), you can add the `DontDestroyOnSceneChangeTag`.
 
 Now you can build your Mario Party clone, your multi-track racer, or your fancy
-5-scene credits system in ECS with the ease you had in `MonoBehaviour`s. Oh,
-and having most scenes be almost exclusively `MonoBehaviour`s while a couple
-of scenes use ECS is totally a thing you can do, especially since you can check
+5-scene credits system in ECS with the ease you had in `MonoBehaviour`s. Oh, and
+having most scenes be almost exclusively `MonoBehaviour`s while a couple of
+scenes use ECS is totally a thing you can do, especially since you can check
 `CurrentScene` inside `ShouldUpdateSystem`. For all you out there trying to
 shoehorn ECS into your Mono game, shoehorn no more!
 
@@ -143,9 +143,9 @@ are structs that implement `ICollectionComponent`.
 There are some special ways you need to work with them.**
 
 They do not affect the archetype. Instead, they “follow” an existing component
-you can specify as the `AssociatedComponentType`. Whenever you add or remove
-the `AssociatedComponentType`, a system will add or remove the collection
-component in the `ManagedComponentReactiveSystemGroup` which runs in
+you can specify as the `AssociatedComponentType`. Whenever you add or remove the
+`AssociatedComponentType`, a system will add or remove the collection component
+in the `ManagedComponentReactiveSystemGroup` which runs in
 `LatiosInitializationSystemGroup`.
 
 The typical way to iterate through these collection components is to use
@@ -163,24 +163,26 @@ extensions.
 Collection components have this nice feature of automatically updating their
 dependencies if you use them in a `SubSystem` (`SystemBase`).
 
-See more: [Collection and Managed Struct Components](Collection%20and%20Managed%20Struct%20Components.md)
+See more: [Collection and Managed Struct
+Components](Collection%20and%20Managed%20Struct%20Components.md)
 
 ### Managed Struct Components
 
 So you got some SOs or some Meshes and Materials or something that you want to
 live on individual entities, but you don’t want to use Shared Components and
 chop your memory and performance into gravel. You also don’t want to use class
-`IComponentData` because that’s garbage every time you instantiate a new
-entity and you know how to reference data on other entities using Entity fields.
+`IComponentData` because that’s garbage every time you instantiate a new entity
+and you know how to reference data on other entities using Entity fields.
 Really, you just want GC-free structs that can store shared references. You
 can’t use them in jobs, but that’s not the concern.
 
 Meet `IManagedComponent`. It is a struct that can hold references. You can get
 and set them using `EntityManager.Get/SetManagedComponent` and friends. They
-work essentially the same as `ICollectionComponent` except without the
-automatic dependency management because there’s no dependencies to manage.
+work essentially the same as `ICollectionComponent` except without the automatic
+dependency management because there’s no dependencies to manage.
 
-See more: [Collection and Managed Struct Components](Collection%20and%20Managed%20Struct%20Components.md)
+See more: [Collection and Managed Struct
+Components](Collection%20and%20Managed%20Struct%20Components.md)
 
 ### Math
 
@@ -199,37 +201,23 @@ dependencies.
 
 Fluent Queries have a concept of “weak” requests, or requests that can be
 overridden by other expressions. For example, an extension method may request a
-weak readonly `Translation`. If a `Translation` request already exists
-(readonly or readwrite), the weak request will be ignored.
+weak readonly `Translation`. If a `Translation` request already exists (readonly
+or readwrite), the weak request will be ignored.
 
 There are similar mechanisms for handling “Any” requests and “Exclude” requests.
 
 See more: [Fluent Queries](Fluent%20Queries.md)
 
-### Burst Patcher for Generic Jobs
-
-It is not perfect. It does not work with generic systems. But I have a mechanism
-for getting Burst to compile generic jobs constrained by an interface when
-performing an AOT build (building a player). It works for private interface
-implementations as well as private generic jobs.
-
-To make a generic job compile with Burst for AOT, add the
-`BurstPatcherAttribute` and give it the name of the interface to generate jobs
-for. You still need to add `[BurstCompile]`.
-
-On any interface implementation, you can add `[IgnoreBurstPatcher]` to prevent
-the job from being compiled with Burst.
-
 ## Known Issues
 
--   This package does not work with the DOTS Runtime. I rely on reflection in
-    order to not fork the Entities package.
+-   This package does not work with Project Tiny. I rely on reflection in order
+    to not fork the Entities package.
 
 -   There’s a limit to how many generic components you can add at runtime before
     everything explodes. If you want to expand that limit, write a T4 script to
-    generate hundreds of non-generic `IComponentData` types. Your compiler
-    will hate you, but Unity might stop exploding. I’ll take dealing with one
-    enemy over death any day.
+    generate hundreds of non-generic `IComponentData` types. Your compiler will
+    hate you, but Unity might stop exploding. I’ll take dealing with one enemy
+    over death any day.
 
 -   `IManagedComponent` and `ICollectionComponent` are not true components.
     Under the hood, I use generic components to modify the Entity archetypes.
@@ -238,9 +226,7 @@ the job from being compiled with Burst.
 
 -   `IManagedComponent` and `ICollectionComponent` do not save in subscenes.
 
--   Burst Patcher jobs do not always show up in the Burst Inspector.
-
-## Near-Term Roadmap
+## Coming in version 0.3.0
 
 -   Smart sync point management
 
@@ -249,8 +235,46 @@ the job from being compiled with Burst.
     -   Automatically provide the ECB its dependencies similar to
         `ICollectionComponent`
 
-    -   Specialized CommandBuffer types which use fast paths when you know what
-        you need to write in advance
+    -   Specialized CommandBuffer types which use fast paths when you know in
+        advance what type of commands you need to write
+
+        -   InstantiateCommandBuffer
+
+        -   DestroyCommandBuffer
+
+        -   EnableCommandBuffer
+
+        -   DisableCommandBuffer
+
+        -   EntityOperationCommandBuffer
+
+-   EntityLocationInChunk
+
+-   SimdFloat3 improvements
+
+-   Extensions
+
+    -   StringBuilder extensions for FixedString types
+
+    -   NativeList.AddRangeFromBlob
+
+    -   BlobBuilder.ConstructFromNativeArray
+
+-   Rename *global entities* to *blackboard entities*
+
+## Near-Term Roadmap
+
+-   Gameplay Toolkit
+
+    -   Reduce cognitive overhead of DOTS for gameplay programmers
+
+    -   Entity component references and Entity buffer element references
+
+    -   Hierarchy navigation and modification
+
+    -   Type handle dependency resolver
+
+    -   A/B systems
 
 -   Codegen generic components
 
@@ -259,8 +283,6 @@ the job from being compiled with Burst.
     -   Static parents
 
     -   Partially static hierarchies
-
--   Burst-Patcher Burst Inspector support
 
 -   World configuration settings
 
@@ -287,7 +309,3 @@ the job from being compiled with Burst.
 -   Custom Lambda Code-gen
 
     -   If I am feeling really, really brave…
-
--   More Examples
-
--   More docs

@@ -10,6 +10,7 @@ using UnityEditor.Compilation;
 
 namespace Latios.Editor
 {
+#if BURST_PATCHER
     internal class BurstPatcherHook : IPostBuildPlayerScriptDLLs
     {
         //Set the callback order to happen before Burst Compilation.
@@ -129,5 +130,6 @@ namespace Latios.Editor
             return rootAssemblies;
         }
     }
+#endif
 }
 

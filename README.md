@@ -2,11 +2,10 @@
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
-either licensed under the [MIT License](https://opensource.org/licenses/MIT) or
-the [Unity Companion
+either licensed under the [Unity Companion
 License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
-packages licensed under the Unity Companion License may contain code borrowed
-from official Unity packages and therefore may be seen as derivative works.
+packages may contain code borrowed from official Unity packages and therefore
+may be seen as derivative works.
 
 ## Packages
 
@@ -16,14 +15,17 @@ from official Unity packages and therefore may be seen as derivative works.
 -   [Physics](Documentation~/Physics/README.md) – Collision and Physics building
     blocks using an alternate runtime representation
 
--   Audio – Simple, scalable, spatialized sounds and music streaming (No public
-    release)
+-   Audio – Simple, scalable, spatialized sounds and music streaming (Coming in
+    version 0.3.0)
+
+-   Kinemation – Authored animation, simulated animation, and everything in
+    between (No public release)
+
+-   MachAxleAI – An infinite axis utility evaluator designed for high throughput
+    (No public release)
 
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public
     release)
-
--   Kinemation – IK over FK animation authoring and runtime with post-sample
-    oscillations (No public release)
 
 ## Getting Started
 
@@ -36,11 +38,20 @@ released packages).
 
 -   Clone or submodule this repository into your project’s Packages folder
 
+After installing the framework package, follow the instructions detailed
+[here](Documentation~/Core/Getting%20Started.md)
+
 If you wish to use Latios.Core without Latios.Physics but do not want to clone
 or submodule the repo, please let me know and I will create a dedicated
 Latios.Core release.
 
 Getting Started pages and documentation are provided with each package.
+
+## Proud Users of Latios Framework
+
+### Open Projects
+
+-   [Latios Space Shooter Sample](https://github.com/Dreaming381/lsss-wip)
 
 ## Support
 
@@ -58,10 +69,37 @@ developing. See Contributing for more information.
         -   I don’t spend time heavily testing this framework as it is a hobby
             and not my full time job. I probably will only notice issues when I
             try to use something in a game jam or personal project and it
-            breaks, unless you alert me.
+            breaks, unless you alert me. With that said, nearly every feature in
+            this framework is at least partially tested in a production project.
 
         -   Repros and test cases will increase the chances of me publishing a
             fix quickly.
+
+    -   Consider optimization requests.
+
+        -   As long as Burst is in play, most people care more about features
+            than performance, so that’s usually my priority. However,
+            optimization is fun! So if you have a performance problem because of
+            my code, tell me! I will make it my problem to make it not a
+            problem.
+
+    -   Consider documentation and example requests.
+
+        -   XML docs
+
+        -   Markdown docs
+
+        -   Examples highlighting a specific feature that is difficult to
+            understand
+
+    -   Consider collaboration requests.
+
+        -   If you are an asset developer (free or paid) and would like to
+            officially support this framework, don’t be shy to reach out to me.
+
+        -   If you are working on a game and wish to use my framework, but need
+            help integrating it into your project and utilizing its features,
+            don’t be shy! I’m pretty easy to reach on the Unity forums.
 
     -   Consider API suggestions.
 

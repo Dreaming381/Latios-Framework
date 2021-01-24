@@ -232,9 +232,9 @@ about that problem, or just avoid it by not using
 writing to components.
 
 But even more importantly, you must ensure that **no entity can appear twice in
-a participating CollisionLayer!** I have no automatic way to check for this, so
-if you violate this rule you will silently generate race conditions. If that’s a
-problem for you, use ScheduleSingle instead.
+a participating CollisionLayer!** There is a check in place for this when safety
+checks are turned. If this rule is a problem for you, use ScheduleSingle
+instead.
 
 There’s still one more awesome thing about FindPairs. It is a broadphase. It
 reports AABB intersection pairs, not true collider pairs. Why is that a good
@@ -289,7 +289,7 @@ Unity.Physics first and foremost tries to be an out-of-the-box solution and then
 slowly is working on exposing flexibility.
 
 In constrast, Latios Physics tries to be a “Build your own solution” framework
-and is being designed from inside-out. Over time, it will eventually achieve an
+and is being designed inside-out. Over time, it will eventually achieve an
 out-of-the-box status, but that is not the focus. The focus is flexibility with
 the luxury of drop-in optimized and accurate algorithms and authoring tools.
 
@@ -306,17 +306,14 @@ it wouldn’t work.
     features. These are coming soon!
 
 -   PhysicsScale is not added when authoring a scaled collider. Instead, the
-    collider’s scale is baked in during conversion. This will be fixed with the
-    custom authoring components.
+    collider’s scale is baked in during conversion.
 
 -   Composite Transform components are not currently supported.
 
 -   FindPairs is not fully optimized. I’m using a single-axis pruner because of
     both familiarity and wanting to see how far I can push the algorithm with
-    Burst and easily iterate-able data structures. I still need to implement
-    inner loop single load, sign-flip safe compares, and sentinel loops. I may
-    then experiment with a dual-axis pruner or a port of Unity’s BVH to multibox
-    and the alternate data representation.
+    Burst and easily iterate-able data structures. I haven’t even come close to
+    pushing this algorithm to the limit yet.
 
 -   Compound Colliders use linear brute force algorithms and lack an underlying
     acceleration structure. Try to keep the count of primitive colliders down to
@@ -326,19 +323,19 @@ it wouldn’t work.
 
 -   This Readme has too many words and not enough pictures.
 
+## Coming in version 0.3.0
+
+-   BoxCollider
+
+-   Debug API overhaul
+
+-   CompoundCollider subcollider indices
+
+-   PhysicsComponentDataFromEntity API simplification
+
 ## Near-Term Roadmap
 
--   Optimize Physics.BuildCollisionLayer to reduce memory pressure
-
-    -   Prefetching?
-
-    -   Compression?
-
--   Optimize FindPairs more
-
--   Container caches to reduce temp malloc pressure
-
--   Support Streams in FindPairs
+-   FindPairsCache, FindPairsStream, and FindPairsAdvanced
 
     -   Cache and replay pairs
 
@@ -356,14 +353,9 @@ it wouldn’t work.
 
 -   More Collider Shapes
 
-    -   Box, Triangle, and Quad just need a fast EPA
+    -   Triangle, Quad, BeveledBox, Cone, Cylinder
 
-    -   Develop the fastest Capsule vs Box algorithm ever (seriously, I haven’t
-        seen any one try the approach I am attempting which I expect to only be
-        slightly more expensive than capsule vs capsule)
-
-    -   Static Compound (nested variants), Terrain, Convex Hull, Static Mesh,
-        Dynamic Compound, and Dynamic Mesh
+    -   Terrain, Convex Hull, Static Mesh, Dynamic Compound, Dynamic Mesh
 
 -   Raycasting CollisionLayers
 
@@ -379,36 +371,31 @@ it wouldn’t work.
 
 -   Simplified Overlap Queries
 
--   Collider improvements
+-   Manifold Generation
 
-    -   Allow in and ref argument passing optimizations
+-   Collider improvements
 
     -   Allow manipulating the Collider data directly using the specialized type
         as a ref
 
-    -   Hopefully help Burst be more aggressive at optimizing
-
--   New Authoring Components
+-   Authoring Improvements
 
     -   Autofitting
 
     -   Scale baking options
 
--   More Debug Tools
+-   Query Debug Tools
 
-    -   Support checks with multiple Collision Layers
+-   Debug Gizmo Integration Hooks
 
-    -   Sanity check unique Entities
-
-    -   Got any more debug view ideas? Let me know!
+    -   If you are an asset developer interested in this, please reach out to me
 
 ## Not-So-Near-Term
 
--   Simulations (eventual requirement for Kinemation, but I just don’t foresee
-    myself getting to it soon without outside help)
+-   Simulations (The first piece of this is Manifold Generation)
 
 -   Dual axis broadphase
 
 -   BVH broadphase
 
--   2D
+-   2D (Need Tiny 2D lighting support)

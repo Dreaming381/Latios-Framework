@@ -11,8 +11,8 @@ create menu and selecting *Latios-\>Bootstrap*.
 For beginners, it is recommended to choose the *Injection Workflow* variant, as
 this matches the default Unity behavior.
 
-For those who prefer explicit ordering of systems, you may find the Explicit
-Workflow more enticing. This workflow will automatically inject Unity systems,
+For those who prefer explicit ordering of systems, you may find the *Explicit
+Workflow* more enticing. This workflow will automatically inject Unity systems,
 but then allow you to inject only top-level systems which set up children
 systems in a top-down manner. See [Super Systems](Super%20Systems.md) for more
 info on this workflow.

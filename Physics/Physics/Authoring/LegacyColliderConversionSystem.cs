@@ -10,6 +10,8 @@ namespace Latios.PhysicsEngine.Authoring.Systems
         {
             Entities.WithNone<DontConvertColliderTag>().ForEach((UnityEngine.SphereCollider goSphere) =>
             {
+                DeclareDependency(goSphere,
+                                  goSphere.transform);
                 float3 lossyScale = goSphere.transform.lossyScale;
                 if (math.cmax(lossyScale) - math.cmin(lossyScale) > 1.0E-5f)
                 {
@@ -29,10 +31,13 @@ namespace Latios.PhysicsEngine.Authoring.Systems
 
             Entities.WithNone<DontConvertColliderTag>().ForEach((UnityEngine.CapsuleCollider goCap) =>
             {
+                DeclareDependency(goCap,
+                                  goCap.transform);
                 float3 lossyScale = goCap.transform.lossyScale;
                 if (math.cmax(lossyScale) - math.cmin(lossyScale) > 1.0E-5f)
                 {
-                    UnityEngine.Debug.LogWarning("Failed to convert " + goCap + ". Only uniform scaling is supported on CapsuleCollider.");
+                    UnityEngine.Debug.LogWarning(
+                        $"Failed to convert { goCap }. Only uniform scaling is supported on CapsuleCollider. Lossy Scale divergence was: {math.cmax(lossyScale) - math.cmin(lossyScale)}");
                     return;
                 }
 

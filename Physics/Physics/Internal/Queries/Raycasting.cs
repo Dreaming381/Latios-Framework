@@ -98,7 +98,7 @@ namespace Latios.PhysicsEngine
             bool           hit2    = RaycastSphere(ray, sphere2, out float fraction2, out float3 normal2);
             fraction1              = hit1 ? fraction1 : fraction1 + 1f;
             fraction2              = hit2 ? fraction2 : fraction2 + 1f;
-            fraction               = math.select(fraction2, fraction2, fraction1 < fraction2);
+            fraction               = math.select(fraction2, fraction1, fraction1 < fraction2);
             normal                 = math.select(normal2, normal1, fraction1 < fraction2);
             return hit1 | hit2;
         }

@@ -83,25 +83,25 @@ Physics.SomePhysicsOperation(requiredParams).One(or).MoreExtra(Settings).Schedul
 
 ## Building Collision Layers
 
-You start the Fluent chain by calling `Physics.BuildCollisionLayer`. There are
-a couple of variants based on whether you want to build from an `EntityQuery`
-or `NativeArray`s.
+You start the Fluent chain by calling `Physics.BuildCollisionLayer`. There are a
+couple of variants based on whether you want to build from an `EntityQuery` or
+`NativeArray`s.
 
-If you build from an `EntityQuery`, the `EntityQuery` must have the
-`Collider` component. If you use Fluent, you can use the extension method
+If you build from an `EntityQuery`, the `EntityQuery` must have the `Collider`
+component. If you use Fluent, you can use the extension method
 `PatchQueryForBuildingCollisionLayer` when building your `EntityQuery`.
 
 Next in the fluent chain, you have the ability to apply custom settings and
-options. You can customize the `CollisionLayerSettings` for better
-performance. The settings are given as follows:
+options. You can customize the `CollisionLayerSettings` for better performance.
+The settings are given as follows:
 
 -   worldAABB – The AABB from which to construct the multibox
 
 -   worldSubdivisionsPerAxis – How many “buckets” AKA cells to divide the world
     into along each axis
 
-*Important: `worldAABB` and `worldSubdivisionsPerAxis` MUST match when
-performing queries across multiple `CollisionLayer`s. I will probably add a
+*Important:* `worldAABB` *and* `worldSubdivisionsPerAxis` *MUST match when
+performing queries across multiple* `CollisionLayer`*s. I will probably add a
 safety check for this in a future release.*
 
 You can also create or pass in a `remapSrcArray` which will map indices in
@@ -139,12 +139,13 @@ with `ComponentDataFromEntity`.
     -   To find pairs between two layers (Bipartite), pass in both layers. No
         pairs are generated within each individual layer. It is up to you to
         ensure no entity exists simultaneously in both layers or else scheduling
-        a parallel job will not be safe.
+        a parallel job will not be safe. When safety checks are enabled, an
+        exception will be thrown if this rule is violated.
 
-    -   The final argument in `FindPairs` is an `IFindPairsProcessor`.
-        Implement this interface as a struct containing any native containers
-        your algorithm relies upon. When done correctly, your struct should
-        resemble a non-lambda job struct.
+    -   The final argument in `FindPairs` is an `IFindPairsProcessor`. Implement
+        this interface as a struct containing any native containers your
+        algorithm relies upon. When done correctly, your struct should resemble
+        a non-lambda job struct.
 
 -   Step 2: Call a scheduling method
 
@@ -157,18 +158,24 @@ with `ComponentDataFromEntity`.
 
     -   .ScheduleParallel – Run on multiple worker threads with Burst.
 
-## Why is FindPairs so slow in a build?
+    -   .ScheduleParallelUnsafe – Run on multiple worker threads with maximum
+        parallelization. This is unsafe and should only be used for marking
+        colliders as hit or for writing to an
+        `EntityCommandBuffer.ParallelWriter`
+
+## Why is FindPairs so slow?
 
 Great question! Latios Physics internally schedules multiple generic jobs for
 FindPairs dynamically. The Burst Compiler currently does not support generic
-jobs in builds without explicit declarations of their concrete types.
+jobs without declarations of their concrete types.
 
-Latios.Core introduced a new BurstPatcher in 0.2.0 which should resolve this
-problem, but I have not been able to test for all the different platforms which
-means it is likely broken on some of them. Check your build for a
-LatiosBurstPatched.dll. You can also check for lib_burst_generated.txt and see
-if the FindPairs jobs are being listed.
+Beginning in Physics 0.2.2, the dispatcher was updated to implicitly generate
+concrete instances of these generic jobs. However, this only works if a concrete
+instance of IFindPairsProcessor is passed into the FindPairs function. Invoking
+FindPairs in a generic context with a generic IFindPairsProcessor is not
+supported by Burst.
 
-If everything works correctly, FindPairs should be working much faster! In Mono
-builds, I typically see over a 100x improvement. And on IL2CPP I see a 50x
-improvement.
+Prior to Physics 0.2.2, the dispatcher relied on a tool called BurstPatcher.
+However, BurstPatcher is now deprecated.
+
+With Burst, FindPairs typically runs 20x – 100x faster.

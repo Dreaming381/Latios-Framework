@@ -87,11 +87,15 @@ namespace Latios
         /// <summary>
         /// Injects the system into the world. Automatically creates parent ComponentSystemGroups if necessary.
         /// </summary>
+        /// <remarks>This function does nothing for unmanaged systems.</remarks>
         /// <param name="type">The type to inject. Uses world.GetOrCreateSystem</param>
         /// <param name="world">The world to inject the system into</param>
         /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
         public static ComponentSystemBase InjectSystem(Type type, World world, ComponentSystemGroup defaultGroup = null)
         {
+            if (!typeof(ComponentSystemBase).IsAssignableFrom(type))
+                return null;
+
             var                 groups = type.GetCustomAttributes(typeof(UpdateInGroupAttribute), true);
             ComponentSystemBase result = null;
             if (groups.Length == 0 && defaultGroup != null)
@@ -161,6 +165,8 @@ namespace Latios
             foreach (var system in systems)
             {
                 if (IsGroup(system))
+                    continue;
+                if (!typeof(ComponentSystemBase).IsAssignableFrom(system))
                     continue;
                 foreach (var targetGroup in groupList)
                 {
