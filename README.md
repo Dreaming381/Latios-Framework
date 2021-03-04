@@ -14,9 +14,10 @@ Guide*](Documentation~/Upgrade%20Guide.md)*!*
 
 -   [Core](Documentation~/Core/README.md) – General-purpose utilities and
     bootstrap
--   [Psyshock Physics](Documentation~/Physics/README.md) – Collision and Physics
-    building blocks using an alternate runtime representation
--   Myri Audio – Simple, scalable, spatialized sounds and music streaming
+-   [Psyshock Physics](Documentation~/Psyshock%20Physics/README.md) – Collision
+    and Physics building blocks using an alternate runtime representation
+-   [Myri Audio](Documentation~/Myri%20Audio/README.md) – Simple, scalable,
+    spatialized sounds and music streaming
 -   Kinemation – Authored animation, simulated animation, and everything in
     between (No public release)
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
