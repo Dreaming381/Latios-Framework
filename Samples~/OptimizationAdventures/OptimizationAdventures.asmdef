@@ -2,7 +2,7 @@
     "name": "OptimizationAdventures",
     "references": [
         "Latios.Core",
-        "Latios.Physics",
+        "Latios.Psyshock",
         "Unity.Burst",
         "Unity.Collections",
         "Unity.Entities",

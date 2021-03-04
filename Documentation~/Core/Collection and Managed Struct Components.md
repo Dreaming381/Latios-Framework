@@ -56,21 +56,19 @@ public struct PipeEmissionQueue : ICollectionComponent
 }
 
 ```
-
 ## Component Lifecycles
 
 There are two ways to affect the lifecycle of an instance of a
 `ICollectionComponent` or `IManagedComponent`.
 
-### Direct Mode – EntityManager and ManagedEntity
+### Direct Mode – EntityManager and BlackboardEntity
 
 In direct mode, you operate on the `ICollectionComponent` and
 `IManagedComponent` types directly. Adding a collection component with
-`AddCollectionComponent` will automatically add the
-`AssociatedComponentType` as well. Removing the collection component with
-`RemoveCollectionComponentAndDispose` will remove the
-`AssociatedComponentType` as well as invoke `Dispose()` on the stored
-collection component.
+`AddCollectionComponent` will automatically add the `AssociatedComponentType` as
+well. Removing the collection component with
+`RemoveCollectionComponentAndDispose` will remove the `AssociatedComponentType`
+as well as invoke `Dispose()` on the stored collection component.
 
 When using the direct mode API, the contents of a collection component are
 assumed to be allocated. If this is not the case, you must check for this in the
@@ -78,75 +76,62 @@ assumed to be allocated. If this is not the case, you must check for this in the
 
 ### Indirect Mode – AssociatedComponentType
 
-Sometimes you need to use an EntityCommandBuffer to intantiate entities or add
-components that you wish to have a collection component. Or sometimes you want
-to author a component that needs a collection component at runtime. For these
-cases, you can rely on the `AssociatedComponentType` to add or remove the
+Sometimes you need to use an `EntityCommandBuffer` to instantiate entities or
+add components that you wish to have a collection component. Or sometimes you
+want to author a component that needs a collection component at runtime. For
+these cases, you can rely on the `AssociatedComponentType` to add or remove the
 components you need.
 
-When adding the `AssociatedComponentType` to an entity, the collection
-component will not exist immediately. Instead, it will be added on the next
-frame. The exact timing of this will be after the `SceneManagerSystem` and
+When adding the `AssociatedComponentType` to an entity, the collection component
+will not exist immediately. Instead, it will be added on the next frame. The
+exact timing of this will be after the `SceneManagerSystem` and
 `MergeGlobalsSystem` but before other custom systems in
 `LatiosInitializationSystemGroup`. The systems which perform this live in a
-`ManagedComponentsReactiveSystemGroup`. Checking ‘HasComponent()’ on the
-entity will return `false` until this happens.
+`ManagedComponentsReactiveSystemGroup`. Checking `HasComponent()` on the entity
+will return `false` until this happens.
 
 A collection component added in this matter will be default-initialized, meaning
 none of its NativeContainers will be allocated. The component will be flagged
 appropriately, so that the reactive systems do not try to dispose the container
 later.
 
-When the `AssociatedComponentType` is removed, the collection component will
-not be removed immediately. Instead, it will be removed and disposed within the
-`ManagedComponentsReactiveSystemGroup`. Checking `HasComponent()` on the
-entity immediately after the `AssociatedComponentType` is removed will return
-`false`.
+When the `AssociatedComponentType` is removed, the collection component will not
+be removed immediately. Instead, it will be removed and disposed within the
+`ManagedComponentsReactiveSystemGroup`. Checking `HasComponent()` on the entity
+immediately after the `AssociatedComponentType` is removed will return `false`.
 
 ## Getting and Setting Components
 
 Collection components and managed struct components can only be fetched or set
-through EntityManager extension methods or using a ManagedEntity like the
+through `EntityManager` extension methods or using a `BlackboardEntity` like the
 `sceneGlobalEntity` or `worldGlobalEntity`.
 
 The following are API methods exposed for manipulating these components:
 
 -   Managed Components
-
     -   AddManagedComponent\<T\> - Adds the managed struct component to the
         entity
-
     -   RemoveManagedComponent\<T\> - Removes the managed struct component from
         the entity
-
     -   GetManagedComponent\<T\> - Gets a copy of the managed struct component
         from the entity, copying references to managed types rather than their
         underlying objects
-
     -   SetManagedComponent\<T\> - Replaces the stored managed struct component
         with a copy of the passed in struct, copying references to managed types
-
     -   HasManagedComponent\<T\> - Checks if a stored managed struct component
         exists on the entity and is not pending removal
-
 -   Collection Components
-
     -   AddCollectionComponent\<T\> - Adds the collection component to the
         entity, marking it unallocated if `isInitialized` is manually set to
         `false`
-
     -   RemoveCollectionComponentAndDispose\<T\> - Removes the collection
         component and disposes it if it was flagged as allocated
-
     -   GetCollectionComponent\<T\> - Gets the collection component from the
-        entity and marks it as readonly if `readOnly` is manually set to
-        `true`
-
+        entity and marks it as readonly if `readOnly` is manually set to `true`
     -   SetCollectionComponentAndDisposeOld\<T\> - Replaces the stored
         collection component from the entity with the passed in collection
         component and disposes the replaced collection component if it was
         flagged as allocated
-
     -   HasCollectionComponent\<T\> - Checks if a stored collection component
         exists on the entity and is not pending removal
 
@@ -164,7 +149,6 @@ same rules as `ComponentType`s in Unity’s ECS:
 
 -   Multiple independent jobs may read from a collection component
     simultaneously
-
 -   When a job has write-access to a collection component, no other job may read
     nor write to that collection component simultaneously
 
@@ -179,13 +163,13 @@ run simultaneously with a job writing to EntityB’s PipeEmissionQueue.
 
 ### How the Dependencies are Updated
 
-Before the `OnUpdate` of the `SubSystem` executes, the system registers
-itself with the `LatiosWorld` as the active running system. From there, the
-`LatiosWorld` forwards all `Dependency` updates to that system and also
-records a list of all Entity-ICollectionComponent pairs which have been accessed
-and need their internal `JobHandle`s updated. After the `OnUpdate` finishes,
-the `SubSystem` passes the final `Dependency` to the `LatiosWorld` which
-then commits the `Dependency` to the internal storage.
+Before the `OnUpdate` of the `SubSystem` executes, the system registers itself
+with the `LatiosWorld` as the active running system. From there, the
+`LatiosWorld` forwards all `Dependency` updates to that system and also records
+a list of all `Entity`-`ICollectionComponent` pairs which have been accessed and
+need their internal `JobHandle`s updated. After the `OnUpdate` finishes, the
+`SubSystem` passes the final `Dependency` to the `LatiosWorld` which then
+commits the `Dependency` to the internal storage.
 
 **Warning:** Be careful when iterating through collection components in an
 `Entities.ForEach` loop like the following:
@@ -198,7 +182,7 @@ Entities.WithAll<FactionTag>().ForEach((Entity entity) =>
 }).WithoutBurst().Run();
 ```
 
-This will complete Dependency at the start of the Entities.ForEach, which may
+This will complete Dependency at the start of the `Entities.ForEach`, which may
 include jobs for components you may be trying to run new jobs on inside your
 loop that interact with your collection components.
 
@@ -224,9 +208,9 @@ API to more conveniently handle this scenario will come in a future release.
 ### Fine-Grained Dependency Control
 
 If for some reason, you wish to have more fine-grained control over the
-dependency management, there are overloads of the EntityManager methods which
+dependency management, there are overloads of the `EntityManager` methods which
 you can use instead. The following table shows which functions modify which
-JobHandle values:
+`JobHandle` values:
 
 | Method                                                 | Modifies Dependency | Queues internal update from Dependency | Removes internal update from queue |
 |--------------------------------------------------------|---------------------|----------------------------------------|------------------------------------|
@@ -241,7 +225,7 @@ JobHandle values:
 One reason why you may wish to manually control dependencies is to allow jobs to
 run during a sync point. By scheduling a job which only interacts with
 collection components attached to `worldGlobalEntity` and calling
-`UpdateCollectionComponentDependency<T>()` on those collection components
-while not touching `Dependency`, the `JobHandle`s will be automatically
-managed by the Latios automatic dependency management system but not Unity ECS’s
-automatic dependency management system.
+`UpdateCollectionComponentDependency<T>()` on those collection components while
+not touching `Dependency`, the `JobHandle`s will be automatically managed by the
+Latios automatic dependency management system but not Unity ECS’s automatic
+dependency management system.

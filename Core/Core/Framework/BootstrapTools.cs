@@ -47,13 +47,13 @@ namespace Latios
         /// <param name="systems"></param>
         /// <param name="world"></param>
         /// <param name="defaultGroup"></param>
-        public static void InjectUnitySystems(List<Type> systems, World world, ComponentSystemGroup defaultGroup = null)
+        public static void InjectUnitySystems(List<Type> systems, World world, ComponentSystemGroup defaultGroup = null, bool silenceWarnings = true)
         {
             foreach (var type in systems)
             {
                 if (type.Namespace == null)
                 {
-                    if (type.Assembly.FullName.Contains("Unity"))
+                    if (type.Assembly.FullName.Contains("Unity") && !silenceWarnings)
                     {
                         Debug.LogWarning("Hey Unity Devs! You forget a namespace for " + type.ToString());
                     }

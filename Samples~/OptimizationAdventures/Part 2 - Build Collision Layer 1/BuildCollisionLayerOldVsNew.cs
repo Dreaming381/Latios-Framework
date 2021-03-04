@@ -1,4 +1,4 @@
-﻿using Latios.PhysicsEngine;
+﻿using Latios.Psyshock;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -476,7 +476,7 @@ namespace OptimizationAdventures
             return result;
         }
 
-        private static void calculatePrefixSum(NativeArray<int> counts, NativeArray<int> sums)
+        private static void CalculatePrefixSum(NativeArray<int> counts, NativeArray<int> sums)
         {
             sums[0] = 0;
             for (int i = 0; i < counts.Length - 1; i++)
@@ -515,10 +515,10 @@ namespace OptimizationAdventures
             }
 
             //Sums
-            calculatePrefixSum(counts1, prefixSum1);
-            calculatePrefixSum(counts2, prefixSum2);
-            calculatePrefixSum(counts3, prefixSum3);
-            calculatePrefixSum(counts4, prefixSum4);
+            CalculatePrefixSum(counts1, prefixSum1);
+            CalculatePrefixSum(counts2, prefixSum2);
+            CalculatePrefixSum(counts3, prefixSum3);
+            CalculatePrefixSum(counts4, prefixSum4);
 
             for (int i = 0; i < count; i++)
             {

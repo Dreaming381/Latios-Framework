@@ -1743,6 +1743,178 @@ namespace Latios
         {
             get { return new simdFloat3 { m_float3s = new float4x3(x.wwww, y.wwww, z.wwww) }; }
         }
+
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xxx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, x, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xxy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, x, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xxz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, x, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xyx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, y, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xyy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, y, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xyz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, y, z) }; }
+            set
+            {
+                x = value.x;
+                y = value.y;
+                z = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xzx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, z, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xzy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, z, y) }; }
+            set
+            {
+                x = value.x;
+                z = value.y;
+                y = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 xzz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(x, z, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yxx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, x, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yxy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, x, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yxz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, x, z) }; }
+            set
+            {
+                y = value.x;
+                x = value.y;
+                z = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yyx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, y, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yyy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, y, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yyz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, y, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yzx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, z, x) }; }
+            set
+            {
+                y = value.x;
+                z = value.y;
+                x = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yzy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, z, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 yzz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(y, z, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zxx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, x, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zxy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, x, y) }; }
+            set
+            {
+                z = value.x;
+                x = value.y;
+                y = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zxz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, x, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zyx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, y, x) }; }
+            set
+            {
+                z = value.x;
+                y = value.y;
+                x = value.z;
+            }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zyy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, y, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zyz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, y, z) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zzx
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, z, x) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zzy
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, z, y) }; }
+        }
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public simdFloat3 zzz
+        {
+            get { return new simdFloat3 { m_float3s = new float4x3(z, z, z) }; }
+        }
     }
 }
 

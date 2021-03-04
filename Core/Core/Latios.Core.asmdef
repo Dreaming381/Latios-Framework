@@ -8,9 +8,9 @@
         "Unity.Rendering.Hybrid",
         "Unity.Transforms",
         "Unity.Collections",
-        "Unity.Scenes.Hybrid",
         "Unity.Entities.Hybrid",
-        "Unity.Burst"
+        "Unity.Burst",
+        "Unity.Scenes"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

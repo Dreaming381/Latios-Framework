@@ -3,7 +3,7 @@ using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-namespace Latios.Authoring
+namespace Latios.Authoring.Systems
 {
     [ConverterVersion("latios", 1)]
     [UpdateInGroup(typeof(GameObjectConversionGroup))]

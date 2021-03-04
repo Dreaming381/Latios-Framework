@@ -93,6 +93,39 @@ namespace Latios
 			}
 		}
 	}
+
+	var xyzComponents = new char[] {'x', 'y', 'z'};
+	foreach (var first in xyzComponents)
+	{
+		foreach (var second in xyzComponents)
+		{
+			foreach (var third in xyzComponents)
+			{
+				bool isSettable = first != second && first != third && second != third;
+#>
+		[EditorBrowsable(EditorBrowsableState.Never)]
+		public simdFloat3 <#=first#><#=second#><#=third#>
+		{
+			get { return new simdFloat3 { m_float3s = new float4x3(<#=first#>, <#=second#>, <#=third#>) }; }
+<#
+				if (isSettable)
+				{
+#>
+			set 
+			{
+				<#=first#> = value.x;
+				<#=second#> = value.y;
+				<#=third#> = value.z;
+			}
+<#
+				}
+
+#>
+		}
+<#
+			}
+		}
+	}
 }
 #>
 	}

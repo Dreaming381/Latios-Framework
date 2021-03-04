@@ -1,5 +1,5 @@
 ﻿using System;
-using Latios.PhysicsEngine;
+using Latios.Psyshock;
 using Unity.Entities;
 
 namespace OptimizationAdventures

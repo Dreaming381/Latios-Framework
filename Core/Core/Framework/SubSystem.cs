@@ -11,8 +11,8 @@ namespace Latios
     {
         public LatiosWorld latiosWorld { get; private set; }
 
-        public ManagedEntity sceneGlobalEntity => latiosWorld.sceneGlobalEntity;
-        public ManagedEntity worldGlobalEntity => latiosWorld.worldGlobalEntity;
+        public BlackboardEntity sceneBlackboardEntity => latiosWorld.sceneBlackboardEntity;
+        public BlackboardEntity worldBlackboardEntity => latiosWorld.worldBlackboardEntity;
 
         public FluentQuery Fluent => this.Fluent();
 
@@ -29,16 +29,17 @@ namespace Latios
             }
             else
             {
-                throw new InvalidOperationException("The current world is not of type LatiosWorld required for Latios framework functionality.");
+                throw new InvalidOperationException(
+                    "The current world is not of type LatiosWorld required for Latios framework functionality. Did you forget to create a Bootstrap?");
             }
             OnCreateInternal();
         }
 
         protected sealed override void OnUpdate()
         {
-            latiosWorld.BeginCollectionTracking(this);
+            latiosWorld.BeginDependencyTracking(this);
             OnUpdateInternal();
-            latiosWorld.EndCollectionTracking(Dependency);
+            latiosWorld.EndDependencyTracking(Dependency);
         }
 
         protected sealed override void OnDestroy()

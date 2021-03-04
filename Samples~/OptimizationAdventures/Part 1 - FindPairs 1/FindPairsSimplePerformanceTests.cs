@@ -1,4 +1,4 @@
-﻿using Latios.PhysicsEngine;
+﻿using Latios.Psyshock;
 using NUnit.Framework;
 using Unity.Burst;
 using Unity.Collections;
@@ -56,7 +56,7 @@ namespace OptimizationAdventures
             random.InitState(seed);
             NativeArray<AabbEntity> randomAabbs = new NativeArray<AabbEntity>(count, Allocator.TempJob);
             var                     jh          = new GenerateRandomAabbs { random = random, aabbs = randomAabbs }.Schedule();
-            jh                                  = randomAabbs.SortJob(jh);
+            jh                                  = randomAabbs.Sort(jh);
             jh.Complete();
 
             NativeList<EntityPair> pairsNaive     = new NativeList<EntityPair>(preallocate, Allocator.TempJob);

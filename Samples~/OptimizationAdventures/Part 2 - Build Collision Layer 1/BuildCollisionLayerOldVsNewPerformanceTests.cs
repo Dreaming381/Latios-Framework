@@ -1,4 +1,4 @@
-﻿using Latios.PhysicsEngine;
+﻿using Latios.Psyshock;
 using NUnit.Framework;
 using Unity.Burst;
 using Unity.Collections;

@@ -1,8 +1,8 @@
 # Latios Framework Core
 
 Latios.Core offers a toolbox of extensions to the Unity.Entities package. It
-does not abstract away ECS nor provide an alternative ECS. Many Latios packages
-depend on Latios.Core.
+does not abstract away ECS nor provide an alternative ECS. The other modules in
+this framework all depend on Core.
 
 Check out the [Getting Started](Getting%20Started.md) page!
 
@@ -15,14 +15,9 @@ you really customize the injection pipeline. That’s what the `BootstrapTools`
 class is here for!
 
 -   Inject systems based on namespaces
-
 -   Build partial hierarchies
-
 -   Build a playerloop with custom preset loops (like one with classical
     FixedUpdate or one with Rendering before Simulation)
-
--   Inject generic component types based on an interface constraint (Going away
-    soonish)
 
 See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 
@@ -31,27 +26,32 @@ See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 Do the `[UpdateBefore/After]` attributes confuse you? Would you rather just see
 the systems ordered explicitly in your code within the group as they do in the
 editor windows? Would you like to decouple the systems so that they don’t
-reference each other? Well there’s a new way to order systems in the framework.
-You can specify the system order explicitly using the `GetOrCreateAndAdd` API in
-`SuperSystem.CreateSystems()`. It is opt-in so if you prefer the injection
-approach you can do things that way too.
+reference each other? Would you like to switch back and forth between two system
+orderings?
+
+If you answered “yes” to any of those, then you definitely want to try the new
+way to order systems in this framework. You can specify the system order
+explicitly using the `GetOrCreateAndAdd` API in `SuperSystem.CreateSystems()`.
+It is opt-in so if you prefer the injection approach you can do things that way
+too.
 
 See more: [Super Systems](Super%20Systems.md)
 
 ### EntityDataCopyKit
 
 Ever want to copy a component from one Entity to another using its
-`ComponentType`, perhaps obtained by comparing two entities’ archetypes? I did.
-So I wrote this. It uses evil reflection hacking magic to invade the ECS
-internals. But it also caches what it does so hopefully no GC.
+`ComponentType`, perhaps obtained by comparing two entities’ archetypes? I did,
+so I wrote this. It currently uses cached evil reflection hacking magic to
+invade the ECS internals, but this will be converted into Burst-friendly
+mechanisms in the future.
 
 ### Conditional System Updates
 
 Unity does this thing where it tries to look at your EntityQueries and decide if
 your system should update or not. While it’s certainly cute that Unity cares
 about performance, you as the programmer can make much better decisions. Turn
-off Unity’s logic with the [AlwaysUpdateSystem] attribute and turn on your own
-by overriding ShouldUpdateSystem.
+off Unity’s logic with the `[AlwaysUpdateSystem]` attribute and turn on your own
+by overriding `ShouldUpdateSystem()`.
 
 You can also use both mechanisms if Unity’s logic is not interfering but you
 also want to further constrain the system to a specific scene or something. I do
@@ -62,7 +62,7 @@ enable or disable an entire group of systems.
 
 See more: [Super Systems](Super%20Systems.md)
 
-### Global Entities
+### Blackboard Entities
 
 Unity’s solution to singletons is to create an `EntityQuery` every time you want
 a new one and also make every singleton component live in its own 16 kB mansion.
@@ -75,11 +75,11 @@ or is it really because they want most logic to find the same shared instance?
 
 Well for me, it is the latter.
 
-My solution is global entities. There are two of them: world and scene. The
-`worldGlobalEntity` lives as long as the world does. The `sceneGlobalEntity`
-dies and respawns when the scene changes. These two each get a 16 kB chunk for
-all of their components, and they even have a special convenient API for getting
-and setting components directly on them.
+My solution is blackboard entities. There are two of them: world and scene. The
+`worldBlackboardEntity` lives as long as the world does. The
+`sceneBlackboardEntity` dies and respawns when the scene changes. These two each
+get a 16 kB chunk for all of their components, and they even have a special
+convenient API for getting and setting components directly on them.
 
 But the best part is that there’s no `EntityQuery` associated with them, so if
 you want to make a hundred backups of these entities to track your state over
@@ -87,16 +87,20 @@ time, or have a component represent the “Active” option from a pool of entit
 containing “viable” options, well you can do those things here.
 
 Wait, no. That wasn’t the best part. The best part is the authoring workflow!
-Simply attach a `GlobalEntityData` component to automatically have all the
-components merged into one of the two global entities of your choice. You can
-even set a merging strategy for them. This also works at runtime, so you can do
-cool stuff like instantiate a new settings override from a prefab.
+Simply attach a `BlackboardEntityData` component to automatically have all the
+components merged into one of the two blackboard entities of your choice. You
+can even set a merging strategy for them. This also works at runtime, so you can
+do cool stuff like instantiate a new settings override from a prefab.
 
-See more: [Global Entities](Global%20Entities.md)
+Regardless of whether you use the authoring tools, feel free to dump components
+onto these entities. The `SceneManagerSystem `and Myri’s `AudioSystem `use the
+`worldBlackboardEntity` to expose status and settings.
 
-*Feedback Request: I am looking for a better term than “global” to describe
-these entities. “World” + “Global” sounds redundant and simultaneously confusing
-when the “Scene” variant comes into play.*
+See more: [Blackboard Entities](Blackboard%20Entities.md)
+
+*Sidenote: Blackboard entities were previously referred to as “global entities”.
+The new name better represents their function, as they serve as hubs for systems
+to store or expose state.*
 
 ### Scene Management
 
@@ -133,7 +137,6 @@ they not watch the Overwatch ECS talks?
 All joking aside, they support them in two different ways:
 
 -   Class components implementing `IDisposable`, which works but allocates GC
-
 -   Unsafe collections which you have to be extra careful using
 
 I wasn’t really satisfied with either of these solutions, so I made my own. They
@@ -191,6 +194,16 @@ Overly-used algorithms and some SIMD stuff are here. Help yourself!
 
 See more: [Math](Math.md)
 
+### Extensions and Exposed
+
+Sometimes Unity is missing API for no good reason other than DOTS still being
+under development. And sometimes, I need this missing API. Sometimes this can be
+fixed using an extension method. Sometimes this requires extending the package
+directly using asmrefs. The former can be found in the Utilities folder, and the
+latter shows up in the `Unity.Entities.Exposed` namespace.
+
+See more: [Extensions and Exposed](Extensions%20and%20Exposed.md)
+
 ### Fluent Queries
 
 Fluent syntax for expressing EntityQueries was a big improvement. However, every
@@ -208,104 +221,91 @@ There are similar mechanisms for handling “Any” requests and “Exclude” r
 
 See more: [Fluent Queries](Fluent%20Queries.md)
 
+### Smart Sync Point and Custom Command Buffers
+
+`EntityCommandBuffer` is a powerful tool, but it has some limitations.
+
+First, it has no equivalent for `EntityManager.SetEnabled()`. While this can be
+replicated by attaching or detaching the Disabled component directly, one would
+also have to manage the `LinkedEntityGroup`, which could change between command
+recording and playback.
+
+Enter `EnableCommandBuffer` and `DisableCommandBuffer`. They are quite limited
+in that they can only handle one type of command each, but they do it right!
+
+The second issue comes when instantiating new entities. Often times, the entity
+does not just need to be instantiated, but also have some of its components
+initialized. This is done one-by-one in the `EntityCommandBuffer` which can be
+slow.
+
+Enter `InstantiateCommandBuffer`. You can use this command buffer to instantiate
+entities and initialize up to 5 components. You can also add an additional 5
+components on top. It uses batch processing for increased speed.
+
+Lastly, there’s a `DestroyCommandBuffer`. This command buffer may provide a
+speedup in some circumstances.
+
+All of these command buffers can be played back by the `SyncPointPlaybackSystem`
+(which can play back `EntityCommandBuffers` too). If using a `SubSystem`, you
+can fetch this using `latiosWorld.SyncPoint` and skip caching it in
+`OnCreate()`. And you don’t even have to invoke `AddJobHandleForProducer()` when
+you are done. All that boilerplate is gone. As the title says, this sync point
+is smart!
+
+See more: [Custom Command Buffers and
+SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSystem.md)
+
 ## Known Issues
 
--   This package does not work with Project Tiny. I rely on reflection in order
-    to not fork the Entities package.
-
+-   This package does not work with Project Tiny. There are a few issues I need
+    to address and I will likely expose a separate Tiny version of the
+    framework.
 -   There’s a limit to how many generic components you can add at runtime before
     everything explodes. If you want to expand that limit, write a T4 script to
     generate hundreds of non-generic `IComponentData` types. Your compiler will
     hate you, but Unity might stop exploding. I’ll take dealing with one enemy
-    over death any day.
-
+    over death any day. This will be fixed in the future.
 -   `IManagedComponent` and `ICollectionComponent` are not true components.
     Under the hood, I use generic components to modify the Entity archetypes.
     Expect them to not work with a lot of query and archetype sugar. I do try to
     make them blend in where I can though.
-
 -   `IManagedComponent` and `ICollectionComponent` do not save in subscenes.
-
-## Coming in version 0.3.0
-
--   Smart sync point management
-
-    -   Fetch ECBs from “sync points” rather than `EntityCommandBufferSystems`
-
-    -   Automatically provide the ECB its dependencies similar to
-        `ICollectionComponent`
-
-    -   Specialized CommandBuffer types which use fast paths when you know in
-        advance what type of commands you need to write
-
-        -   InstantiateCommandBuffer
-
-        -   DestroyCommandBuffer
-
-        -   EnableCommandBuffer
-
-        -   DisableCommandBuffer
-
-        -   EntityOperationCommandBuffer
-
--   EntityLocationInChunk
-
--   SimdFloat3 improvements
-
--   Extensions
-
-    -   StringBuilder extensions for FixedString types
-
-    -   NativeList.AddRangeFromBlob
-
-    -   BlobBuilder.ConstructFromNativeArray
-
--   Rename *global entities* to *blackboard entities*
+-   `InstantiateCommandBuffer` types do not return a remappable entity when
+    creating a command.
+-   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of the
+    `DisposeSentinel` hack that allows `EntityCommandBufferSystem` to use
+    `Allocator.TempJob`.
+-   Unmanaged systems are not supported when added directly to a non-user
+    `ComponentSystemGroup`. Create a custom `ComponentSystemGroup` as an
+    injection point as a workaround.
+-   System sorting does not occur automatically for non-user
+    `ComponentSystemGroup`s after initialization. Call `SortSystems()`
+    explicitly for these groups.
 
 ## Near-Term Roadmap
 
 -   Gameplay Toolkit
-
     -   Reduce cognitive overhead of DOTS for gameplay programmers
-
     -   Entity component references and Entity buffer element references
-
     -   Hierarchy navigation and modification
-
     -   Type handle dependency resolver
-
     -   A/B systems
-
+-   More custom command buffer types
 -   Codegen generic components
-
 -   Optimized transform hierarchy types and systems
-
     -   Static parents
-
     -   Partially static hierarchies
-
+    -   Faster hierarchy updates
 -   World configuration settings
-
 -   Improved collection components
-
     -   Default initialization interface
-
     -   Dependency backup/restore for Entities.ForEach
-
     -   Get as ref
-
     -   Conversion and serialization
-
 -   Profiling tools
-
     -   Port and cleanup from Lsss
-
 -   Reflection-free refactor
-
     -   For Tiny support
-
--   Safe blob management
-
+-   Job-friendly safe blob management
 -   Custom Lambda Code-gen
-
     -   If I am feeling really, really brave…

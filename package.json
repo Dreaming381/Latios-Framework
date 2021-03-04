@@ -1,14 +1,14 @@
 {
   "name": "com.latios.latiosframework",
   "displayName": "Latios Framework for DOTS",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "unity": "2020.1",
-  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Physics\n\nComplete game examples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.2.0",
+  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\nComplete game examples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.3.0",
   "dependencies": {
     "com.unity.entities": "0.17.0-preview.41",
-    "com.unity.code-analysis": "0.1.2-preview"
+    "com.unity.audio.dspgraph": "0.1.0-preview.17"
   },
-  "unityRelease": "2f1",
+  "unityRelease": "9f1",
   "keywords": [
     "dots",
     "latios",
@@ -24,9 +24,14 @@
       "path": "Samples~/OptimizationAdventures"
     },
     {
-      "displayName": "Find Pairs Examples",
+      "displayName": "Psyshock FindPairs Examples",
       "description": "Simple scenes and logic showcasing Physics.FindPairs capabilities",
       "path": "Samples~/FindPairsExamples"
+    },
+    {
+      "displayName": "Myri Examples",
+      "description": "Simple scenes showing how to set up Myri and play clips at randomized positions with spatialization",
+      "path": "Samples~/MyriExamples"
     }
   ]
 }

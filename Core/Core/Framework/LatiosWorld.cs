@@ -11,8 +11,23 @@ namespace Latios
 {
     public class LatiosWorld : World
     {
-        public ManagedEntity worldGlobalEntity { get; private set; }
-        public ManagedEntity sceneGlobalEntity { get; private set; }
+        public BlackboardEntity worldBlackboardEntity { get; private set; }
+        public BlackboardEntity sceneBlackboardEntity { get; private set; }
+
+        public SyncPointPlaybackSystem syncPoint
+        {
+            get
+            {
+                m_activeSystemAccessedSyncPoint = true;
+                return m_syncPointPlaybackSystem;
+            }
+            set => m_syncPointPlaybackSystem = value;
+        }
+        public LatiosInitializationSystemGroup initializationSystemGroup => m_initializationSystemGroup;
+        public LatiosSimulationSystemGroup simulationSystemGroup => m_simulationSystemGroup;
+        public LatiosPresentationSystemGroup presentationSystemGroup => m_presentationSystemGroup;
+
+        public bool useExplicitSystemOrdering = false;
 
         internal ManagedStructComponentStorage ManagedStructStorage { get { return m_componentStorage; } }
         internal CollectionComponentStorage CollectionComponentStorage { get { return m_collectionsStorage; } }
@@ -25,9 +40,10 @@ namespace Latios
         private ManagedStructComponentStorage m_componentStorage   = new ManagedStructComponentStorage();
         private CollectionComponentStorage    m_collectionsStorage = new CollectionComponentStorage();
 
-        private InitializationSystemGroup m_initializationSystemGroup;
-        private SimulationSystemGroup     m_simulationSystemGroup;
-        private PresentationSystemGroup   m_presentationSystemGroup;
+        private LatiosInitializationSystemGroup m_initializationSystemGroup;
+        private LatiosSimulationSystemGroup     m_simulationSystemGroup;
+        private LatiosPresentationSystemGroup   m_presentationSystemGroup;
+        private SyncPointPlaybackSystem         m_syncPointPlaybackSystem;
 
         private bool m_paused          = false;
         private bool m_resumeNextFrame = false;
@@ -39,19 +55,22 @@ namespace Latios
             //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentSystemStateTag<>), typeof(ICollectionComponent));
 
-            worldGlobalEntity = new ManagedEntity(EntityManager.CreateEntity(), EntityManager);
-            sceneGlobalEntity = new ManagedEntity(EntityManager.CreateEntity(), EntityManager);
-            worldGlobalEntity.AddComponentData(new WorldGlobalTag());
-            sceneGlobalEntity.AddComponentData(new SceneGlobalTag());
+            worldBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
+            sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
+            worldBlackboardEntity.AddComponentData(new WorldBlackboardTag());
+            sceneBlackboardEntity.AddComponentData(new SceneBlackboardTag());
 
 #if UNITY_EDITOR
-            EntityManager.SetName(worldGlobalEntity, "World Global Entity");
-            EntityManager.SetName(sceneGlobalEntity, "Scene Global Entity");
+            EntityManager.SetName(worldBlackboardEntity, "World Blackboard Entity");
+            EntityManager.SetName(sceneBlackboardEntity, "Scene Blackboard Entity");
 #endif
 
+            useExplicitSystemOrdering   = true;
             m_initializationSystemGroup = GetOrCreateSystem<LatiosInitializationSystemGroup>();
             m_simulationSystemGroup     = GetOrCreateSystem<LatiosSimulationSystemGroup>();
             m_presentationSystemGroup   = GetOrCreateSystem<LatiosPresentationSystemGroup>();
+            m_syncPointPlaybackSystem   = GetExistingSystem<SyncPointPlaybackSystem>();
+            useExplicitSystemOrdering   = false;
         }
 
         //Todo: Make this API public in the future.
@@ -69,20 +88,22 @@ namespace Latios
             }
         }
 
-        internal void CreateNewSceneGlobalEntity()
+        internal void CreateNewSceneBlackboardEntity()
         {
-            if (!EntityManager.Exists(sceneGlobalEntity) || !sceneGlobalEntity.HasComponentData<SceneGlobalTag>())
+            if (!EntityManager.Exists(sceneBlackboardEntity) || !sceneBlackboardEntity.HasComponent<SceneBlackboardTag>())
             {
-                sceneGlobalEntity = new ManagedEntity(EntityManager.CreateEntity(), EntityManager);
-                sceneGlobalEntity.AddComponentData(new SceneGlobalTag());
+                sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
+                sceneBlackboardEntity.AddComponentData(new SceneBlackboardTag());
 #if UNITY_EDITOR
-                EntityManager.SetName(sceneGlobalEntity, "Scene Global Entity");
+                EntityManager.SetName(sceneBlackboardEntity, "Scene Blackboard Entity");
 #endif
             }
         }
 
-        #region CollectionDependencies
+        #region AutoDependencies
+
         private SubSystemBase m_activeSystem;
+        private bool          m_activeSystemAccessedSyncPoint;
 
         internal void UpdateOrCompleteDependency(JobHandle readHandle, JobHandle writeHandle)
         {
@@ -129,16 +150,17 @@ namespace Latios
             }
         }
 
-        internal void BeginCollectionTracking(SubSystemBase sys)
+        internal void BeginDependencyTracking(SubSystemBase sys)
         {
             if (m_activeSystem != null)
             {
                 throw new InvalidOperationException("Error: Calling Update on a SubSystem from within another SubSystem is not allowed!");
             }
-            m_activeSystem = sys;
+            m_activeSystem                  = sys;
+            m_activeSystemAccessedSyncPoint = false;
         }
 
-        internal void EndCollectionTracking(JobHandle outputDeps)
+        internal void EndDependencyTracking(JobHandle outputDeps)
         {
             m_activeSystem = null;
             if (outputDeps.IsCompleted)
@@ -149,6 +171,10 @@ namespace Latios
             else
             {
                 UpdateCollectionDependencies(outputDeps);
+                if (m_activeSystemAccessedSyncPoint)
+                {
+                    m_syncPointPlaybackSystem.AddJobHandleForProducer(outputDeps);
+                }
             }
         }
 
@@ -215,13 +241,20 @@ namespace Latios
         #endregion
     }
 
+namespace Systems
+{
     public class LatiosSimulationSystemGroup : SimulationSystemGroup
     {
         protected override void OnUpdate()
         {
             LatiosWorld lw = World as LatiosWorld;
             if (!lw.paused)
-                base.OnUpdate();
+            {
+                foreach (var sys in Systems)
+                {
+                    SuperSystem.UpdateManagedSystem(sys);
+                }
+            }
         }
     }
 
@@ -231,8 +264,14 @@ namespace Latios
         {
             LatiosWorld lw = World as LatiosWorld;
             if (!lw.paused)
-                base.OnUpdate();
+            {
+                foreach (var sys in Systems)
+                {
+                    SuperSystem.UpdateManagedSystem(sys);
+                }
+            }
         }
     }
+}
 }
 

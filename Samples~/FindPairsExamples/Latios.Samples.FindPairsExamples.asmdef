@@ -2,14 +2,13 @@
     "name": "Latios.Samples.FindPairsExamples",
     "references": [
         "Latios.Core",
-        "Latios.Physics",
+        "Latios.Psyshock",
         "Unity.Burst",
         "Unity.Collections",
         "Unity.Entities",
         "Unity.Jobs",
         "Unity.Mathematics",
-        "Unity.Transforms",
-        "Unity.TextMeshPro"
+        "Unity.Transforms"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

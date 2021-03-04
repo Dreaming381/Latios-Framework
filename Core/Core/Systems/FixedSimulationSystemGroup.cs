@@ -9,7 +9,12 @@ namespace Latios.Systems
         {
             LatiosWorld lw = World as LatiosWorld;
             if (!lw.paused)
-                base.OnUpdate();
+            {
+                foreach (var sys in Systems)
+                {
+                    SuperSystem.UpdateManagedSystem(sys);
+                }
+            }
         }
     }
 }

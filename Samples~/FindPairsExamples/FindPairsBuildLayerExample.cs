@@ -1,16 +1,13 @@
-﻿using System.Diagnostics;
-using Latios.PhysicsEngine;
-using TMPro;
-using Unity.Burst;
+﻿using Latios;
+using Latios.Psyshock;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
-namespace Latios
+namespace Dragons
 {
-    [AlwaysUpdateSystem]
+    [AlwaysUpdateSystem, DisableAutoCreation]
     public class FindPairsBuildLayerExample : SubSystem
     {
         private EntityQuery m_query;
@@ -21,7 +18,7 @@ namespace Latios
 
         public override bool ShouldUpdateSystem()
         {
-            var currentScene = worldGlobalEntity.GetComponentData<CurrentScene>();
+            var currentScene = worldBlackboardEntity.GetComponentData<CurrentScene>();
             return currentScene.current.Equals("FindPairsBuildLayerExample");
         }
 
@@ -32,11 +29,9 @@ namespace Latios
                 worldSubdivisionsPerAxis = new int3(2, 2, 2),
                 worldAABB                = new Aabb { min = new float3(-50f, -50f, -50f), max = new float3(50f, 50f, 50f) },
             };
-            var jh = Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob);
-            jh.Complete();
-            //Physics.WithSettings(settings).BuildCollisionLayer(m_query, this).Run(out CollisionLayer layer, Allocator.TempJob);
-            PhysicsDebug.DrawLayer(layer);
-            layer.Dispose();
+            Dependency = Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob, Dependency);
+            Dependency = PhysicsDebug.DrawLayer(layer).ScheduleParallel(Dependency);
+            Dependency = layer.Dispose(Dependency);
         }
     }
 }

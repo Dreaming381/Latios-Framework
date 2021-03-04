@@ -13,6 +13,8 @@ namespace Latios.Systems
     }
 
     [DisableAutoCreation]
+    [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderFirst = true)]
+    [UpdateAfter(typeof(MergeBlackboardsSystem))]
     public class ManagedComponentsReactiveSystemGroup : RootSuperSystem
     {
         struct AssociatedTypeSysStateTagTypePair : IEquatable<AssociatedTypeSysStateTagTypePair>

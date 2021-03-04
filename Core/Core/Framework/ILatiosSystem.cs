@@ -8,8 +8,8 @@ namespace Latios
     {
         LatiosWorld latiosWorld { get; }
 
-        ManagedEntity worldGlobalEntity { get; }
-        ManagedEntity sceneGlobalEntity { get; }
+        BlackboardEntity worldBlackboardEntity { get; }
+        BlackboardEntity sceneBlackboardEntity { get; }
 
         bool ShouldUpdateSystem();
 

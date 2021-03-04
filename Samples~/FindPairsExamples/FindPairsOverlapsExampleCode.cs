@@ -1,5 +1,5 @@
 ﻿using Latios;
-using Latios.PhysicsEngine;
+using Latios.Psyshock;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -8,13 +8,12 @@ using Unity.Transforms;
 
 namespace Dragons
 {
-    [AlwaysSynchronizeSystem]
-    [AlwaysUpdateSystem]
+    [AlwaysUpdateSystem, DisableAutoCreation]
     public class FindPairsOverlapsExampleSystem : SubSystem
     {
         public override bool ShouldUpdateSystem()
         {
-            var currentScene = worldGlobalEntity.GetComponentData<CurrentScene>();
+            var currentScene = worldBlackboardEntity.GetComponentData<CurrentScene>();
             return currentScene.current.Equals("FindPairsOverlapExample");
         }
 
@@ -43,9 +42,9 @@ namespace Dragons
                 worldSubdivisionsPerAxis = new int3(1, 4, 4),
                 worldAABB                = new Aabb(-1000f, 1000f),
             };
-            Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob).Complete();
-            PhysicsDebug.DrawFindPairs(layer);
-            layer.Dispose();
+            Dependency = Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob, Dependency);
+            Dependency = PhysicsDebug.DrawFindPairs(layer).ScheduleParallel(Dependency);
+            Dependency = layer.Dispose(Dependency);
         }
     }
 }
