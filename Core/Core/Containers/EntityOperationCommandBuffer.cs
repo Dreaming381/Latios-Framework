@@ -420,7 +420,9 @@ namespace Latios
                 m_blockList   = blockList;
                 m_state       = (State*)state;
                 m_ThreadIndex = 0;
-                m_Safety      = default;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                m_Safety = default;
+#endif
             }
 
             /// <summary>

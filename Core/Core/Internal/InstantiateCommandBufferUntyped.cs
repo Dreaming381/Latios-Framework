@@ -711,7 +711,9 @@ namespace Latios
                 m_componentDataBlockList = componentDataBlockList;
                 m_state                  = (State*)state;
                 m_ThreadIndex            = 0;
-                m_Safety                 = default;
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                m_Safety = default;
+#endif
             }
 
             public void Add<T0>(Entity prefab, T0 c0, int sortKey) where T0 : unmanaged

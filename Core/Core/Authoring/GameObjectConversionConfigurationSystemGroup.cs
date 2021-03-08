@@ -35,7 +35,11 @@ namespace Latios.Authoring.Systems
             {
                 if (sys is GameObjectConversionConfigurationSystem config)
                 {
+#if UNITY_EDITOR
                     config.Enabled = config.ShouldRunConversionSystem();
+#else
+                    config.Enabled = true;
+#endif
                 }
             }
         }
