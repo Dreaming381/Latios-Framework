@@ -178,14 +178,14 @@ namespace Latios.Psyshock
                 for (int i = 0; i < layer.BucketCount; i++)
                 {
                     var bucket = layer.GetBucketSlices(i);
-                    SelfSweep(bucket, jobIndex++, processor);
+                    SelfSweep(bucket, jobIndex++, processor, false);
                 }
 
                 var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
                 for (int i = 0; i < layer.BucketCount - 1; i++)
                 {
                     var bucket = layer.GetBucketSlices(i);
-                    BipartiteSweep(bucket, crossBucket, jobIndex++, processor);
+                    BipartiteSweep(bucket, crossBucket, jobIndex++, processor, false);
                 }
             }
 
@@ -196,21 +196,21 @@ namespace Latios.Psyshock
                 {
                     var bucketA = layerA.GetBucketSlices(i);
                     var bucketB = layerB.GetBucketSlices(i);
-                    BipartiteSweep(bucketA, bucketB, jobIndex++, processor);
+                    BipartiteSweep(bucketA, bucketB, jobIndex++, processor, false);
                 }
 
                 var crossBucketA = layerA.GetBucketSlices(layerA.BucketCount - 1);
                 for (int i = 0; i < layerA.BucketCount - 1; i++)
                 {
                     var bucket = layerB.GetBucketSlices(i);
-                    BipartiteSweep(crossBucketA, bucket, jobIndex++, processor);
+                    BipartiteSweep(crossBucketA, bucket, jobIndex++, processor, false);
                 }
 
                 var crossBucketB = layerB.GetBucketSlices(layerB.BucketCount - 1);
                 for (int i = 0; i < layerA.BucketCount - 1; i++)
                 {
                     var bucket = layerA.GetBucketSlices(i);
-                    BipartiteSweep(bucket, crossBucketB, jobIndex++, processor);
+                    BipartiteSweep(bucket, crossBucketB, jobIndex++, processor, false);
                 }
             }
             #endregion
@@ -318,7 +318,7 @@ namespace Latios.Psyshock
             #endregion
 
             #region SweepMethods
-            private static void SelfSweep(BucketSlices bucket, int jobIndex, T processor)
+            private static void SelfSweep(BucketSlices bucket, int jobIndex, T processor, bool isThreadSafe = true)
             {
                 int count = bucket.xmins.Length;
                 for (int i = 0; i < count - 1; i++)
@@ -333,18 +333,19 @@ namespace Latios.Psyshock
                         {
                             processor.Execute(new FindPairsResult
                             {
-                                bodyA      = bucket.bodies[i],
-                                bodyB      = bucket.bodies[j],
-                                bodyAIndex = i,
-                                bodyBIndex = j,
-                                jobIndex   = jobIndex
+                                bodyA        = bucket.bodies[i],
+                                bodyB        = bucket.bodies[j],
+                                bodyAIndex   = i,
+                                bodyBIndex   = j,
+                                jobIndex     = jobIndex,
+                                isThreadSafe = isThreadSafe
                             });
                         }
                     }
                 }
             }
 
-            private static void BipartiteSweep(BucketSlices bucketA, BucketSlices bucketB, int jobIndex, T processor)
+            private static void BipartiteSweep(BucketSlices bucketA, BucketSlices bucketB, int jobIndex, T processor, bool isThreadSafe = true)
             {
                 int countA = bucketA.xmins.Length;
                 int countB = bucketB.xmins.Length;
@@ -373,11 +374,12 @@ namespace Latios.Psyshock
                         {
                             processor.Execute(new FindPairsResult
                             {
-                                bodyA      = bucketA.bodies[i],
-                                bodyB      = bucketB.bodies[j],
-                                bodyAIndex = i,
-                                bodyBIndex = j,
-                                jobIndex   = jobIndex
+                                bodyA        = bucketA.bodies[i],
+                                bodyB        = bucketB.bodies[j],
+                                bodyAIndex   = i,
+                                bodyBIndex   = j,
+                                jobIndex     = jobIndex,
+                                isThreadSafe = isThreadSafe
                             });
                         }
                     }
@@ -405,11 +407,12 @@ namespace Latios.Psyshock
                         {
                             processor.Execute(new FindPairsResult
                             {
-                                bodyA      = bucketA.bodies[j],
-                                bodyB      = bucketB.bodies[i],
-                                bodyAIndex = i,
-                                bodyBIndex = j,
-                                jobIndex   = jobIndex
+                                bodyA        = bucketA.bodies[j],
+                                bodyB        = bucketB.bodies[i],
+                                bodyAIndex   = i,
+                                bodyBIndex   = j,
+                                jobIndex     = jobIndex,
+                                isThreadSafe = isThreadSafe
                             });
                         }
                     }

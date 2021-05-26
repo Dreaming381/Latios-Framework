@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] – 2021-5-25
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added constructor for `PhysicsScale` to auto-compute the state for a `float3
+    scale`
+
+### Fixed
+
+-   Fixed compound collider scaling for AABBs and `DistanceBetween()`
+-   Fixed `BuildCollisionLayer.ScheduleSingle()` using the wrong parallel job
+    count
+-   Fixed issue where a user could accidentally generate silent race-conditions
+    when using `PhysicsComponentDataFromEntity` and `RunImmediate()` inside a
+    parallel job. An error is thrown instead when safety checks are enabled.
+-   Renamed some files so that Unity would not complain about them matching the
+    names of `GameObject` components
+
 ## [0.3.0] – 2021-3-4
 
 Officially supports Entities [0.17.0]

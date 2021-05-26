@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.3.0]
+# Latios Framework Packages for DOTS – [0.3.2]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -24,6 +24,9 @@ Guide*](Documentation~/Upgrade%20Guide.md)*!*
     throughput (No public release)
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public
     release)
+-   Ethereal – An NPR renderer authored in reality (No public release)
+-   Networking (Name TBD) – Snapshots + input sim = unified, testable,
+    inexpensive, and hardware-friendly networking (No public release)
 
 ## Getting Started
 

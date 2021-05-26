@@ -237,7 +237,7 @@ namespace Latios.Psyshock
                     bucketStartAndCounts = layer.bucketStartsAndCounts,
                     unsortedSrcIndices   = remapSrcIndices,
                     xmins                = xmins
-                }.Run(count);
+                }.Run(layer.BucketCount);
 
                 new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
@@ -341,7 +341,7 @@ namespace Latios.Psyshock
                     bucketStartAndCounts = layer.bucketStartsAndCounts,
                     unsortedSrcIndices   = remapSrcIndices,
                     xmins                = xmins
-                }.Schedule(count, jh);
+                }.Schedule(layer.BucketCount, jh);
 
                 jh = new BuildCollisionLayerInternal.Part5FromQueryJob
                 {

@@ -27,17 +27,10 @@ namespace Latios.Psyshock
 
         public static Aabb CalculateAabb(CompoundCollider compound, RigidTransform transform)
         {
-            var    local = compound.compoundColliderBlob.Value.localAabb;
-            float3 c     = (local.min + local.max) / 2f;
-            //BoxCollider box   = new BoxCollider(c, local.max - c);
-            //return CalculateAabb(box, transform);
-
-            float3 extents = local.max - c;
-
-            var rotMatrix    = new float3x3(transform.rot);
-            var worldExtents = LatiosMath.RotateExtents(extents, rotMatrix);
-            var worldCenter  = math.transform(transform, c);
-            return new Aabb(worldCenter - worldExtents, worldCenter + worldExtents);
+            var         local = compound.compoundColliderBlob.Value.localAabb;
+            float3      c     = (local.min + local.max) / 2f;
+            BoxCollider box   = new BoxCollider(c, local.max - c);
+            return CalculateAabb(Physics.ScaleCollider(box, new PhysicsScale(compound.scale)), transform);
         }
 
         #region Dispatch

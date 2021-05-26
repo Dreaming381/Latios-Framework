@@ -279,7 +279,9 @@ public class InstantiateAndParentICB : SubSystem
 {
     protected override void OnUpdate()
     {
-        var icb = latiosWorld.syncPoint.CreateInstantiateCommandBuffer<Parent, Translation>().AsParallelWriter();
+        var icbMainthread = latiosWorld.syncPoint.CreateInstantiateCommandBuffer<Parent, Translation>();
+		icbMainThread.AddComponentTag<LocalToParent>();
+		var icb = icbMainThread.AsParallelWriter();
 
         Entities.ForEach((Entity entity, int entityInQueryIndex, in Translation trans, in Lsss.ShipFireEffectPrefab prefab) =>
         {

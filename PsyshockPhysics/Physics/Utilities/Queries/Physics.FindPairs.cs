@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -24,8 +25,29 @@ namespace Latios.Psyshock
         public int          bodyBIndex;
         public int          jobIndex;
 
+        internal bool isThreadSafe;
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        public SafeEntity entityA => new SafeEntity
+        {
+            entity = new Entity
+            {
+                Index   = math.select(-bodyA.entity.Index, bodyA.entity.Index, isThreadSafe),
+                Version = bodyA.entity.Version
+            }
+        };
+        public SafeEntity entityB => new SafeEntity
+        {
+            entity = new Entity
+            {
+                Index   = math.select(-bodyB.entity.Index, bodyB.entity.Index, isThreadSafe),
+                Version = bodyB.entity.Version
+            }
+        };
+#else
         public SafeEntity entityA => new SafeEntity { entity = bodyA.entity };
         public SafeEntity entityB => new SafeEntity { entity = bodyB.entity };
+#endif
         //Todo: Shorthands for calling narrow phase distance and manifold queries
     }
 

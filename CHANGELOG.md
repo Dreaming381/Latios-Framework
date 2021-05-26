@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] – 2021-5-25
+
+Officially supports Entities [0.17.0]
+
+### Changed
+
+-   Updated Psyshock to v0.3.2
+-   Updated Myri to v0.3.2
+-   Removed Package lock file which caused 2020.3 LTS to complain
+
 ## [0.3.1] – 2021-3-7
 
 Officially supports Entities [0.17.0]

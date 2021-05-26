@@ -180,18 +180,21 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit        = false;
-            result          = default;
-            result.distance = float.MaxValue;
-            ref var blob    = ref compound.compoundColliderBlob.Value;
+            bool hit              = false;
+            result                = default;
+            result.distance       = float.MaxValue;
+            ref var blob          = ref compound.compoundColliderBlob.Value;
+            var     compoundScale = new PhysicsScale { scale = compound.scale, state = PhysicsScale.State.Uniform };
             for (int i = 0; i < blob.colliders.Length; i++)
             {
-                bool newHit = DistanceBetween(blob.colliders[i],
-                                              math.mul(compoundTransform, blob.transforms[i]),
-                                              sphere,
-                                              sphereTransform,
-                                              math.min(result.distance, maxDistance),
-                                              out var newResult);
+                var blobTransform  = blob.transforms[i];
+                blobTransform.pos *= compound.scale;
+                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                                                     math.mul(compoundTransform, blobTransform),
+                                                     sphere,
+                                                     sphereTransform,
+                                                     math.min(result.distance, maxDistance),
+                                                     out var newResult);
 
                 newResult.subColliderIndexA  = i;
                 newHit                      &= newResult.distance < result.distance;
@@ -208,7 +211,7 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, sphere, sphereTransform,  maxDistance, out var flipResult);
+            bool hit = DistanceBetween(compound, compoundTransform, sphere, sphereTransform, maxDistance, out var flipResult);
             result   = FlipResult(flipResult);
             return hit;
         }
@@ -220,18 +223,21 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit        = false;
-            result          = default;
-            result.distance = float.MaxValue;
-            ref var blob    = ref compound.compoundColliderBlob.Value;
+            bool hit              = false;
+            result                = default;
+            result.distance       = float.MaxValue;
+            ref var blob          = ref compound.compoundColliderBlob.Value;
+            var     compoundScale = new PhysicsScale { scale = compound.scale, state = PhysicsScale.State.Uniform };
             for (int i = 0; i < blob.colliders.Length; i++)
             {
-                bool newHit = DistanceBetween(blob.colliders[i],
-                                              math.mul(compoundTransform, blob.transforms[i]),
-                                              capsule,
-                                              capsuleTransform,
-                                              math.min(result.distance, maxDistance),
-                                              out var newResult);
+                var blobTransform  = blob.transforms[i];
+                blobTransform.pos *= compound.scale;
+                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                                                     math.mul(compoundTransform, blobTransform),
+                                                     capsule,
+                                                     capsuleTransform,
+                                                     math.min(result.distance, maxDistance),
+                                                     out var newResult);
 
                 newResult.subColliderIndexA  = i;
                 newHit                      &= newResult.distance < result.distance;
@@ -260,18 +266,21 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit        = false;
-            result          = default;
-            result.distance = float.MaxValue;
-            ref var blob    = ref compound.compoundColliderBlob.Value;
+            bool hit              = false;
+            result                = default;
+            result.distance       = float.MaxValue;
+            ref var blob          = ref compound.compoundColliderBlob.Value;
+            var     compoundScale = new PhysicsScale { scale = compound.scale, state = PhysicsScale.State.Uniform };
             for (int i = 0; i < blob.colliders.Length; i++)
             {
-                bool newHit = DistanceBetween(blob.colliders[i],
-                                              math.mul(compoundTransform, blob.transforms[i]),
-                                              box,
-                                              boxTransform,
-                                              maxDistance,
-                                              out var newResult);
+                var blobTransform  = blob.transforms[i];
+                blobTransform.pos *= compound.scale;
+                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                                                     math.mul(compoundTransform, blobTransform),
+                                                     box,
+                                                     boxTransform,
+                                                     maxDistance,
+                                                     out var newResult);
 
                 newResult.subColliderIndexA  = i;
                 newHit                      &= newResult.distance < result.distance;
@@ -300,18 +309,21 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit        = false;
-            result          = default;
-            result.distance = float.MaxValue;
-            ref var blob    = ref compoundA.compoundColliderBlob.Value;
+            bool hit              = false;
+            result                = default;
+            result.distance       = float.MaxValue;
+            ref var blob          = ref compoundA.compoundColliderBlob.Value;
+            var     compoundScale = new PhysicsScale { scale = compoundA.scale, state = PhysicsScale.State.Uniform };
             for (int i = 0; i < blob.colliders.Length; i++)
             {
-                bool newHit = DistanceBetween(blob.colliders[i],
-                                              math.mul(aTransform, blob.transforms[i]),
-                                              compoundB,
-                                              bTransform,
-                                              math.min(result.distance, maxDistance),
-                                              out var newResult);
+                var blobTransform  = blob.transforms[i];
+                blobTransform.pos *= compoundA.scale;
+                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                                                     math.mul(aTransform, blobTransform),
+                                                     compoundB,
+                                                     bTransform,
+                                                     math.min(result.distance, maxDistance),
+                                                     out var newResult);
 
                 newResult.subColliderIndexA  = i;
                 newHit                      &= newResult.distance < result.distance;

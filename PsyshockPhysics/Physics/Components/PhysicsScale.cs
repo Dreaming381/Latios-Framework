@@ -16,6 +16,21 @@ namespace Latios.Psyshock
             NonUniform,
             NonComputable,
         }
+
+        public PhysicsScale(float3 scale)
+        {
+            if (math.all(scale.x == scale.yz))
+            {
+                if (scale.x == 1f)
+                    state = State.None;
+                else
+                    state = State.Uniform;
+            }
+            else
+                state    = State.NonUniform;
+            this.scale   = scale;
+            ignoreParent = false;
+        }
     }
 
     public struct AutoUpdatePhysicsScaleTag : IComponentData { }

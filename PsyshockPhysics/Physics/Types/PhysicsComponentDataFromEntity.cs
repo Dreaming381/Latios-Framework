@@ -1,6 +1,9 @@
-﻿using Unity.Collections;
+﻿using System;
+using System.Diagnostics;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
@@ -10,7 +13,13 @@ namespace Latios.Psyshock
     {
         internal Entity entity;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        public static implicit operator Entity(SafeEntity e) => new Entity {
+            Index = math.abs(e.entity.Index), Version = e.entity.Version
+        };
+#else
         public static implicit operator Entity(SafeEntity e) => e.entity;
+#endif
     }
 
     public struct PhysicsComponentDataFromEntity<T> where T : struct, IComponentData
@@ -20,8 +29,16 @@ namespace Latios.Psyshock
 
         public T this[SafeEntity safeEntity]
         {
-            get => cdfe[safeEntity.entity];
-            set => cdfe[safeEntity.entity] = value;
+            get
+            {
+                ValidateSafeEntityIsSafe(safeEntity);
+                return cdfe[safeEntity.entity];
+            }
+            set
+            {
+                ValidateSafeEntityIsSafe(safeEntity);
+                cdfe[safeEntity.entity] = value;
+            }
         }
 
         public bool HasComponent(SafeEntity safeEntity) => cdfe.HasComponent(safeEntity.entity);
@@ -31,6 +48,17 @@ namespace Latios.Psyshock
         public static implicit operator PhysicsComponentDataFromEntity<T>(ComponentDataFromEntity<T> componentDataFromEntity)
         {
             return new PhysicsComponentDataFromEntity<T> { cdfe = componentDataFromEntity };
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (safeEntity.entity.Index < 0)
+            {
+                throw new InvalidOperationException("PhysicsComponentDataFromEntity cannot be used inside a RunImmediate context. Use ComponentDataFromEntity instead.");
+            }
+#endif
         }
     }
 
