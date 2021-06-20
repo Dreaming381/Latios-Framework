@@ -122,6 +122,20 @@ framerate proportionally. This comes at a performance cost as well as less
 accept the occasional first audio frame drops and leave *Audio Subframes Per
 Frame* at *1*.
 
+### Optimizing Clips for Performance
+
+Every audio clip has a sample rate, typically measured in kHz. Common sample
+rates may be 44.1 kHz and 48 kHz. The audio output of the device may have a
+different sample rate than the audio clip. When this happens, Myri needs to
+“resample” the clip to compensate at runtime, which may have a measurable
+performance impact for complex audio workloads. Therefore, it is recommended to
+convert the clips sample rates to the target device’s sample rate if performance
+is a concern. This can be done using the import settings for the audio clip. The
+following image shows an audio clip with a sample rate of 44.1 kHz being
+converted to 48 kHz.
+
+![](media/8986587ec983ff3f342baaf8990b8899.png)
+
 ## IComponentData
 
 Myri’s entire API is exposed as Burst-friendly `IComponentData` that can be

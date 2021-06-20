@@ -303,15 +303,16 @@ it wouldn’t work.
 
 ## Near-Term Roadmap
 
--   DeferredCollisionLayers
--   FindPairsCache, FindPairsStream, and FindPairsAdvanced
-    -   Cache and replay pairs
-    -   Apply custom pair filtering
-    -   Custom streams
-    -   Indexing items in CollisionLayers
-    -   Fix Part 2 performance issues
--   FindAabbPairs
-    -   Lightweight version which omits the Collider and RigidTransform
+-   Character Controller Utilities
+-   FindPairs overhaul
+    -   Aabb layers
+    -   Stack optimizations
+    -   Pair caching
+    -   Pair filter caching
+    -   Mismatched layers support
+    -   CollisionLayers fully deferrable (breaking)
+    -   “Any” mode with early outs
+    -   Bucket begin/end callbacks
 -   More Collider Shapes
     -   Triangle, Quad, BeveledBox, Cone, Cylinder
     -   Terrain, Convex Hull, Static Mesh, Dynamic Compound, Dynamic Mesh

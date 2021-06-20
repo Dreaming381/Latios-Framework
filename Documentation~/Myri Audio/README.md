@@ -80,20 +80,31 @@ were hoping for, well I’m glad I delivered.
     audio framerate is faster than the simulation framerate. A configurable
     audio framerate multiplier exists to combat this, but issues may still arise
     during frame spikes.
--   A job which manages listeners and the DSP graph is not Bursted due to
-    DSPGraph limitations.
 -   Myri will only use up to `n` worker threads when performing sampling, where
     `n` is the sum of spatialization channels across all listeners. A default
     listener has four spatialization channels.
+-   Myri does not properly handle peaks in audio where the samples mixed become
+    greater than 1.0f. A proper limiter would likely solve this, but I’m not an
+    audio engineer, and so this is one of the areas I need help.
+
+## Known DSPGraph Issues
+
+The following issues are issues with Unity’s underlying DSPGraph and cannot be
+resolved in Myri. If you encounter one of these issues, submit a bug report to
+Unity!
+
+-   A job which manages listeners and the DSP graph is not Bursted due to
+    DSPGraph limitations.
 -   The Unity Editor sometimes emits an exception from a Bursted job. This is a
     DSPGraph and job system bug related to scheduling, and does not appear to
     have any adverse effects currently.
 -   Exiting play mode while an active listener exists will cause a warning
     regarding DSPGraph nodes not being disposed. This is an execution order
     issue on teardown.
--   Myri does not properly handle peaks in audio where the samples mixed become
-    greater than 1.0f. A proper limiter would likely solve this, but I’m not an
-    audio engineer, and so this is one of the areas I need help.
+-   Audio causes crashes for MacOS builds using 2020.1.9f1 and possibly other
+    versions. (1 report)
+-   DSPGraph does not initialize correctly on 2020.3 using the new build system
+    packages for Windows (1 report)
 
 ## Near-Term Roadmap
 

@@ -150,6 +150,8 @@ namespace Latios.Myri
                 var outputSamples = outputSamplesMegaBuffer.GetSubArray(targetListenerParameters.bufferStart + targetListenerParameters.samplesPerChannel * channelIndex,
                                                                         targetListenerParameters.samplesPerChannel);
 
+                ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+
                 for (int clipIndex = 0; clipIndex < clipFrameLookups.Length; clipIndex++)
                 {
                     if (targetListenerIndices[clipIndex] != listenerIndex)
@@ -167,33 +169,21 @@ namespace Latios.Myri
                     {
                         float weight = itdWeights[itd] * channelWeight;
 
-                        double itdOffset    = math.lerp(0, -itdMaxOffset, itd / (double)(itdWeights.Length - 1));
-                        itdOffset           = math.select(itdOffset, math.lerp(-itdMaxOffset, 0, itd / (double)(itdWeights.Length - 1)), isRightChannel);
-                        itdOffset           = math.select(itdOffset, 0, itdWeights.Length == 1);
-                        ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                        double itdOffset = math.lerp(0, -itdMaxOffset, itd / (double)(itdWeights.Length - 1));
+                        itdOffset        = math.select(itdOffset, math.lerp(-itdMaxOffset, 0, itd / (double)(itdWeights.Length - 1)), isRightChannel);
+                        itdOffset        = math.select(itdOffset, 0, itdWeights.Length == 1);
 
                         if (weight > 0f)
                         {
                             if (clip.sampleRate == sampleRate)
                             {
-                                int clipStart = (int)(samplesPlayed % (ulong)clip.samplesLeftOrMono.Length) + (int)math.round(itdOffset) + loopOffset;
+                                int clipStart = (int)((samplesPlayed + (ulong)loopOffset) % (ulong)clip.samplesLeftOrMono.Length) + (int)math.round(itdOffset);
                                 SampleMatchedRate(ref clip, clipStart, isRightChannel, weight, outputSamples);
                             }
                             else
                             {
-                                double clipLengthInOutputSamples      = clip.samplesLeftOrMono.Length * clipSampleStride;
-                                ulong  clipLengthInOutputSamplesFloor = (ulong)clipLengthInOutputSamples;
-                                ulong  loops                          = samplesPlayed / clipLengthInOutputSamplesFloor;
-                                ulong  currentLoopSamples             = samplesPlayed - (loops * clipLengthInOutputSamplesFloor);
-                                double clipStart                      = currentLoopSamples + loops * math.frac(clipLengthInOutputSamples) + itdOffset + loopOffset;
-                                while (clipStart < 0)
-                                {
-                                    clipStart += clipLengthInOutputSamples;
-                                }
-                                while (clipStart >= clipLengthInOutputSamples)
-                                {
-                                    clipStart -= clipLengthInOutputSamples;
-                                }
+                                double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
+                                double clipStart                    = (samplesPlayedInSourceSamples + loopOffset + itdOffset) % clip.samplesLeftOrMono.Length;
                                 SampleMismatchedRate(ref clip, clipStart, clipSampleStride, isRightChannel, weight, outputSamples);
                             }
                         }
@@ -223,8 +213,7 @@ namespace Latios.Myri
 
             void SampleMismatchedRate(ref AudioClipBlob clip, double clipStart, double clipSampleStride, bool isRightChannel, float weight, NativeArray<float> output)
             {
-                ref var clipSamples               = ref (isRightChannel && clip.isStereo ? ref clip.samplesRight : ref clip.samplesLeftOrMono);
-                double  clipLengthInOutputSamples = clipSamples.Length * clipSampleStride;
+                ref var clipSamples = ref (isRightChannel && clip.isStereo ? ref clip.samplesRight : ref clip.samplesLeftOrMono);
 
                 for (int i = 0; i < output.Length; i++)
                 {
