@@ -18,21 +18,20 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<AudioSourceOneShot> oneshotHandle;
             [ReadOnly] public EntityTypeHandle                        entityHandle;
             [ReadOnly] public NativeReference<int>                    audioFrame;
+            [ReadOnly] public NativeReference<int>                    lastPlayedAudioFrame;
             [ReadOnly] public ComponentDataFromEntity<AudioSettings>  settingsCdfe;
             public Entity                                             worldBlackboardEntity;
             public int                                                sampleRate;
-            public int                                                samplesPerSubframe;
+            public int                                                samplesPerFrame;
 
             public void Execute(ArchetypeChunk chunk, int chunkIndex)
             {
-                var oneshots        = chunk.GetNativeArray(oneshotHandle);
-                var entities        = chunk.GetNativeArray(entityHandle);
-                var lastAudioFrame  = audioFrame.Value - 1;
-                int samplesPerFrame = samplesPerSubframe * settingsCdfe[worldBlackboardEntity].audioSubframesPerFrame;
+                var oneshots = chunk.GetNativeArray(oneshotHandle);
+                var entities = chunk.GetNativeArray(entityHandle);
                 for (int i = 0; i < oneshots.Length; i++)
                 {
                     var    os           = oneshots[i];
-                    int    playedFrames = lastAudioFrame - os.m_spawnedAudioFrame;
+                    int    playedFrames = lastPlayedAudioFrame.Value - os.m_spawnedAudioFrame;
                     double resampleRate = os.clip.Value.sampleRate / (double)sampleRate;
                     if (os.isInitialized && os.clip.Value.samplesLeftOrMono.Length < resampleRate * playedFrames * samplesPerFrame)
                     {
@@ -117,6 +116,7 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<LocalToWorld>           ltwHandle;
             public NativeArray<OneshotEmitter>                            emitters;
             [ReadOnly] public NativeReference<int>                        audioFrame;
+            [ReadOnly] public NativeReference<int>                        lastPlayedAudioFrame;
             [ReadOnly] public NativeReference<int>                        lastConsumedBufferId;
             public int                                                    bufferId;
 
@@ -130,7 +130,7 @@ namespace Latios.Myri
                     //In such a case, we still want the one shot to start at the beginning rather than skip the first audio frame.
                     //This is more likely to happen in high framerate scenarios.
                     //This does not solve the problem where the audio frame ticks during DSP and again before the next AudioSystemUpdate.
-                    if ((!oneshot.isInitialized) | (oneshot.m_spawnedBufferId - lastConsumedBufferId.Value > 0))
+                    if ((!oneshot.isInitialized) || (oneshot.m_spawnedBufferId - lastConsumedBufferId.Value > 0 && (lastPlayedAudioFrame.Value - oneshot.m_spawnedAudioFrame >= 0)))
                     {
                         oneshot.m_spawnedBufferId   = bufferId;
                         oneshot.m_spawnedAudioFrame = audioFrame.Value;
@@ -355,7 +355,7 @@ namespace Latios.Myri
 
             public void Execute(ArchetypeChunk chunk, int chunkIndex, int firstEntityIndex)
             {
-                var seed   = math.asuint(audioFrame.Value);
+                var rng    = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, chunkIndex)));
                 var looped = chunk.GetNativeArray(loopedHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -363,7 +363,7 @@ namespace Latios.Myri
 
                     if (!l.m_initialized)
                     {
-                        l.m_loopOffsetIndex = (int)((Squirrel3Noise((uint)(firstEntityIndex + i), seed) * (ulong)l.m_clip.Value.loopedOffsets.Length) >> 32);
+                        l.m_loopOffsetIndex = rng.NextInt(0, l.m_clip.Value.loopedOffsets.Length);
                         l.m_initialized     = true;
                         looped[i]           = l;
                     }
@@ -422,19 +422,6 @@ namespace Latios.Myri
 
                     default: ErrorCase(); break;
                 }
-            }
-
-            //From https://www.youtube.com/watch?v=LWFzPP8ZbdU
-            uint Squirrel3Noise(uint position, uint seed)
-            {
-                var val  = position * 0x68e31da4;
-                val     *= seed;
-                val     ^= (val >> 8);
-                val     += 0xb5297a4d;
-                val     ^= (val << 8);
-                val     *= 0x1b56c4e9;
-                val     ^= (val >> 8);
-                return val;
             }
 
             void ProcessNoTransform(ArchetypeChunk chunk, int firstEntityIndex)

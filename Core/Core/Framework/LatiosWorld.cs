@@ -12,7 +12,25 @@ namespace Latios
     public class LatiosWorld : World
     {
         public BlackboardEntity worldBlackboardEntity { get; private set; }
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+        private BlackboardEntity m_sceneBlackboardEntity;
+        private bool m_sceneBlackboardSafetyOverride;
+        public BlackboardEntity sceneBlackboardEntity
+        {
+            get
+            {
+                if (m_sceneBlackboardEntity == Entity.Null && !m_sceneBlackboardSafetyOverride)
+                {
+                    throw new InvalidOperationException(
+                        "The sceneBlackboard Entity has not been initialized yet. If you are trying to access this entity in OnCreate(), please use OnNewScene() or another callback instead.");
+                }
+                return m_sceneBlackboardEntity;
+            }
+            private set => m_sceneBlackboardEntity = value;
+        }
+#else
         public BlackboardEntity sceneBlackboardEntity { get; private set; }
+#endif
 
         public SyncPointPlaybackSystem syncPoint
         {
@@ -56,13 +74,10 @@ namespace Latios
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentSystemStateTag<>), typeof(ICollectionComponent));
 
             worldBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
-            sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
             worldBlackboardEntity.AddComponentData(new WorldBlackboardTag());
-            sceneBlackboardEntity.AddComponentData(new SceneBlackboardTag());
 
 #if UNITY_EDITOR
             EntityManager.SetName(worldBlackboardEntity, "World Blackboard Entity");
-            EntityManager.SetName(sceneBlackboardEntity, "Scene Blackboard Entity");
 #endif
 
             useExplicitSystemOrdering   = true;
@@ -90,6 +105,9 @@ namespace Latios
 
         internal void CreateNewSceneBlackboardEntity()
         {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            m_sceneBlackboardSafetyOverride = true;
+#endif
             if (!EntityManager.Exists(sceneBlackboardEntity) || !sceneBlackboardEntity.HasComponent<SceneBlackboardTag>())
             {
                 sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
@@ -97,7 +115,17 @@ namespace Latios
 #if UNITY_EDITOR
                 EntityManager.SetName(sceneBlackboardEntity, "Scene Blackboard Entity");
 #endif
+                foreach (var system in Systems)
+                {
+                    if (system is ILatiosSystem latiosSystem)
+                    {
+                        latiosSystem.OnNewScene();
+                    }
+                }
             }
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            m_sceneBlackboardSafetyOverride = false;
+#endif
         }
 
         #region AutoDependencies

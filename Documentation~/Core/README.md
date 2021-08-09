@@ -154,10 +154,8 @@ in the `ManagedComponentReactiveSystemGroup` which runs in
 The typical way to iterate through these collection components is to use
 
 ```csharp
-
 Entities.WithAll\<{AssociatedComponentType}\>().ForEach((Entity)
 =\>{}).WithoutBurst().Run();
-
 ```
 
 You can then access the collection component using the `EntityManager`
@@ -255,6 +253,52 @@ is smart!
 See more: [Custom Command Buffers and
 SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSystem.md)
 
+### Rng and RngToolkit
+
+There are three common strategies for using random numbers in DOTS ECS. The
+first is to store the `Random` instance in a singleton, which prevents
+multithreading. The second is to store several `Random` instances in an array
+and access them using `[NativeThreadIndex]` which breaks determinism. The third
+is to store a `Random` instance on every entity which requires an intelligent
+seeding strategy and consumes memory bandwidth.
+
+There’s a way better way!
+
+`Rng` is a new type which provides deterministic, parallel, low bandwidth random
+numbers to your jobs. Simply call `Shuffle()` before passing it into a job, then
+access a unique sequence of random numbers using `GetSequence()` and passing in
+a unique integer (`chunkIndex`, `entityInQueryIndex`, ect). The returned
+sequence object can be used just like `Random` for the remainder of the job. You
+don’t even need to assign the state back to anything.
+
+`Rng` is based on the Noise-Based RNG presented in [this GDC
+Talk](https://www.youtube.com/watch?v=LWFzPP8ZbdU) but updated to a more
+recently shared version:
+[SquirrelNoise5](https://twitter.com/SquirrelTweets/status/1421251894274625536)
+
+However, if you would like to use your own random number generation algorithm,
+you can use the `RngToolkit` to help convert your `uint` outputs into more
+desirable forms.
+
+See more: [Rng and RngToolkit](Rng%20and%20RngToolkit.md)
+
+### EntityWith\<T\> and EntityWithBuffer\<T\>
+
+Have you ever found an `Entity` reference in a component and wondered what you
+are supposed to do with it? Do you instantiate it? Do you manipulate it? Do you
+read from it? Maybe the name might give you a clue, but we all know naming
+things is hard.
+
+So instead, use `EntityWith<T>` and `EntityWithBuffer<T>` instead! They work
+just like normal `Entity` references, except you can gather additional context
+about them. An `EntityWith<Prefab>` should probably be instantiated. An
+`EntityWith<Disabled>` needs to be enabled at the right moment. An
+`EntityWith<LocalToWorld>` is a transform to spawn things at or attach things
+to.
+
+These new types also come with some syntax sugar methods which may make some
+complex code a little more compact and readable.
+
 ## Known Issues
 
 -   This package does not work with Project Tiny. There are a few issues I need
@@ -286,7 +330,6 @@ SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSys
 
 -   Gameplay Toolkit
     -   Reduce cognitive overhead of DOTS for gameplay programmers
-    -   Entity component references and Entity buffer element references
     -   Hierarchy navigation and modification
     -   Type handle dependency resolver
     -   A/B systems

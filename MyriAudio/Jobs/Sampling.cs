@@ -28,14 +28,13 @@ namespace Latios.Myri
 
             public int sampleRate;
 
-            public int samplesPerSubframe;
+            public int samplesPerFrame;
 
             public void Execute(int forIndex)
             {
                 int  listenerIndex            = forIndexToListenerAndChannelIndices[forIndex].x;
                 int  channelIndex             = forIndexToListenerAndChannelIndices[forIndex].y;
                 var  targetListenerParameters = listenerBufferParameters[listenerIndex];
-                int  samplesPerFrame          = samplesPerSubframe * targetListenerParameters.subFramesPerFrame;
                 bool isRightChannel           = targetListenerParameters.leftChannelsCount <= channelIndex;
 
                 var outputSamples = outputSamplesMegaBuffer.GetSubArray(targetListenerParameters.bufferStart + targetListenerParameters.samplesPerChannel * channelIndex,
@@ -137,14 +136,13 @@ namespace Latios.Myri
             [NativeDisableParallelForRestriction] public NativeArray<float> outputSamplesMegaBuffer;
 
             public int sampleRate;
-            public int samplesPerSubframe;
+            public int samplesPerFrame;
 
             public void Execute(int forIndex)
             {
                 int  listenerIndex            = forIndexToListenerAndChannelIndices[forIndex].x;
                 int  channelIndex             = forIndexToListenerAndChannelIndices[forIndex].y;
                 var  targetListenerParameters = listenerBufferParameters[listenerIndex];
-                int  samplesPerFrame          = samplesPerSubframe * targetListenerParameters.subFramesPerFrame;
                 bool isRightChannel           = targetListenerParameters.leftChannelsCount <= channelIndex;
 
                 var outputSamples = outputSamplesMegaBuffer.GetSubArray(targetListenerParameters.bufferStart + targetListenerParameters.samplesPerChannel * channelIndex,

@@ -9,6 +9,14 @@ Check out the [Getting Started](Getting%20Started.md) page!
 
 ## Features
 
+### Out-of-the-Box
+
+Myri can play audio without requiring a single line of code. Simply add Myri
+Audio Source components to your GameObjects and a Myri Audio Listener Authoring
+to your camera transform and you are good to go. A brickwall limiter is applied
+to the final audio result so your audio can remain distortion-free no matter how
+chaotic your scene is.
+
 ### Spatialization
 
 Myri processes sound in 3D space in order to provide the listener a sense of
@@ -83,9 +91,6 @@ were hoping for, well I’m glad I delivered.
 -   Myri will only use up to `n` worker threads when performing sampling, where
     `n` is the sum of spatialization channels across all listeners. A default
     listener has four spatialization channels.
--   Myri does not properly handle peaks in audio where the samples mixed become
-    greater than 1.0f. A proper limiter would likely solve this, but I’m not an
-    audio engineer, and so this is one of the areas I need help.
 
 ## Known DSPGraph Issues
 

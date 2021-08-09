@@ -134,6 +134,10 @@ namespace Latios
                 UnityEngine.Debug.LogException(e);
             }
         }
+
+        public virtual void OnNewScene()
+        {
+        }
     }
 }
 

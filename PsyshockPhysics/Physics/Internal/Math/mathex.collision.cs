@@ -12,6 +12,14 @@ namespace Latios.Psyshock
             normal          = v * invLength;
             return lengthSq * invLength;
         }
+
+        public static float4 getLengthAndNormal(simdFloat3 v, out simdFloat3 normal)
+        {
+            float4 lengthSq  = simd.lengthsq(v);
+            float4 invLength = math.rsqrt(lengthSq);
+            normal           = v * invLength;
+            return lengthSq * invLength;
+        }
     }
 }
 

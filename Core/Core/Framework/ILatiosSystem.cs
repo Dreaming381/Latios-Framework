@@ -12,6 +12,7 @@ namespace Latios
         BlackboardEntity sceneBlackboardEntity { get; }
 
         bool ShouldUpdateSystem();
+        void OnNewScene();
 
         EntityQuery GetEntityQuery(EntityQueryDesc desc);
 

@@ -93,9 +93,7 @@ out the ones that it knows are not colliding. A good broadphase satisfies 3
 rules:
 
 -   It is fast – otherwise why do it?
-
 -   It must remove most non-colliding pairs – again, otherwise why do it?
-
 -   If it is wrong about a pair, it can only be wrong in that it suspects a pair
     may be colliding when it is not. In other words, it can only produce false
     positives, not false negatives.
@@ -128,9 +126,7 @@ reasons:
     very large and very small objects in the same world. This is something that
     fixed-sized grids have trouble with and makes those solutions not as
     reusable.
-
 -   Broadphase algorithms are heavily studied and have become quite optimized.
-
 -   Broadphase algorithms allow for a unique search area per object.
 
 So when I am trying to figure out which lasers hit which space ships, or whether
@@ -289,11 +285,8 @@ on x86, one of the two operands can be to main memory using brackets.
 As for the instructions:
 
 -   mov is a copy instruction between registers and main memory.
-
 -   inc is an increment, j++
-
 -   cmp is a compare
-
 -   jle is jump if less or equal. The .LBB0_11 is a constant instruction address
     to the evaluation of the outer loop. If length is less than or equal to j,
     jump out of the inner loop.
@@ -312,17 +305,13 @@ jb        .LBB0_11
 
 -   shl is shift left. This is effectively multiplying our index value by 32
     which happens to be the size of our AabbEntity struct in bytes.
-
 -   xmm6 is an SSE register. It is 128 bits wide and can store 4 floating point
     numbers at once. We’ll get to SSE registers later. Right now we are only
     storing a single float in here.
-
 -   movss is a move instruction for SSE registers. The first ‘s’ means single,
     as in move only one. The second ‘s’ stands for single precision, or floating
     point.
-
 -   ucomiss is a floating point compare. The ‘s’s mean the same thing as above.
-
 -   jb is jump if below. It is going to the same outer loop point.
 
 Next, in our inner loop, we load up the current AABB. Yes, Burst reloads it in
@@ -403,8 +392,7 @@ if (0 == (invalidatedx | invalidatedy | invalidatedz | invalidatedw))
 {
     overlaps.Add(new EntityPair(current.entity, aabbs[j].entity));
 }
-```
-```asm
+
 movss          xmm0, dword ptr [rax + rdi + 36] #
 movss          xmm1, dword ptr [rax + rdi + 40] #
 xor            edx, edx
@@ -668,7 +656,7 @@ respectively.
 And that means we broke the 2X mark! To put this in perspective, our 60 FPS game
 is now running at 144 FPS.
 
-As for those 8 load instructions, We could try to add a second compare and a
+As for those 8 load instructions, we could try to add a second compare and a
 shuffle and cut that number in half, saving two instructions. However, the
 reason they exist is because my little simplified data structure sucks. The
 layout is terrible. If we want to push this algorithm further, we are going to

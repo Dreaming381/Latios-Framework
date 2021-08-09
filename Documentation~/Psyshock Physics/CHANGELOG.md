@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] – 2021-8-9
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added `StepVelocityWithInput()`. It is the input-driven smooth motion logic
+    I have been using for several projects.
+-   Added several methods and utilities to aid in ballistics simulations. This
+    API is subject to change as I continue to explore and develop this aspect of
+    Psyshock. The new stuff can be found in
+    *Physics/Dynamics/Physics.BallisticUtils.cs*.
+-   *New Feature:* Added `Physics.ColliderCast()` queries.
+-   *New Feature:* Added `DistanceBetween()` queries that take a single point as
+    an input.
+-   Added `subColliderIndex` to `PointDistanceResult` and `RaycastResult`.
+-   Added `CombineAabb()`.
+
+### Changed
+
+-   **Breaking:** Renamed `CalculateAabb()` to `AabbFrom()`.
+
+### Fixed
+
+-   Fixed an issue where `DistanceBetween()` queries did not properly account
+    for the center point of `SphereColliders`.
+
 ## [0.3.2] – 2021-5-25
 
 Officially supports Entities [0.17.0]

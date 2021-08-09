@@ -95,6 +95,11 @@ namespace Latios
             return RotateExtents(extents, rotationMatrix.c0, rotationMatrix.c1, rotationMatrix.c2);
         }
 
+        public static float2 ComplexMul(float2 a, float2 b)
+        {
+            return new float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+        }
+
         #endregion Transformations
 
         #region NumberTricks

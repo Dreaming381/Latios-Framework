@@ -1,8 +1,8 @@
 # Getting Started with Psyshock Physics
 
-This is the third preview version I am releasing out to the public. It currently
-only supports a small number of use cases. The number of supported use cases
-will grow with each release.
+This is the fourth preview version I am releasing out to the public. It
+currently only supports a small number of use cases. The number of supported use
+cases will grow with each release.
 
 ## Authoring
 

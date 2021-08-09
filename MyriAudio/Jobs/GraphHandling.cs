@@ -17,16 +17,32 @@ namespace Latios.Myri
         {
             public NativeReference<long> packedFrameCounterBufferId;  //MSB bufferId, LSB frame
             public NativeReference<int>  audioFrame;
+            public NativeReference<int>  lastPlayedAudioFrame;
             public NativeReference<int>  lastReadBufferId;
+
+            public NativeQueue<AudioFrameBufferHistoryElement>       audioFrameHistory;
+            [ReadOnly] public ComponentDataFromEntity<AudioSettings> audioSettingsCdfe;
+            public Entity                                            worldBlackboardEntity;
 
             public unsafe void Execute()
             {
-                ref long packedRef     = ref UnsafeUtility.AsRef<long>(packedFrameCounterBufferId.GetUnsafePtr());
-                long     frameData     = Interlocked.Read(ref packedRef);
-                int      frame         = (int)(frameData & 0xffffffff);
-                int      bufferId      = (int)(frameData >> 32);
-                audioFrame.Value       = frame + 1;
-                lastReadBufferId.Value = bufferId;
+                ref long packedRef = ref UnsafeUtility.AsRef<long>(packedFrameCounterBufferId.GetUnsafePtr());
+                long     frameData = Interlocked.Read(ref packedRef);
+                int      frame     = (int)(frameData & 0xffffffff);
+                int      bufferId  = (int)(frameData >> 32);
+
+                while (!audioFrameHistory.IsEmpty() && audioFrameHistory.Peek().bufferId < bufferId)
+                {
+                    audioFrameHistory.Dequeue();
+                }
+                int targetFrame = frame + 1 + math.max(audioSettingsCdfe[worldBlackboardEntity].lookaheadAudioFrames, 0);
+                if (!audioFrameHistory.IsEmpty() && audioFrameHistory.Peek().bufferId == bufferId)
+                {
+                    targetFrame = math.max(audioFrameHistory.Peek().expectedNextUpdateFrame, targetFrame);
+                }
+                audioFrame.Value           = targetFrame;
+                lastReadBufferId.Value     = bufferId;
+                lastPlayedAudioFrame.Value = frame;
             }
         }
 
@@ -44,7 +60,8 @@ namespace Latios.Myri
             [ReadOnly] public ComponentDataFromEntity<AudioSettings> audioSettingsCdfe;
             public Entity                                            worldBlackboardEntity;
 
-            [ReadOnly] public NativeReference<int> audioFrame;
+            [ReadOnly] public NativeReference<int>             audioFrame;
+            public NativeQueue<AudioFrameBufferHistoryElement> audioFrameHistory;
 
             public NativeList<int>      systemMixNodePortFreelist;
             public NativeReference<int> systemMixNodePortCount;
@@ -60,7 +77,7 @@ namespace Latios.Myri
             public NativeList<float>                     outputSamplesMegaBuffer;
             public NativeList<IldBufferChannel>          outputSamplesMegaBufferChannels;
 
-            public int samplesPerSubframe;
+            public int samplesPerFrame;
             public int bufferId;
 
             public unsafe void Execute()
@@ -73,9 +90,10 @@ namespace Latios.Myri
                 int  megaBufferSampleCount  = 0;
                 var  channelCounts          = new NativeArray<int>(listenerBufferParameters.Length, Allocator.Temp);
 
-                var audioSettings                    = audioSettingsCdfe[worldBlackboardEntity];
-                audioSettings.audioFramesPerUpdate   = math.max(audioSettings.audioFramesPerUpdate, 1);
-                audioSettings.audioSubframesPerFrame = math.max(audioSettings.audioSubframesPerFrame, 1);
+                var audioSettings                  = audioSettingsCdfe[worldBlackboardEntity];
+                audioSettings.audioFramesPerUpdate = math.max(audioSettings.audioFramesPerUpdate, 1);
+                audioSettings.safetyAudioFrames    = math.max(audioSettings.safetyAudioFrames, 0);
+                audioSettings.lookaheadAudioFrames = math.max(audioSettings.lookaheadAudioFrames, 0);
 
                 //Destroy graph state and components of old entities
                 for (int i = 0; i < destroyedListenerEntities.Length; i++)
@@ -161,9 +179,8 @@ namespace Latios.Myri
                         listenerBufferParameters[i] = new ListenerBufferParameters
                         {
                             bufferStart       = megaBufferSampleCount,
-                            subFramesPerFrame = audioSettings.audioSubframesPerFrame,
                             leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
-                            samplesPerChannel = samplesPerSubframe * audioSettings.audioSubframesPerFrame * audioSettings.audioFramesPerUpdate
+                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
                         for (int j = 0; j < numChannels; j++)
                         {
@@ -222,9 +239,8 @@ namespace Latios.Myri
                         listenerBufferParameters[i] = new ListenerBufferParameters
                         {
                             bufferStart       = megaBufferSampleCount,
-                            subFramesPerFrame = audioSettings.audioSubframesPerFrame,
                             leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
-                            samplesPerChannel = samplesPerSubframe * audioSettings.audioSubframesPerFrame * audioSettings.audioFramesPerUpdate
+                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
                         for (int j = 0; j < numChannels; j++)
                         {
@@ -343,17 +359,23 @@ namespace Latios.Myri
                         });
                     }
                 }
+                audioFrameHistory.Enqueue(new AudioFrameBufferHistoryElement
+                {
+                    audioFrame              = audioFrame.Value,
+                    bufferId                = bufferId,
+                    expectedNextUpdateFrame = audioFrame.Value + audioSettings.audioFramesPerUpdate
+                });
                 commandBlock.UpdateAudioKernel<ReadIldBuffersNodeUpdate, ReadIldBuffersNode.Parameters, ReadIldBuffersNode.SampleProviders, ReadIldBuffersNode>(new ReadIldBuffersNodeUpdate
                 {
                     ildBuffer = new IldBuffer
                     {
-                        bufferChannels    = (IldBufferChannel*)outputSamplesMegaBufferChannels.GetUnsafePtr(),
-                        bufferId          = bufferId,
-                        framesInBuffer    = audioSettings.audioFramesPerUpdate,
-                        subframesPerFrame = audioSettings.audioSubframesPerFrame,
-                        channelCount      = outputSamplesMegaBufferChannels.Length,
-                        frame             = audioFrame.Value,
-                        warnIfStarved     = audioSettings.logWarningIfBuffersAreStarved
+                        bufferChannels  = (IldBufferChannel*)outputSamplesMegaBufferChannels.GetUnsafePtr(),
+                        bufferId        = bufferId,
+                        framesInBuffer  = 1 + audioSettings.safetyAudioFrames,
+                        framesPerUpdate = audioSettings.audioFramesPerUpdate,
+                        channelCount    = outputSamplesMegaBufferChannels.Length,
+                        frame           = audioFrame.Value,
+                        warnIfStarved   = audioSettings.logWarningIfBuffersAreStarved
                     },
                 },
                                                                                                                                                                 systemIldNode);

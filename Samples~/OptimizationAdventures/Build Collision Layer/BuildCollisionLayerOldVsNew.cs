@@ -268,7 +268,7 @@ namespace OptimizationAdventures
 
             private void ProcessEntity(int index, Entity entity, Collider collider, RigidTransform rigidTransform)
             {
-                Aabb aabb = Physics.CalculateAabb(collider, rigidTransform);
+                Aabb aabb = Physics.AabbFrom(collider, rigidTransform);
 
                 colliderAoS[index] = new ColliderAoSData
                 {

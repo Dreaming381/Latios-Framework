@@ -16,35 +16,35 @@ namespace Latios.Psyshock
         }
 
         //All algorithms return a negative distance if inside the collider.
-        /*public static bool DistanceBetween(float3 point, SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result)
-           {
-            float3 delta = sphere.center - point;
-            float pcDistanceSq = math.lengthsq(delta);  //point center distance
-            bool distanceIsZero = pcDistanceSq == 0.0f;
-            float invPCDistance = math.select(math.rsqrt(pcDistanceSq), 0.0f, distanceIsZero);
-            float3 inNormal = math.select(delta * invPCDistance, new float3(0, 1, 0), distanceIsZero);  // choose an arbitrary normal when the distance is zero
-            float distance = pcDistanceSq * invPCDistance - sphere.radius;
-            result = new PointDistanceResultInternal
+        public static bool DistanceBetween(float3 point, SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result)
+        {
+            float3 delta          = sphere.center - point;
+            float  pcDistanceSq   = math.lengthsq(delta);  //point center distance
+            bool   distanceIsZero = pcDistanceSq == 0.0f;
+            float  invPCDistance  = math.select(math.rsqrt(pcDistanceSq), 0.0f, distanceIsZero);
+            float3 inNormal       = math.select(delta * invPCDistance, new float3(0, 1, 0), distanceIsZero);  // choose an arbitrary normal when the distance is zero
+            float  distance       = pcDistanceSq * invPCDistance - sphere.radius;
+            result                = new PointDistanceResultInternal
             {
                 hitpoint = point + inNormal * distance,
                 distance = distance,
-                normal = -inNormal,
+                normal   = -inNormal,
             };
             return distance <= maxDistance;
-           }*/
+        }
 
-        /*public static bool DistanceBetween(float3 point, CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
-           {
+        public static bool DistanceBetween(float3 point, CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
+        {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
-            float3 edge = capsule.pointB - capsule.pointA;
-            float3 ap = point - capsule.pointA;
-            float dot = math.dot(ap, edge);
-            float edgeLengthSq = math.lengthsq(edge);
-            dot = math.clamp(dot, 0f, edgeLengthSq);
-            float3 pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
-            SphereCollider sphere = new SphereCollider(pointOnSegment, capsule.radius);
+            float3 edge                   = capsule.pointB - capsule.pointA;
+            float3 ap                     = point - capsule.pointA;
+            float  dot                    = math.dot(ap, edge);
+            float  edgeLengthSq           = math.lengthsq(edge);
+            dot                           = math.clamp(dot, 0f, edgeLengthSq);
+            float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
+            SphereCollider sphere         = new SphereCollider(pointOnSegment, capsule.radius);
             return DistanceBetween(point, sphere, maxDistance, out result);
-           }*/
+        }
 
         /*public static bool DistanceBetween(float3 point, CylinderCollider cylinder, float maxDistance, out PointDistanceResultInternal result)
            {
@@ -296,22 +296,22 @@ namespace Latios.Psyshock
            }*/
 
         //Distance is unsigned, quad is "double-sided"
-        /*public static bool DistanceBetween(float3 point, QuadCollider quad, float maxDistance, out PointDistanceResultInternal result)
-           {
-            simdFloat3 abcd = new simdFloat3(quad.pointA, quad.pointB, quad.pointC, quad.pointD);
+        public static bool DistanceBetween(float3 point, simdFloat3 quadPoints, float maxDistance, out PointDistanceResultInternal result)
+        {
+            simdFloat3 abcd     = new simdFloat3(quadPoints.a, quadPoints.b, quadPoints.c, quadPoints.d);
             simdFloat3 abbccdda = abcd.bcda - abcd.abcd;
-            simdFloat3 abcdp = point - abcd;
+            simdFloat3 abcdp    = point - abcd;
 
             //project point onto plane
             //if clockwise, normal faces "up"
-            float3 planeNormal = math.normalize(math.cross(abbccdda.a, abbccdda.d));  //ab, da
-            float projectionDot = math.dot(planeNormal, abcdp.a);
+            float3 planeNormal    = math.normalize(math.cross(abbccdda.a, abbccdda.d));  //ab, da
+            float  projectionDot  = math.dot(planeNormal, abcdp.a);
             float3 projectedPoint = point - projectionDot * planeNormal;
 
             //calculate edge planes aligned with quad normal without the normalization (since it isn't required)
             //normals face "inward"
             simdFloat3 abbccddaUnnormal = simd.cross(abbccdda, planeNormal);
-            float4 dotsEdges = simd.dot(abbccddaUnnormal, abcdp);
+            float4     dotsEdges        = simd.dot(abbccddaUnnormal, abcdp);
 
             if (math.bitmask(dotsEdges < 0f) == 0)  //if (math.all(dotsEdges >= 0))
             {
@@ -320,70 +320,70 @@ namespace Latios.Psyshock
             }
             else
             {
-                float3 acUnnormal = math.cross(quad.pointC - quad.pointA, planeNormal);  //faces D
-                float3 bdUnnormal = math.cross(quad.pointD - quad.pointB, planeNormal);  //faces A
-                float2 dotsDiags = new float2(math.dot(acUnnormal, abcdp.a), math.dot(bdUnnormal, abcdp.b));
-                int region = math.csum(math.select(new int2(1, 2), int2.zero, dotsDiags >= 0));  //Todo: bitmask?
+                float3 acUnnormal = math.cross(quadPoints.c - quadPoints.a, planeNormal);  //faces D
+                float3 bdUnnormal = math.cross(quadPoints.d - quadPoints.b, planeNormal);  //faces A
+                float2 dotsDiags  = new float2(math.dot(acUnnormal, abcdp.a), math.dot(bdUnnormal, abcdp.b));
+                int    region     = math.csum(math.select(new int2(1, 2), int2.zero, dotsDiags >= 0));  //Todo: bitmask?
                 switch (region)
                 {
                     case 0:
-                        {
-                            //closest to da
-                            var da = abbccdda.d;
-                            var dp = abcdp.d;
-                            float daLengthSq = math.lengthsq(da);
-                            float dot = math.clamp(math.dot(dp, da), 0f, daLengthSq);
-                            result.hitpoint = quad.pointD + da * dot / daLengthSq;
-                            result.distance = math.distance(point, result.hitpoint);
-                            break;
-                        }
+                    {
+                        //closest to da
+                        var   da         = abbccdda.d;
+                        var   dp         = abcdp.d;
+                        float daLengthSq = math.lengthsq(da);
+                        float dot        = math.clamp(math.dot(dp, da), 0f, daLengthSq);
+                        result.hitpoint  = quadPoints.d + da * dot / daLengthSq;
+                        result.distance  = math.distance(point, result.hitpoint);
+                        break;
+                    }
                     case 1:
-                        {
-                            //closest to ab
-                            var ab = abbccdda.a;
-                            var ap = abcdp.a;
-                            float abLengthSq = math.lengthsq(ab);
-                            float dot = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
-                            result.hitpoint = quad.pointA + ab * dot / abLengthSq;
-                            result.distance = math.distance(point, result.hitpoint);
-                            break;
-                        }
+                    {
+                        //closest to ab
+                        var   ab         = abbccdda.a;
+                        var   ap         = abcdp.a;
+                        float abLengthSq = math.lengthsq(ab);
+                        float dot        = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
+                        result.hitpoint  = quadPoints.a + ab * dot / abLengthSq;
+                        result.distance  = math.distance(point, result.hitpoint);
+                        break;
+                    }
                     case 2:
-                        {
-                            //closest to bc
-                            var bc = abbccdda.b;
-                            var bp = abcdp.b;
-                            float bcLengthSq = math.lengthsq(bc);
-                            float dot = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
-                            result.hitpoint = quad.pointB + bc * dot / bcLengthSq;
-                            result.distance = math.distance(point, result.hitpoint);
-                            break;
-                        }
+                    {
+                        //closest to bc
+                        var   bc         = abbccdda.b;
+                        var   bp         = abcdp.b;
+                        float bcLengthSq = math.lengthsq(bc);
+                        float dot        = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
+                        result.hitpoint  = quadPoints.b + bc * dot / bcLengthSq;
+                        result.distance  = math.distance(point, result.hitpoint);
+                        break;
+                    }
                     case 3:
-                        {
-                            //closest to cd
-                            var cd = abbccdda.c;
-                            var cp = abcdp.c;
-                            float cdLengthSq = math.lengthsq(cd);
-                            float dot = math.clamp(math.dot(cp, cd), 0f, cdLengthSq);
-                            result.hitpoint = quad.pointC + cd * dot / cdLengthSq;
-                            result.distance = math.distance(point, result.hitpoint);
-                            break;
-                        }
+                    {
+                        //closest to cd
+                        var   cd         = abbccdda.c;
+                        var   cp         = abcdp.c;
+                        float cdLengthSq = math.lengthsq(cd);
+                        float dot        = math.clamp(math.dot(cp, cd), 0f, cdLengthSq);
+                        result.hitpoint  = quadPoints.c + cd * dot / cdLengthSq;
+                        result.distance  = math.distance(point, result.hitpoint);
+                        break;
+                    }
                     default:
-                        {
-                            //How the heck did we get here?
-                            throw new InvalidOperationException();
-                            result.hitpoint = projectedPoint;
-                            result.distance = maxDistance * 2f;
-                            break;
-                        }
+                    {
+                        //How the heck did we get here?
+                        //throw new InvalidOperationException();
+                        result.hitpoint = projectedPoint;
+                        result.distance = maxDistance * 2f;
+                        break;
+                    }
                 }
             }
 
             result.normal = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
             return result.distance <= maxDistance;
-           }*/
+        }
     }
 }
 

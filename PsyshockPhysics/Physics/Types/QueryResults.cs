@@ -10,6 +10,7 @@ namespace Latios.Psyshock
         public float3 hitpoint;
         public float  distance;
         public float3 normal;
+        public int    subColliderIndex;
     }
 
     public struct ColliderDistanceResult
@@ -28,6 +29,18 @@ namespace Latios.Psyshock
         public float3 position;
         public float  distance;
         public float3 normal;
+        public int    subColliderIndex;
+    }
+
+    public struct ColliderCastResult
+    {
+        public float3 hitpointOnCaster;
+        public float3 hitpointOnTarget;
+        public float3 normalOnSweep;
+        public float3 normalOnTarget;
+        public float  distance;
+        public int    subColliderIndexOnCaster;
+        public int    subColliderIndexOnTarget;
     }
 }
 

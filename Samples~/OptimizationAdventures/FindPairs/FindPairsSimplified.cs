@@ -1,5 +1,6 @@
 ﻿using Unity.Burst;
 using Unity.Collections;
+using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -172,7 +173,7 @@ namespace OptimizationAdventures
     }
 
     [BurstCompile]
-    public struct NewSweep : IJob
+    public struct SimdSweep : IJob
     {
         [ReadOnly] public NativeArray<AabbEntity> aabbs;
         public NativeList<EntityPair>             overlaps;
@@ -191,6 +192,110 @@ namespace OptimizationAdventures
                     if (math.bitmask(less < more) == 0)
                     {
                         overlaps.Add(new EntityPair(current.entity, aabbs[j].entity));
+                    }
+                }
+            }
+        }
+    }
+
+    [BurstCompile]
+    public struct RearrangedSweep : IJob
+    {
+        [ReadOnly] public NativeArray<AabbEntityRearranged> aabbs;
+        public NativeList<EntityPair>                       overlaps;
+
+        public void Execute()
+        {
+            for (int i = 0; i < aabbs.Length - 1; i++)
+            {
+                AabbEntityRearranged current = aabbs[i];
+
+                for (int j = i + 1; j < aabbs.Length && aabbs[j].minXmaxX.x <= current.minXmaxX.y; j++)
+                {
+                    float4 less = math.shuffle(current.minYZmaxYZ,
+                                               aabbs[j].minYZmaxYZ,
+                                               math.ShuffleComponent.LeftZ,
+                                               math.ShuffleComponent.RightZ,
+                                               math.ShuffleComponent.LeftW,
+                                               math.ShuffleComponent.RightW);
+                    float4 more = math.shuffle(current.minYZmaxYZ,
+                                               aabbs[j].minYZmaxYZ,
+                                               math.ShuffleComponent.RightX,
+                                               math.ShuffleComponent.LeftX,
+                                               math.ShuffleComponent.RightY,
+                                               math.ShuffleComponent.LeftY);
+
+                    if (math.bitmask(less < more) == 0)
+                    {
+                        overlaps.Add(new EntityPair(current.entity, aabbs[j].entity));
+                    }
+                }
+            }
+        }
+    }
+
+    [BurstCompile]
+    public struct SoaSweep : IJob
+    {
+        [ReadOnly] public NativeArray<float>  xmins;
+        [ReadOnly] public NativeArray<float>  xmaxs;
+        [ReadOnly] public NativeArray<float4> minYZmaxYZs;
+        [ReadOnly] public NativeArray<Entity> entities;
+        public NativeList<EntityPair>         overlaps;
+
+        public void Execute()
+        {
+            for (int i = 0; i < xmins.Length - 1; i++)
+            {
+                float4 current = minYZmaxYZs[i];
+
+                for (int j = i + 1; j < xmaxs.Length && xmins[j] <= xmaxs[i]; j++)
+                {
+                    float4 less = new float4(current.z, minYZmaxYZs[j].z, current.w, minYZmaxYZs[j].w);
+                    float4 more = new float4(minYZmaxYZs[j].x, current.x, minYZmaxYZs[j].y, current.y);
+
+                    if (math.bitmask(less < more) == 0)
+                    {
+                        overlaps.Add(new EntityPair(entities[i], entities[j]));
+                    }
+                }
+            }
+        }
+    }
+
+    [BurstCompile]
+    public struct SoaShuffleSweep : IJob
+    {
+        [ReadOnly] public NativeArray<float>  xmins;
+        [ReadOnly] public NativeArray<float>  xmaxs;
+        [ReadOnly] public NativeArray<float4> minYZmaxYZs;
+        [ReadOnly] public NativeArray<Entity> entities;
+        public NativeList<EntityPair>         overlaps;
+
+        public void Execute()
+        {
+            for (int i = 0; i < xmins.Length - 1; i++)
+            {
+                float4 current = minYZmaxYZs[i];
+
+                for (int j = i + 1; j < xmaxs.Length && xmins[j] <= xmaxs[i]; j++)
+                {
+                    float4 less = math.shuffle(current,
+                                               minYZmaxYZs[j],
+                                               math.ShuffleComponent.LeftZ,
+                                               math.ShuffleComponent.RightZ,
+                                               math.ShuffleComponent.LeftW,
+                                               math.ShuffleComponent.RightW);
+                    float4 more = math.shuffle(current,
+                                               minYZmaxYZs[j],
+                                               math.ShuffleComponent.RightX,
+                                               math.ShuffleComponent.LeftX,
+                                               math.ShuffleComponent.RightY,
+                                               math.ShuffleComponent.LeftY);
+
+                    if (math.bitmask(less < more) == 0)
+                    {
+                        overlaps.Add(new EntityPair(entities[i], entities[j]));
                     }
                 }
             }

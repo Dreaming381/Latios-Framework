@@ -1,6 +1,7 @@
 ﻿using System;
 using Latios.Psyshock;
 using Unity.Entities;
+using Unity.Mathematics;
 
 namespace OptimizationAdventures
 {
@@ -12,6 +13,18 @@ namespace OptimizationAdventures
         public int CompareTo(AabbEntity other)
         {
             return aabb.min.x.CompareTo(other.aabb.min.x);
+        }
+    }
+
+    public struct AabbEntityRearranged : IComparable<AabbEntityRearranged>
+    {
+        public float2 minXmaxX;
+        public float4 minYZmaxYZ;
+        public Entity entity;
+
+        public int CompareTo(AabbEntityRearranged other)
+        {
+            return minXmaxX.x.CompareTo(other.minXmaxX.x);
         }
     }
 

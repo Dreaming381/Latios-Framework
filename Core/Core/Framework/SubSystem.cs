@@ -55,6 +55,8 @@ namespace Latios
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
 
+        public abstract void OnNewScene();
+
         internal JobHandle SystemBaseDependency
         {
             get => Dependency;
@@ -73,6 +75,10 @@ namespace Latios
         }
 
         protected new abstract void OnUpdate();
+
+        public override void OnNewScene()
+        {
+        }
 
         internal override void OnCreateInternal()
         {

@@ -15,8 +15,9 @@ namespace OptimizationAdventures
         [BurstCompile]
         public struct GenerateRandomAabbs : IJob
         {
-            public Random                  random;
-            public NativeArray<AabbEntity> aabbs;
+            public Random                            random;
+            public NativeArray<AabbEntity>           aabbs;
+            public NativeArray<AabbEntityRearranged> rearrangedAabbs;
 
             public void Execute()
             {
@@ -46,7 +47,33 @@ namespace OptimizationAdventures
                         }
                     };
                     aabbs[i] = aabbEntity;
+
+                    var aabbEntityRearranged = new AabbEntityRearranged
+                    {
+                        minXmaxX   = new float2(min.x, max.x),
+                        minYZmaxYZ = new float4(min.yz, max.yz),
+                        entity     = aabbEntity.entity
+                    };
+                    rearrangedAabbs[i] = aabbEntityRearranged;
                 }
+            }
+        }
+
+        [BurstCompile]
+        public struct ConvertToSoa : IJobFor
+        {
+            [ReadOnly] public NativeArray<AabbEntityRearranged> aabbs;
+            public NativeArray<float>                           xmins;
+            public NativeArray<float>                           xmaxs;
+            public NativeArray<float4>                          minYZmaxYZs;
+            public NativeArray<Entity>                          entities;
+
+            public void Execute(int i)
+            {
+                xmins[i]       = aabbs[i].minXmaxX.x;
+                xmaxs[i]       = aabbs[i].minXmaxX.y;
+                minYZmaxYZs[i] = aabbs[i].minYZmaxYZ;
+                entities[i]    = aabbs[i].entity;
             }
         }
 
@@ -54,17 +81,30 @@ namespace OptimizationAdventures
         {
             Random random = new Random(seed);
             random.InitState(seed);
-            NativeArray<AabbEntity> randomAabbs = new NativeArray<AabbEntity>(count, Allocator.TempJob);
-            var                     jh          = new GenerateRandomAabbs { random = random, aabbs = randomAabbs }.Schedule();
-            jh                                  = randomAabbs.Sort(jh);
+            NativeArray<AabbEntity>           randomAabbs           = new NativeArray<AabbEntity>(count, Allocator.TempJob);
+            NativeArray<AabbEntityRearranged> randomAabbsRearranged = new NativeArray<AabbEntityRearranged>(count, Allocator.TempJob);
+            NativeArray<float>                xmins                 = new NativeArray<float>(count, Allocator.TempJob);
+            NativeArray<float>                xmaxs                 = new NativeArray<float>(count, Allocator.TempJob);
+            NativeArray<float4>               minYZmaxYZs           = new NativeArray<float4>(count, Allocator.TempJob);
+            NativeArray<Entity>               entities              = new NativeArray<Entity>(count, Allocator.Temp);
+            var                               jh                    =
+                new GenerateRandomAabbs { random                    = random, aabbs = randomAabbs, rearrangedAabbs = randomAabbsRearranged }.Schedule();
+            jh                                                      = randomAabbs.Sort(jh);
+            jh                                                      = randomAabbsRearranged.Sort(jh);
+            jh                                                      = new ConvertToSoa {
+                aabbs                                               = randomAabbsRearranged, xmins = xmins, xmaxs = xmaxs, minYZmaxYZs = minYZmaxYZs, entities = entities
+            }.Schedule(xmins.Length, jh);
             jh.Complete();
 
-            NativeList<EntityPair> pairsNaive     = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
-            NativeList<EntityPair> pairsBool4     = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
-            NativeList<EntityPair> pairsLessNaive = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
-            NativeList<EntityPair> pairsFunny     = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
-            NativeList<EntityPair> pairsBetter    = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
-            NativeList<EntityPair> pairsNew       = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsNaive      = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsBool4      = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsLessNaive  = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsFunny      = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsBetter     = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsSimd       = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsRearrange  = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsSoa        = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
+            NativeList<EntityPair> pairsSoaShuffle = new NativeList<EntityPair>(preallocate, Allocator.TempJob);
 
             SampleUnit unit = count > 999 ? SampleUnit.Millisecond : SampleUnit.Microsecond;
 
@@ -98,23 +138,49 @@ namespace OptimizationAdventures
             .MeasurementCount(1)
             .Run();
 
-            Measure.Method(() => { new NewSweep { aabbs = randomAabbs, overlaps = pairsNew }.Run(); })
-            .SampleGroup("NewSweep")
+            Measure.Method(() => { new SimdSweep { aabbs = randomAabbs, overlaps = pairsSimd }.Run(); })
+            .SampleGroup("SimdSweep")
+            .WarmupCount(0)
+            .MeasurementCount(1)
+            .Run();
+
+            Measure.Method(() => { new RearrangedSweep { aabbs = randomAabbsRearranged, overlaps = pairsRearrange }.Run(); })
+            .SampleGroup("RearrangedSweep")
+            .WarmupCount(0)
+            .MeasurementCount(1)
+            .Run();
+
+            Measure.Method(() => { new SoaSweep { xmins = xmins, xmaxs = xmaxs, minYZmaxYZs = minYZmaxYZs, entities = entities, overlaps = pairsSoa }.Run(); })
+            .SampleGroup("SoaSweep")
+            .WarmupCount(0)
+            .MeasurementCount(1)
+            .Run();
+
+            Measure.Method(() => { new SoaShuffleSweep { xmins = xmins, xmaxs = xmaxs, minYZmaxYZs = minYZmaxYZs, entities = entities, overlaps = pairsSoaShuffle }.Run(); })
+            .SampleGroup("SoaShuffleSweep")
             .WarmupCount(0)
             .MeasurementCount(1)
             .Run();
 
             UnityEngine.Debug.Log("Pairs: " + pairsNaive.Length);
             UnityEngine.Debug.Log("Pairs: " + pairsBetter.Length);
-            UnityEngine.Debug.Log("Pairs: " + pairsNew.Length);
+            UnityEngine.Debug.Log("Pairs: " + pairsSimd.Length);
 
             randomAabbs.Dispose();
+            randomAabbsRearranged.Dispose();
+            xmins.Dispose();
+            xmaxs.Dispose();
+            minYZmaxYZs.Dispose();
+            entities.Dispose();
             pairsNaive.Dispose();
             pairsBool4.Dispose();
             pairsLessNaive.Dispose();
             pairsFunny.Dispose();
             pairsBetter.Dispose();
-            pairsNew.Dispose();
+            pairsSimd.Dispose();
+            pairsRearrange.Dispose();
+            pairsSoa.Dispose();
+            pairsSoaShuffle.Dispose();
         }
 
         [Test, Performance]

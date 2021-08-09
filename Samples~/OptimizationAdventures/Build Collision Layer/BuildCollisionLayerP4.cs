@@ -123,7 +123,7 @@ namespace OptimizationAdventures
 
             private void ProcessEntity(int index, Collider collider, RigidTransform rigidTransform)
             {
-                Aabb aabb              = Physics.CalculateAabb(collider, rigidTransform);
+                Aabb aabb              = Physics.AabbFrom(collider, rigidTransform);
                 rigidTransforms[index] = rigidTransform;
                 aabbs[index]           = aabb;
 

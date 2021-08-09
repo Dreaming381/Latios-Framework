@@ -326,6 +326,40 @@ namespace Latios.Psyshock
                     return false;
             }
         }
+
+        public static bool DistanceBetween(float3 point,
+                                           Collider collider,
+                                           RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out PointDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(point, col, colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(point, col, colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(point, col, colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(point, col, colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
     }
 }
 

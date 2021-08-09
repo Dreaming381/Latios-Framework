@@ -4,8 +4,9 @@ namespace Latios.Myri
 {
     public struct AudioSettings : IComponentData
     {
+        public int  safetyAudioFrames;
         public int  audioFramesPerUpdate;
-        public int  audioSubframesPerFrame;
+        public int  lookaheadAudioFrames;
         public bool logWarningIfBuffersAreStarved;
     }
 }

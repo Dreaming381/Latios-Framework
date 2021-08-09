@@ -70,6 +70,7 @@ namespace Latios.Systems
             var currentScene = worldBlackboardEntity.GetComponentData<CurrentScene>();
             if (currentScene.currentScene.Length == 0)
             {
+                latiosWorld.CreateNewSceneBlackboardEntity();
                 currentScene.currentScene      = SceneManager.GetActiveScene().name;
                 currentScene.isSceneFirstFrame = true;
             }

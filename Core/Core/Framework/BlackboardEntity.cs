@@ -90,9 +90,9 @@ namespace Latios
             return em.GetBuffer<T>(entity);
         }
 
-        public void AddCollectionComponent<T>(T value) where T : struct, ICollectionComponent
+        public void AddCollectionComponent<T>(T value, bool isInitialized = true) where T : struct, ICollectionComponent
         {
-            em.AddCollectionComponent(entity, value);
+            em.AddCollectionComponent(entity, value, isInitialized);
         }
 
         public T GetCollectionComponent<T>(bool readOnly, out JobHandle handle) where T : struct, ICollectionComponent

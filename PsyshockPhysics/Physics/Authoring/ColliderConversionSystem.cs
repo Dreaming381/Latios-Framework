@@ -308,7 +308,7 @@ namespace Latios.Psyshock.Authoring.Systems
                     var t             = transforms[j + range.x];
                     blobColliders[j]  = c;
                     blobTransforms[j] = t;
-                    var newbox        = Physics.CalculateAabb(c, t);
+                    var newbox        = Physics.AabbFrom(c, t);
                     aabb.min          = math.min(aabb.min, newbox.min);
                     aabb.max          = math.max(aabb.max, newbox.max);
                 }

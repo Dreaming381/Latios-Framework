@@ -284,6 +284,16 @@ While it is a long way off yet, I plan on having a customizable simulation
 graph. I’m not aware of any graph-based physics engine, but I see no reason why
 it wouldn’t work.
 
+### Invent Your Own Laws
+
+For most physics engines, if you need something extremely custom, you either
+have to put in the hooks in the right places to trick the engine into doing what
+you want, or even worse, modify the code directly. In Psyshock, you own the
+engine. It is up to you whether or not you want to use the physical rules
+provided or make up your own. Do you want every object to experience its own
+rate of time? Such a concept would usually require a custom physics engine. But
+with Psyshock, this can be achieved with much less effort.
+
 ## Known Issues
 
 -   This release is missing quite a few collider shapes, queries, and FindPairs
@@ -303,7 +313,7 @@ it wouldn’t work.
 
 ## Near-Term Roadmap
 
--   Character Controller Utilities
+-   More Character Controller Utilities
 -   FindPairs overhaul
     -   Aabb layers
     -   Stack optimizations
@@ -319,12 +329,10 @@ it wouldn’t work.
 -   Raycasting CollisionLayers
     -   Any hit, first hit, and multi-hit with IRaycastLayerProcessor
     -   Batch structures
--   Point Queries
--   Collider Casts
-    -   Using optimized CCD polynomial rootfinding algorithms
 -   Simplified Overlap Queries
 -   Manifold Generation
--   Collider improvements
+-   More Force Equations
+-   Collider Improvements
     -   Allow manipulating the Collider data directly using the specialized type
         as a ref
 -   Authoring Improvements

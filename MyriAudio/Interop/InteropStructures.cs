@@ -19,7 +19,7 @@ namespace Latios.Myri
         public int               frame;
         public int               bufferId;
         public int               framesInBuffer;
-        public int               subframesPerFrame;
+        public int               framesPerUpdate;
         public bool              warnIfStarved;
     }
 }

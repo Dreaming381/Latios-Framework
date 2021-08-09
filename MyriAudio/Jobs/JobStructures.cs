@@ -46,7 +46,6 @@ namespace Latios.Myri
         public int bufferStart;
         public int leftChannelsCount;
         public int samplesPerChannel;
-        public int subFramesPerFrame;
     }
 
     internal struct ListenerWithTransform
@@ -69,6 +68,13 @@ namespace Latios.Myri
         public RigidTransform         transform;
         public AudioSourceEmitterCone cone;
         public bool                   useCone;
+    }
+
+    internal struct AudioFrameBufferHistoryElement
+    {
+        public int bufferId;
+        public int audioFrame;
+        public int expectedNextUpdateFrame;
     }
 }
 

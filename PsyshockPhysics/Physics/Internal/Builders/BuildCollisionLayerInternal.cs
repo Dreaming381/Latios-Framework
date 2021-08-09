@@ -268,7 +268,7 @@ namespace Latios.Psyshock
 
             private void ProcessEntity(int index, Entity entity, Collider collider, RigidTransform rigidTransform)
             {
-                Aabb aabb = Physics.CalculateAabb(collider, rigidTransform);
+                Aabb aabb = Physics.AabbFrom(collider, rigidTransform);
 
                 colliderAoS[index] = new ColliderAoSData
                 {
@@ -308,7 +308,7 @@ namespace Latios.Psyshock
 
             public void Execute(int i)
             {
-                var aabb = Physics.CalculateAabb(colliderBodies[i].collider, colliderBodies[i].transform);
+                var aabb = Physics.AabbFrom(colliderBodies[i].collider, colliderBodies[i].transform);
                 aabbs[i] = aabb;
                 xmins[i] = aabb.min.x;
 

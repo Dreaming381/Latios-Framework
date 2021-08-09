@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] – 2021-8-9
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added argument `isInitialized` to
+    `BlackboardEntity.AddCollectionComponent()`
+-   *New Feature:* Added `OnNewScene()` callback to `SubSystem` and
+    `SuperSystem`, which can be used to initialize components on the
+    `sceneBlackboardEntity`.
+-   *New Feature:* Added `EntityWith<T>` and `EntityWithBuffer<T>` for strongly
+    typed entity references and left-to-right dereferencing chains.
+-   Added `LatiosMath.ComplexMul()`.
+-   *New Feature:* Added `Rng` and `RngToolkit` which provide a new framework
+    for fast, deterministic, parallel random number generation.
+
+### Improved
+
+-   Added safety checks for improper usage of `sceneBlackboardEntity` that would
+    only cause issues in builds.
+
 ## [0.3.1] – 2021-3-7
 
 Officially supports Entities [0.17.0]
@@ -33,23 +55,23 @@ Officially supports Entities [0.17.0]
     systems run. Not all entities have been gathered when `OnUpdate()` is
     called. Note that this mechanism is likely temporary and may change after a
     Unity bug is fixed.
--   `New Feature: Added the following containers: EnableCommandBuffer,
-    DisableCommandBuffer, DestroyCommandBuffer, InstantiateCommandBuffer,
-    EntityOperationCommandBuffer`
--   `New Feature: Added SyncPointPlaybackSystem which can play back
-    EntityCommandBuffers as well as the new command buffer types`
--   `New Feature: Added LatiosWorld.syncPoint which provides fast access to the
-    SyncPointPlaybackSystem and removes the need to call
-    AddJobHandleForProducer() when invoked from a SubSystem`
--   `Added BlackboardEntity.AddComponentDataIfMissing<T>(T data) which systems
-    can use to default-initialize worldBlackboardEntity components in OnCreate()
-    without overriding custom settings`
--   `Added PreSyncPointGroup for scheduling non-ECS jobs to execute on worker
-    threads during the sync point`
--   `Added extension BlobBuilder.ConstructFromNativeArray<T>() which allows
-    initializing a BlobArray<T> from a NativeArray<T>`
--   `Added extension BlobBuilder.AllocateFixedString<T>() which allows
-    initializing a BlobString from a FixedString### or HeapString` inside a
+-   *New Feature:* Added the following containers: `EnableCommandBuffer`,
+    `DisableCommandBuffer`, `DestroyCommandBuffer`, `InstantiateCommandBuffer`,
+    `EntityOperationCommandBuffer`
+-   *New Feature:* Added `SyncPointPlaybackSystem` which can play back
+    `EntityCommandBuffers` as well as the new command buffer types
+-   *New Feature:* Added `LatiosWorld.syncPoint` which provides fast access to
+    the `SyncPointPlaybackSystem` and removes the need to call
+    `AddJobHandleForProducer()` when invoked from a `SubSystem`
+-   Added `BlackboardEntity.AddComponentDataIfMissing<T>(T data)` which systems
+    can use to default-initialize `worldBlackboardEntity` components in
+    `OnCreate()` without overriding custom settings
+-   Added `PreSyncPointGroup` for scheduling non-ECS jobs to execute on worker
+    threads during the sync point
+-   Added extension `BlobBuilder.ConstructFromNativeArray<T>()` which allows
+    initializing a `BlobArray<T>` from a `NativeArray<T>`
+-   Added extension `BlobBuilder.AllocateFixedString<T>()` which allows
+    initializing a `BlobString` from a `FixedString###` or `HeapString` inside a
     Burst job
 -   Added extension `NativeList<T>.AddRangeFromBlob()` which appends the
     `BlobArray` data to the list

@@ -13,14 +13,16 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            SphereCollider bInASpace = new SphereCollider(sphereB.center + bTransform.pos - aTransform.pos, sphereB.radius);
-            bool           hit       = DistanceQueries.DistanceBetween(sphereA, bInASpace, maxDistance, out DistanceQueries.ColliderDistanceResultInternal localResult);
-            result                   = new ColliderDistanceResult
+            var            aWorldToLocal      = math.inverse(aTransform);
+            var            bInASpaceTransform = math.mul(aWorldToLocal, bTransform);
+            SphereCollider bInASpace          = new SphereCollider(math.transform(bInASpaceTransform, sphereB.center), sphereB.radius);
+            bool           hit                = DistanceQueries.DistanceBetween(sphereA, bInASpace, maxDistance, out DistanceQueries.ColliderDistanceResultInternal localResult);
+            result                            = new ColliderDistanceResult
             {
-                hitpointA = localResult.hitpointA + aTransform.pos,
-                hitpointB = localResult.hitpointB + aTransform.pos,
-                normalA   = localResult.normalA,
-                normalB   = localResult.normalB,
+                hitpointA = math.transform(aTransform, localResult.hitpointA),
+                hitpointB = math.transform(aTransform, localResult.hitpointB),
+                normalA   = math.rotate(aTransform, localResult.normalA),
+                normalB   = math.rotate(aTransform, localResult.normalB),
                 distance  = localResult.distance
             };
             return hit;
@@ -35,13 +37,14 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var            capWorldToLocal        = math.inverse(capsuleTransform);
-            float3         sphereCenterInCapSpace = math.transform(capWorldToLocal, sphere.center + sphereTransform.pos);
-            SphereCollider sphereInCapSpace       = new SphereCollider(sphereCenterInCapSpace, sphere.radius);
-            bool           hit                    = DistanceQueries.DistanceBetween(capsule,
-                                                                          sphereInCapSpace,
-                                                                          maxDistance,
-                                                                          out DistanceQueries.ColliderDistanceResultInternal localResult);
+            var            capWorldToLocal           = math.inverse(capsuleTransform);
+            var            sphereInCapSpaceTransfrom = math.mul(capWorldToLocal, sphereTransform);
+            float3         sphereCenterInCapSpace    = math.transform(sphereInCapSpaceTransfrom, sphere.center);
+            SphereCollider sphereInCapSpace          = new SphereCollider(sphereCenterInCapSpace, sphere.radius);
+            bool           hit                       = DistanceQueries.DistanceBetween(capsule,
+                                                                             sphereInCapSpace,
+                                                                             maxDistance,
+                                                                             out DistanceQueries.ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
                 hitpointA = math.transform(capsuleTransform, localResult.hitpointA),
@@ -91,13 +94,14 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var            boxWorldToLocal        = math.inverse(boxTransform);
-            float3         sphereCenterInBoxSpace = math.transform(boxWorldToLocal, sphere.center + sphereTransform.pos);
-            SphereCollider sphereInBoxSpace       = new SphereCollider(sphereCenterInBoxSpace, sphere.radius);
-            bool           hit                    = DistanceQueries.DistanceBetween(box,
-                                                                          sphereInBoxSpace,
-                                                                          maxDistance,
-                                                                          out DistanceQueries.ColliderDistanceResultInternal localResult);
+            var            boxWorldToLocal           = math.inverse(boxTransform);
+            var            sphereInBoxSpaceTransform = math.mul(boxWorldToLocal, sphereTransform);
+            float3         sphereCenterInBoxSpace    = math.transform(sphereInBoxSpaceTransform, sphere.center);
+            SphereCollider sphereInBoxSpace          = new SphereCollider(sphereCenterInBoxSpace, sphere.radius);
+            bool           hit                       = DistanceQueries.DistanceBetween(box,
+                                                                             sphereInBoxSpace,
+                                                                             maxDistance,
+                                                                             out DistanceQueries.ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
                 hitpointA = math.transform(boxTransform, localResult.hitpointA),
@@ -372,6 +376,72 @@ namespace Latios.Psyshock
                 distance  = bInAResult.ClosestPoints.distance
             };
            }*/
+
+        #region Point
+        public static bool DistanceBetween(float3 point, SphereCollider sphere, RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
+        {
+            var  pointInSphereSpace = math.transform(math.inverse(sphereTransform), point);
+            bool hit                = DistanceQueries.DistanceBetween(pointInSphereSpace, sphere, maxDistance, out var localResult);
+            result                  = new PointDistanceResult
+            {
+                hitpoint = math.transform(sphereTransform, localResult.hitpoint),
+                normal   = math.rotate(sphereTransform, localResult.normal),
+                distance = localResult.distance
+            };
+            return hit;
+        }
+
+        public static bool DistanceBetween(float3 point, CapsuleCollider capsule, RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
+        {
+            var  pointInCapSpace = math.transform(math.inverse(capsuleTransform), point);
+            bool hit             = DistanceQueries.DistanceBetween(pointInCapSpace, capsule, maxDistance, out var localResult);
+            result               = new PointDistanceResult
+            {
+                hitpoint = math.transform(capsuleTransform, localResult.hitpoint),
+                normal   = math.rotate(capsuleTransform, localResult.normal),
+                distance = localResult.distance
+            };
+            return hit;
+        }
+
+        public static bool DistanceBetween(float3 point, BoxCollider box, RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
+        {
+            var  pointInBoxSpace = math.transform(math.inverse(boxTransform), point);
+            bool hit             = DistanceQueries.DistanceBetween(pointInBoxSpace, box, maxDistance, out var localResult);
+            result               = new PointDistanceResult
+            {
+                hitpoint = math.transform(boxTransform, localResult.hitpoint),
+                normal   = math.rotate(boxTransform, localResult.normal),
+                distance = localResult.distance
+            };
+            return hit;
+        }
+
+        public static bool DistanceBetween(float3 point, CompoundCollider compound, RigidTransform compoundTransform, float maxDistance, out PointDistanceResult result)
+        {
+            bool hit              = false;
+            result                = default;
+            result.distance       = float.MaxValue;
+            ref var blob          = ref compound.compoundColliderBlob.Value;
+            var     compoundScale = new PhysicsScale { scale = compound.scale, state = PhysicsScale.State.Uniform };
+            for (int i = 0; i < blob.colliders.Length; i++)
+            {
+                var blobTransform  = blob.transforms[i];
+                blobTransform.pos *= compound.scale;
+                bool newHit        = DistanceBetween(point,
+                                                     ScaleCollider(blob.colliders[i], compoundScale),
+                                                     math.mul(compoundTransform, blobTransform),
+                                                     math.min(result.distance, maxDistance),
+                                                     out var newResult);
+
+                newResult.subColliderIndex  = i;
+                newHit                     &= newResult.distance < result.distance;
+                hit                        |= newHit;
+                result                      = newHit ? newResult : result;
+            }
+            return hit;
+        }
+        #endregion
     }
 }
 
