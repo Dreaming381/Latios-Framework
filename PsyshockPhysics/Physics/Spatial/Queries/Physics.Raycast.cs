@@ -9,7 +9,7 @@ namespace Latios.Psyshock
         public static bool Raycast(Ray ray, SphereCollider sphere, RigidTransform sphereTransform, out RaycastResult result)
         {
             var  rayInSphereSpace   = Ray.TransformRay(math.inverse(sphereTransform), ray);
-            bool hit                = Raycasting.RaycastSphere(rayInSphereSpace, sphere, out float fraction, out float3 normal);
+            bool hit                = SpatialInternal.RaycastSphere(rayInSphereSpace, sphere, out float fraction, out float3 normal);
             result.position         = math.lerp(ray.start, ray.end, fraction);
             result.normal           = math.rotate(sphereTransform, normal);
             result.distance         = math.distance(ray.start, result.position);
@@ -20,7 +20,7 @@ namespace Latios.Psyshock
         public static bool Raycast(Ray ray, CapsuleCollider capsule, RigidTransform capsuleTransform, out RaycastResult result)
         {
             var  rayInCapsuleSpace  = Ray.TransformRay(math.inverse(capsuleTransform), ray);
-            bool hit                = Raycasting.RaycastCapsule(rayInCapsuleSpace, capsule, out float fraction, out float3 normal);
+            bool hit                = SpatialInternal.RaycastCapsule(rayInCapsuleSpace, capsule, out float fraction, out float3 normal);
             result.position         = math.lerp(ray.start, ray.end, fraction);
             result.normal           = math.rotate(capsuleTransform, normal);
             result.distance         = math.distance(ray.start, result.position);
@@ -31,7 +31,7 @@ namespace Latios.Psyshock
         public static bool Raycast(Ray ray, BoxCollider box, RigidTransform boxTransform, out RaycastResult result)
         {
             var  rayInBoxSpace      = Ray.TransformRay(math.inverse(boxTransform), ray);
-            bool hit                = Raycasting.RaycastBox(rayInBoxSpace, box, out float fraction, out float3 normal);
+            bool hit                = SpatialInternal.RaycastBox(rayInBoxSpace, box, out float fraction, out float3 normal);
             result.position         = math.lerp(ray.start, ray.end, fraction);
             result.normal           = math.rotate(boxTransform, normal);
             result.distance         = math.distance(ray.start, result.position);

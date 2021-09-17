@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] – 2021-9-16
+
+Officially supports Entities [0.17.0]
+
+### Changed
+
+-   Updated Core to v0.4.1
+-   Updated Psyshock to v0.4.1
+-   Added Optimization Adventure 6
+
 ## [0.4.0] – 2021-8-9
 
 Officially supports Entities [0.17.0]

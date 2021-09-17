@@ -39,12 +39,23 @@ namespace Latios
 
         public static float4 lengthsq(simdFloat3 a) => dot(a, a);
 
+        public static float4 length(simdFloat3 a) => math.sqrt(dot(a, a));
+
         public static simdFloat3 select(simdFloat3 a, simdFloat3 b, bool4 c)
         {
             simdFloat3 result = default;
             result.x          = math.select(a.x, b.x, c);
             result.y          = math.select(a.y, b.y, c);
             result.z          = math.select(a.z, b.z, c);
+            return result;
+        }
+
+        public static simdFloat3 select(simdFloat3 a, simdFloat3 b, bool4 xSelect, bool4 ySelect, bool4 zSelect)
+        {
+            simdFloat3 result = default;
+            result.x          = math.select(a.x, b.x, xSelect);
+            result.y          = math.select(a.y, b.y, ySelect);
+            result.z          = math.select(a.z, b.z, zSelect);
             return result;
         }
 
@@ -129,6 +140,31 @@ namespace Latios
         public static float3 cmaxabcd(simdFloat3 s)
         {
             return new float3(math.cmax(s.x), math.cmax(s.y), math.cmax(s.z));
+        }
+
+        public static float4 cminxyz(simdFloat3 s)
+        {
+            return math.min(math.min(s.x, s.y), s.z);
+        }
+
+        public static float4 cmaxxyz(simdFloat3 s)
+        {
+            return math.max(math.max(s.x, s.y), s.z);
+        }
+
+        public static simdFloat3 abs(simdFloat3 s)
+        {
+            return new simdFloat3(math.abs(s.x), math.abs(s.y), math.abs(s.z));
+        }
+
+        public static simdFloat3 project(simdFloat3 a, float3 target)
+        {
+            return (dot(a, target) / math.dot(target, target)) * new simdFloat3(target);
+        }
+
+        public static bool4 isfiniteallxyz(simdFloat3 s)
+        {
+            return math.isfinite(s.x) & math.isfinite(s.y) & math.isfinite(s.z);
         }
     }
 }

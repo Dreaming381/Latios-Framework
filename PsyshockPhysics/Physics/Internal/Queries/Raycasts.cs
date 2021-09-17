@@ -2,7 +2,7 @@
 
 namespace Latios.Psyshock
 {
-    internal static class Raycasting
+    internal static partial class SpatialInternal
     {
         public static bool RaycastAabb(Ray ray, Aabb aabb, out float fraction)
         {
@@ -159,7 +159,7 @@ namespace Latios.Psyshock
         public static bool RaycastRoundedBox(Ray ray, BoxCollider box, float radius, out float fraction, out float3 normal)
         {
             // Early out if inside hit
-            if (DistanceQueries.DistanceBetween(ray.start, box, radius, out _))
+            if (PointBoxDistance(ray.start, box, radius, out _))
             {
                 fraction = default;
                 normal   = default;
@@ -171,7 +171,7 @@ namespace Latios.Psyshock
             bool hitOuter      = RaycastBox(ray, outerBox, out fraction, out normal);
             var  hitPoint      = math.lerp(ray.start, ray.end, fraction);
 
-            if (hitOuter && math.all(normal > 0.9f | (hitPoint >= box.center - box.halfSize & hitPoint <= box.center + box.halfSize)))
+            if (hitOuter && math.all(math.abs(normal) > 0.9f | (hitPoint >= box.center - box.halfSize & hitPoint <= box.center + box.halfSize)))
             {
                 // We hit a flat surface of the box. We have our result already.
                 return true;
@@ -232,6 +232,7 @@ namespace Latios.Psyshock
             bestNormals              = simd.select(bestNormals, frontBackNormals, frontBackFractions < bestFractions);
             bestFractions            = math.select(bestFractions, frontBackFractions, frontBackFractions < bestFractions);
             bestNormals              = simd.select(bestNormals, bestNormals.badc, bestFractions.yxwz < bestFractions);
+            bestFractions            = math.select(bestFractions, bestFractions.yxwz, bestFractions.yxwz < bestFractions);
             normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
             fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
             return fraction <= 1f;
@@ -323,7 +324,7 @@ namespace Latios.Psyshock
             else if (nDotAEnd == 0f)
             {
                 // The end of the ray is on the infinite plane
-                fraction               = 0f;
+                fraction               = 1f;
                 simdFloat3 edgeNormals = simd.cross(abbccdda, normal);
                 float3     doubleEnd   = ray.end + ray.end;
                 simdFloat3 r           = doubleEnd - (quadPoints + quadPoints.bcda);
@@ -340,7 +341,7 @@ namespace Latios.Psyshock
         public static bool RaycastRoundedQuad(Ray ray, simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
         {
             // Make sure the ray doesn't start inside.
-            if (DistanceQueries.DistanceBetween(ray.start, quadPoints, radius, out _))
+            if (SpatialInternal.PointQuadDistance(ray.start, quadPoints, radius, out _))
             {
                 fraction = 2f;
                 normal   = default;
@@ -360,6 +361,40 @@ namespace Latios.Psyshock
             quadFraction             = math.select(2f, quadFraction, quadFaceHit);
             bool4 capsuleHits        = Raycast4Capsules(ray, quadPoints, quadPoints.bcda, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
             capsuleFractions         = math.select(2f, capsuleFractions, capsuleHits);
+            simdFloat3 bestNormals   = simd.select(capsuleNormals, capsuleNormals.badc, capsuleFractions.yxwz < capsuleFractions);
+            float4     bestFractions = math.select(capsuleFractions, capsuleFractions.yxwz, capsuleFractions.yxwz < capsuleFractions);
+            normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
+            fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
+            normal                   = math.select(normal, quadNormal, quadFraction < fraction);
+            fraction                 = math.select(fraction, quadFraction, quadFraction < fraction);
+            return fraction <= 1f;
+        }
+
+        public static bool RaycastRoundedQuadDebug(Ray ray, simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
+        {
+            // Make sure the ray doesn't start inside.
+            if (SpatialInternal.PointQuadDistance(ray.start, quadPoints, radius, out _))
+            {
+                fraction = 2f;
+                normal   = default;
+                return false;
+            }
+
+            float3 ab         = quadPoints.b - quadPoints.a;
+            float3 ca         = quadPoints.a - quadPoints.c;
+            float3 quadNormal = math.cross(ab, ca);
+            quadNormal        = math.select(quadNormal, -quadNormal, math.dot(quadNormal, ray.displacement) > 0f);
+
+            // Catch degenerate quad here
+            bool  quadFaceHit  = math.any(quadNormal);
+            float quadFraction = 2f;
+            if (quadFaceHit)
+                quadFaceHit = RaycastQuad(ray, quadPoints + math.normalize(quadNormal) * radius, out quadFraction);
+            UnityEngine.Debug.Log($"quadFaceHit: {quadFaceHit}, quadFraction: {quadFraction}");
+            quadFraction      = math.select(2f, quadFraction, quadFaceHit);
+            bool4 capsuleHits = Raycast4Capsules(ray, quadPoints, quadPoints.bcda, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
+            capsuleFractions  = math.select(2f, capsuleFractions, capsuleHits);
+            UnityEngine.Debug.Log($"capsuleHits: {capsuleHits}, capsuleFractions: {capsuleFractions}");
             simdFloat3 bestNormals   = simd.select(capsuleNormals, capsuleNormals.badc, capsuleFractions.yxwz < capsuleFractions);
             float4     bestFractions = math.select(capsuleFractions, capsuleFractions.yxwz, capsuleFractions.yxwz < capsuleFractions);
             normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);

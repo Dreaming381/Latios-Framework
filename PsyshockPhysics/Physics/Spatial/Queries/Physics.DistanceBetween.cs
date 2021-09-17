@@ -16,8 +16,9 @@ namespace Latios.Psyshock
             var            aWorldToLocal      = math.inverse(aTransform);
             var            bInASpaceTransform = math.mul(aWorldToLocal, bTransform);
             SphereCollider bInASpace          = new SphereCollider(math.transform(bInASpaceTransform, sphereB.center), sphereB.radius);
-            bool           hit                = DistanceQueries.DistanceBetween(sphereA, bInASpace, maxDistance, out DistanceQueries.ColliderDistanceResultInternal localResult);
-            result                            = new ColliderDistanceResult
+            bool           hit                =
+                SpatialInternal.SphereSphereDistance(sphereA, bInASpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
+            result = new ColliderDistanceResult
             {
                 hitpointA = math.transform(aTransform, localResult.hitpointA),
                 hitpointB = math.transform(aTransform, localResult.hitpointB),
@@ -41,10 +42,10 @@ namespace Latios.Psyshock
             var            sphereInCapSpaceTransfrom = math.mul(capWorldToLocal, sphereTransform);
             float3         sphereCenterInCapSpace    = math.transform(sphereInCapSpaceTransfrom, sphere.center);
             SphereCollider sphereInCapSpace          = new SphereCollider(sphereCenterInCapSpace, sphere.radius);
-            bool           hit                       = DistanceQueries.DistanceBetween(capsule,
-                                                                             sphereInCapSpace,
-                                                                             maxDistance,
-                                                                             out DistanceQueries.ColliderDistanceResultInternal localResult);
+            bool           hit                       = SpatialInternal.CapsuleSphereDistance(capsule,
+                                                                                   sphereInCapSpace,
+                                                                                   maxDistance,
+                                                                                   out SpatialInternal.ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
                 hitpointA = math.transform(capsuleTransform, localResult.hitpointA),
@@ -80,7 +81,7 @@ namespace Latios.Psyshock
             CapsuleCollider BinASpace          = new CapsuleCollider(math.transform(BinASpaceTransform, capsuleB.pointA),
                                                                      math.transform(BinASpaceTransform, capsuleB.pointB),
                                                                      capsuleB.radius);
-            bool hit = DistanceQueries.DistanceBetween(capsuleA, BinASpace, maxDistance, out DistanceQueries.ColliderDistanceResultInternal localResult);
+            bool hit = SpatialInternal.CapsuleCapsuleDistance(capsuleA, BinASpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
             result   = BinAResultToWorld(localResult, aTransform);
             return hit;
         }
@@ -98,10 +99,10 @@ namespace Latios.Psyshock
             var            sphereInBoxSpaceTransform = math.mul(boxWorldToLocal, sphereTransform);
             float3         sphereCenterInBoxSpace    = math.transform(sphereInBoxSpaceTransform, sphere.center);
             SphereCollider sphereInBoxSpace          = new SphereCollider(sphereCenterInBoxSpace, sphere.radius);
-            bool           hit                       = DistanceQueries.DistanceBetween(box,
-                                                                             sphereInBoxSpace,
-                                                                             maxDistance,
-                                                                             out DistanceQueries.ColliderDistanceResultInternal localResult);
+            bool           hit                       = SpatialInternal.BoxSphereDistance(box,
+                                                                               sphereInBoxSpace,
+                                                                               maxDistance,
+                                                                               out SpatialInternal.ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
                 hitpointA = math.transform(boxTransform, localResult.hitpointA),
@@ -137,8 +138,9 @@ namespace Latios.Psyshock
             var capsuleInBoxSpace      = new CapsuleCollider(math.transform(capInBoxSpaceTransform, capsule.pointA),
                                                              math.transform(capInBoxSpaceTransform, capsule.pointB),
                                                              capsule.radius);
-            bool hit = DistanceQueries.DistanceBetween(box, capsuleInBoxSpace, maxDistance, out DistanceQueries.ColliderDistanceResultInternal localResult);
+            bool hit = SpatialInternal.BoxCapsuleDistance(box, capsuleInBoxSpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
             result   = BinAResultToWorld(localResult, boxTransform);
+
             return hit;
         }
 
@@ -165,12 +167,35 @@ namespace Latios.Psyshock
             var bWorldToLocal      = math.inverse(bTransform);
             var bInASpaceTransform = math.mul(aWorldToLocal, bTransform);
             var aInBSpaceTransform = math.mul(bWorldToLocal, aTransform);
-            var hit                = DistanceQueries.DistanceBetween(boxA,
-                                                                     boxB,
-                                                                     bInASpaceTransform,
-                                                                     aInBSpaceTransform,
-                                                                     maxDistance,
-                                                                     out DistanceQueries.ColliderDistanceResultInternal localResult);
+            var hit                = SpatialInternal.BoxBoxDistance(boxA,
+                                                                    boxB,
+                                                                    bInASpaceTransform,
+                                                                    aInBSpaceTransform,
+                                                                    maxDistance,
+                                                                    out SpatialInternal.ColliderDistanceResultInternal localResult);
+            result = BinAResultToWorld(localResult, aTransform);
+            return hit;
+        }
+
+        internal static bool DistanceBetweenDebug(BoxCollider boxA,
+                                                  RigidTransform aTransform,
+                                                  BoxCollider boxB,
+                                                  RigidTransform bTransform,
+                                                  float maxDistance,
+                                                  out ColliderDistanceResult result)
+        {
+            var aWorldToLocal      = math.inverse(aTransform);
+            var bWorldToLocal      = math.inverse(bTransform);
+            var bInASpaceTransform = math.mul(aWorldToLocal, bTransform);
+            var aInBSpaceTransform = math.mul(bWorldToLocal, aTransform);
+            UnityEngine.Debug.Log(
+                $"DistanceBetween BoxBox: aTransform: {aTransform.rot.value}, bTransform: {bTransform.rot.value}, bWorldToLocal: {bWorldToLocal.rot.value}, aInBSpaceTransform: {aInBSpaceTransform.rot.value}");
+            var hit = SpatialInternal.BoxBoxDistanceDebug(boxA,
+                                                          boxB,
+                                                          bInASpaceTransform,
+                                                          aInBSpaceTransform,
+                                                          maxDistance,
+                                                          out SpatialInternal.ColliderDistanceResultInternal localResult);
             result = BinAResultToWorld(localResult, aTransform);
             return hit;
         }
@@ -353,7 +378,7 @@ namespace Latios.Psyshock
             };
         }
 
-        private static ColliderDistanceResult BinAResultToWorld(DistanceQueries.ColliderDistanceResultInternal BinAResult, RigidTransform aTransform)
+        private static ColliderDistanceResult BinAResultToWorld(SpatialInternal.ColliderDistanceResultInternal BinAResult, RigidTransform aTransform)
         {
             return new ColliderDistanceResult
             {
@@ -365,23 +390,27 @@ namespace Latios.Psyshock
             };
         }
 
-        /*private static ColliderDistanceResult BinAResultToWorld(GjkResult bInAResult, RigidTransform aTransform)
-           {
-            return new ColliderDistanceResult
+        private static ColliderDistanceResult DistanceBetweenGjk(Collider colliderA, RigidTransform aTransform, Collider colliderB, RigidTransform bTransform)
+        {
+            var bInATransform = math.mul(math.inverse(aTransform), bTransform);
+            var gjkResult     = SpatialInternal.DoGjkEpa(colliderA, colliderB, bInATransform);
+            DistanceBetween(gjkResult.hitpointOnAInASpace, colliderA, RigidTransform.identity, float.MaxValue, out var closestOnA);
+            DistanceBetween(gjkResult.hitpointOnBInASpace, colliderB, bInATransform,           float.MaxValue, out var closestOnB);
+            return BinAResultToWorld(new SpatialInternal.ColliderDistanceResultInternal
             {
-                hitpointA = math.transform(aTransform, bInAResult.ClosestPoints.hitpointA),
-                hitpointB = math.transform(aTransform, bInAResult.ClosestPoints.hitpointB),
-                normalA   = math.rotate(aTransform, bInAResult.ClosestPoints.normalA),
-                normalB   = math.rotate(aTransform, bInAResult.ClosestPoints.normalB),
-                distance  = bInAResult.ClosestPoints.distance
-            };
-           }*/
+                distance  = gjkResult.distance,
+                hitpointA = gjkResult.hitpointOnAInASpace,
+                hitpointB = gjkResult.hitpointOnBInASpace,
+                normalA   = closestOnA.normal,
+                normalB   = closestOnB.normal
+            }, aTransform);
+        }
 
         #region Point
         public static bool DistanceBetween(float3 point, SphereCollider sphere, RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInSphereSpace = math.transform(math.inverse(sphereTransform), point);
-            bool hit                = DistanceQueries.DistanceBetween(pointInSphereSpace, sphere, maxDistance, out var localResult);
+            bool hit                = SpatialInternal.PointSphereDistance(pointInSphereSpace, sphere, maxDistance, out var localResult);
             result                  = new PointDistanceResult
             {
                 hitpoint = math.transform(sphereTransform, localResult.hitpoint),
@@ -394,7 +423,7 @@ namespace Latios.Psyshock
         public static bool DistanceBetween(float3 point, CapsuleCollider capsule, RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInCapSpace = math.transform(math.inverse(capsuleTransform), point);
-            bool hit             = DistanceQueries.DistanceBetween(pointInCapSpace, capsule, maxDistance, out var localResult);
+            bool hit             = SpatialInternal.PointCapsuleDistance(pointInCapSpace, capsule, maxDistance, out var localResult);
             result               = new PointDistanceResult
             {
                 hitpoint = math.transform(capsuleTransform, localResult.hitpoint),
@@ -407,7 +436,7 @@ namespace Latios.Psyshock
         public static bool DistanceBetween(float3 point, BoxCollider box, RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInBoxSpace = math.transform(math.inverse(boxTransform), point);
-            bool hit             = DistanceQueries.DistanceBetween(pointInBoxSpace, box, maxDistance, out var localResult);
+            bool hit             = SpatialInternal.PointBoxDistance(pointInBoxSpace, box, maxDistance, out var localResult);
             result               = new PointDistanceResult
             {
                 hitpoint = math.transform(boxTransform, localResult.hitpoint),

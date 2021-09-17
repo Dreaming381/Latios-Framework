@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] – 2021-9-16
+
+Officially supports Entities [0.17.0]
+
+### Fixed
+
+-   Fixed `DistanceBetween()` queries for nearly touching box colliders where
+    the edges were incorrectly reported as the closest points.
+-   Fixed `ColliderCast()` queries for sphere vs box where negative local axes
+    faces could not be hit.
+-   Fixed `ColliderCast()` queries for sphere vs box where the wrong edge
+    fraction was reported.
+-   Fixed `ColliderCast()` queries for capsule vs capsule where a hit at the
+    very end of the cast would report a zero distance hit.
+-   Fixed `ColliderCast()` queries involving compound colliders incorrectly
+    reporting a hit if the colliders start in an overlapping state.
+-   Fixed `ColliderCast()` queries for capsule casters vs sphere targets where
+    the wrong transforms were used.
+-   Fixed `ColliderCast()` queries for capsule vs capsule where the query was
+    executed in the wrong coordinate space.
+-   Fixed `ColliderCast()` queries for box casters vs sphere targets where the
+    start and end points were flipped, causing incorrect results to be
+    generated.
+-   Fixed argument names in `ColliderCast()` queries involving compound
+    colliders.
+
+### Improved
+
+-   `ColliderCast()` queries for capsule vs box use a new more accurate
+    algorithm.
+-   `ColliderCast()` queries for box vs box use a new algorithm which is both
+    faster and more accurate.
+
 ## [0.4.0] – 2021-8-9
 
 Officially supports Entities [0.17.0]

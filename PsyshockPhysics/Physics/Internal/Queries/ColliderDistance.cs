@@ -3,7 +3,7 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    internal static partial class DistanceQueries
+    internal static partial class SpatialInternal
     {
         public struct ColliderDistanceResultInternal
         {
@@ -15,7 +15,7 @@ namespace Latios.Psyshock
         }
 
         #region Sphere
-        public static bool DistanceBetween(SphereCollider sphereA, SphereCollider sphereB, float maxDistance, out ColliderDistanceResultInternal result)
+        public static bool SphereSphereDistance(SphereCollider sphereA, SphereCollider sphereB, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 delta          = sphereB.center - sphereA.center;
             float  ccDistanceSq   = math.lengthsq(delta);  //center center distance
@@ -36,7 +36,7 @@ namespace Latios.Psyshock
         #endregion Sphere
 
         #region Capsule
-        public static bool DistanceBetween(CapsuleCollider capsule, SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
+        public static bool CapsuleSphereDistance(CapsuleCollider capsule, SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
             float3 edge                   = capsule.pointB - capsule.pointA;
@@ -46,10 +46,10 @@ namespace Latios.Psyshock
             dot                           = math.clamp(dot, 0f, edgeLengthSq);
             float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
             SphereCollider sphereA        = new SphereCollider(pointOnSegment, capsule.radius);
-            return DistanceBetween(sphereA, sphere, maxDistance, out result);
+            return SphereSphereDistance(sphereA, sphere, maxDistance, out result);
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsuleA, CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
+        public static bool CapsuleCapsuleDistance(CapsuleCollider capsuleA, CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 edgeA = capsuleA.pointB - capsuleA.pointA;
             float3 edgeB = capsuleB.pointB - capsuleB.pointA;
@@ -58,14 +58,14 @@ namespace Latios.Psyshock
             //Todo: There may be some precision issues at close distances. Figure this out later.
             SphereCollider sphereA = new SphereCollider(closestA, capsuleA.radius);
             SphereCollider sphereB = new SphereCollider(closestB, capsuleB.radius);
-            return DistanceBetween(sphereA, sphereB, maxDistance, out result);
+            return SphereSphereDistance(sphereA, sphereB, maxDistance, out result);
         }
         #endregion Capsule
 
         #region Box
-        public static bool DistanceBetween(BoxCollider box, SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
+        public static bool BoxSphereDistance(BoxCollider box, SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
         {
-            bool   hit     = DistanceBetween(sphere.center, box, maxDistance + sphere.radius, out PointDistanceResultInternal pointDistanceResult);
+            bool   hit     = PointBoxDistance(sphere.center, box, maxDistance + sphere.radius, out PointDistanceResultInternal pointDistanceResult);
             float3 normalB = math.normalizesafe(pointDistanceResult.hitpoint - sphere.center, -pointDistanceResult.normal);
             result         = new ColliderDistanceResultInternal
             {

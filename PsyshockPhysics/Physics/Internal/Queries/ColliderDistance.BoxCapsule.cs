@@ -3,9 +3,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    internal static partial class DistanceQueries
+    internal static partial class SpatialInternal
     {
-        public static bool DistanceBetween(BoxCollider box, CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
+        public static bool BoxCapsuleDistance(BoxCollider box, CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 osPointA = capsule.pointA - box.center;  //os = origin space
             float3 osPointB = capsule.pointB - box.center;

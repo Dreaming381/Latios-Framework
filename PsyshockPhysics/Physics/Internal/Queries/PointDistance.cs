@@ -6,7 +6,7 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    internal static partial class DistanceQueries
+    internal static partial class SpatialInternal
     {
         public struct PointDistanceResultInternal
         {
@@ -16,7 +16,7 @@ namespace Latios.Psyshock
         }
 
         //All algorithms return a negative distance if inside the collider.
-        public static bool DistanceBetween(float3 point, SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result)
+        public static bool PointSphereDistance(float3 point, SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result)
         {
             float3 delta          = sphere.center - point;
             float  pcDistanceSq   = math.lengthsq(delta);  //point center distance
@@ -33,7 +33,7 @@ namespace Latios.Psyshock
             return distance <= maxDistance;
         }
 
-        public static bool DistanceBetween(float3 point, CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
+        public static bool PointCapsuleDistance(float3 point, CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
             float3 edge                   = capsule.pointB - capsule.pointA;
@@ -43,10 +43,10 @@ namespace Latios.Psyshock
             dot                           = math.clamp(dot, 0f, edgeLengthSq);
             float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
             SphereCollider sphere         = new SphereCollider(pointOnSegment, capsule.radius);
-            return DistanceBetween(point, sphere, maxDistance, out result);
+            return PointSphereDistance(point, sphere, maxDistance, out result);
         }
 
-        /*public static bool DistanceBetween(float3 point, CylinderCollider cylinder, float maxDistance, out PointDistanceResultInternal result)
+        /*public static bool PointCylinderDistance(float3 point, CylinderCollider cylinder, float maxDistance, out PointDistanceResultInternal result)
            {
             //Strategy: Project p onto the capsule's line.
             //If on the segment, do point vs sphere.
@@ -103,7 +103,7 @@ namespace Latios.Psyshock
             }
            }*/
 
-        public static bool DistanceBetween(float3 point, BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
+        public static bool PointBoxDistance(float3 point, BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
         {
             //Idea: The positive octant of the box contains 7 feature regions: 3 faces, 3 edges, and inside.
             //The other octants are identical except with flipped signs. So if we unflip signs,
@@ -200,7 +200,7 @@ namespace Latios.Psyshock
         }
 
         //Distance is unsigned, triangle is "double-sided"
-        /*public static bool DistanceBetween(float3 point, TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
+        /*public static bool PointTriangleDistance(float3 point, TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
            {
             float3 ab = triangle.pointB - triangle.pointA;
             float3 bc = triangle.pointC - triangle.pointB;
@@ -296,7 +296,7 @@ namespace Latios.Psyshock
            }*/
 
         //Distance is unsigned, quad is "double-sided"
-        public static bool DistanceBetween(float3 point, simdFloat3 quadPoints, float maxDistance, out PointDistanceResultInternal result)
+        public static bool PointQuadDistance(float3 point, simdFloat3 quadPoints, float maxDistance, out PointDistanceResultInternal result)
         {
             simdFloat3 abcd     = new simdFloat3(quadPoints.a, quadPoints.b, quadPoints.c, quadPoints.d);
             simdFloat3 abbccdda = abcd.bcda - abcd.abcd;

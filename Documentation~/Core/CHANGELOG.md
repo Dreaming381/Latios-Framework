@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] – 2021-9-16
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added `simd.length()`.
+-   Added `simd.select()` which allows for selecting the x, y, and z components
+    using separate masks.
+-   Added `simd.cminxyz()` and `cmaxxyz()` which computes the min/max between x,
+    y, and z for each of the four float3 values.
+-   Added `simd.abs()`.
+-   Added `simd.project()`.
+-   Added `simd.isfiniteallxyz()` which returns true for each float3 if the x,
+    y, and z components are all finite values.
+
 ## [0.4.0] – 2021-8-9
 
 Officially supports Entities [0.17.0]

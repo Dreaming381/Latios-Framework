@@ -46,14 +46,17 @@ if (collider.type == ColliderType.Sphere)
 -   Current
     -   Physics.CalculateAabb
     -   Physics.Raycast
-    -   Physics.DistanceBetween (Collider vs Collider only)
--   Future
-    -   Physics.DistanceBetween (Point vs Collider)
-    -   Physics.AreIntersecting
+    -   Physics.DistanceBetween
     -   Physics.ColliderCast
+-   Future
+    -   Physics.AreIntersecting
     -   Physics.ComputeContacts
     -   Physics.QuadraticCast
     -   Physics.QuadraticColliderCast
+
+*Warning: Unlike Unity Physics,* `Raycast()` *and* `ColliderCast()` *do not
+report inside hits or “zero-distance” hits. Use a* `DistanceBetween()` *query at
+the start point to get inside hit info.*
 
 ## Simple Modifiers
 
