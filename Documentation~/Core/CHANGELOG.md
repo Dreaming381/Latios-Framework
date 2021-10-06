@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] – 2021-10-5
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added `flags` parameter to `LatiosWorld` constructor which is required for
+    NetCode projects.
+
+### Improved
+
+-   Improved the error message for when a `SubSystem` begins its `OnUpdate()`
+    procedure but the previous `SubSystem` did not clean up the automatic
+    dependency stack. The error now identifies both systems and suggests the
+    more likely cause being an exception in the previous `SubSystem`.
+
 ## [0.4.1] – 2021-9-16
 
 Officially supports Entities [0.17.0]

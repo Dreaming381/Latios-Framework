@@ -66,7 +66,7 @@ namespace Latios
         private bool m_paused          = false;
         private bool m_resumeNextFrame = false;
 
-        public LatiosWorld(string name) : base(name)
+        public LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation) : base(name, flags)
         {
             //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentTag<>),               typeof(IManagedComponent));
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentSystemStateTag<>),    typeof(IManagedComponent));
@@ -182,7 +182,8 @@ namespace Latios
         {
             if (m_activeSystem != null)
             {
-                throw new InvalidOperationException("Error: Calling Update on a SubSystem from within another SubSystem is not allowed!");
+                throw new InvalidOperationException(
+                    $"{sys.GetType().Name} has detected that the previously updated {m_activeSystem.GetType().Name} did not finish its update procedure properly. This is likely due to an exception thrown from within OnUpdate(), but please note that calling Update() on a SubSystem from within another SubSystem is not supported.");
             }
             m_activeSystem                  = sys;
             m_activeSystemAccessedSyncPoint = false;

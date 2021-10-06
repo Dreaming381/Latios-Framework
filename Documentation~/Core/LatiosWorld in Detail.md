@@ -31,7 +31,8 @@ The following systems are created by the `LatiosInitializationSystemGroup`:
 -   [SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSystem.md)
     – This is a system capable of playing back command buffers which perform ECS
     structural changes
--   [SceneManagerSystem](Scene%20Management.md) – Triggers scene changes
+-   [SceneManagerSystem](Scene%20Management.md) – Triggers scene changes and
+    initializes `sceneBlackboardEntity` in play mode.
 -   [MergeBlackboardsSystem](Blackboard%20Entities.md) – Merges
     `BlackboardEntityData` entities into the `sceneBlackboardEntity` and
     `worldBlackboardEntity`
@@ -71,7 +72,7 @@ Currently, the `LatiosInitializationSystemGroup` orders itself as follows:
 -   [End OrderFirst region]
 -   …
 -   [Unity SceneSystemGroup]
--   LatiosWorldSyncSystem
+-   LatiosWorldSyncGroup
     -   MergeBlackboardsSystem
     -   ManagedComponentReactiveSystemGroup
     -   [End OrderFirst region]
@@ -109,4 +110,5 @@ behavior.
 The `LatiosWorld` also contains the public `useExplicitSystemOrdering` flag
 which tells `SuperSystem`s if they should enable system sorting by default. This
 is used by the bootstrap templates to set the appropriate workflow. However, a
-`SuperSystem` may override this setting for itself in `CreateSystems()`.
+`SuperSystem` may override this setting for itself in `CreateSystems()` by
+setting the `EnableSystemSorting` flag.

@@ -325,9 +325,15 @@ complex code a little more compact and readable.
 -   System sorting does not occur automatically for non-user
     `ComponentSystemGroup`s after initialization. Call `SortSystems()`
     explicitly for these groups.
+-   Automatic dependency management for `latiosWorld.SyncPoint` and collection
+    components do not function correctly when used inside `OnStartRunning()` or
+    `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
+    exceptions or jobs occur inside these methods.
 
 ## Near-Term Roadmap
 
+-   Automatic `ConverterVersion` bumping on code changes
+-   Exposed `UnsafeParallelBlockList` and similar data structures
 -   Gameplay Toolkit
     -   Reduce cognitive overhead of DOTS for gameplay programmers
     -   Hierarchy navigation and modification
@@ -342,7 +348,7 @@ complex code a little more compact and readable.
 -   World configuration settings
 -   Improved collection components
     -   Default initialization interface
-    -   Dependency backup/restore for Entities.ForEach
+    -   Dependency backup/restore for `Entities.ForEach`
     -   Get as ref
     -   Conversion and serialization
 -   Profiling tools
