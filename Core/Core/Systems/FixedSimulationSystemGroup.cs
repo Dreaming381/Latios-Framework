@@ -10,10 +10,7 @@ namespace Latios.Systems
             LatiosWorld lw = World as LatiosWorld;
             if (!lw.paused)
             {
-                foreach (var sys in Systems)
-                {
-                    SuperSystem.UpdateManagedSystem(sys);
-                }
+                SuperSystem.UpdateAllManagedSystems(this);
             }
         }
     }

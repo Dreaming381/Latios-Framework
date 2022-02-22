@@ -9,7 +9,7 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.Authoring.Systems
 {
-    [ConverterVersion("Latios", 1)]
+    [ConverterVersion("Latios", 2)]
     public class ClipsAndListenersConversionSystem : GameObjectConversionSystem
     {
         protected override void OnUpdate()
@@ -49,6 +49,8 @@ namespace Latios.Myri.Authoring.Systems
                 {
                     if (authoring.clip != null)
                     {
+                        DeclareAssetDependency(authoring.gameObject, authoring.clip);
+
                         int frequency = authoring.clip.frequency;
                         var arr       = new float[authoring.clip.samples * authoring.clip.channels];
                         authoring.clip.GetData(arr, 0);
@@ -269,6 +271,9 @@ namespace Latios.Myri.Authoring.Systems
                     Hash128 hash = default;
                     if (authoring.listenerResponseProfile == null)
                         authoring.listenerResponseProfile = defaultProfileBuilder;
+                    else
+                        DeclareAssetDependency(authoring.gameObject, authoring.listenerResponseProfile);
+
                     if (profileHashDictionary.TryGetValue(authoring.listenerResponseProfile, out var foundHash))
                         hash = foundHash;
                     else

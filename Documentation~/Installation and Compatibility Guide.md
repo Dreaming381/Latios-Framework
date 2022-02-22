@@ -7,18 +7,18 @@ framework.
 ## Installation
 
 Nearly all Latios Framework functionality requires that the World instance be a
-subclass instance called LatiosWorld. If your project currently uses default
+subclass instance called `LatiosWorld`. If your project currently uses default
 world initialization, you simply have to go to your project window, *right
 click-\>Create-\>Latios-\>Bootstrap – Injection Workflow*. This will create an
-instance of an ICustomBootstrap which sets up a variation of the default world,
-but with Latios Framework components installed.
+instance of an `ICustomBootstrap` which sets up a variation of the default
+world, but with Latios Framework components installed.
 
 ### Installing with Existing ICustomBootstrap
 
-If you are already using an ICustomBootstrap, you may still be able to install
-Latios Framework. The following lines in Initialize() are the minimum
-requirements to create a working LatiosWorld. You can either assign this world
-to World.DefaultGameObjectInjectionWorld or create multiple LatiosWorld
+If you are already using an `ICustomBootstrap`, you may still be able to install
+Latios Framework. The following lines in `Initialize()` are the minimum
+requirements to create a working `LatiosWorld`. You can either assign this world
+to World.`DefaultGameObjectInjectionWorld` or create multiple `LatiosWorld`
 instances in a multi-world setup.
 
 ```charp
@@ -27,7 +27,7 @@ world.initializationSystemGroup.SortSystems();
 return true;
 ```
 
-LatiosWorld creates several systems in its constructor. This can throw off
+`LatiosWorld` creates several systems in its constructor. This can throw off
 `DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups()`. You may need
 to remove some system types from the list. You can refer to the templates as
 examples of what may need to be removed.

@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.4.2]
+# Latios Framework Packages for DOTS – [0.4.3]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -45,7 +45,32 @@ section [here](Documentation~/Core/Getting%20Started.md). You may also want to
 look through the [compatibility
 guide](Documentation~/Installation%20and%20Compatibility%20Guide.md).
 
-Getting Started pages and documentation are provided with each package.
+Getting Started pages and documentation are provided with each module.
+
+## Learning Resources
+
+-   Videos
+    -   [Intro Tour Video
+        Playlist](https://www.youtube.com/watch?v=UGKtIZOolEo&list=PLFME_M84NcPylGB41xAzh2bbbT8nhb_a0)
+-   Official How-To Guides
+    -   How To Make an N – 1 Render Loop
+    -   How To Spawn an Entity at a Position in a Job
+    -   [How To Make Parallel Deterministic
+        RNG](Documentation~/Core/Rng%20and%20RngToolkit.md)
+    -   How To Find All Tagged Neighbors Within a Radius
+-   Optimization Adventures
+    -   [Find Pairs
+        1](Documentation~/Optimization%20Adventures/Part%201%20-%20Find%20Pairs%201.md)
+    -   [Build Collision Layer
+        1](Documentation~/Optimization%20Adventures/Part%202%20-%20Build%20Collision%20Layer%201.md)
+    -   [Space Sky
+        1](Documentation~/Optimization%20Adventures/Part%203%20-%20Space%20Sky%201.md)
+    -   [Command Buffers
+        1](Documentation~/Optimization%20Adventures/Part%204%20-%20Command%20Buffers%201.md)
+    -   [Find Pairs
+        2](Documentation~/Optimization%20Adventures/Part%205%20-%20Find%20Pairs%202.md)
+    -   [Collider Cast
+        1](Documentation~/Optimization%20Adventures/Part%206%20-%20ColliderCast%201.md)
 
 ## Proud Users of Latios Framework
 
@@ -54,6 +79,9 @@ Getting Started pages and documentation are provided with each package.
 -   [Latios Space Shooter Sample](https://github.com/Dreaming381/lsss-wip)
 
 ## Support
+
+*TL;DR – I try to take issues and feedback as seriously as if this were a
+commercial project. Do not hesitate to reach out to me!*
 
 I develop this framework separately from this repository. I will provide the
 current snapshot of that code upon request. I promise the code may be terrible.

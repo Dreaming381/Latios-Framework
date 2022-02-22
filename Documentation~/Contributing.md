@@ -10,44 +10,97 @@ this plan!
 
 Here’s how to contribute new features.
 
-## Steps
+## Picking a Feature
 
-1.  Ask me about new features
-    -   Odds are I probably have some design ideas and/or requirements for any
-        given new feature. Ask me to get that info before you write something I
-        don’t want to accept.
-    -   If you wish to develop a new feature, try to pick a low priority item,
-        unless you can make a fast turnaround and have discussed timelines with
-        me.
-    -   The best means to reach me the first time is via a PM in the Unity
-        forums.
-    -   You do not have to ask me about adding tests and examples. Go for it!
-2.  Implement your new code
-    -   Try to follow naming conventions.
-    -   Don’t worry about formatting. I have a little tool I wrote called Alina
-        that automatically formats my code. I don’t give Alina enough love for
-        how much I ask of her, and sometimes she gives me stupid-looking code as
-        payback. If you want to meet her, I can arrange something. But
-        otherwise, don’t worry about the formatting. I’ll ask her to format your
-        code for you once you are done writing it.
-    -   You do not have to write tests. I don’t. However, you are certainly
-        welcome to if you wish to. I will keep them (and probably even use
-        them).
-3.  Make a pull request
-    -   If I make a comment requesting changes, I will not do anything with the
-        code until you make changes or you ignore me for too long.
-    -   If I don’t pull the pull request but mention that I accepted it, that
-        means that I am manually merging the changes into one of the development
-        repositories and making sure things tie together correctly. I’ll post a
-        link to that commit before closing the PR so you can see how your
-        changes ultimately landed.
-    -   Very rarely will I pull directly. If this makes you uncomfortable, you
-        may wish to push changes to one of the open projects instead.
+The first step is to pick a feature. Here’s a list of features to choose from.
+If you don’t see the feature you want to explore listed here or have questions
+regarding one of these features, please reach out to me.
+
+### Core
+
+-   Easy
+    -   GetComponent/Buffer(s)InRoot/Hierarchy/Children
+    -   FindEntity/EntitiesWithTypeInHierarchy/Children
+    -   RemoveComponentCommandBuffer
+-   Advanced
+    -   AddComponentCommandBuffer
+    -   AddSharedComponentCommandBuffer
+    -   InstantiateCommandBufferWithRemap
+    -   InstantiateCommandBuffer – dynamic buffer variants
+    -   InstantiateCommandBuffer – children initialization variants
+    -   Collection Component unmanaged indexing
+    -   Blackboard Entity runtime editor
+
+### Psyshock
+
+-   Easy
+    -   SpeculativeAabbFrom
+    -   Spring Force Utility
+    -   PID Controller
+    -   PhysicsDebug.DrawSphere/Capsule/Box
+-   Advanced
+    -   Character Controller Support Plane Solver
+    -   AreOverlapping(Sphere/Capsule/Box)
+    -   FitToMesh(Sphere/Capsule/Box)
+
+### Myri
+
+-   Easy
+    -   Audio Source Gizmos and Handles
+    -   Audio Source Streamlined Inspector
+    -   Audio Layers
+-   Advanced
+    -   Audio Clip Compression and Decompression Library
+    -   Multiband EQ Kernel
+    -   Multiband Limiter Kernel
+    -   Vertical Spatialization Profile
+
+## Developing Using a Public GitHub Account
+
+If you would like to use git to develop a new feature, follow these steps:
+
+1.  Fork the Latios Framework from GitHub.
+2.  Create a Unity Project where you would like to develop your feature. This
+    can be a new or existing project. No one but you will see this project.
+3.  Clone or Submodule your fork of the Latios Framework into the Packages
+    folder of your project.
+4.  If you use a code formatter, format all code in the Latios Framework and
+    commit it. (If you know in advance which files you need to modify, you can
+    choose to only format those files instead. But make sure you do not commit
+    any other formatted files in future commits.)
+5.  Make your changes and test using your project.
+6.  Make as many commits as you like.
+7.  Do not worry about documentation or version numbers. Documentation updates
+    are nice, but not necessary. Unity Tests are also optional.
+8.  Push your changes to your fork.
+9.  Make a pull request.
+10. If your PR is closed, that means a version of the feature you implemented
+    has landed in an internal repo and will arrive in a future release.
+
+## Developing Without GitHub
+
+If you use some other source control mechanism or an internal git host, follow
+these steps:
+
+1.  Create a Unity Project where you would like to develop your feature. This
+    can be a new or existing project. No one but you will see this project.
+2.  Download, Clone, or Submodule the Latios Framework into the Packages folder
+    of your project.
+3.  If you use a code formatter, format all the code in the Latios Framework and
+    save a copy in a zipped folder.
+4.  Make your changes and test using your project.
+5.  Do not worry about documentation or version numbers. Documentation updates
+    are nice, but not necessary. Unity Tests are also optional.
+6.  Save a copy of your changes to a zipped folder.
+7.  Send your zipped folder (and the zipped folder from step 3 if you have one)
+    via Unity forums PM, email, or any other contact channel you are aware of.
 
 ## Naming
 
 My naming conventions are a little bit different from Unity and more closely
-resemble my C++ naming convention.
+resemble my C++ naming convention. You don’t have to follow these when
+developing new features. But expect deviations to be modified in an official
+release.
 
 -   All data types, enum values, and methods use PascalCase.
 -   All fields and properties use camelCase.
@@ -57,20 +110,16 @@ resemble my C++ naming convention.
 -   ECS tag components have a “Tag” suffix.
 -   ECS systems have a “System” suffix.
 
+If you have a tendency to be overly bland or generic with your type, variable,
+and function names, please use comments to provide details so that I can better
+understand your code.
+
 ## My Workflow
 
-My main development used to be done in a private repository called Reflections
-OP, which is the name of a game I prototyped during a game jam and had been
-working on. Then scope creep convinced me to focus on building this framework
-with small game jam games until I was ready to tackle that larger scope project
-again.
-
-Then Unity fixed the workflow for working with packages in development, and my
-active development shifted into the lsss-wip repo which is public and was used
-to stabilize version 0.2.0. Where my active development takes place will
-probably shift around some more depending on what I am working on. I may have
-experimental stuff spread out across several repos (there’s some experimental
-stuff whose only home is still the Reflections OP repo).
+I manually synchronize development of the Latios Framework across several
+projects. This means I often have multiple versions of the framework with
+experimental features. Eventually changes are organized in a release repo which
+pushes directly to the official repo on GitHub.
 
 If you would like a copy of any experimental version of the framework,
 especially if you wish to develop new features against it and make some of the
@@ -79,13 +128,14 @@ that unreleased experimental stuff to not obliterate your nose with awfulness.
 
 ## “I’d love to help, but the stuff you do is way over my head!”
 
-My suggestion is to write tests and examples. I don’t personally write many
-tests for this framework because this is a hobby project and I have chosen not
-to spend my time writing tests. I am willing to deal with the consequences. But
-if you write tests, I will use them, and it will be a great way for you to learn
-how this stuff works while simultaneously protecting my present self from my
-future self (or vice versa). Examples are also pretty cool and can help people
-new to the framework.
+You don’t need to develop new features to help out.
+
+If you use the Latios Framework, you can make demo projects which can help
+others understand how to use the API. You can send those projects to me via zip
+files or send me a public link to the demo.
+
+If you are an artist or designer, you can create assets and send them to me to
+be featured in demos, examples, and tutorials.
 
 ## My Single Rule Regarding Examples
 

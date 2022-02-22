@@ -38,11 +38,11 @@ namespace Latios.Systems
         {
             LatiosWorld lw = World as LatiosWorld;
             lw.FrameStart();
-            foreach (var sys in Systems)
+            for (int i = 0; i < Systems.Count; i++)
             {
                 if (lw.paused)
                     break;
-                SuperSystem.UpdateManagedSystem(sys);
+                SuperSystem.UpdateManagedSystem(Systems[i]);
             }
         }
     }
@@ -54,10 +54,7 @@ namespace Latios.Systems
     {
         protected override void OnUpdate()
         {
-            foreach (var sys in Systems)
-            {
-                SuperSystem.UpdateManagedSystem(sys);
-            }
+            SuperSystem.UpdateAllManagedSystems(this);
         }
     }
 
@@ -70,7 +67,7 @@ namespace Latios.Systems
         {
             foreach (var sys in Systems)
             {
-                SuperSystem.UpdateManagedSystem(sys);
+                SuperSystem.UpdateAllManagedSystems(this);
             }
         }
     }

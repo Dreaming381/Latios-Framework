@@ -92,12 +92,14 @@ were hoping for, well I’m glad I delivered.
     `n` is the sum of spatialization channels across all listeners. A default
     listener has four spatialization channels.
 
-## Known DSPGraph Issues
+## Known Unity Engine and DSPGraph Issues
 
 The following issues are issues with Unity’s underlying DSPGraph and cannot be
 resolved in Myri. If you encounter one of these issues, submit a bug report to
 Unity!
 
+-   Background subscene conversion may fail to properly convert audio sources as
+    it fails to read the AudioClip files.
 -   A job which manages listeners and the DSP graph is not Bursted due to
     DSPGraph limitations.
 -   The Unity Editor sometimes emits an exception from a Bursted job. This is a

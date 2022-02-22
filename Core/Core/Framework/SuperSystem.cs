@@ -64,13 +64,7 @@ namespace Latios
         [EditorBrowsable(EditorBrowsableState.Never)]
         protected override void OnUpdate()
         {
-            foreach (var sys in Systems)
-            {
-                UpdateManagedSystem(sys);
-
-                if (World.QuitUpdate)
-                    break;
-            }
+            UpdateAllManagedSystems(this);
         }
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
@@ -132,6 +126,17 @@ namespace Latios
             catch (Exception e)
             {
                 UnityEngine.Debug.LogException(e);
+            }
+        }
+
+        internal static void UpdateAllManagedSystems(ComponentSystemGroup group)
+        {
+            for (int i = 0; i < group.Systems.Count; i++)
+            {
+                UpdateManagedSystem(group.Systems[i]);
+
+                if (group.World.QuitUpdate)
+                    break;
             }
         }
 

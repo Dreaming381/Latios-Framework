@@ -337,7 +337,6 @@ complex code a little more compact and readable.
 -   Gameplay Toolkit
     -   Reduce cognitive overhead of DOTS for gameplay programmers
     -   Hierarchy navigation and modification
-    -   Type handle dependency resolver
     -   A/B systems
 -   More custom command buffer types
 -   Codegen generic components
@@ -356,5 +355,6 @@ complex code a little more compact and readable.
 -   Reflection-free refactor
     -   For Tiny support
 -   Job-friendly safe blob management
+-   Blob conversion factory
 -   Custom Lambda Code-gen
     -   If I am feeling really, really brave…
