@@ -46,7 +46,7 @@ namespace Latios.Myri
                         continue;
 
                     ref var clip          = ref clipFrameLookups[clipIndex].clip.Value;
-                    int     spawnFrame    = clipFrameLookups[clipIndex].spawnFrameOrOffsetIndex;
+                    int     spawnFrame    = clipFrameLookups[clipIndex].spawnFrameOrOffset;
                     var     channelWeight = weights[clipIndex].channelWeights[channelIndex];
                     var     itdWeights    = weights[clipIndex].itdWeights;
 
@@ -82,7 +82,7 @@ namespace Latios.Myri
 
             void SampleMatchedRate(ref AudioClipBlob clip, int clipStart, bool isRightChannel, float weight, NativeArray<float> output)
             {
-                int outputStartIndex     = math.min(clipStart, 0);
+                int outputStartIndex     = math.max(-clipStart, 0);
                 int remainingClipSamples = clip.samplesLeftOrMono.Length - clipStart;
                 int remainingSamples     = math.min(output.Length, math.select(0, remainingClipSamples, remainingClipSamples > 0));
 
@@ -156,7 +156,7 @@ namespace Latios.Myri
                         continue;
 
                     ref var clip          = ref clipFrameLookups[clipIndex].clip.Value;
-                    int     loopOffset    = clip.loopedOffsets[clipFrameLookups[clipIndex].spawnFrameOrOffsetIndex];
+                    int     loopOffset    = clipFrameLookups[clipIndex].spawnFrameOrOffset;
                     var     channelWeight = weights[clipIndex].channelWeights[channelIndex];
                     var     itdWeights    = weights[clipIndex].itdWeights;
 
@@ -191,6 +191,9 @@ namespace Latios.Myri
 
             void SampleMatchedRate(ref AudioClipBlob clip, int clipStart, bool isRightChannel, float weight, NativeArray<float> output)
             {
+                while (clipStart < 0)
+                    clipStart += clip.samplesLeftOrMono.Length;
+
                 if (isRightChannel && clip.isStereo)
                 {
                     for (int i = 0; i < output.Length; i++)

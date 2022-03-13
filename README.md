@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.4.3]
+# Latios Framework Packages for DOTS – [0.4.4]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -6,6 +6,10 @@ licensed under the [Unity Companion
 License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages may contain code borrowed from official Unity packages and therefore
 may be seen as derivative works.
+
+A compatibility patch release is planned shortly after the release of DOTS 0.50.
+Based on recent conversations, minimal impact on the Latios Framework is
+expected (that’s a good thing).
 
 *[0.3.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
@@ -36,7 +40,7 @@ survey**](https://docs.google.com/forms/d/e/1FAIpQLScgqi7IxpxdPDrAvv_Vif7lf-Ejbo
 There are three methods to install the framework package (contains all publicly
 released packages).
 
--   Add package via PackageManager-\>Add package from git URL
+-   Add package via Package Manager -\> Add package from git URL
 -   Add via [OpenUPM](https://openupm.com/packages/com.latios.latiosframework/)
 -   Clone or submodule this repository into your project’s Packages folder
 
@@ -53,11 +57,19 @@ Getting Started pages and documentation are provided with each module.
     -   [Intro Tour Video
         Playlist](https://www.youtube.com/watch?v=UGKtIZOolEo&list=PLFME_M84NcPylGB41xAzh2bbbT8nhb_a0)
 -   Official How-To Guides
-    -   How To Make an N – 1 Render Loop
-    -   How To Spawn an Entity at a Position in a Job
+    -   [How To Make an N – 1 Render
+        Loop](Documentation~/How-To%20Guides/How%20To%20Make%20an%20N%20-%201%20Render%20Loop.md)
+    -   [How To Spawn an Entity at a Position in a
+        Job](Documentation~/How-To%20Guides/How%20To%20Spawn%20an%20Entity%20at%20a%20Position%20in%20a%20Job.md)
     -   [How To Make Parallel Deterministic
         RNG](Documentation~/Core/Rng%20and%20RngToolkit.md)
-    -   How To Find All Tagged Neighbors Within a Radius
+    -   [How To Find All Tagged Neighbors Within a
+        Radius](Documentation~/How-To%20Guides/How%20To%20Find%20All%20Tagged%20Neighbors%20Within%20a%20Radius.md)
+-   FAQ
+    -   [Can I use Core and Myri with Unity or Havok
+        Physics?](Documentation~/FAQ/FAQ%20-%20Can%20I%20Use%20Core%20and%20Myri%20with%20Unity%20or%20Havok%20Physics.md)
+    -   [How Do I Choose Between Hybrid, Shared, and Managed Components for My
+        Data?](Documentation~/FAQ/FAQ%20-%20Component%20Types.md)
 -   Optimization Adventures
     -   [Find Pairs
         1](Documentation~/Optimization%20Adventures/Part%201%20-%20Find%20Pairs%201.md)

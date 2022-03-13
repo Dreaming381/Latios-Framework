@@ -9,7 +9,7 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.Authoring.Systems
 {
-    [ConverterVersion("Latios", 2)]
+    [ConverterVersion("Latios", 3)]
     public class ClipsAndListenersConversionSystem : GameObjectConversionSystem
     {
         protected override void OnUpdate()
@@ -160,11 +160,12 @@ namespace Latios.Myri.Authoring.Systems
                             {
                                 DstEntityManager.AddComponentData(entity, new AudioSourceLooped
                                 {
-                                    m_clip          = blob,
-                                    innerRange      = authoring.innerRange,
-                                    outerRange      = authoring.outerRange,
-                                    rangeFadeMargin = authoring.rangeFadeMargin,
-                                    volume          = authoring.volume,
+                                    m_clip               = blob,
+                                    innerRange           = authoring.innerRange,
+                                    outerRange           = authoring.outerRange,
+                                    rangeFadeMargin      = authoring.rangeFadeMargin,
+                                    volume               = authoring.volume,
+                                    offsetIsBasedOnSpawn = authoring.playFromBeginningAtSpawn
                                 });
                             }
                             if (authoring.useCone)

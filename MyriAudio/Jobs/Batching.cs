@@ -47,8 +47,8 @@ namespace Latios.Myri
                         var               e   = emitters[listenerEmitterPairIndices.y];
                         ClipFrameListener cfl = new ClipFrameListener
                         {
-                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffsetIndex = e.source.m_spawnedAudioFrame },
-                            listenerIndex                                                                       = listenerEmitterPairIndices.x
+                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_spawnedAudioFrame },
+                            listenerIndex                                                                  = listenerEmitterPairIndices.x
                         };
                         if (hashmap.TryGetValue(cfl, out int foundIndex))
                         {
@@ -104,8 +104,8 @@ namespace Latios.Myri
                         var               e   = emitters[listenerEmitterPairIndices.y];
                         ClipFrameListener cfl = new ClipFrameListener
                         {
-                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffsetIndex = e.source.m_loopOffsetIndex },
-                            listenerIndex                                                                       = listenerEmitterPairIndices.x
+                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_loopOffset },
+                            listenerIndex                                                                  = listenerEmitterPairIndices.x
                         };
                         if (hashmap.TryGetValue(cfl, out int foundIndex))
                         {
@@ -138,7 +138,7 @@ namespace Latios.Myri
 
             public unsafe override int GetHashCode()
             {
-                return new int3((int)((ulong)lookup.clip.GetUnsafePtr() >> 4), lookup.spawnFrameOrOffsetIndex, listenerIndex).GetHashCode();
+                return new int3((int)((ulong)lookup.clip.GetUnsafePtr() >> 4), lookup.spawnFrameOrOffset, listenerIndex).GetHashCode();
             }
         }
     }

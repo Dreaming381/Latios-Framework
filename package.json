@@ -1,7 +1,7 @@
 {
   "name": "com.latios.latiosframework",
   "displayName": "Latios Framework for DOTS",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "unity": "2020.1",
   "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.4.0\n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos",
   "dependencies": {

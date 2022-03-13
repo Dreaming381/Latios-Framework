@@ -26,8 +26,8 @@ First, let me introduce you to the decisions that make no sense to me:
 -   Simulation callbacks are single-threaded
 -   Physics is very decoupled from ECS, trashing the Transform system and using
     layers rather than the superior ECS query system; yet simultaneously, it is
-    tightly coupled as colliders use blobs, RigidBody has an Entity field, and
-    all of its authoring uses GameObjectConversion
+    tightly coupled as colliders use blobs, `RigidBody` has an `Entity` field,
+    and all of its authoring uses GameObjectConversion
 
 Now, to understand why this is terrible for me, let me present to you a game
 idea a friend of mine and I came up with during a game jam:
@@ -49,11 +49,11 @@ So let’s examine how Unity.Physics stacks up:
     traverse. Unity.Physics handles that perfectly well.
 -   We need colliders on animated characters. Actually, we are still good here
     too. Even though Unity.Physics trashes the hierarchy, it doesn’t trash the
-    LinkedEntityGroup, which means we can still instantiate a prefab with all of
-    the individual colliders and reference them to drive them with bones.
+    `LinkedEntityGroup`, which means we can still instantiate a prefab with all
+    of the individual colliders and reference them to drive them with bones.
 -   We need morphing collider shapes. Most of this is just going to be scaling
     spheres based on an animation curve, but we need this. Currently this means
-    we need to allocate, destroy, and reallocate a BlobAsset every frame while
+    we need to allocate, destroy, and reallocate a `BlobAsset` every frame while
     simultaneously making sure that the colliders are not shared. This is not
     performant.
 -   Most of our game logic is going to be detecting if two colliders
@@ -69,12 +69,12 @@ can characterize that based on EntityQueries, because we are using Tags and
 unique component types for all of our other logic. But for Unity.Physics we need
 to encode all of that into a layer system. While annoying, it is doable.
 
-After having told Unity what collides with what, it generates a NativeStream to
-be processed in an ITriggerEventsJob giving us all of our collisions. That seems
-nice, except all of our resulting pairs are mixed together like a jar of jelly
-beans. Consequently each unique event handler needs to filter through the
+After having told Unity what collides with what, it generates a `NativeStream`
+to be processed in an `ITriggerEventsJob` giving us all of our collisions. That
+seems nice, except all of our resulting pairs are mixed together like a jar of
+jelly beans. Consequently each unique event handler needs to filter through the
 results and pick out the ones it cares for. That’s a lot of iterating through
-the events. We can use the new EntityQueryMask to speed this up, but still, it
+the events. We can use the new `EntityQueryMask` to speed this up, but still, it
 isn’t great. Instead, we might decide to bring our iteration count back down by
 having one job do all the filtering for all the different handlers to react to
 by creating a bunch of smaller collections of pairs. This works, but now the
@@ -146,10 +146,10 @@ component. Don’t worry. You don’t have to query for every `SphereCollider`,
 the different types together. The primitive colliders fit entirely in the
 component, which makes sense because those are the colliders you are going to
 want to mutate every which way possible anyways. The more complex colliders may
-expose some readily tweakable parameters but also rely on Blobs or Entity
-references to an Entity with dynamic buffers and stuff. So per-frame animated
-(or simulated like cloth) mesh colliders are not only more accessible but more
-intuitive in the DOTS ecosystem.
+expose some readily tweakable parameters (like scale) but also rely on Blobs or
+Entity references to an Entity with dynamic buffers and stuff. So per-frame
+animated (or simulated like cloth) mesh colliders are not only more accessible
+but more intuitive in the DOTS ecosystem.
 
 One might argue that copying large collider components (it is the same size as
 `LocalToWorld`) is quite a bit more expensive than copying pointers. But given
@@ -159,10 +159,11 @@ this trade any day.
 As a bonus, Psyshock colliders are constructable and copyable on the stack. That
 makes them a lot more pleasant to work with.
 
-*Feedback Request: Due to the safety system in ECS, complex mutable colliders
-will require a scripting define which modifies the API to require an EcsContext
-object. If anyone has ideas for how to make this migration-friendly, please send
-me your thoughts.*
+*Feedback Request: I am still considering options for complex mutable colliders.
+Originally I was thinking requiring a scripting define which modifies the API to
+require an EcsContext object. But now I am thinking of implementing this using
+planned Blob safety management utilities in Core. I would love to hear your
+thoughts on this!*
 
 ### Transform Hierarchy Support
 
@@ -261,6 +262,31 @@ useful for “What if?” logic.
 
 Also, you might see some more non-traditional queries pop up at some point if I
 find myself wanting parabolic and smoothstep trajectories again.
+
+### No Hacks
+
+Did you know that casting an infinitely small sphere collider, like one with 0
+radius, is equivalent to a Raycast? So let’s say you have a 1x1x1 box collider
+with a bevel radius *r* at the origin and you cast a ray and a sphere starting
+at (-10, -10, -10) towards the origin. Theoretically, you should get the same
+hit point in world space. Yet if you compare the results of these operations
+using Unity.Physics, you will get two different hit points in world space. In
+fact, the distance between those two points is expressed by this formula: *r(√3
+– 1)*
+
+This isn’t the only hack in Unity.Physics. Any CastCollider function will
+translate the casted collider along the ray and then check if it is “close
+enough”. And if it doesn’t find something after 10 tries, it just gives up and
+calls it a miss.
+
+These are hacks, designed to provide slight performance benefits for most people
+who don’t care about them. Yet these hacks can also be the source of
+difficult-to-understand bugs and long weeks of “why is my object placement math
+code wrong?”
+
+Psyshock is hack-free. Queries generate consistent results with as much
+precision as the 32-bit floating point hardware allows. And yes, this leads to
+some very interesting ColliderCast algorithms.
 
 ### Immediate Mode Design
 

@@ -100,6 +100,9 @@ Unity!
 
 -   Background subscene conversion may fail to properly convert audio sources as
     it fails to read the AudioClip files.
+-   Sometimes in the editor, audio may stutter despite a lack of warnings of the
+    DSPGraph being starved. This is because GC spikes stall the audio thread on
+    some versions of Unity. (It is not due to Myri. I checked.)
 -   A job which manages listeners and the DSP graph is not Bursted due to
     DSPGraph limitations.
 -   The Unity Editor sometimes emits an exception from a Bursted job. This is a
@@ -111,7 +114,7 @@ Unity!
 -   Audio causes crashes for MacOS builds using 2020.1.9f1 and possibly other
     versions. (1 report)
 -   DSPGraph does not initialize correctly on 2020.3 using the new build system
-    packages for Windows (1 report)
+    packages for Windows. (1 report)
 
 ## Near-Term Roadmap
 

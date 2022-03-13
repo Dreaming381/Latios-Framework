@@ -70,7 +70,10 @@ For *Looping* sources, *Voices* is the number of unique audio sources that will
 play with the same clip. Each unique source will be played with a unique offset.
 The offsets are evenly distributed. All sources sharing the same clip will be
 assigned one of these offsets, and sources sharing the same offset will be
-combined.
+combined. Voices are synchronized with the application time independent of when
+the source was created. If you would like to play a source from the beginning
+when it is created, check the *Play From Beginning At Spawn* checkbox. In this
+case, the *Voices* parameter does nothing.
 
 One-shot sources will be combined if they begin playing at the same time (the
 same audio frame).

@@ -88,7 +88,7 @@ namespace Latios.Myri
                         //Todo: Figure out how to bring this optimization back.
                         //if (l.volume > 0f)
                         {
-                            l.itdResolution = math.max(l.itdResolution, 0);
+                            l.itdResolution = math.clamp(l.itdResolution, 0, 15);
 
                             var transform = RigidTransform.identity;
                             if (hasRotation)
@@ -352,6 +352,8 @@ namespace Latios.Myri
             [ReadOnly] public NativeReference<int>                        audioFrame;
             [ReadOnly] public NativeReference<int>                        lastConsumedBufferId;
             public int                                                    bufferId;
+            public int                                                    sampleRate;
+            public int                                                    samplesPerFrame;
 
             public void Execute(ArchetypeChunk chunk, int chunkIndex, int firstEntityIndex)
             {
@@ -361,11 +363,58 @@ namespace Latios.Myri
                 {
                     var l = looped[i];
 
-                    if (!l.m_initialized)
+                    if (!l.initialized)
                     {
-                        l.m_loopOffsetIndex = rng.NextInt(0, l.m_clip.Value.loopedOffsets.Length);
-                        l.m_initialized     = true;
-                        looped[i]           = l;
+                        if (l.offsetIsBasedOnSpawn)
+                        {
+                            ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                            if (sampleRate == l.clip.Value.sampleRate)
+                            {
+                                int clipStart  = (int)(samplesPlayed % (ulong)l.clip.Value.samplesLeftOrMono.Length);
+                                l.m_loopOffset = l.clip.Value.samplesLeftOrMono.Length - clipStart;
+                            }
+                            else
+                            {
+                                double clipSampleStride             = l.clip.Value.sampleRate / (double)sampleRate;
+                                double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
+                                double clipStart                    = samplesPlayedInSourceSamples % l.clip.Value.samplesLeftOrMono.Length;
+                                // We can't get exact due to the mismatched rate, so we choose a rounded start point between
+                                // the last and first sample by chopping off the fractional part
+                                l.m_loopOffset = (int)(l.clip.Value.samplesLeftOrMono.Length - clipStart);
+                            }
+                            l.m_spawnBufferLow16 = (short)bufferId;
+                        }
+                        else
+                        {
+                            l.m_loopOffset = l.m_clip.Value.loopedOffsets[rng.NextInt(0, l.m_clip.Value.loopedOffsets.Length)];
+                            l.offsetLocked = true;
+                        }
+                        l.initialized = true;
+                        looped[i]     = l;
+                    }
+                    else if (!l.offsetLocked && l.offsetIsBasedOnSpawn)
+                    {
+                        if ((short)lastConsumedBufferId.Value - l.m_spawnBufferLow16 >= 0)
+                        {
+                            l.offsetLocked = true;
+                        }
+                        else
+                        {
+                            // This check compares if the playhead loop advanced past the target start point in the loop
+                            ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                            double clipSampleStride             = l.clip.Value.sampleRate / (double)sampleRate;
+                            double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
+                            double clipStart                    = (samplesPlayedInSourceSamples + l.m_loopOffset) % l.clip.Value.samplesLeftOrMono.Length;
+                            // We add a one sample tolerance in case we are regenerating the same audio frame, in which case the old values are fine.
+                            if (clipStart < l.clip.Value.samplesLeftOrMono.Length / 2 && clipStart > 1)
+                            {
+                                // We missed the buffer
+                                clipStart            = samplesPlayedInSourceSamples % l.clip.Value.samplesLeftOrMono.Length;
+                                l.m_loopOffset       = (int)(l.clip.Value.samplesLeftOrMono.Length - clipStart);
+                                l.m_spawnBufferLow16 = (short)bufferId;
+                            }
+                        }
+                        looped[i] = l;
                     }
                 }
 

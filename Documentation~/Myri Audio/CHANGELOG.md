@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] – 2022-3-13
+
+Officially supports Entities [0.17.0]
+
+### Added
+
+-   Added a new option for looping audio sources to begin playing from the
+    beginning at spawn rather than a voice offset. While this drastically
+    reduces voice-combining potential, it is useful for background music and
+    similar use cases.
+
+### Fixed
+
+-   Fixed an issue where the ITD offset would cause arrays to be indexed with a
+    negative value.
+
+### Improved
+
+-   Added XML documentation and tooltips for a significant amount of Myri.
+
 ## [0.4.3] – 2022-2-21
 
 Officially supports Entities [0.17.0]

@@ -265,6 +265,8 @@ namespace Latios.Myri.Systems
                 audioFrame           = m_audioFrame,
                 lastConsumedBufferId = m_lastReadBufferId,
                 bufferId             = m_currentBufferId,
+                sampleRate           = m_sampleRate,
+                samplesPerFrame      = m_samplesPerFrame,
                 emitters             = loopedEmitters
             }.ScheduleParallel(m_loopedQuery, 1, ecsCaptureFrameJH);
 

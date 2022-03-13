@@ -11,10 +11,31 @@ using Hash128 = Unity.Entities.Hash128;
 
 namespace Latios.Myri.Authoring
 {
+    /// <summary>
+    /// An asset type which is used to define a volume and frequency spatialization profile for an audio listener
+    /// </summary>
     public abstract class AudioIldProfileBuilder : ScriptableObject
     {
+        /// <summary>
+        /// Override this function to make several calls to AddChannel and AddFilterToChannel which defines a profile.
+        /// </summary>
         protected abstract void BuildProfile();
 
+        /// <summary>
+        /// Adds a channel to the profile. A channel is a 3D radial slice where all audio sources coming from that direction
+        /// are subject to the channels filters. Sources between channels will interpolate between the channels.
+        /// </summary>
+        /// <param name="minMaxHorizontalAngleInRadiansCounterClockwiseFromRight">
+        /// The horizontal extremes of the slice in radians beginning from the left ear positively rotating towards forward.
+        /// Values between -2pi and +2pi are allowed.</param>
+        /// <param name="minMaxVerticalAngleInRadians">
+        /// The vertical extremes of the slice in radians beginning from horizontal positively rotating upwards.
+        /// Values between -2pi and +2pi are allowed.</param>
+        /// <param name="passthroughFraction">The amount of signal which should bypass the filters. Must be between 0 and 1.</param>
+        /// <param name="filterVolume">The raw attenuation or amplification to apply to the input of filtered signal. Not in decibels.</param>
+        /// <param name="passthroughVolume">The raw attenuation of amplification to apply to the signal bypassing the filters. Not in decibels.</param>
+        /// <param name="isRightEar">If true, this channel uses the right ear. Otherwise, it uses the left ear.</param>
+        /// <returns>A handle which can be used to add filters to the channel</returns>
         protected ChannelHandle AddChannel(float2 minMaxHorizontalAngleInRadiansCounterClockwiseFromRight,
                                            float2 minMaxVerticalAngleInRadians,
                                            float passthroughFraction,
@@ -43,6 +64,11 @@ namespace Latios.Myri.Authoring
             }
         }
 
+        /// <summary>
+        /// Adds a filter to the channel. Filters are applied in the order they are added.
+        /// </summary>
+        /// <param name="filter">The filter to apply</param>
+        /// <param name="channel">The channel handle returned from AddChannel</param>
         protected void AddFilterToChannel(FrequencyFilter filter, ChannelHandle channel)
         {
             if (channel.isRightChannel)
@@ -57,6 +83,9 @@ namespace Latios.Myri.Authoring
             }
         }
 
+        /// <summary>
+        /// A handle representing a channel added to the profile
+        /// </summary>
         public struct ChannelHandle
         {
             internal int  channelIndex;
