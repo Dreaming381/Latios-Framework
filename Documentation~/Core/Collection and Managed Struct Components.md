@@ -54,8 +54,8 @@ public struct PipeEmissionQueue : ICollectionComponent
     public JobHandle Dispose(JobHandle inputDeps) => 
 	    JobHandle.CombineDependencies(disabledEntityQueue.Dispose(inputDeps), entitiesToEnable.Dispose(inputDeps));
 }
-
 ```
+
 ## Component Lifecycles
 
 There are two ways to affect the lifecycle of an instance of a
@@ -227,5 +227,9 @@ run during a sync point. By scheduling a job which only interacts with
 collection components attached to `worldGlobalEntity` and calling
 `UpdateCollectionComponentDependency<T>()` on those collection components while
 not touching `Dependency`, the `JobHandle`s will be automatically managed by the
-Latios automatic dependency management system but not Unity ECS’s automatic
-dependency management system.
+Latios Framework’s automatic dependency management system but not Unity ECS’s
+automatic dependency management system.
+
+## Known Issues
+
+Managed Components and Collection Components are not supported in `ISystem`.

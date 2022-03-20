@@ -9,7 +9,7 @@ namespace Latios.Systems
     [DisableAutoCreation]
     [AlwaysUpdateSystem]
     [UpdateInGroup(typeof(LatiosInitializationSystemGroup), OrderLast = true)]  //Doesn't matter, but good for visualization
-    public class DestroyEntitiesOnSceneChangeSystem : SubSystem
+    public partial class DestroyEntitiesOnSceneChangeSystem : SubSystem
     {
         private EntityQuery m_destroyQuery = default;
 

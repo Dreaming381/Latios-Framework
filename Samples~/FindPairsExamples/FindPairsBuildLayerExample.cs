@@ -8,7 +8,7 @@ using Unity.Mathematics;
 namespace Dragons
 {
     [AlwaysUpdateSystem, DisableAutoCreation]
-    public class FindPairsBuildLayerExample : SubSystem
+    public partial class FindPairsBuildLayerExample : SubSystem
     {
         private EntityQuery m_query;
         protected override void OnCreate()

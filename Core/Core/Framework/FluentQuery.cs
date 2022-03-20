@@ -1,4 +1,5 @@
 ﻿using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 
 namespace Latios
@@ -20,6 +21,7 @@ namespace Latios
                 m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
                 m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
                 m_targetSystem           = system,
+                m_targetState            = default,
                 m_targetManager          = default,
                 m_anyIsSatisfiedByAll    = false,
                 m_sharedComponentFilterA = null,
@@ -44,7 +46,33 @@ namespace Latios
                 m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
                 m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
                 m_targetSystem           = null,
+                m_targetState            = default,
                 m_targetManager          = em,
+                m_anyIsSatisfiedByAll    = false,
+                m_sharedComponentFilterA = null,
+                m_sharedComponentFilterB = null,
+                m_changeFilters          = new NativeList<ComponentType>(Allocator.TempJob),
+                m_options                = EntityQueryOptions.Default
+            };
+        }
+
+        /// <summary>
+        /// Starts the construction of an EntityQuery
+        /// </summary>
+        public static unsafe FluentQuery Fluent(this ref SystemState state)
+        {
+            return new FluentQuery
+            {
+                m_all                    = new NativeList<ComponentType>(Allocator.TempJob),
+                m_any                    = new NativeList<ComponentType>(Allocator.TempJob),
+                m_none                   = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcluded       = new NativeList<ComponentType>(Allocator.TempJob),
+                m_allWeak                = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
+                m_targetSystem           = null,
+                m_targetState            = (SystemState*)UnsafeUtility.AddressOf(ref state),
+                m_targetManager          = default,
                 m_anyIsSatisfiedByAll    = false,
                 m_sharedComponentFilterA = null,
                 m_sharedComponentFilterB = null,
@@ -54,7 +82,7 @@ namespace Latios
         }
     }
 
-    public struct FluentQuery
+    public unsafe struct FluentQuery
     {
         internal NativeList<ComponentType> m_all;
         internal NativeList<ComponentType> m_any;
@@ -65,6 +93,7 @@ namespace Latios
         internal NativeList<ComponentType> m_anyIfNotExcludedWeak;
 
         internal ILatiosSystem m_targetSystem;
+        internal SystemState*  m_targetState;
         internal EntityManager m_targetManager;
 
         internal bool m_anyIsSatisfiedByAll;
@@ -363,6 +392,10 @@ namespace Latios
             if (m_targetSystem != null)
             {
                 query = m_targetSystem.GetEntityQuery(desc);
+            }
+            else if (m_targetState != null)
+            {
+                query = m_targetState->GetEntityQuery(desc);
             }
             else if (m_targetManager != default)
             {

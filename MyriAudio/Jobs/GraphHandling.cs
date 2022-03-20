@@ -47,7 +47,7 @@ namespace Latios.Myri
         }
 
         //Temporary workaround: DSPGraph updates can't be scheduled from Burst
-        //[BurstCompile]
+        // [BurstCompile]
         public struct UpdateListenersGraphJob : IJob
         {
             [ReadOnly] public NativeArray<Entity>                    listenerEntities;

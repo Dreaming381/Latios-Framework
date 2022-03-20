@@ -37,7 +37,7 @@ namespace Latios.Psyshock
     }
 
     [Serializable]
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
     public unsafe partial struct Collider : IComponentData
     {
         [FieldOffset(0)]

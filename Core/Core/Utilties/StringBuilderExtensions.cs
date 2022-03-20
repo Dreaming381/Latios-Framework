@@ -4,7 +4,7 @@ using Unity.Collections;
 
 public static class StringBuilderExtensions
 {
-    public static void Append(this StringBuilder builder, FixedString32 fixedString)
+    public static void Append(this StringBuilder builder, FixedString32Bytes fixedString)
     {
         foreach (var c in fixedString)
         {
@@ -12,7 +12,7 @@ public static class StringBuilderExtensions
         }
     }
 
-    public static void Append(this StringBuilder builder, FixedString64 fixedString)
+    public static void Append(this StringBuilder builder, FixedString64Bytes fixedString)
     {
         foreach (var c in fixedString)
         {
@@ -20,7 +20,7 @@ public static class StringBuilderExtensions
         }
     }
 
-    public static void Append(this StringBuilder builder, FixedString128 fixedString)
+    public static void Append(this StringBuilder builder, FixedString128Bytes fixedString)
     {
         foreach (var c in fixedString)
         {
@@ -28,7 +28,7 @@ public static class StringBuilderExtensions
         }
     }
 
-    public static void Append(this StringBuilder builder, FixedString512 fixedString)
+    public static void Append(this StringBuilder builder, FixedString512Bytes fixedString)
     {
         foreach (var c in fixedString)
         {
@@ -36,7 +36,7 @@ public static class StringBuilderExtensions
         }
     }
 
-    public static void Append(this StringBuilder builder, FixedString4096 fixedString)
+    public static void Append(this StringBuilder builder, FixedString4096Bytes fixedString)
     {
         foreach (var c in fixedString)
         {

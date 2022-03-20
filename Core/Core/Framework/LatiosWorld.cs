@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Debug = UnityEngine.Debug;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 
 using Latios.Systems;
@@ -22,7 +23,7 @@ namespace Latios
                 if (m_sceneBlackboardEntity == Entity.Null && !m_sceneBlackboardSafetyOverride)
                 {
                     throw new InvalidOperationException(
-                        "The sceneBlackboard Entity has not been initialized yet. If you are trying to access this entity in OnCreate(), please use OnNewScene() or another callback instead.");
+                        "The sceneBlackboardEntity has not been initialized yet. If you are trying to access this entity in OnCreate(), please use OnNewScene() or another callback instead.");
                 }
                 return m_sceneBlackboardEntity;
             }
@@ -49,19 +50,22 @@ namespace Latios
 
         internal ManagedStructComponentStorage ManagedStructStorage { get { return m_componentStorage; } }
         internal CollectionComponentStorage CollectionComponentStorage { get { return m_collectionsStorage; } }
+        internal UnmanagedExtraInterfacesDispatcher UnmanagedExtraInterfacesDispatcher { get { return m_interfacesDispatcher; } }
 
         private List<CollectionDependency> m_collectionDependencies = new List<CollectionDependency>();
 
-        //Todo: Disposal of collection storage is currently done in ManagedStructStorageCleanupSystems.cs.
+        //Todo: Disposal of storages is currently done in ManagedStructStorageCleanupSystems.cs.
         //This is because overriding World doesn't give us an opportunity to override the Dispose method.
         //In the future it may be worth creating a DisposeTool system that Dispose events can be registered to.
-        private ManagedStructComponentStorage m_componentStorage   = new ManagedStructComponentStorage();
-        private CollectionComponentStorage    m_collectionsStorage = new CollectionComponentStorage();
+        private ManagedStructComponentStorage      m_componentStorage   = new ManagedStructComponentStorage();
+        private CollectionComponentStorage         m_collectionsStorage = new CollectionComponentStorage();
+        private UnmanagedExtraInterfacesDispatcher m_interfacesDispatcher;
 
-        private LatiosInitializationSystemGroup m_initializationSystemGroup;
-        private LatiosSimulationSystemGroup     m_simulationSystemGroup;
-        private LatiosPresentationSystemGroup   m_presentationSystemGroup;
-        private SyncPointPlaybackSystem         m_syncPointPlaybackSystem;
+        private LatiosInitializationSystemGroup         m_initializationSystemGroup;
+        private LatiosSimulationSystemGroup             m_simulationSystemGroup;
+        private LatiosPresentationSystemGroup           m_presentationSystemGroup;
+        private SyncPointPlaybackSystem                 m_syncPointPlaybackSystem;
+        private SystemHandle<BlackboardUnmanagedSystem> m_blackboardUnmanagedSystem;
 
         private bool m_paused          = false;
         private bool m_resumeNextFrame = false;
@@ -72,13 +76,16 @@ namespace Latios
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentSystemStateTag<>),    typeof(IManagedComponent));
             //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentSystemStateTag<>), typeof(ICollectionComponent));
+            m_interfacesDispatcher = new UnmanagedExtraInterfacesDispatcher();
+
+            var bus                     = this.GetOrCreateSystem<BlackboardUnmanagedSystem>();
+            m_blackboardUnmanagedSystem = bus.Handle;
 
             worldBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
             worldBlackboardEntity.AddComponentData(new WorldBlackboardTag());
-
-#if UNITY_EDITOR
             EntityManager.SetName(worldBlackboardEntity, "World Blackboard Entity");
-#endif
+            bus.Struct.worldBlackboardEntity = (Entity)worldBlackboardEntity;
+            bus.Struct.sceneBlackboardEntity = default;
 
             useExplicitSystemOrdering   = true;
             m_initializationSystemGroup = GetOrCreateSystem<LatiosInitializationSystemGroup>();
@@ -112,9 +119,9 @@ namespace Latios
             {
                 sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
                 sceneBlackboardEntity.AddComponentData(new SceneBlackboardTag());
-#if UNITY_EDITOR
+                Unmanaged.ResolveSystem(m_blackboardUnmanagedSystem).sceneBlackboardEntity = (Entity)sceneBlackboardEntity;
                 EntityManager.SetName(sceneBlackboardEntity, "Scene Blackboard Entity");
-#endif
+
                 foreach (var system in Systems)
                 {
                     if (system is ILatiosSystem latiosSystem)
@@ -122,6 +129,16 @@ namespace Latios
                         latiosSystem.OnNewScene();
                     }
                 }
+
+                var unmanaged       = Unmanaged;
+                var unmanagedStates = unmanaged.GetAllSystemStates(Allocator.TempJob);
+                for (int i = 0; i < unmanagedStates.Length; i++)
+                {
+                    var dispatcher = m_interfacesDispatcher.GetDispatch(ref unmanagedStates.At(i));
+                    if (dispatcher != null)
+                        dispatcher.OnNewScene(ref unmanagedStates.At(i));
+                }
+                unmanagedStates.Dispose();
             }
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             m_sceneBlackboardSafetyOverride = false;
@@ -274,25 +291,21 @@ namespace Systems
 {
     public class LatiosSimulationSystemGroup : SimulationSystemGroup
     {
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
-            LatiosWorld lw = World as LatiosWorld;
-            if (!lw.paused)
-            {
-                SuperSystem.UpdateAllManagedSystems(this);
-            }
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 
     public class LatiosPresentationSystemGroup : PresentationSystemGroup
     {
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
-            LatiosWorld lw = World as LatiosWorld;
-            if (!lw.paused)
-            {
-                SuperSystem.UpdateAllManagedSystems(this);
-            }
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 }

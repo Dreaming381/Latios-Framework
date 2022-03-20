@@ -9,7 +9,7 @@ using Unity.Transforms;
 namespace Dragons
 {
     [AlwaysUpdateSystem, DisableAutoCreation]
-    public class FindPairsSimpleBenchmark : SubSystem
+    public partial class FindPairsSimpleBenchmark : SubSystem
     {
         private struct DestroyOnCollisionProcessor : IFindPairsProcessor
         {

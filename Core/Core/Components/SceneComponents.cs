@@ -13,17 +13,17 @@ namespace Latios
     /// </summary>
     public struct RequestLoadScene : IComponentData
     {
-        public FixedString128 newScene;
+        public FixedString128Bytes newScene;
     }
 
     public struct CurrentScene : IComponentData
     {
-        internal FixedString128 currentScene;
-        internal FixedString128 previousScene;
+        internal FixedString128Bytes currentScene;
+        internal FixedString128Bytes previousScene;
         internal bool           isSceneFirstFrame;
 
-        public FixedString128 current => currentScene;
-        public FixedString128 previous => previousScene;
+        public FixedString128Bytes current => currentScene;
+        public FixedString128Bytes previous => previousScene;
         public bool isFirstFrame => isSceneFirstFrame;
     }
 }

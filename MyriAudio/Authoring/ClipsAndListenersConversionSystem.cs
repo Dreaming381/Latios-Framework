@@ -97,7 +97,7 @@ namespace Latios.Myri.Authoring.Systems
                     var rates         = new NativeArray<int>(computationDataArray.Length, Allocator.TempJob);
                     var channelCounts = new NativeArray<int>(computationDataArray.Length, Allocator.TempJob);
                     var offsets       = new NativeArray<int>(computationDataArray.Length, Allocator.TempJob);
-                    var names         = new NativeArray<FixedString128>(computationDataArray.Length, Allocator.TempJob);
+                    var names         = new NativeArray<FixedString128Bytes>(computationDataArray.Length, Allocator.TempJob);
                     for (int i = 0; i < computationDataArray.Length; i++)
                     {
                         var clip           = clipList[computationDataArray[i].index];
@@ -207,7 +207,7 @@ namespace Latios.Myri.Authoring.Systems
             [ReadOnly] public NativeArray<int>            rates;
             [ReadOnly] public NativeArray<int>            channelCounts;
             [ReadOnly] public NativeArray<int>            offsetCounts;
-            [ReadOnly] public NativeArray<FixedString128> names;
+            [ReadOnly] public NativeArray<FixedString128Bytes> names;
             public NativeArray<AudioClipComputationData>  computationDataArray;
 
             public void Execute(int index)

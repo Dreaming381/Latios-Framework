@@ -6,13 +6,73 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] – 2022-3-20
+
+Officially supports Entities [0.50.0]
+
+### Added
+
+-   Added `Fluent()` extension method for `SystemState` for use of Fluent in
+    `ISystem`.
+-   Added `ISystemNewScene` and `ISystemShouldUpdate` which provides additional
+    callbacks for `ISystem` matching that of `SubSystem` and `SuperSystem`.
+-   Added `GetWorldBlackboardEntity()` and `GetSceneBlackboardEntity()`
+    extension methods for `SystemState` which are compatible with Burst.
+-   Added `SortingSystemTracker` which can detect systems added or removed from
+    a `ComponentSystemGroup`.
+-   Added `CopyComponentData()` and `CopyDynamicBuffer()` extension methods for
+    `EntityManager` which are compatible with Burst.
+-   Added `CopySharedComponent()` extension method for `EntityManager`.
+-   Added `GetSystemEnumerator()` extension method for `ComponentSystemGroup`
+    which can step through all managed and unmanaged systems in update order.
+-   Added `ExecutingSystemHandle()` extension method for `WorldUnmanaged` which
+    returns a handle to the system currently in its `OnUpdate()` routine. This
+    is compatible with Burst.
+-   Added `AsManagedSystem()` extension method for `World` and `WorldUnmanaged`
+    which extract the class reference of a managed system from a
+    `SystemHandleUntyped`.
+-   Added `GetAllSystemStates()` extension method for `WorldUnmanaged` which can
+    gather all `SystemState` instances and consequently all systems in a World
+    including unmanaged systems.
+-   Added `WorldExposedExtensions.GetMetaIdForType()` which can generate an ID
+    for a `System.Type` which can be compared against
+    `SystemState.UnmanagedMetaIndex`.
+
+### Changed
+
+-   `BootstrapTools.InjectSystem` can now inject unmanaged systems. Many other
+    `BootstrapTools` functions now handle unmanaged systems too.
+
+### Fixed
+
+-   Fixed an issue where custom command buffers could not be played back from
+    within a Burst context.
+-   All custom `ComponentSystemGroup` types including `SuperSystem` and
+    `RootSuperSystem` support unmanaged systems.
+-   All custom `ComponentSystemGroup` types including `SuperSystem` and
+    `RootSuperSystem` support `IRateManager`.
+-   All custom `ComponentSystemGroup` types including `SuperSystem` and
+    `RootSuperSystem` support automatic system sorting when systems are added
+    and removed.
+-   Fixed an issue where the managed and collection component reactive systems
+    were being stripped in builds.
+-   Fixed an issue with `EntityDataCopyKit` not handling default-valued shared
+    components correctly.
+
+### Improved
+
+-   `EntityDataCopyKit` no longer uses reflection.
+-   All custom `ComponentSystemGroup` types including `SuperSystem` and
+    `RootSuperSystem` behave much more like Unity’s systems regarding error
+    handling.
+
 ## [0.4.3] – 2022-2-21
 
 Officially supports Entities [0.17.0]
 
 ### Fixed
 
--   Fixed GC allocations caused by using a foreach on IReadOnlyList type
+-   Fixed GC allocations caused by using a foreach on `IReadOnlyList` type
 -   Removed a reference to the Input System package in Latios.Core.asmdef
 
 ## [0.4.2] – 2021-10-5

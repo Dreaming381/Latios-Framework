@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
@@ -7,7 +7,7 @@ using Unity.Jobs;
 namespace Latios
 {
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    public abstract class SubSystemBase : SystemBase, ILatiosSystem
+    public abstract partial class SubSystemBase : SystemBase, ILatiosSystem
     {
         public LatiosWorld latiosWorld { get; private set; }
 
@@ -64,7 +64,7 @@ namespace Latios
         }
     }
 
-    public abstract class SubSystem : SubSystemBase
+    public abstract partial class SubSystem : SubSystemBase
     {
         protected new virtual void OnCreate()
         {

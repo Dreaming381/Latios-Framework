@@ -86,7 +86,7 @@ namespace OptimizationAdventures
             NativeArray<float>                xmins                 = new NativeArray<float>(count, Allocator.TempJob);
             NativeArray<float>                xmaxs                 = new NativeArray<float>(count, Allocator.TempJob);
             NativeArray<float4>               minYZmaxYZs           = new NativeArray<float4>(count, Allocator.TempJob);
-            NativeArray<Entity>               entities              = new NativeArray<Entity>(count, Allocator.Temp);
+            NativeArray<Entity>               entities              = new NativeArray<Entity>(count, Allocator.TempJob);
             var                               jh                    =
                 new GenerateRandomAabbs { random                    = random, aabbs = randomAabbs, rearrangedAabbs = randomAabbsRearranged }.Schedule();
             jh                                                      = randomAabbs.Sort(jh);

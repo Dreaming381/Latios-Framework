@@ -11,7 +11,7 @@ using Unity.Transforms;
 namespace Latios.Myri.Systems
 {
     [UpdateInGroup(typeof(Latios.Systems.PreSyncPointGroup))]
-    public class AudioSystem : SubSystem
+    public partial class AudioSystem : SubSystem
     {
         private DSPGraph             m_graph;
         private LatiosDSPGraphDriver m_driver;
@@ -237,7 +237,7 @@ namespace Latios.Myri.Systems
                 settingsCdfe          = audioSettingsCdfe,
                 samplesPerFrame       = m_samplesPerFrame,
                 worldBlackboardEntity = worldBlackboardEntity
-            }.ScheduleParallel(m_oneshotsToDestroyWhenFinishedQuery, 1, ecsCaptureFrameJH);
+            }.ScheduleParallel(m_oneshotsToDestroyWhenFinishedQuery, ecsCaptureFrameJH);
 
             var updateOneshotsJH = new InitUpdateDestroy.UpdateOneshotsJob
             {
@@ -252,7 +252,7 @@ namespace Latios.Myri.Systems
                 lastConsumedBufferId = m_lastReadBufferId,
                 bufferId             = m_currentBufferId,
                 emitters             = oneshotEmitters
-            }.ScheduleParallel(m_oneshotsQuery, 1, destroyOneshotsJH);
+            }.ScheduleParallel(m_oneshotsQuery, destroyOneshotsJH);
 
             var updateLoopedJH = new InitUpdateDestroy.UpdateLoopedsJob
             {
@@ -268,7 +268,7 @@ namespace Latios.Myri.Systems
                 sampleRate           = m_sampleRate,
                 samplesPerFrame      = m_samplesPerFrame,
                 emitters             = loopedEmitters
-            }.ScheduleParallel(m_loopedQuery, 1, ecsCaptureFrameJH);
+            }.ScheduleParallel(m_loopedQuery, ecsCaptureFrameJH);
 
             //No more ECS
             var oneshotsCullingWeightingJH = new CullingAndWeighting.OneshotsJob

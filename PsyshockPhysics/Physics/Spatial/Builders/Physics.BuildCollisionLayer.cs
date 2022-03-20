@@ -429,7 +429,7 @@ namespace Latios.Psyshock
                     layerIndices = layerIndices,
                     xmins        = xmins,
                     colliderAoS  = aos
-                }.ScheduleParallel(config.query, 1, jh);
+                }.ScheduleParallel(config.query, jh);
 
                 jh = new BuildCollisionLayerInternal.Part2Job
                 {

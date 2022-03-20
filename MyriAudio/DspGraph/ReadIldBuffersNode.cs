@@ -26,7 +26,7 @@ namespace Latios.Myri
         int       m_lastPlayedBufferID;
         IldBuffer m_ildBuffer;
 
-        internal FixedList4096<IldBuffer> m_queuedIldBuffers;
+        internal FixedList4096Bytes<IldBuffer> m_queuedIldBuffers;
 
         [NativeDisableUnsafePtrRestriction]
         internal long* m_packedFrameCounterBufferId;

@@ -12,18 +12,30 @@ using Latios.Systems;
 
 namespace OptimizationAdventures
 {
-    public class BuildCollisionLayerOldVsNewPerformanceTests
+    public partial class BuildCollisionLayerOldVsNewPerformanceTests
     {
         [BurstCompile]
-        struct GenerateJob : IJobForEach<Translation, Rotation, Collider>
+        partial struct GenerateJob : IJobEntityBatch
         {
             public Random random;
             public Aabb   aabb;
-            public void Execute(ref Translation c0, ref Rotation c1, ref Collider c2)
+
+            public ComponentTypeHandle<Translation> tHandle;
+            public ComponentTypeHandle<Rotation>    rHandle;
+            public ComponentTypeHandle<Collider>    cHandle;
+
+            public unsafe void Execute(ArchetypeChunk batchInChunk, int batchIndex)
             {
-                c0.Value = random.NextFloat3(aabb.min, aabb.max);
-                c1.Value = random.NextQuaternionRotation();
-                c2       = new CapsuleCollider(random.NextFloat3(-10f, 10f), random.NextFloat3(-10f, 10f), random.NextFloat(0f, 10f));
+                var t = batchInChunk.GetNativeArray(tHandle);
+                var r = batchInChunk.GetNativeArray(rHandle);
+                var c = batchInChunk.GetNativeArray(cHandle);
+
+                for (int i = 0; i < batchInChunk.Count; i++)
+                {
+                    t[i] = new Translation { Value = random.NextFloat3(aabb.min, aabb.max) };
+                    r[i]                           = new Rotation { Value = random.NextQuaternionRotation() };
+                    c[i]                           = new CapsuleCollider(random.NextFloat3(-10f, 10f), random.NextFloat3(-10f, 10f), random.NextFloat(0f, 10f));
+                }
             }
         }
 
@@ -53,7 +65,14 @@ namespace OptimizationAdventures
             var archetype = world.EntityManager.CreateArchetype(typeof(Translation), typeof(Rotation), typeof(Collider), typeof(LocalToWorld));
             var e         = world.EntityManager.CreateEntity(archetype, count, Allocator.Persistent);
             e.Dispose();
-            new GenerateJob { random = new Random(seed), aabb = settings.worldAABB }.Run(eq);
+            new GenerateJob
+            {
+                random  = new Random(seed),
+                aabb    = settings.worldAABB,
+                tHandle = world.EntityManager.GetComponentTypeHandle<Translation>(false),
+                rHandle = world.EntityManager.GetComponentTypeHandle<Rotation>(false),
+                cHandle = world.EntityManager.GetComponentTypeHandle<Collider>(false)
+            }.Run(eq);
 
             {
                 var typeGroup    = BuildCollisionLayerP4.BuildLayerChunkTypeGroup(system);

@@ -16,8 +16,8 @@ class is here for!
 
 -   Inject systems based on namespaces
 -   Build partial hierarchies
--   Build a playerloop with custom preset loops (like one with classical
-    FixedUpdate or one with Rendering before Simulation)
+-   Build a `playerloop` with custom preset loops (like one with classical
+    `FixedUpdate` or one with Rendering before Simulation)
 
 See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 
@@ -51,7 +51,8 @@ Unity does this thing where it tries to look at your EntityQueries and decide if
 your system should update or not. While it’s certainly cute that Unity cares
 about performance, you as the programmer can make much better decisions. Turn
 off Unity’s logic with the `[AlwaysUpdateSystem]` attribute and turn on your own
-by overriding `ShouldUpdateSystem()`.
+by overriding `ShouldUpdateSystem()` on a `SubSystem` (`SystemBase`) or
+`ISystemShouldUpdate` (for `ISystem`).
 
 You can also use both mechanisms if Unity’s logic is not interfering but you
 also want to further constrain the system to a specific scene or something. I do
@@ -95,6 +96,9 @@ do cool stuff like instantiate a new settings override from a prefab.
 Regardless of whether you use the authoring tools, feel free to dump components
 onto these entities. The `SceneManagerSystem `and Myri’s `AudioSystem `use the
 `worldBlackboardEntity` to expose status and settings.
+
+Blackboard entities can be accessed as properties of `LatiosWorld`, `SubSystem`,
+and `SuperSystem`, or via the `SystemState` extension methods.
 
 See more: [Blackboard Entities](Blackboard%20Entities.md)
 
@@ -162,7 +166,7 @@ You can then access the collection component using the `EntityManager`
 extensions.
 
 Collection components have this nice feature of automatically updating their
-dependencies if you use them in a `SubSystem` (`SystemBase`).
+dependencies if you use them in a `SubSystem`.
 
 See more: [Collection and Managed Struct
 Components](Collection%20and%20Managed%20Struct%20Components.md)
@@ -217,6 +221,10 @@ or readwrite), the weak request will be ignored.
 
 There are similar mechanisms for handling “Any” requests and “Exclude” requests.
 
+You begin a Fluent chain using the `Fluent` property on `SubSystem` and
+`SuperSystem` or by invoking `Fluent()` on an `EntityManager` or `SystemState`.
+To get the resulting `EntityQuery`, call `Build()`.
+
 See more: [Fluent Queries](Fluent%20Queries.md)
 
 ### Smart Sync Point and Custom Command Buffers
@@ -249,6 +257,9 @@ can fetch this using `latiosWorld.SyncPoint` and skip caching it in
 `OnCreate()`. And you don’t even have to invoke `AddJobHandleForProducer()` when
 you are done. All that boilerplate is gone. As the title says, this sync point
 is smart!
+
+You can also manually play back these buffers manually, including in a Burst
+`ISystem`.
 
 See more: [Custom Command Buffers and
 SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSystem.md)
@@ -319,16 +330,15 @@ complex code a little more compact and readable.
 -   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of the
     `DisposeSentinel` hack that allows `EntityCommandBufferSystem` to use
     `Allocator.TempJob`.
--   Unmanaged systems are not supported when added directly to a non-user
-    `ComponentSystemGroup`. Create a custom `ComponentSystemGroup` as an
-    injection point as a workaround.
--   System sorting does not occur automatically for non-user
-    `ComponentSystemGroup`s after initialization. Call `SortSystems()`
-    explicitly for these groups.
+-   Unmanaged systems do not support automatic dependency management features,
+    due to them being unable to receive an external `NativeContainer` while in
+    Burst.
+-   `ISystemShouldUpdate` and `ISystemNewScene` do not work correctly with
+    `SystemState` lambdas.
 -   Automatic dependency management for `latiosWorld.SyncPoint` and collection
     components do not function correctly when used inside `OnStartRunning()` or
     `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
-    exceptions or jobs occur inside these methods.
+    exceptions occur inside these methods.
 
 ## Near-Term Roadmap
 

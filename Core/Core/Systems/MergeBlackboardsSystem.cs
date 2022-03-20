@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using Unity.Entities;
 using Unity.Jobs;
@@ -8,7 +8,7 @@ namespace Latios.Systems
     [DisableAutoCreation]
     [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderFirst = true)]
     [UpdateBefore(typeof(ManagedComponentsReactiveSystemGroup))]
-    public class MergeBlackboardsSystem : SubSystem
+    public partial class MergeBlackboardsSystem : SubSystem
     {
         private EntityDataCopyKit m_copyKit;
         private EntityQuery       m_query;

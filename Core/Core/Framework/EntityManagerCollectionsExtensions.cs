@@ -4,7 +4,7 @@ using Unity.Jobs;
 
 namespace Latios
 {
-    public static class EntityManagerExtensions
+    public static class EntityManagerCollectionsExtensions
     {
         public static void AddManagedComponent<T>(this EntityManager em, Entity entity, T component) where T : struct, IManagedComponent
         {

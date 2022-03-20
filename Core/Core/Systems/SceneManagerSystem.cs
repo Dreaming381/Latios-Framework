@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine.SceneManagement;
@@ -9,7 +9,7 @@ namespace Latios.Systems
     [AlwaysUpdateSystem]
     [UpdateInGroup(typeof(LatiosInitializationSystemGroup), OrderFirst = true)]
     [UpdateAfter(typeof(SyncPointPlaybackSystem))]
-    public class SceneManagerSystem : SubSystem
+    public partial class SceneManagerSystem : SubSystem
     {
         private EntityQuery m_rlsQuery;
         private bool        m_paused = false;
@@ -18,8 +18,8 @@ namespace Latios.Systems
         {
             CurrentScene curr = new CurrentScene
             {
-                currentScene      = new FixedString128(),
-                previousScene     = new FixedString128(),
+                currentScene      = new FixedString128Bytes(),
+                previousScene     = new FixedString128Bytes(),
                 isSceneFirstFrame = false
             };
             worldBlackboardEntity.AddComponentData(curr);
@@ -29,8 +29,8 @@ namespace Latios.Systems
         {
             if (m_rlsQuery.CalculateChunkCount() > 0)
             {
-                FixedString128 targetScene = new FixedString128();
-                bool           isInvalid   = false;
+                FixedString128Bytes targetScene = new FixedString128Bytes();
+                bool                isInvalid   = false;
 
                 Entities.WithStoreEntityQueryInField(ref m_rlsQuery).ForEach((ref RequestLoadScene rls) =>
                 {

@@ -70,8 +70,9 @@ namespace Latios
         public void Playback(EntityManager entityManager)
         {
             CheckDidNotPlayback();
-            bool ran      = false;
-            var  entities = RunPrepInJob(ref ran);
+            bool               ran      = false;
+            NativeList<Entity> entities = default;
+            RunPrepInJob(ref ran, ref entities);
             if (ran)
             {
                 entityManager.DestroyEntity(entities);
@@ -112,12 +113,11 @@ namespace Latios
 
         #region PlaybackJobs
         [BurstDiscard]
-        private NativeList<Entity> RunPrepInJob(ref bool ran)
+        private unsafe void RunPrepInJob(ref bool ran, ref NativeList<Entity> entities)
         {
             ran                = true;
-            var entities       = new NativeList<Entity>(0, Allocator.TempJob);
+            entities           = new NativeList<Entity>(0, Allocator.TempJob);
             new PrepJob { eocb = m_entityOperationCommandBuffer, entities = entities }.Run();
-            return entities;
         }
 
         [BurstCompile]

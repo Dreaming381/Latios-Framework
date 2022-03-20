@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] – 2022-3-20
+
+Officially supports Entities [0.50.0]
+
+### Changed
+
+-   Updated DSPGraph to 0.1.0-preview.22.
+
+### Fixed
+
+-   Myri is now compatible with Burst 1.6.4.
+
 ## [0.4.4] – 2022-3-13
 
 Officially supports Entities [0.17.0]

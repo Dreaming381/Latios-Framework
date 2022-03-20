@@ -11,7 +11,7 @@ namespace Latios.Psyshock
     {
         public static DrawLayerConfig DrawLayer(CollisionLayer layer)
         {
-            var colors                         = new FixedList512<Color>();
+            var colors                         = new FixedList512Bytes<Color>();
             colors.Length                      = 7;
             colors[0]                          = Color.red;
             colors[1]                          = Color.green;
@@ -27,10 +27,10 @@ namespace Latios.Psyshock
         public struct DrawLayerConfig
         {
             internal CollisionLayer      layer;
-            internal FixedList512<Color> colors;
+            internal FixedList512Bytes<Color> colors;
             internal Color               crossColor;
 
-            public DrawLayerConfig WithColors(FixedList512<Color> colors, Color crossBucketColor)
+            public DrawLayerConfig WithColors(FixedList512Bytes<Color> colors, Color crossBucketColor)
             {
                 this.colors     = colors;
                 this.crossColor = crossBucketColor;
@@ -324,7 +324,7 @@ namespace Latios.Psyshock
         private struct DebugDrawLayerJob : IJobFor
         {
             [ReadOnly] public CollisionLayer layer;
-            public FixedList512<Color>       colors;
+            public FixedList512Bytes<Color>       colors;
             public Color                     crossColor;
 
             public void Execute(int index)

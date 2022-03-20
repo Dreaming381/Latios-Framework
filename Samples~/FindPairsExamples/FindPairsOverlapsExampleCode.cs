@@ -9,7 +9,7 @@ using Unity.Transforms;
 namespace Dragons
 {
     [AlwaysUpdateSystem, DisableAutoCreation]
-    public class FindPairsOverlapsExampleSystem : SubSystem
+    public partial class FindPairsOverlapsExampleSystem : SubSystem
     {
         public override bool ShouldUpdateSystem()
         {

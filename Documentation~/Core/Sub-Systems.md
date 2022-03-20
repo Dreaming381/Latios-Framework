@@ -5,6 +5,9 @@ boilerplate reduction mechanisms within the framework. You can use them exactly
 as you would a `SystemBase`, and frequently you will want to do just that.
 However, there are some additional features to take advantage of.
 
+Many `SubSystem` features are [being extended](ISystem%20Support.md) to
+`ISystem`.
+
 ## Fluent Queries
 
 [Fluent query](Fluent%20Queries.md) expressions can be initiated using the
@@ -39,6 +42,13 @@ be sent to `SyncPointPlaybackSystem` after the `SubSystem` finishes
 `OnUpdate()`. When combined with lambda jobs, you may never have to explicitly
 touch `Dependency` nor any other `JobHandle`.
 
+## New Scene Callback
+
+When using the scene management system, a Subsystem can receive a callback when
+a new scene is created by overriding `OnNewScene()`. The order these functions
+are called do not reflect the system order. This callback happens during the
+scene switching frame.
+
 ## Custom Update Criteria
 
 `ShouldUpdateSystem()` can be overridden if a [custom
@@ -50,5 +60,5 @@ disable those, add `[AlwaysUpdateSystem]` to the `SubSystem`.
 method is invoked. Only EntityManager, EntityQuery, and BlackboardEntity
 operations are recommended.*
 
-*Caution 2: Only SubSystems directly inside a SuperSystem or RootSuperSystem
-will have ShouldUpdateSystem() invoked.*
+*Caution 2: Only SubSystems directly inside a SuperSystem, RootSuperSystem or
+Core-defined ComponentSystemGroup will have ShouldUpdateSystem() invoked.*

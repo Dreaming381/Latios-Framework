@@ -40,12 +40,64 @@ on the entity as well as an implicit cast to the `Entity` type. The
 without access to an `EntityManager` and expect that the function will only ever
 be able to modify the `BlackboardEntity` and no other entity.
 
-You can access `sceneBlackboardEntity` and `worldBlackboardEntity` properties on
-the following types:
+You can access `sceneBlackboardEntity` and `worldBlackboardEntity` properties in
+the following ways:
 
--   LatiosWorld
--   SubSystem
--   SuperSystem
+```csharp
+public struct CompA : IComponentData
+{
+    public int count;
+}
+
+public class ManagedSystem : SubSystem
+{
+    protected override void OnUpdate()
+    {
+        var a = worldBlackboardEntity.GetComponentData<CompA>();
+        a.count++;
+        worldBlackboardEntity.SetComponentData(a);
+    }
+}
+
+[BurstCompile]
+public struct UnmanagedSystem : ISystem
+{
+    [BurstCompile]
+    public void OnCreate(ref SystemState state) { }
+    [BurstCompile]
+    public void OnDestroy(ref SystemState state) { }
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        var a = state.GetWorldBlackboardEntity().GetComponentData<CompA>();
+        a.count++;
+        state.GetWorldBlackboardEntity().SetComponentData(a);
+    }
+}
+
+public class BlackboardSuperSystem : SuperSystem
+{
+    protected override void CreateSystems()
+    {
+        GetOrCreateAndAddSystem<ManagedSystem>();
+        GetOrCreateAndAddUnmanagedSystem<UnmanagedSystem>();
+    }
+
+    public override bool ShouldUpdateSystem()
+    {
+        return worldBlackboardEntity.GetComponentData<CompA>().count < 10;
+    }
+}
+
+public class MonoBridge : UnityEngine.MonoBehaviour
+{
+    private void Update()
+    {
+        var latiosWorld = World.DefaultGameObjectInjectionWorld as LatiosWorld;
+        latiosWorld.worldBlackboardEntity.SetComponentData(new CompA { count = 0 });
+    }
+}
+```
 
 ## Blackboard Entity Lifetimes
 
@@ -94,4 +146,4 @@ Some additional rules exist regardless of the settings:
 -   The source entity will always be destroyed
 -   Disabled and Prefab entities with the `BlackboardEntityData` component will
     be ignored, allowing you to enable or instantiate these entities at runtime
-    to alter the global entities
+    to alter the blackboard entities

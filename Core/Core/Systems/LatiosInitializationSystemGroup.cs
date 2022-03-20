@@ -2,6 +2,8 @@
 using System.Linq;
 using Debug = UnityEngine.Debug;
 using Unity.Entities;
+using Unity.Entities.Exposed;
+using Unity.Entities.Exposed.Dangerous;
 
 namespace Latios.Systems
 {
@@ -34,27 +36,31 @@ namespace Latios.Systems
             m_syncGroup.AddSystemToUpdateList(m_cleanupGroup);
         }
 
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS && !UNITY_DOTSRUNTIME
+            this.ClearSystemIds();
+#endif
+
             LatiosWorld lw = World as LatiosWorld;
             lw.FrameStart();
-            for (int i = 0; i < Systems.Count; i++)
-            {
-                if (lw.paused)
-                    break;
-                SuperSystem.UpdateManagedSystem(Systems[i]);
-            }
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 
     [DisableAutoCreation]
     [UpdateInGroup(typeof(LatiosInitializationSystemGroup))]
     [UpdateAfter(typeof(Unity.Scenes.SceneSystemGroup))]
+    [UpdateAfter(typeof(ConvertToEntitySystem))]
     public class LatiosWorldSyncGroup : ComponentSystemGroup
     {
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
-            SuperSystem.UpdateAllManagedSystems(this);
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 
@@ -63,12 +69,11 @@ namespace Latios.Systems
     [UpdateBefore(typeof(BeginInitializationEntityCommandBufferSystem))]
     public class PreSyncPointGroup : ComponentSystemGroup
     {
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
-            foreach (var sys in Systems)
-            {
-                SuperSystem.UpdateAllManagedSystems(this);
-            }
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 }

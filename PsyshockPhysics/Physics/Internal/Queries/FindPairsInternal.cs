@@ -284,8 +284,9 @@ namespace Latios.Psyshock
                 {
                     if (!hashSet.Add(layer.bodies[i].entity))
                     {
+                        var entity = layer.bodies[i].entity;
                         throw new InvalidOperationException(
-                            $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {layer.bodies[i].entity}");
+                            $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {entity}");
                     }
                 }
             }
@@ -299,8 +300,9 @@ namespace Latios.Psyshock
                     if (!hashSet.Add(layerA.bodies[i].entity))
                     {
                         //Note: At this point, we know the issue lies exclusively in layerA.
+                        var entity = layerA.bodies[i].entity;
                         throw new InvalidOperationException(
-                            $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {layerA.bodies[i].entity}");
+                            $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {entity}");
                     }
                 }
                 for (int i = 0; i < layerB.Count; i++)
@@ -308,8 +310,9 @@ namespace Latios.Psyshock
                     if (!hashSet.Add(layerB.bodies[i].entity))
                     {
                         //Note: At this point, it is unknown whether the repeating entity first showed up in layerA or layerB.
+                        var entity = layerB.bodies[i].entity;
                         throw new InvalidOperationException(
-                            $"A parallel FindPairs job was scheduled using two layers combined containing more than one instance of Entity {layerB.bodies[i].entity}");
+                            $"A parallel FindPairs job was scheduled using two layers combined containing more than one instance of Entity {entity}");
                     }
                 }
             }

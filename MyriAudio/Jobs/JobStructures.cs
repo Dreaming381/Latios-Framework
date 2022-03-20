@@ -23,8 +23,8 @@ namespace Latios.Myri
 
     internal struct Weights
     {
-        public FixedListFloat512 channelWeights;
-        public FixedListFloat128 itdWeights;
+        public FixedList512Bytes<float> channelWeights;
+        public FixedList128Bytes<float> itdWeights;
 
         public static Weights operator + (Weights a, Weights b)
         {

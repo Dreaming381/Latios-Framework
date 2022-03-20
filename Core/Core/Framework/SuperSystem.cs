@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
+using Unity.Entities.Exposed.Dangerous;
 
 namespace Latios
 {
@@ -64,7 +67,7 @@ namespace Latios
         [EditorBrowsable(EditorBrowsableState.Never)]
         protected override void OnUpdate()
         {
-            UpdateAllManagedSystems(this);
+            DoSuperSystemUpdate(this, ref m_systemSortingTracker);
         }
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
@@ -73,17 +76,46 @@ namespace Latios
 
         protected abstract void CreateSystems();
 
-        public ComponentSystemBase GetOrCreateAndAddSystem(Type type)
+        public virtual void OnNewScene()
         {
-            var system = World.GetOrCreateSystem(type);
-            AddSystemToUpdateList(system);
-            return system;
+        }
+
+        public BootstrapTools.ComponentSystemBaseSystemHandleUntypedUnion GetOrCreateAndAddSystem(Type type)
+        {
+            if (typeof(ComponentSystemBase).IsAssignableFrom(type))
+            {
+                var system = World.GetOrCreateSystem(type);
+                AddSystemToUpdateList(system);
+                return new BootstrapTools.ComponentSystemBaseSystemHandleUntypedUnion
+                {
+                    systemHandle  = system.SystemHandleUntyped,
+                    systemManaged = system
+                };
+            }
+            if (typeof(ISystem).IsAssignableFrom(type))
+            {
+                var system = World.GetOrCreateUnmanagedSystem(type);
+                AddUnmanagedSystemToUpdateList(system);
+                return new BootstrapTools.ComponentSystemBaseSystemHandleUntypedUnion
+                {
+                    systemHandle  = system,
+                    systemManaged = null
+                };
+            }
+            return default;
         }
 
         public T GetOrCreateAndAddSystem<T>() where T : ComponentSystemBase
         {
             var system = World.GetOrCreateSystem<T>();
             AddSystemToUpdateList(system);
+            return system;
+        }
+
+        public SystemRef<T> GetOrCreateAndAddUnmanagedSystem<T>() where T : unmanaged, ISystem
+        {
+            var system = World.GetOrCreateSystem<T>();
+            AddUnmanagedSystemToUpdateList(system.Handle);
             return system;
         }
 
@@ -94,9 +126,39 @@ namespace Latios
             EnableSystemSorting = enableSortingAlways;
         }
 
+        new public static unsafe void UpdateSystem(ref WorldUnmanaged world, SystemHandleUntyped system)
+        {
+            var managed = world.AsManagedSystem(system);
+            if (managed != null)
+            {
+                UpdateManagedSystem(managed);
+            }
+            else
+            {
+                var     wu    = world;
+                ref var state = ref UnsafeUtility.AsRef<SystemState>(wu.ResolveSystemState(system));
+                if(state.World is LatiosWorld lw)
+                {
+                    var dispatcher = lw.UnmanagedExtraInterfacesDispatcher.GetDispatch(ref state);
+                    if (dispatcher != null)
+                    {
+                        if (!dispatcher.ShouldUpdateSystem(ref state))
+                        {
+                            state.Enabled = false;
+                            return;
+                        }
+                        else
+                            state.Enabled = true;
+                    }
+                }
+
+                ComponentSystemGroup.UpdateSystem(ref wu, system);
+            }
+        }
+
         #endregion API
 
-        internal static void UpdateManagedSystem(ComponentSystemBase system)
+        internal static void UpdateManagedSystem(ComponentSystemBase system, bool propagateError = false)
         {
             try
             {
@@ -125,23 +187,85 @@ namespace Latios
             }
             catch (Exception e)
             {
+                if (propagateError)
+                    throw e;
+
                 UnityEngine.Debug.LogException(e);
             }
         }
 
-        internal static void UpdateAllManagedSystems(ComponentSystemGroup group)
+        SystemSortingTracker m_systemSortingTracker;
+
+        internal static void UpdateAllSystems(ComponentSystemGroup group, ref SystemSortingTracker tracker)
         {
-            for (int i = 0; i < group.Systems.Count; i++)
+            tracker.CheckAndSortSystems(group);
+
+            LatiosWorld lw = group.World as LatiosWorld;
+
+            // Update all unmanaged and managed systems together, in the correct sort order.
+            var world                     = group.World.Unmanaged;
+            var previouslyExecutingSystem = world.ExecutingSystemHandle();
+            var enumerator                = group.GetSystemEnumerator();
+            while (enumerator.MoveNext())
             {
-                UpdateManagedSystem(group.Systems[i]);
+                if (lw.paused)
+                    break;
+
+                try
+                {
+                    if (!enumerator.IsCurrentManaged)
+                    {
+                        // Update unmanaged (burstable) code.
+                        var handle = enumerator.current;
+                        group.SetExecutingSystem(ref world, handle);
+                        UpdateSystem(ref world, handle);
+                    }
+                    else
+                    {
+                        // Update managed code.
+                        UpdateManagedSystem(enumerator.currentManaged, true);
+                    }
+                }
+                catch (Exception e)
+                {
+                    UnityEngine.Debug.LogException(e);
+#if UNITY_DOTSRUNTIME
+                    // When in a DOTS Runtime build, throw this upstream -- continuing after silently eating an exception
+                    // is not what you'll want, except maybe once we have LiveLink.  If you're looking at this code
+                    // because your LiveLink dots runtime build is exiting when you don't want it to, feel free
+                    // to remove this block, or guard it with something to indicate the player is not for live link.
+                    throw;
+#endif
+                }
+                finally
+                {
+                    group.SetExecutingSystem(ref world, previouslyExecutingSystem);
+                }
 
                 if (group.World.QuitUpdate)
                     break;
             }
+
+            group.DestroyPendingSystemsInWorld(ref world);
         }
 
-        public virtual void OnNewScene()
+        internal static void DoSuperSystemUpdate(ComponentSystemGroup group, ref SystemSortingTracker tracker)
         {
+            if (!group.Created)
+                throw new InvalidOperationException(
+                    $"Group of type {group.GetType()} has not been created, either the derived class forgot to call base.OnCreate(), or it has been destroyed");
+
+            if (group.RateManager == null)
+            {
+                UpdateAllSystems(group, ref tracker);
+            }
+            else
+            {
+                while (group.RateManager.ShouldGroupUpdate(group))
+                {
+                    UpdateAllSystems(group, ref tracker);
+                }
+            }
         }
     }
 }

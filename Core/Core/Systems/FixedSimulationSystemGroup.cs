@@ -1,17 +1,16 @@
 ﻿using Unity.Entities;
+using Unity.Entities.Exposed;
 
 namespace Latios.Systems
 {
     [DisableAutoCreation]
     public class FixedSimulationSystemGroup : ComponentSystemGroup
     {
+        SystemSortingTracker m_tracker;
+
         protected override void OnUpdate()
         {
-            LatiosWorld lw = World as LatiosWorld;
-            if (!lw.paused)
-            {
-                SuperSystem.UpdateAllManagedSystems(this);
-            }
+            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 }

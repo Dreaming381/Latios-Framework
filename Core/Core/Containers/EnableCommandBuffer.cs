@@ -70,8 +70,9 @@ namespace Latios
         public void Playback(EntityManager entityManager, BufferFromEntity<LinkedEntityGroup> linkedFEReadOnly)
         {
             CheckDidNotPlayback();
-            bool ran      = false;
-            var  entities = RunPrepInJob(linkedFEReadOnly, ref ran);
+            bool               ran      = false;
+            NativeList<Entity> entities = default;
+            RunPrepInJob(linkedFEReadOnly, ref ran, ref entities);
             if (ran)
             {
                 entityManager.RemoveComponent<Disabled>(entities);
@@ -112,12 +113,11 @@ namespace Latios
 
         #region PlaybackJobs
         [BurstDiscard]
-        private NativeList<Entity> RunPrepInJob(BufferFromEntity<LinkedEntityGroup> linkedFE, ref bool ran)
+        private void RunPrepInJob(BufferFromEntity<LinkedEntityGroup> linkedFE, ref bool ran, ref NativeList<Entity> entities)
         {
             ran                    = true;
-            var entities           = new NativeList<Entity>(0, Allocator.TempJob);
+            entities               = new NativeList<Entity>(0, Allocator.TempJob);
             new PrepJob { linkedFE = linkedFE, eocb = m_entityOperationCommandBuffer, entities = entities }.Run();
-            return entities;
         }
 
         [BurstCompile]

@@ -256,14 +256,14 @@ namespace Latios.Myri
                     //No perfect match.
                     int4              bestMinMaxXYIndices = default;  //This should always be overwritten
                     float4            bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
-                    FixedListInt128   candidateChannels   = default;
-                    FixedListFloat128 candidateDistances  = default;
+                    FixedList128Bytes<int>   candidateChannels   = default;
+                    FixedList128Bytes<float> candidateDistances  = default;
 
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerLeftChannel);
                     var                 leftChannelDeltas  = scratchCache.AsArray();
-                    FixedList512<bool2> leftChannelInsides = default;
+                    FixedList512Bytes<bool2> leftChannelInsides = default;
 
                     for (int i = 0; i < leftChannelDeltas.Length; i++)
                     {
@@ -441,14 +441,14 @@ namespace Latios.Myri
                     //No perfect match.
                     int4              bestMinMaxXYIndices = default;  //This should always be overwritten
                     float4            bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
-                    FixedListInt128   candidateChannels   = default;
-                    FixedListFloat128 candidateDistances  = default;
+                    FixedList128Bytes<int>   candidateChannels   = default;
+                    FixedList128Bytes<float> candidateDistances  = default;
 
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerRightChannel);
                     var                 rightChannelDeltas  = scratchCache.AsArray();
-                    FixedList512<bool2> rightChannelInsides = default;
+                    FixedList512Bytes<bool2> rightChannelInsides = default;
 
                     for (int i = 0; i < rightChannelDeltas.Length; i++)
                     {

@@ -167,7 +167,7 @@ namespace Latios.Myri
             public float z1, z2;
         }
 
-        FixedList512<Channel> m_channels;
+        FixedList512Bytes<Channel> m_channels;
 
         public enum Parameters
         {

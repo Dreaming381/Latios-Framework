@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.4.4]
+# Latios Framework Packages for DOTS – [0.4.5]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -7,9 +7,8 @@ License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages may contain code borrowed from official Unity packages and therefore
 may be seen as derivative works.
 
-A compatibility patch release is planned shortly after the release of DOTS 0.50.
-Based on recent conversations, minimal impact on the Latios Framework is
-expected (that’s a good thing).
+The current version targets DOTS 0.50. If you are still using Entities 0.17,
+please use the framework version 0.4.4 instead.
 
 *[0.3.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*

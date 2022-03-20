@@ -71,7 +71,7 @@ Currently, the `LatiosInitializationSystemGroup` orders itself as follows:
 -   SceneManagerSystem
 -   [End OrderFirst region]
 -   …
--   [Unity SceneSystemGroup]
+-   [Unity SceneSystemGroup or ConvertToEntitySystem, whichever is latter]
 -   LatiosWorldSyncGroup
     -   MergeBlackboardsSystem
     -   ManagedComponentReactiveSystemGroup
@@ -87,14 +87,18 @@ imply, these objects store the collection components and managed struct
 components that can be attached to entities. `CollectionComponentStorage` also
 stores the `JobHandle`s and allocation flags with each collection component.
 
-Second, it creates a cache of the collection component dependencies pending
+Second, it scans the list of unmanaged systems and generates generic classes for
+`ISystemShouldUpdate` and `ISystemNewScene`. It also creates an unmanaged system
+providing access to the blackboard entities from a Burst `ISystem`.
+
+Third, it creates a cache of the collection component dependencies pending
 update of an executing `SubSystem.Dependency`’s final value.
 
-Third, it injects generic types used by the reactive systems which track
+Fourth, it injects generic types used by the reactive systems which track
 collection and managed struct components into the `TypeManager` so that Unity’s
 ECS recognizes them.
 
-Fourth, it creates `sceneBlackboardEntity` and `worldBlackboardEntity`.
+Fifth, it creates `sceneBlackboardEntity` and `worldBlackboardEntity`.
 
 Finally, it creates the `LatiosInitializationSystemGroup`, the
 `LatiosSimulationSystemGroup`, and the `LatiosPresentationSystemGroup` which are
