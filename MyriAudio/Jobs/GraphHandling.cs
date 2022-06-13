@@ -408,7 +408,7 @@ namespace Latios.Myri
             return StateVariableFilterNode.FilterType.Lowpass;
         }
 
-        public static void BuildChannelGraph(ref IldProfileBlob profile, DSPCommandBlock commandBlock, DSPNode listenerMixNode, ref ListenerGraphState listenerGraphState)
+        public static void BuildChannelGraph(ref ListenerProfileBlob profile, DSPCommandBlock commandBlock, DSPNode listenerMixNode, ref ListenerGraphState listenerGraphState)
         {
             //Create the channel nodes and connections but leave the ild outputs disconnected
             int listenerMixPortCount = 0;

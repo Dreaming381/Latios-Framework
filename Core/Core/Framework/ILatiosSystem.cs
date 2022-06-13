@@ -15,6 +15,7 @@ namespace Latios
         void OnNewScene();
 
         EntityQuery GetEntityQuery(EntityQueryDesc desc);
+        EntityQuery GetEntityQuery(EntityQueryDescBuilder desc);
 
         FluentQuery Fluent { get; }
     }

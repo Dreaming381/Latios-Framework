@@ -1,0 +1,33 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UploadBytes
+
+uniform ByteAddressBuffer _src;
+uniform RWByteAddressBuffer _dst;
+
+uniform ByteAddressBuffer _meta;
+
+uint _elementSizeInBytes;
+uint _startOffset;
+
+[numthreads(64, 1, 1)]
+void UploadBytes(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+{
+    uint3 m = _meta.Load3((groupIds.x + _startOffset) * 12);
+
+    uint srcBase = m.x * _elementSizeInBytes;
+    uint dstBase = m.y * _elementSizeInBytes;
+    uint elementCount = m.z * (_elementSizeInBytes / 4);
+
+    uint i = 0;
+    for (i = 0; i + 64 < elementCount; i += 64)
+    {
+        uint val = _src.Load(srcBase + (i + threadId) * 4);
+        _dst.Store(dstBase + (i + threadId) * 4, val);
+    }
+
+    if (i + threadId < elementCount)
+    {
+        uint val = _src.Load(srcBase + (i + threadId) * 4);
+        _dst.Store(dstBase + (i + threadId) * 4, val);
+    }
+}

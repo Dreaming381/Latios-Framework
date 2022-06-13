@@ -1,0 +1,85 @@
+{
+    "name": "Latios.Kinemation",
+    "rootNamespace": "Latios.Kinemation",
+    "references": [
+        "Latios.Core",
+        "Latios.Psyshock",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Deformations",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Jobs",
+        "Unity.Mathematics",
+        "Unity.Rendering.Hybrid",
+        "Unity.Transforms",
+        "Unity.Mathematics.Extensions",
+        "Unity.Mathematics.Extensions.Hybrid",
+        "ACL_Unity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "6.9.9",
+            "define": "HDRP_7_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "6.9.9",
+            "define": "URP_7_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.core",
+            "expression": "6.9.9",
+            "define": "SRP_7_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "8.9.9",
+            "define": "HDRP_9_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "8.9.9",
+            "define": "URP_9_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.core",
+            "expression": "8.9.9",
+            "define": "SRP_9_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.high-definition",
+            "expression": "9.9.9",
+            "define": "HDRP_10_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.universal",
+            "expression": "9.9.9",
+            "define": "URP_10_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.render-pipelines.core",
+            "expression": "9.9.9",
+            "define": "SRP_10_0_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.tiny",
+            "expression": "0.21.9",
+            "define": "TINY_0_22_0_OR_NEWER"
+        },
+        {
+            "name": "com.unity.moc.native",
+            "expression": "0.0.0",
+            "define": "UNITY_MOC_NATIVE_AVAILABLE"
+        }
+    ],
+    "noEngineReferences": false
+}

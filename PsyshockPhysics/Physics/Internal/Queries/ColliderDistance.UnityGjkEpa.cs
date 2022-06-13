@@ -21,6 +21,7 @@ namespace Latios.Psyshock
             public float  distance;
             public float3 hitpointOnAInASpace;
             public float3 hitpointOnBInASpace;
+            public float3 normalizedOriginToClosestCsoPoint;
         }
 
         // From Unity.Physics ConvexConvexDistance.cs
@@ -243,7 +244,7 @@ namespace Latios.Psyshock
                     {
                         // Select closest triangle.
                         closestTriangleIndex = -1;
-                        foreach (int triangleIndex in hull.triangles.Indices)
+                        foreach (int triangleIndex in hull.triangles.indices)
                         {
                             if (hull.triangles[triangleIndex].uid != uidsCache[triangleIndex])
                             {
@@ -268,7 +269,7 @@ namespace Latios.Psyshock
                     while (++iteration < maxIterations);
 
                     // There could be multiple triangles in the closest plane, pick the one that has the closest point to the origin on its face
-                    foreach (int triangleIndex in hull.triangles.Indices)
+                    foreach (int triangleIndex in hull.triangles.indices)
                     {
                         if (distancesCache[triangleIndex] >= closestPlane.distanceFromOrigin - k_epaEpsilon)
                         {
@@ -344,12 +345,13 @@ namespace Latios.Psyshock
             UnityEngine.Assertions.Assert.IsTrue(math.abs(math.lengthsq(normalizedOriginToClosestCsoPoint) - 1.0f) < 1e-5f);
 
             // Patch distance with radius
-            float radialA               = GetRadialPadding(colliderA);
-            float radialB               = GetRadialPadding(colliderB);
-            result.hitpointOnAInASpace += normalizedOriginToClosestCsoPoint * radialA;
-            result.distance            -= radialA;
-            result.distance            -= radialB;
-            result.hitpointOnBInASpace  = result.hitpointOnAInASpace - normalizedOriginToClosestCsoPoint * result.distance;
+            float radialA                             = GetRadialPadding(colliderA);
+            float radialB                             = GetRadialPadding(colliderB);
+            result.hitpointOnAInASpace               += normalizedOriginToClosestCsoPoint * radialA;
+            result.distance                          -= radialA;
+            result.distance                          -= radialB;
+            result.hitpointOnBInASpace                = result.hitpointOnAInASpace - normalizedOriginToClosestCsoPoint * result.distance;
+            result.normalizedOriginToClosestCsoPoint  = normalizedOriginToClosestCsoPoint;
             return result;
         }
 

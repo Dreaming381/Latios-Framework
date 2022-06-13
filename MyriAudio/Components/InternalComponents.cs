@@ -19,7 +19,7 @@ namespace Latios.Myri
         public UnsafeList<DSPNode>                nodes;
         public UnsafeList<DSPConnection>          connections;
         public UnsafeList<IldOutputConnection>    ildConnections;
-        public BlobAssetReference<IldProfileBlob> lastUsedProfile;
+        public BlobAssetReference<ListenerProfileBlob> lastUsedProfile;
     }
 
     internal struct EntityOutputGraphState : ISystemStateComponentData

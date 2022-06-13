@@ -43,6 +43,22 @@ namespace Latios.Psyshock
             return box;
         }
 
+        public static TriangleCollider ScaleCollider(TriangleCollider triangle, PhysicsScale scale)
+        {
+            CheckNoOrValidScale(scale, ColliderType.Triangle);
+            triangle.pointA *= scale.scale;
+            triangle.pointB *= scale.scale;
+            triangle.pointC *= scale.scale;
+            return triangle;
+        }
+
+        public static ConvexCollider ScaleCollider(ConvexCollider convex, PhysicsScale scale)
+        {
+            CheckNoOrValidScale(scale, ColliderType.Convex);
+            convex.scale *= scale.scale;
+            return convex;
+        }
+
         public static CompoundCollider ScaleCollider(CompoundCollider compound, PhysicsScale scale)
         {
             CheckNoOrUniformScale(scale, ColliderType.Compound);

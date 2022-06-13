@@ -8,6 +8,11 @@ using Unity.Entities.Exposed.Dangerous;
 
 namespace Latios
 {
+    /// <summary>
+    /// A SuperSystem that does not require its parent ComponentSystemGroup to support ShouldUpdateSystem().
+    /// Use this for custom SuperSystems that need to be injected into raw ComponentSystemGroup types.
+    /// Nearly all Latios Framework ComponentSystemGroup types already support ShouldUpdateSystem().
+    /// </summary>
     public abstract class RootSuperSystem : SuperSystem
     {
         bool m_recursiveContext = false;
@@ -33,15 +38,35 @@ namespace Latios
         }
     }
 
+    /// <summary>
+    /// A subclass of ComponentSystemGroup which provides Latios Framework Core features.
+    /// </summary>
     public abstract class SuperSystem : ComponentSystemGroup, ILatiosSystem
     {
+        /// <summary>
+        /// The latiosWorld of this system
+        /// </summary>
         public LatiosWorld latiosWorld { get; private set; }
 
+        /// <summary>
+        /// The scene blackboard entity for the LatiosWorld of this system
+        /// </summary>
         public BlackboardEntity sceneBlackboardEntity => latiosWorld.sceneBlackboardEntity;
+        /// <summary>
+        /// The world blackboard entity for the LatiosWorld of this system
+        /// </summary>
         public BlackboardEntity worldBlackboardEntity => latiosWorld.worldBlackboardEntity;
 
+        /// <summary>
+        /// Begins a Fluent query chain
+        /// </summary>
         public FluentQuery Fluent => this.Fluent();
 
+        /// <summary>
+        /// Override this method to perform additional filtering to decide if this system should run.
+        /// If it does not run, none of its child systems will run either.
+        /// </summary>
+        /// <returns>true if this system should run</returns>
         public virtual bool ShouldUpdateSystem()
         {
             return Enabled;
@@ -71,15 +96,29 @@ namespace Latios
         }
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
+        public EntityQuery GetEntityQuery(EntityQueryDescBuilder desc) => GetEntityQuery(desc);
 
         #region API
-
+        /// <summary>
+        /// Define the systems to be added to this SuperSystem using GetOrCreateAndAddSystem<>()
+        /// or GetOrCreateAndAddUnmanagedSystem<>(). Leave empty for injection workflows.
+        /// </summary>
         protected abstract void CreateSystems();
 
+        /// <summary>
+        /// Override to get alerted whenever a new sceneBlackboardEntity is created
+        /// </summary>
         public virtual void OnNewScene()
         {
         }
 
+        /// <summary>
+        /// Creates a new system from the given type and adds it to this SuperSystem's update list.
+        /// If system sorting is disabled, the update order is based on the order the systems are added.
+        /// If the system already exists in the world, that system is added to the update list and returned instead.
+        /// </summary>
+        /// <param name="type">The type of system to add. It can be managed or unmanaged.</param>
+        /// <returns>A union object that contains the created managed or unmanaged system added</returns>
         public BootstrapTools.ComponentSystemBaseSystemHandleUntypedUnion GetOrCreateAndAddSystem(Type type)
         {
             if (typeof(ComponentSystemBase).IsAssignableFrom(type))
@@ -105,6 +144,13 @@ namespace Latios
             return default;
         }
 
+        /// <summary>
+        /// Creates a new managed system and adds it to this SuperSystem's update list.
+        /// If system sorting is disabled, the update order is based on the order the systems are added.
+        /// If the system already exists in the world, that system is added to the update list and returned instead.
+        /// </summary>
+        /// <typeparam name="T">The type of managed system to create</typeparam>
+        /// <returns>The managed system added</returns>
         public T GetOrCreateAndAddSystem<T>() where T : ComponentSystemBase
         {
             var system = World.GetOrCreateSystem<T>();
@@ -112,6 +158,13 @@ namespace Latios
             return system;
         }
 
+        /// <summary>
+        /// Creates a new unmanaged system and adds it to this SuperSystem's update list.
+        /// If system sorting is disabled, the update order is based on the order the systems are added.
+        /// If the system already exists in the world, that system is added to the update list and returned instead.
+        /// </summary>
+        /// <typeparam name="T">The type of unmanaged system to create</typeparam>
+        /// <returns>The unmanaged system added</returns>
         public SystemRef<T> GetOrCreateAndAddUnmanagedSystem<T>() where T : unmanaged, ISystem
         {
             var system = World.GetOrCreateSystem<T>();
@@ -126,6 +179,11 @@ namespace Latios
             EnableSystemSorting = enableSortingAlways;
         }
 
+        /// <summary>
+        /// Updates a system while supporting full Latios Framework features
+        /// </summary>
+        /// <param name="world">The world containing the system</param>
+        /// <param name="system">The system's handle</param>
         new public static unsafe void UpdateSystem(ref WorldUnmanaged world, SystemHandleUntyped system)
         {
             var managed = world.AsManagedSystem(system);
@@ -188,7 +246,7 @@ namespace Latios
             catch (Exception e)
             {
                 if (propagateError)
-                    throw e;
+                    throw;
 
                 UnityEngine.Debug.LogException(e);
             }

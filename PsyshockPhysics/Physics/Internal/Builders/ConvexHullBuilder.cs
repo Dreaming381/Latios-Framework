@@ -287,7 +287,7 @@ namespace Latios.Psyshock
             m_integerSpaceAabb  = new Aabb(center - extents, center + extents);
 
             int quantizationBits = (intResolution == IntResolution.Low ? 16 : 30);
-            m_integerSpace       = new IntegerSpace(domain, (1 << quantizationBits) - 1);
+            m_integerSpace       = new IntegerSpace(m_integerSpaceAabb, (1 << quantizationBits) - 1);
         }
 
         /// <summary>
@@ -343,7 +343,7 @@ namespace Latios.Psyshock
             if (vertices.Compact((int*)vertexRemap.GetUnsafePtr()))
             {
                 // Remap all of the vertices in triangles, then compact the triangles array
-                foreach (int t in triangles.Indices)
+                foreach (int t in triangles.indices)
                 {
                     Triangle tri = triangles[t];
                     tri.vertex0  = vertexRemap[tri.vertex0];
@@ -564,7 +564,7 @@ namespace Latios.Psyshock
                     int    lastFrontTriangleIndex  = -1;
                     float3 floatPoint              = m_integerSpace.ToFloatSpace(intPoint);
                     float  maxDistance             = 0.0f;
-                    foreach (int triangleIndex in triangles.Indices)
+                    foreach (int triangleIndex in triangles.indices)
                     {
                         Triangle triangle = triangles[triangleIndex];
                         long     det      = IntDet(triangle.vertex0, triangle.vertex1, triangle.vertex2, intPoint);
@@ -691,7 +691,7 @@ namespace Latios.Psyshock
             {
                 OLSData data = new OLSData();
                 data.Init();
-                foreach (int v in vertices.Indices)
+                foreach (int v in vertices.indices)
                 {
                     float3 position             = vertices[v].position;
                     tempVertices[numVertices++] = position;
@@ -757,7 +757,7 @@ namespace Latios.Psyshock
                     NativeArray<int>   triangleIndices = new NativeArray<int>(triangles.peakCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     NativeArray<float> triangleAreas   = new NativeArray<float>(triangles.peakCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     int                numTriangles    = 0;
-                    foreach (int triangleIndex in triangles.Indices)
+                    foreach (int triangleIndex in triangles.indices)
                     {
                         Triangle t                      = triangles[triangleIndex];
                         float3   o                      = vertices[t.vertex0].position;
@@ -929,7 +929,8 @@ namespace Latios.Psyshock
         private int AllocateVertex(float3 point, uint userData)
         {
             Assert.IsTrue(math.all(point >= m_integerSpaceAabb.min & point <= m_integerSpaceAabb.max));
-            var vertex      = new Vertex(point, userData) {
+            var vertex = new Vertex(point, userData)
+            {
                 intPosition = m_integerSpace.ToIntegerSpace(point)
             };
             return vertices.Allocate(vertex);
@@ -1001,7 +1002,7 @@ namespace Latios.Psyshock
                 }
 
                 int numNewVertices = 0;
-                foreach (int v in vertices.Indices)
+                foreach (int v in vertices.indices)
                 {
                     float3 x          = vertices[v].position;
                     bool   keep       = true;
@@ -1314,7 +1315,7 @@ namespace Latios.Psyshock
             }
 
             // Write the original index of each vertex to its user data so that we can maintain its error matrix across rebuilds
-            foreach (int v in vertices.Indices)
+            foreach (int v in vertices.indices)
             {
                 SetUserData(v, (uint)v);
                 numVertices++;
@@ -1332,7 +1333,7 @@ namespace Latios.Psyshock
                 if (dimension == 3)
                 {
                     // Build collapses for each edge
-                    foreach (int t in triangles.Indices)
+                    foreach (int t in triangles.indices)
                     {
                         Triangle triangle = triangles[t];
                         for (int i = 0; i < 3; i++)
@@ -1416,7 +1417,7 @@ namespace Latios.Psyshock
                 }
 
                 // Add all of the original vertices that weren't removed to the list
-                foreach (int v in vertices.Indices)
+                foreach (int v in vertices.indices)
                 {
                     if (vertices[v].userData != uint.MaxValue)
                     {
@@ -1446,7 +1447,7 @@ namespace Latios.Psyshock
 
                 // Count the vertices
                 numVertices = 0;
-                foreach (int v in vertices.Indices)
+                foreach (int v in vertices.indices)
                 {
                     numVertices++;
                 }
@@ -1625,7 +1626,7 @@ namespace Latios.Psyshock
             NativeArray<int>  numFaceEdges       = new NativeArray<int>(numPlanes, Allocator.Temp, NativeArrayOptions.ClearMemory);
             NativeArray<Edge> faceEdges          = new NativeArray<Edge>(triangles.peakCount * 3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             int               totalNumEdges      = 0;
-            foreach (int t in triangles.Indices)
+            foreach (int t in triangles.indices)
             {
                 // Search each triangle to find one on each face
                 Triangle triangle  = triangles[t];
@@ -1687,7 +1688,7 @@ namespace Latios.Psyshock
 
                 // Calculate the span in the plane normal direction
                 float span = 0.0f;
-                foreach (Vertex vertex in vertices.Elements)
+                foreach (Vertex vertex in vertices.elements)
                 {
                     span = math.max(span, -mathex.signedDistance(plane, vertex.position));
                 }
@@ -1784,7 +1785,7 @@ namespace Latios.Psyshock
             {
                 // Find an edge incident to each vertex (doesn't matter which one)
                 Edge* vertexEdges = stackalloc Edge[vertices.peakCount];
-                foreach (int triangleIndex in triangles.Indices)
+                foreach (int triangleIndex in triangles.indices)
                 {
                     Triangle triangle             = triangles[triangleIndex];
                     vertexEdges[triangle.vertex0] = new Edge(triangleIndex, 0);
@@ -1795,7 +1796,7 @@ namespace Latios.Psyshock
                 // Calculates the square of the distance that each vertex moves if all of its incident planes' are moved unit distance along their normals
                 float            maxShiftSq   = 1.0f;
                 NativeArray<int> planeIndices = new NativeArray<int>(numPlanes, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                foreach (int iVertex in vertices.Indices)
+                foreach (int iVertex in vertices.indices)
                 {
                     Edge vertexEdge = vertexEdges[iVertex];
 
@@ -2176,7 +2177,7 @@ namespace Latios.Psyshock
             SimplifyVertices(k_planeEps, maxVertices);
 
             // Snap coords to their quantized values for the last build
-            foreach (int v in vertices.Indices)
+            foreach (int v in vertices.indices)
             {
                 Vertex vertex   = vertices[v];
                 vertex.position = m_integerSpace.ToFloatSpace(vertex.intPosition);
@@ -2200,7 +2201,7 @@ namespace Latios.Psyshock
         public Edge GetVertexEdge(int vertexIndex)
         {
             Assert.IsTrue(dimension == 3);
-            foreach (int triangleIndex in triangles.Indices)
+            foreach (int triangleIndex in triangles.indices)
             {
                 Triangle triangle = triangles[triangleIndex];
                 if (triangle.vertex0 == vertexIndex)
@@ -2241,7 +2242,7 @@ namespace Latios.Psyshock
         /// </summary>
         public FaceEdge GetFirstFace(int faceIndex)
         {
-            foreach (int triangleIndex in triangles.Indices)
+            foreach (int triangleIndex in triangles.indices)
             {
                 if (triangles[triangleIndex].faceIndex != faceIndex)
                 {
@@ -2306,7 +2307,7 @@ namespace Latios.Psyshock
         public float3 ComputeCentroid()
         {
             float4 sum = new float4(0);
-            foreach (Vertex vertex in vertices.Elements)
+            foreach (Vertex vertex in vertices.elements)
             {
                 sum += new float4(vertex.position, 1);
             }
@@ -2350,7 +2351,7 @@ namespace Latios.Psyshock
                     float3 offset       = ComputeCentroid();
                     int    numTriangles = 0;
                     float* dets         = stackalloc float[triangles.capacity];
-                    foreach (int i in triangles.Indices)
+                    foreach (int i in triangles.indices)
                     {
                         float3 v0        = vertices[triangles[i].vertex0].position - offset;
                         float3 v1        = vertices[triangles[i].vertex1].position - offset;
@@ -2368,7 +2369,7 @@ namespace Latios.Psyshock
                     var diag = new float3(0);
                     var offd = new float3(0);
 
-                    foreach (int i in triangles.Indices)
+                    foreach (int i in triangles.indices)
                     {
                         float3 v0  = vertices[triangles[i].vertex0].position - mp.centerOfMass;
                         float3 v1  = vertices[triangles[i].vertex1].position - mp.centerOfMass;
@@ -2490,7 +2491,7 @@ namespace Latios.Psyshock
             var minAngle                = generationParameters.MinimumAngle;
 
             // Build the points' AABB
-            Aabb domain = new Aabb();
+            Aabb domain = new Aabb(float.MaxValue, float.MinValue);
             for (int iPoint = 0; iPoint < points.Length; iPoint++)
             {
                 domain = Physics.CombineAabb(points[iPoint], domain);
@@ -2524,7 +2525,7 @@ namespace Latios.Psyshock
             if (builder.dimension == 3)
             {
                 int maxNumVertices = 0;
-                foreach (int v in builder.vertices.Indices)
+                foreach (int v in builder.vertices.indices)
                 {
                     maxNumVertices += builder.vertices[v].cardinality - 1;
                 }
@@ -3014,17 +3015,20 @@ namespace Latios.Psyshock
         public bool canAllocate => elementPoolBase->canAllocate;
 
         // Add an element to the pool
-        public int Allocate(T element) {
+        public int Allocate(T element)
+        {
             return elementPoolBase->Allocate<T>(element);
         }
 
         // Remove an element from the pool
-        public void Release(int index) {
+        public void Release(int index)
+        {
             elementPoolBase->Release<T>(index);
         }
 
         // Empty the pool
-        public void Clear() {
+        public void Clear()
+        {
             elementPoolBase->Clear();
         }
 
@@ -3040,24 +3044,28 @@ namespace Latios.Psyshock
             set { elementPoolBase->Set<T>(index, value); }
         }
 
-        public void Set(int index, T value) {
+        public void Set(int index, T value)
+        {
             elementPoolBase->Set<T>(index, value);
         }
 
-        public unsafe void CopyFrom(ElementPool<T> other) {
+        public unsafe void CopyFrom(ElementPool<T> other)
+        {
             elementPoolBase->CopyFrom<T>(*other.elementPoolBase);
         }
 
-        public unsafe void CopyFrom(void* buffer, int length) {
+        public unsafe void CopyFrom(void* buffer, int length)
+        {
             elementPoolBase->CopyFrom<T>(buffer, length);
         }
 
-        public unsafe bool Compact(int* remap) {
+        public unsafe bool Compact(int* remap)
+        {
             return elementPoolBase->Compact<T>(remap);
         }
 
-        public ElementPoolBase.IndexEnumerable<T> Indices => elementPoolBase->GetIndices<T>();
-        public ElementPoolBase.ElementEnumerable<T> Elements => elementPoolBase->GetElements<T>();
+        public ElementPoolBase.IndexEnumerable<T> indices => elementPoolBase->GetIndices<T>();
+        public ElementPoolBase.ElementEnumerable<T> elements => elementPoolBase->GetElements<T>();
     }
 }
 

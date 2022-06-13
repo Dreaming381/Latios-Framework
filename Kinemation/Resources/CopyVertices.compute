@@ -1,0 +1,21 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CopyVertices
+
+struct Vertex
+{
+    float3 position;
+    float3 normal;
+    float3 tangent;
+};
+uniform StructuredBuffer<Vertex> _src;
+uniform RWStructuredBuffer<Vertex> _dst;
+
+int _start;
+
+// Todo: What is the nominal value per platform?
+[numthreads(64,1,1)]
+void CopyVertices (uint3 id : SV_DispatchThreadID)
+{
+    int index = _start + id.x;
+    _dst[index] = _src[index];
+}

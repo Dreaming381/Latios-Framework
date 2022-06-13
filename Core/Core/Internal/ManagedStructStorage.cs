@@ -9,7 +9,18 @@ namespace Latios
 {
     internal class ManagedStructComponentStorage
     {
-        private Dictionary<Type, TypedManagedStructStorageBase> m_typeMap = new Dictionary<Type, TypedManagedStructStorageBase>();
+        private Dictionary<Type, TypedManagedStructStorageBase> m_typeMap      = new Dictionary<Type, TypedManagedStructStorageBase>();
+        private Dictionary<Type, ComponentType>                 m_associateMap = new Dictionary<Type, ComponentType>();
+
+        public ComponentType GetAssociatedType<T>() where T : struct, IManagedComponent
+        {
+            if (!m_associateMap.TryGetValue(typeof(T), out var result))
+            {
+                result = new T().AssociatedComponentType;
+                m_associateMap.Add(typeof(T), result);
+            }
+            return result;
+        }
 
         public void AddComponent<T>(Entity entity, T value) where T : struct, IManagedComponent
         {
@@ -96,7 +107,18 @@ namespace Latios
     //Todo: Explore idea of using NativeHashmap for JobHandles.
     internal class CollectionComponentStorage : IDisposable
     {
-        private Dictionary<Type, TypedCollectionStorageBase> m_typeMap = new Dictionary<Type, TypedCollectionStorageBase>();
+        private Dictionary<Type, TypedCollectionStorageBase> m_typeMap      = new Dictionary<Type, TypedCollectionStorageBase>();
+        private Dictionary<Type, ComponentType>              m_associateMap = new Dictionary<Type, ComponentType>();
+
+        public ComponentType GetAssociatedType<T>() where T : struct, ICollectionComponent
+        {
+            if (!m_associateMap.TryGetValue(typeof(T), out var result))
+            {
+                result = new T().AssociatedComponentType;
+                m_associateMap.Add(typeof(T), result);
+            }
+            return result;
+        }
 
         public void AddCollectionComponent<T>(Entity entity, T value, bool isNotInitialized = false) where T : struct, ICollectionComponent
         {

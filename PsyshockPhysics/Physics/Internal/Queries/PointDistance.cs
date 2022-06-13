@@ -200,8 +200,8 @@ namespace Latios.Psyshock
         }
 
         //Distance is unsigned, triangle is "double-sided"
-        /*public static bool PointTriangleDistance(float3 point, TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
-           {
+        public static bool PointTriangleDistance(float3 point, TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
+        {
             float3 ab = triangle.pointB - triangle.pointA;
             float3 bc = triangle.pointC - triangle.pointB;
             float3 ca = triangle.pointA - triangle.pointC;
@@ -211,8 +211,8 @@ namespace Latios.Psyshock
 
             //project point onto plane
             //if clockwise, normal faces "up"
-            float3 planeNormal = math.normalize(math.cross(ab, ca));
-            float projectionDot = math.dot(planeNormal, point - triangle.pointA);
+            float3 planeNormal    = math.normalize(math.cross(ab, ca));
+            float  projectionDot  = math.dot(planeNormal, point - triangle.pointA);
             float3 projectedPoint = point - projectionDot * planeNormal;
 
             //calculate edge planes aligned with triangle normal without the normalization (since it isn't required)
@@ -228,72 +228,98 @@ namespace Latios.Psyshock
             switch (region)
             {
                 case 0:
-                    {
-                        //all inside, hit plane
-                        result.hitpoint = projectedPoint;
-                        result.distance = math.abs(projectionDot);
-                        break;
-                    }
+                {
+                    //all inside, hit plane
+                    result.hitpoint = projectedPoint;
+                    result.distance = math.abs(projectionDot);
+                    break;
+                }
                 case 1:
-                    {
-                        //outside ab plane
-                        float abLengthSq = math.lengthsq(ab);
-                        float dot = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
-                        result.hitpoint = triangle.pointA + ab * dot / abLengthSq;
-                        result.distance = math.distance(point, result.hitpoint);
-                        break;
-                    }
+                {
+                    //outside ab plane
+                    float abLengthSq = math.lengthsq(ab);
+                    float dot        = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
+                    result.hitpoint  = triangle.pointA + ab * dot / abLengthSq;
+                    result.distance  = math.distance(point, result.hitpoint);
+                    break;
+                }
                 case 2:
-                    {
-                        //outside bc plane
-                        float bcLengthSq = math.lengthsq(bc);
-                        float dot = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
-                        result.hitpoint = triangle.pointB + bc * dot / bcLengthSq;
-                        result.distance = math.distance(point, result.hitpoint);
-                        break;
-                    }
+                {
+                    //outside bc plane
+                    float bcLengthSq = math.lengthsq(bc);
+                    float dot        = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
+                    result.hitpoint  = triangle.pointB + bc * dot / bcLengthSq;
+                    result.distance  = math.distance(point, result.hitpoint);
+                    break;
+                }
                 case 3:
-                    {
-                        //outside ab and bc so closest to point b
-                        result.hitpoint = triangle.pointB;
-                        result.distance = math.distance(point, triangle.pointB);
-                        break;
-                    }
+                {
+                    //outside ab and bc so closest to point b
+                    result.hitpoint = triangle.pointB;
+                    result.distance = math.distance(point, triangle.pointB);
+                    break;
+                }
                 case 4:
-                    {
-                        //outside ca plane
-                        float caLengthSq = math.lengthsq(ca);
-                        float dot = math.clamp(math.dot(cp, ca), 0f, caLengthSq);
-                        result.hitpoint = triangle.pointC + ca * dot / caLengthSq;
-                        result.distance = math.distance(point, result.hitpoint);
-                        break;
-                    }
+                {
+                    //outside ca plane
+                    float caLengthSq = math.lengthsq(ca);
+                    float dot        = math.clamp(math.dot(cp, ca), 0f, caLengthSq);
+                    result.hitpoint  = triangle.pointC + ca * dot / caLengthSq;
+                    result.distance  = math.distance(point, result.hitpoint);
+                    break;
+                }
                 case 5:
-                    {
-                        //outside ab and ca so closest to point a
-                        result.hitpoint = triangle.pointA;
-                        result.distance = math.distance(point, triangle.pointA);
-                        break;
-                    }
+                {
+                    //outside ab and ca so closest to point a
+                    result.hitpoint = triangle.pointA;
+                    result.distance = math.distance(point, triangle.pointA);
+                    break;
+                }
                 case 6:
+                {
+                    //outside bc and ca so closest to point c
+                    result.hitpoint = triangle.pointC;
+                    result.distance = math.distance(point, triangle.pointC);
+                    break;
+                }
+                case 7:
+                {
+                    //on all three edges at once because the cross product was 0
+                    CapsuleCollider capAB = new CapsuleCollider(triangle.pointA, triangle.pointB, 0f);
+                    bool            hitAB = PointCapsuleDistance(point, capAB, maxDistance, out var resultAB);
+                    CapsuleCollider capBC = new CapsuleCollider(triangle.pointB, triangle.pointC, 0f);
+                    bool            hitBC = PointCapsuleDistance(point, capBC, maxDistance, out var resultBC);
+                    CapsuleCollider capCA = new CapsuleCollider(triangle.pointC, triangle.pointA, 0f);
+                    bool            hitCA = PointCapsuleDistance(point, capCA, maxDistance, out var resultCA);
+                    if (!hitAB && !hitBC && !hitCA)
                     {
-                        //outside bc and ca so closest to point c
-                        result.hitpoint = triangle.pointC;
-                        result.distance = math.distance(point, triangle.pointC);
+                        result = resultCA;
                         break;
                     }
+
+                    result          = default;
+                    result.distance = float.MaxValue;
+
+                    if (hitAB)
+                        result = resultAB;
+                    if (hitBC && resultBC.distance < result.distance)
+                        result = resultBC;
+                    if (hitCA && resultCA.distance < result.distance)
+                        result = resultCA;
+                    break;
+                }
                 default:
-                    {
-                        //How the heck did we get here?
-                        throw new InvalidOperationException();
-                        result.hitpoint = projectedPoint;
-                        result.distance = 2f * maxDistance;
-                        break;
-                    }
+                {
+                    //How the heck did we get here?
+                    //throw new InvalidOperationException();
+                    result.hitpoint = projectedPoint;
+                    result.distance = 2f * maxDistance;
+                    break;
+                }
             }
             result.normal = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
             return result.distance <= maxDistance;
-           }*/
+        }
 
         //Distance is unsigned, quad is "double-sided"
         public static bool PointQuadDistance(float3 point, simdFloat3 quadPoints, float maxDistance, out PointDistanceResultInternal result)

@@ -1,0 +1,17 @@
+﻿using Latios;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Entities;
+using Unity.Jobs;
+using Unity.Mathematics;
+using Unity.Transforms;
+
+    #ROOTNAMESPACEBEGIN#
+public partial class #SCRIPTNAME# : SubSystem
+{
+    protected override void OnUpdate()
+    {
+        #NOTRIM#
+    }
+}
+#ROOTNAMESPACEEND#

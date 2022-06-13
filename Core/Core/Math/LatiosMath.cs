@@ -90,6 +90,11 @@ namespace Latios
             return math.abs(m0 * extents.x) + math.abs(m1 * extents.y) + math.abs(m2 * extents.z);
         }
 
+        public static float3 RotateExtents(float extents, float3 m0, float3 m1, float3 m2)
+        {
+            return math.abs(m0 * extents) + math.abs(m1 * extents) + math.abs(m2 * extents);
+        }
+
         public static float3 RotateExtents(float3 extents, float3x3 rotationMatrix)
         {
             return RotateExtents(extents, rotationMatrix.c0, rotationMatrix.c1, rotationMatrix.c2);

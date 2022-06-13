@@ -63,6 +63,35 @@ namespace Latios.Psyshock
             return collider.m_box;
         }
 
+        public unsafe static implicit operator Collider(TriangleCollider triangleCollider)
+        {
+            Collider collider   = default;
+            collider.m_type     = ColliderType.Box;
+            collider.m_triangle = triangleCollider;
+            return collider;
+        }
+
+        public unsafe static implicit operator TriangleCollider(Collider collider)
+        {
+            CheckColliderIsCastTargetType(collider, ColliderType.Triangle);
+            return collider.m_triangle;
+        }
+
+        public unsafe static implicit operator Collider(ConvexCollider convexCollider)
+        {
+            Collider collider        = default;
+            collider.m_type          = ColliderType.Convex;
+            collider.m_storage.a.xyz = convexCollider.scale;
+            collider.m_blobRef       = UnsafeUntypedBlobAssetReference.Create(convexCollider.convexColliderBlob);
+            return collider;
+        }
+
+        public unsafe static implicit operator ConvexCollider(Collider collider)
+        {
+            CheckColliderIsCastTargetType(collider, ColliderType.Convex);
+            return new ConvexCollider(collider.m_blobRef.Reinterpret<ConvexColliderBlob>(), collider.m_storage.a.xyz);
+        }
+
         public unsafe static implicit operator Collider(CompoundCollider compoundCollider)
         {
             Collider collider      = default;
@@ -88,6 +117,9 @@ namespace Latios.Psyshock
                     case ColliderType.Sphere: throw new InvalidOperationException("Collider is not a SphereCollider but is being casted to one.");
                     case ColliderType.Capsule: throw new InvalidOperationException("Collider is not a CapsuleCollider but is being casted to one.");
                     case ColliderType.Box: throw new InvalidOperationException("Collider is not a BoxCollider but is being casted to one.");
+                    case ColliderType.Triangle: throw new InvalidOperationException("Collider is not a TriangleCollider but is being casted to one.");
+                    case ColliderType.Convex: throw new InvalidOperationException(
+                            "Collider is not a ConvexCollider but is being casted to one. Unlike Unity.Physics, ConvexColliders do not aggregate Spheres, Capsules, Boxes, or Triangles.");
                     case ColliderType.Compound: throw new InvalidOperationException("Collider is not a CompoundCollider but is being casted to one.");
                 }
             }

@@ -82,6 +82,9 @@ namespace Latios
         }
     }
 
+    /// <summary>
+    /// A Fluent builder object for creating EntityQuery instances.
+    /// </summary>
     public unsafe struct FluentQuery
     {
         internal NativeList<ComponentType> m_all;
@@ -129,12 +132,23 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
         /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
-        public FluentQuery WithAll<T>(bool readOnly = false)
+        /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
+        public FluentQuery WithAll<T>(bool readOnly = false, bool isChunkComponent = false)
         {
-            if (readOnly)
-                m_all.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+            {
+                if (readOnly)
+                    m_all.Add(ComponentType.ChunkComponentReadOnly<T>());
+                else
+                    m_all.Add(ComponentType.ChunkComponent<T>());
+            }
             else
-                m_all.Add(ComponentType.ReadWrite<T>());
+            {
+                if (readOnly)
+                    m_all.Add(ComponentType.ReadOnly<T>());
+                else
+                    m_all.Add(ComponentType.ReadWrite<T>());
+            }
             return this;
         }
 
@@ -142,9 +156,13 @@ namespace Latios
         /// Adds a required component to the query as ReadOnly unless the component has already been added (or added subsequently)
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
-        public FluentQuery WithAllWeak<T>()
+        /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
+        public FluentQuery WithAllWeak<T>(bool isChunkComponent = false)
         {
-            m_allWeak.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+                m_allWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
+            else
+                m_allWeak.Add(ComponentType.ReadOnly<T>());
             return this;
         }
 
@@ -153,12 +171,23 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
         /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
-        public FluentQuery WithAny<T>(bool readOnly = false)
+        /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
+        public FluentQuery WithAny<T>(bool readOnly = false, bool isChunkComponent = false)
         {
-            if (readOnly)
-                m_any.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+            {
+                if (readOnly)
+                    m_any.Add(ComponentType.ChunkComponentReadOnly<T>());
+                else
+                    m_any.Add(ComponentType.ChunkComponent<T>());
+            }
             else
-                m_any.Add(ComponentType.ReadWrite<T>());
+            {
+                if (readOnly)
+                    m_any.Add(ComponentType.ReadOnly<T>());
+                else
+                    m_any.Add(ComponentType.ReadWrite<T>());
+            }
             return this;
         }
 
@@ -166,9 +195,13 @@ namespace Latios
         /// Adds a component to the WithAny category of the query marked as ReadOnly unless the component has already been added (or added subsequently) with WithAny write access or added to the All category (or added subsequently) in which case the WithAny category is dropped
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
-        public FluentQuery WithAnyWeak<T>()
+        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
+        public FluentQuery WithAnyWeak<T>(bool isChunkComponent = false)
         {
-            m_anyWeak.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+                m_anyWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
+            else
+                m_anyWeak.Add(ComponentType.ReadOnly<T>());
             return this;
         }
 
@@ -176,13 +209,24 @@ namespace Latios
         /// Same as WithAny except if the component was added using "Without" (or added subsequently) the component is not added
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
-        /// <param name="readOnly"></param>
-        public FluentQuery WithAnyNotExcluded<T>(bool readOnly = false)
+        /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
+        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
+        public FluentQuery WithAnyNotExcluded<T>(bool readOnly = false, bool isChunkComponent = false)
         {
-            if (readOnly)
-                m_anyIfNotExcluded.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+            {
+                if (readOnly)
+                    m_anyIfNotExcluded.Add(ComponentType.ChunkComponentReadOnly<T>());
+                else
+                    m_anyIfNotExcluded.Add(ComponentType.ChunkComponent<T>());
+            }
             else
-                m_anyIfNotExcluded.Add(ComponentType.ReadWrite<T>());
+            {
+                if (readOnly)
+                    m_anyIfNotExcluded.Add(ComponentType.ReadOnly<T>());
+                else
+                    m_anyIfNotExcluded.Add(ComponentType.ReadWrite<T>());
+            }
             return this;
         }
 
@@ -190,9 +234,13 @@ namespace Latios
         /// Same as WithAnyWeak except if the component was added using "Without" (or added subsequently) the component is not added
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
-        public FluentQuery WithAnyNotExcludedWeak<T>()
+        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
+        public FluentQuery WithAnyNotExcludedWeak<T>(bool isChunkComponent = false)
         {
-            m_anyIfNotExcludedWeak.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+                m_anyIfNotExcludedWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
+            else
+                m_anyIfNotExcludedWeak.Add(ComponentType.ReadOnly<T>());
             return this;
         }
 
@@ -200,10 +248,14 @@ namespace Latios
         /// Adds a component to be explicitly excluded from the query
         /// </summary>
         /// <typeparam name="T">The type of component to exclude</typeparam>
-        public FluentQuery Without<T>()
+        /// <param name="isChunkComponent">Is the component excluded a chunk component?</param>
+        public FluentQuery Without<T>(bool isChunkComponent = false)
         {
             //m_none.Add(ComponentType.Exclude<T>());
-            m_none.Add(ComponentType.ReadOnly<T>());
+            if (isChunkComponent)
+                m_none.Add(ComponentType.ChunkComponentReadOnly<T>());
+            else
+                m_none.Add(ComponentType.ReadOnly<T>());
             return this;
         }
 
@@ -259,9 +311,26 @@ namespace Latios
             return this;
         }
 
+        /// <summary>
+        /// Turns on write group filtering for this query
+        /// </summary>
+        /// <returns></returns>
         public FluentQuery UseWriteGroups()
         {
             m_options |= EntityQueryOptions.FilterWriteGroup;
+            return this;
+        }
+
+        public delegate void FluentDelegate(ref FluentQuery fluent);
+
+        /// <summary>
+        /// Apply a custom function to the FluentQuery
+        /// </summary>
+        /// <param name="fluentDelegate">The custom function to apply</param>
+        /// <returns></returns>
+        public FluentQuery WithDelegate(FluentDelegate fluentDelegate)
+        {
+            fluentDelegate.Invoke(ref this);
             return this;
         }
 
@@ -302,7 +371,7 @@ namespace Latios
                 {
                     var a = m_any[i];
                     var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex)
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
                     {
                         if (a.AccessModeType != b.AccessModeType)
                         {
@@ -324,7 +393,7 @@ namespace Latios
                 {
                     var a = m_allWeak[i];
                     var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex)
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
                     {
                         found = true;
                     }
@@ -335,7 +404,7 @@ namespace Latios
                     {
                         var a = m_allWeak[i];
                         var b = m_any[j];
-                        if (a.TypeIndex == b.TypeIndex && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
+                        if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
                         {
                             a.AccessModeType      = ComponentType.AccessMode.ReadWrite;
                             m_allWeak[i]          = a;
@@ -354,7 +423,7 @@ namespace Latios
                 {
                     var a = m_anyWeak[i];
                     var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex)
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
                     {
                         found                 = true;
                         m_anyIsSatisfiedByAll = true;
@@ -366,7 +435,7 @@ namespace Latios
                     {
                         var a = m_anyWeak[i];
                         var b = m_any[j];
-                        if (a.TypeIndex == b.TypeIndex && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
+                        if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
                         {
                             a.AccessModeType = ComponentType.AccessMode.ReadWrite;
                             m_anyWeak[i]     = a;
@@ -379,7 +448,17 @@ namespace Latios
             if (m_anyIsSatisfiedByAll)
                 m_any.Clear();
 
-            var desc = new EntityQueryDesc
+            //EntityQueryDescBuilder desc = new EntityQueryDescBuilder(Allocator.Temp);
+            //for (int i = 0; i < m_all.Length; i++)
+            //    desc.AddAll(m_all[i]);
+            //for (int i = 0; i < m_any.Length; i++)
+            //    desc.AddAny(m_any[i]);
+            //for (int i = 0; i < m_none.Length; i++)
+            //    desc.AddNone(m_none[i]);
+            //desc.Options(m_options);
+            //desc.FinalizeQuery();
+
+            var desc = new EntityQueryDesc()
             {
                 All     = m_all.ToArray(),
                 Any     = m_any.ToArray(),
@@ -431,7 +510,7 @@ namespace Latios
                     var a = list[i];
                     var b = list[j];
 
-                    if (a.TypeIndex == b.TypeIndex)
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
                     {
                         if (a.AccessModeType != b.AccessModeType)
                         {
@@ -453,7 +532,7 @@ namespace Latios
             {
                 for (int j = 0; j < typesToRemove.Length; j++)
                 {
-                    if (listToFilter[i].TypeIndex == typesToRemove[j].TypeIndex)
+                    if (listToFilter[i].TypeIndex == typesToRemove[j].TypeIndex && listToFilter[i].IsChunkComponent == typesToRemove[j].IsChunkComponent)
                     {
                         listToFilter.RemoveAtSwapBack(i);
                         i--;

@@ -3,7 +3,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock.Authoring.Systems
 {
-    [ConverterVersion("latios", 2)]
+    [UpdateInGroup(typeof(GameObjectConversionGroup))]
+    [DisableAutoCreation]
+    [ConverterVersion("latios", 4)]
     public class LegacyColliderConversionSystem : GameObjectConversionSystem
     {
         protected override void OnUpdate()
@@ -76,6 +78,25 @@ namespace Latios.Psyshock.Authoring.Systems
                     halfSize = goBox.size * lossyScale / 2f
                 };
                 DstEntityManager.AddComponentData(entity, icdBox);
+            });
+
+            Entities.ForEach((ConvexMeshColliderConversionList list) =>
+            {
+                foreach (var mc in list.meshColliders)
+                {
+                    var entity = GetPrimaryEntity(mc.mesh);
+
+                    var blob = mc.blobHandle.Resolve();
+                    if (!blob.IsCreated)
+                        continue;
+
+                    Collider icdConvex = new ConvexCollider
+                    {
+                        convexColliderBlob = blob,
+                        scale              = mc.mesh.transform.lossyScale
+                    };
+                    DstEntityManager.AddComponentData(entity, icdConvex);
+                }
             });
         }
     }

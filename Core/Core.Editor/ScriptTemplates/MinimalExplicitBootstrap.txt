@@ -1,0 +1,28 @@
+using System;
+using System.Collections.Generic;
+using Latios;
+using Latios.Authoring;
+using Unity.Entities;
+
+[UnityEngine.Scripting.Preserve]
+public class LatiosBootstrap : ICustomBootstrap
+{
+    public unsafe bool Initialize(string defaultWorldName)
+    {
+        var world                             = new LatiosWorld(defaultWorldName);
+        World.DefaultGameObjectInjectionWorld = world;
+        world.useExplicitSystemOrdering       = true;
+
+        var systems = new List<Type>(DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+
+        BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
+        BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+        world.presentationSystemGroup.SortSystems();
+
+        ScriptBehaviourUpdateOrder.AppendWorldToCurrentPlayerLoop(world);
+        return true;
+    }
+}

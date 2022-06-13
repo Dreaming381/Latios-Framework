@@ -10,6 +10,7 @@ using Unity.Transforms;
 
 namespace Latios.Myri.Systems
 {
+    [DisableAutoCreation]
     [UpdateInGroup(typeof(Latios.Systems.PreSyncPointGroup))]
     public partial class AudioSystem : SubSystem
     {

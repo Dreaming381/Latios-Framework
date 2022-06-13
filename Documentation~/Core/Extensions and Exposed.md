@@ -7,7 +7,8 @@ the internals.
 ## Exposed by asmref
 
 The following APIs were created using asmref files and the code is compiled as
-part of the package code:
+part of the package code. Only APIs considered relatively safe for user use are
+listed here.
 
 ### Unity.Mathematics
 
@@ -35,6 +36,8 @@ part of the package code:
 -   `EntityManager.CopySharedComponent()` – Copies the value of a shared
     component from one entity to another given only the `ComponentType`. Will
     add the `ComponentType` to the destination entity if absent.
+-   `BlobAssetReference<T>.GetLength()` – Returns the number of bytes associated
+    with the blob asset starting from `GetUnsafePtr()`
 
 ## Extensions
 

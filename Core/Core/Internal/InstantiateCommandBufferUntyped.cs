@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -329,6 +330,15 @@ namespace Latios
                                        m_state->tagsToAdd.GetComponentType(2),
                                        m_state->tagsToAdd.GetComponentType(3),
                                        type); break;
+                case var n when n >= 5 && n < 15:
+                {
+                    FixedList128Bytes <ComponentType> types = default;
+                    for (int i = 0; i < m_state->tagsToAdd.Length; i++)
+                        types.Add(m_state->tagsToAdd.GetComponentType(i));
+                    types.Add(type);
+                    m_state->tagsToAdd = new ComponentTypes(types);
+                    break;
+                }
                 default: ThrowTooManyTags(); break;
             }
         }

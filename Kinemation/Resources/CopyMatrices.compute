@@ -1,0 +1,15 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CopyMatrices
+
+uniform StructuredBuffer<float3x4> _src;
+uniform RWStructuredBuffer<float3x4> _dst;
+
+int _start;
+
+// Todo: What is the nominal value per platform?
+[numthreads(64, 1, 1)]
+void CopyMatrices(uint3 id : SV_DispatchThreadID)
+{
+    int index = _start + id.x;
+    _dst[index] = _src[index];
+}

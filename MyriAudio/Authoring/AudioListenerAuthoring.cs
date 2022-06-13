@@ -16,7 +16,7 @@ namespace Latios.Myri.Authoring
         public int interauralTimeDifferenceResolution = 2;
 
         [Tooltip("A custom volume and frequency spatialization profile. If empty, a default profile will be used.")]
-        public AudioIldProfileBuilder listenerResponseProfile;
+        public ListenerProfileBuilder listenerResponseProfile;
     }
 }
 

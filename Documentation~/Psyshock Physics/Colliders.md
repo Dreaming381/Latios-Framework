@@ -1,6 +1,6 @@
 # Colliders
 
-In version 0.3.0 of Psyshock, only a small subset of colliders are supported,
+In version 0.5.0 of Psyshock, only a small subset of colliders are supported,
 and authoring for these are not complete.
 
 -   Sphere Collider
@@ -8,7 +8,9 @@ and authoring for these are not complete.
 -   Capsule Collider
     -   pointA, pointB, and radius
 -   Box Collider
-    -   center and halfWidth
+    -   center and halfwidth
+-   Convex Collider
+    -   local-space blob and non-uniform scale factor
 -   Compound Collider
     -   local-space blob and uniform scale factor
 
@@ -34,6 +36,12 @@ Use the PhysX (legacy) *Capsule Collider*.
 Use the PhysX (legacy) *Box Collider*.
 
 ![](media/87073ef01be44817f3ceed69d82cfdeb.png)
+
+### Convex Collider
+
+Use the PhysX (legacy) *Mesh Collider* and ensure *Convex* is checked.
+
+![](media/de907201d91649d712e91c0b54d2f7d3.png)
 
 ### Compound Collider
 
@@ -122,11 +130,26 @@ A `BoxCollider` is a struct which defines an axis-aligned box in local space. It
 contains a `float3 center`, and a `float3 halfWidth`, which is the distances
 from the center to either face along each axis.
 
+### Convex Collider
+
+A ConvexCollider is a struct which defines an immutable convex hull of up to 255
+vertices.
+
+The core of a `ConvexCollider` is its `public
+BlobAssetReference<ConvexColliderBlob> convexColliderBlob `field. It is
+constructed using the Unity.Physics convex hull algorithm, but with the bevel
+radius disabled such that corners and edges are sharp. It can be created via
+converting a *Mesh Collider* component or via a Smart Blobber using
+`conversionSystem.CreateBlob()` and passing in a `ConvexColliderBakeData`.
+
+A `ConvexCollider` exposes a `public float3 scale` which can apply a non-uniform
+scale to the collider.
+
 ### Compound Collider
 
 A `CompoundCollider` is a struct which defines a rigid immutable collection of
-sphere and capsule colliders and their relative transforms. Its purpose is to
-allow multiple colliders to be treated as a single collider for simplicity.
+sphere, capsule, and box colliders and their relative transforms. Its purpose is
+to allow multiple colliders to be treated as a single collider for simplicity.
 
 The core of a `CompoundCollider` is its `public
 BlobAssetReference<CompoundColliderBlob> compoundColliderBlob` field. A
@@ -141,3 +164,10 @@ Authoring* component in the editor.
 A `CompoundCollider` also exposes a `public float scale` which is a uniform
 scale factor to be applied to the collider. This scale factor not only scales
 the collider sizes but also their relative offsets to each other.
+
+### Triangle Collider (Experimental)
+
+There is a `TriangleCollider` type in code which has a complete API but is
+currently mostly untested. It does not have a dedicated authoring workflow.
+Though it is trivial to construct in code as it is basically three vertices. If
+you choose to use it and discover any issues, please report a bug.

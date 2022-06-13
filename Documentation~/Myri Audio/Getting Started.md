@@ -11,47 +11,6 @@ With that said, I do believe that at the time of writing, Myri is the closest to
 a production-ready ECS audio solution for Unity Engine proper (not Tiny). So I
 hope you enjoy trying it out and feel free to send feedback!
 
-## Installing Myri
-
-If you are using the *Bootstrap – Injection Workflow*, you do not have to do
-anything and can skip to the next section.
-
-If you are using the *Bootstrap – Explicit Workflow*, you need to install the
-`AudioSystem` yourself. To install it to the default location, simply add the
-following line to your bootstrap:
-
-```csharp
-BootstrapTools.InjectUnitySystems(systems, world, simulationSystemGroup);
-BootstrapTools.InjectRootSuperSystems(systems, world, simulationSystemGroup);
-// Add the following line:
-BootstrapTools.InjectSystem(typeof(Latios.Myri.Systems.AudioSystem), world);
-
-initializationSystemGroup.SortSystems();
-simulationSystemGroup.SortSystems();
-presentationSystemGroup.SortSystems();
-```
-
-You can also install it into a custom location. The system can be installed in
-most places, but you will likely want to install it right before a sync point.
-`PreSyncPointGroup` or right before `EndSimulationEntityCommandBufferSystem`
-after the `TransformSystemGroup` are both good candidates. The following is
-sufficient:
-
-```csharp
-[UpdateInGroup(typeof(Latios.Systems.PreSyncPointGroup))]
-public class MyriPreSyncRootSuperSystem : RootSuperSystem
-{
-    protected override void CreateSystems()
-    {
-        GetOrCreateAndAddSystem<Latios.Myri.Systems.AudioSystem>();
-    }
-}
-```
-
-Entities with Myri components that also have a Parent must ensure their
-`LocalToWorld` is up-to-date (a queued-up job is sufficient) when the
-`AudioSystem` executes.
-
 ## Authoring
 
 Myri provides three components for authoring audio. They can all be found in

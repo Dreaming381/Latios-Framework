@@ -350,8 +350,8 @@ with Psyshock, this can be achieved with much less effort.
     -   “Any” mode with early outs
     -   Bucket begin/end callbacks
 -   More Collider Shapes
-    -   Triangle, Quad, BeveledBox, Cone, Cylinder
-    -   Terrain, Convex Hull, Static Mesh, Dynamic Compound, Dynamic Mesh
+    -   Quad, RoundedBox, Cone, Cylinder
+    -   Terrain, Static Mesh, Dynamic Compound, Dynamic Mesh
 -   Raycasting CollisionLayers
     -   Any hit, first hit, and multi-hit with IRaycastLayerProcessor
     -   Batch structures

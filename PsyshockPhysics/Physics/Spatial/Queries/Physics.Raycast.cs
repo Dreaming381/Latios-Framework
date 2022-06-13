@@ -39,6 +39,31 @@ namespace Latios.Psyshock
             return hit;
         }
 
+        public static bool Raycast(Ray ray, TriangleCollider triangle, RigidTransform triangleTransform, out RaycastResult result)
+        {
+            var  rayInTriangleSpace = Ray.TransformRay(math.inverse(triangleTransform), ray);
+            bool hit                = SpatialInternal.RaycastTriangle(rayInTriangleSpace,
+                                                                      new simdFloat3(triangle.pointA, triangle.pointB, triangle.pointC, triangle.pointC),
+                                                                      out float fraction,
+                                                                      out float3 normal);
+            result.position         = math.lerp(ray.start, ray.end, fraction);
+            result.normal           = math.rotate(triangleTransform, normal);
+            result.distance         = math.distance(ray.start, result.position);
+            result.subColliderIndex = 0;
+            return hit;
+        }
+
+        public static bool Raycast(Ray ray, ConvexCollider convex, RigidTransform convexTransform, out RaycastResult result)
+        {
+            var  rayInConvexSpace   = Ray.TransformRay(math.inverse(convexTransform), ray);
+            bool hit                = SpatialInternal.RaycastConvex(rayInConvexSpace, convex, out float fraction, out float3 normal);
+            result.position         = math.lerp(ray.start, ray.end, fraction);
+            result.normal           = math.rotate(convexTransform, normal);
+            result.distance         = math.distance(ray.start, result.position);
+            result.subColliderIndex = 0;
+            return hit;
+        }
+
         public static bool Raycast(Ray ray, CompoundCollider compound, RigidTransform compoundTransform, out RaycastResult result)
         {
             result                     = default;

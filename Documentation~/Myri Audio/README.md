@@ -2,8 +2,8 @@
 
 Myri Audio is a pure DOTS audio solution designed for handling a myriad of audio
 sources. It leverages the C\# job system, the Burst compiler, and the DSPGraph.
-At the time of its release initial release (when this page was written), no
-official Unity Entities-based audio solution existed.
+At the time of its initial release (when this page was written), no official
+Unity Entities-based audio solution existed.
 
 Check out the [Getting Started](Getting%20Started.md) page!
 

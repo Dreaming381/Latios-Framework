@@ -37,7 +37,6 @@ regarding one of these features, please reach out to me.
     -   SpeculativeAabbFrom
     -   Spring Force Utility
     -   PID Controller
-    -   PhysicsDebug.DrawSphere/Capsule/Box
 -   Advanced
     -   Character Controller Support Plane Solver
     -   AreOverlapping(Sphere/Capsule/Box)
@@ -54,6 +53,14 @@ regarding one of these features, please reach out to me.
     -   Multiband EQ Kernel
     -   Multiband Limiter Kernel
     -   Vertical Spatialization Profile
+
+### Kinemation
+
+-   Easy
+    -   Platform support (requires modifying ACLUnity CMake)
+    -   Blending and IK utiltities
+-   Advanced
+    -   Cage mesh deformation
 
 ## Developing Using a Public GitHub Account
 

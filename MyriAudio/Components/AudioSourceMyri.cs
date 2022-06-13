@@ -190,7 +190,7 @@ namespace Latios.Myri
         /// <summary>
         /// The name of the audio clip asset that created this blob asset.
         /// </summary>
-        public BlobString name;
+        public FixedString128Bytes name;
         /// <summary>
         /// The sample rate of the audio clip. A value of 48000 would mean 48000 float samples are required for 1 second of audio.
         /// </summary>

@@ -3,17 +3,28 @@ using Unity.Jobs;
 
 namespace Latios
 {
+    /// <summary>
+    /// An entity and its associated EntityManager, which provides shorthands for manipulating the entity's components
+    /// </summary>
     public struct BlackboardEntity
     {
         private Entity        entity;
         private EntityManager em;
 
+        /// <summary>
+        /// Create a blackboard entity
+        /// </summary>
+        /// <param name="entity">The existing entity to use</param>
+        /// <param name="entityManager">The entity's associated EntityManager</param>
         public BlackboardEntity(Entity entity, EntityManager entityManager)
         {
             this.entity = entity;
             em          = entityManager;
         }
 
+        /// <summary>
+        /// Implicitly fetch the entity of the BlackboardEntity
+        /// </summary>
         public static implicit operator Entity(BlackboardEntity entity)
         {
             return entity.entity;
@@ -27,14 +38,6 @@ namespace Latios
         public bool AddComponentData<T>(T data) where T : struct, IComponentData
         {
             return em.AddComponentData(entity, data);
-        }
-
-        public bool AddComponentIfMissing<T>() where T : struct, IComponentData
-        {
-            if (em.HasComponent<T>(entity))
-                return false;
-            em.AddComponent<T>(entity);
-            return true;
         }
 
         public bool AddComponentDataIfMissing<T>(T data) where T : struct, IComponentData
@@ -85,9 +88,9 @@ namespace Latios
             return em.AddBuffer<T>(entity);
         }
 
-        public DynamicBuffer<T> GetBuffer<T>() where T : struct, IBufferElementData
+        public DynamicBuffer<T> GetBuffer<T>(bool readOnly = false) where T : struct, IBufferElementData
         {
-            return em.GetBuffer<T>(entity);
+            return em.GetBuffer<T>(entity, readOnly);
         }
 
         public void AddCollectionComponent<T>(T value, bool isInitialized = true) where T : struct, ICollectionComponent

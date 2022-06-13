@@ -1,5 +1,6 @@
 {
     "name": "Latios.Myri",
+    "rootNamespace": "Latios.Myri",
     "references": [
         "Latios.Core",
         "Unity.Audio.DSPGraph",

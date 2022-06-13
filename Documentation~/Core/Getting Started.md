@@ -8,14 +8,21 @@ the ECS runtime.
 You can create one from one of the two templates using the Project folder’s
 create menu and selecting *Latios-\>Bootstrap*.
 
-For beginners, it is recommended to choose the *Injection Workflow* variant, as
-this matches the default Unity behavior.
+For beginners, it is recommended to choose the *Standard-Injection Workflow*
+variant, as this matches the default Unity behavior.
 
 For those who prefer explicit ordering of systems, you may find the *Explicit
 Workflow* more enticing. This workflow will automatically inject Unity systems,
 but then allow you to inject only top-level systems which set up children
 systems in a top-down manner. See [Super Systems](Super%20Systems.md) for more
 info on this workflow.
+
+For NetCode Projects, the Latios Framework will detect the NetCode package and
+enable additional C\# files for compilation. One of these provides a dedicated
+NetCode bootstrap file.
+
+After the bootstrap is created, it can be
+[customized](Customizing%20the%20Bootstraps.md).
 
 ## Common Types
 
@@ -33,6 +40,10 @@ info on this workflow.
     associated dependencies
 -   [BlackboardEntity](Blackboard%20Entities.md) – an Entity with extensions to
     apply `EntityManager` operations on it
+-   [Rng](Rng%20and%20RngToolkit.md) – a struct with a powerful thread-safe,
+    deterministic, fire-and-forget workflow for random number generation
+-   [Smart Blobber](Smart%20Blobbers.md) – a specialized
+    `GameObjectConversionSystem` used for generating blob assets
 
 ### Components
 

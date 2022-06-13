@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] – 2022-6-13
+
+Officially supports Entities [0.50.1]
+
+### Added
+
+-   *New Feature:* `AudioClipBlob` and `ListenerProfileBlob` are now generated
+    using Smart Blobbers and generation can be requested from user authoring
+    code
+-   Myri is now installed via a `MyriBootstrap` installer, allowing users to
+    exclude it if creating a `DSPGraph` instance breaks their project
+
+### Changed
+
+-   Renamed `IldProfileBlob` to `ListenerProfileBlob`
+
+### Fixed
+
+-   `AudioClipBlob.name` is now a `FixedString128Bytes` and can be used in Burst
+-   Myri will now ignore null `AudioClipBlob` instances rather than crash
+
 ## [0.4.5] – 2022-3-20
 
 Officially supports Entities [0.50.0]

@@ -16,7 +16,7 @@
 
 using Unity.Mathematics;
 
-namespace Latios.PhysicsEngine
+namespace Latios.Psyshock
 {
 	public static partial class Physics
 	{
@@ -28,7 +28,9 @@ namespace Latios.PhysicsEngine
 		"Capsule",
 		"Box",
 		"Triangle",
-		"Quad"
+		//"Quad"
+		"Convex",
+		"Compound"
     };
 #>
 		public static bool Raycast(Ray ray, Collider collider, RigidTransform colliderTransform, out RaycastResult result)

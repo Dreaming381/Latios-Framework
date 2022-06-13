@@ -25,6 +25,21 @@ namespace Latios.Psyshock
             return TransformAabb(new float4x4(transform), box.center, box.halfSize);
         }
 
+        public static Aabb AabbFrom(TriangleCollider triangle, RigidTransform transform)
+        {
+            var transformedTriangle = simd.transform(transform, new simdFloat3(triangle.pointA, triangle.pointB, triangle.pointC, triangle.pointA));
+            var aabb                = new Aabb(math.min(transformedTriangle.a, transformedTriangle.b), math.max(transformedTriangle.a, transformedTriangle.b));
+            return CombineAabb(transformedTriangle.c, aabb);
+        }
+
+        public static Aabb AabbFrom(ConvexCollider convex, RigidTransform transform)
+        {
+            var         local = convex.convexColliderBlob.Value.localAabb;
+            float3      c     = (local.min + local.max) / 2f;
+            BoxCollider box   = new BoxCollider(c, local.max - c);
+            return AabbFrom(ScaleCollider(box, new PhysicsScale(convex.scale)), transform);
+        }
+
         public static Aabb AabbFrom(CompoundCollider compound, RigidTransform transform)
         {
             var         local = compound.compoundColliderBlob.Value.localAabb;
@@ -47,6 +62,12 @@ namespace Latios.Psyshock
                 case ColliderType.Box:
                     BoxCollider box = collider;
                     return AabbFrom(box, transform);
+                case ColliderType.Triangle:
+                    TriangleCollider triangle = collider;
+                    return AabbFrom(triangle, transform);
+                case ColliderType.Convex:
+                    ConvexCollider convex = collider;
+                    return AabbFrom(convex, transform);
                 case ColliderType.Compound:
                     CompoundCollider compound = collider;
                     return AabbFrom(compound, transform);

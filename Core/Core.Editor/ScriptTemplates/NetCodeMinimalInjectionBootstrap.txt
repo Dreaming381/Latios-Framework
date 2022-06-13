@@ -1,0 +1,41 @@
+﻿using System;
+using System.Collections.Generic;
+using Latios;
+using Latios.Authoring;
+using Latios.Compatibility.UnityNetCode;
+using Unity.Entities;
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeLatiosBootstrap : LatiosClientServerBootstrapBase
+{
+    public override bool Initialize(string defaultWorldName)
+    {
+        AutoConnectPort = 7979;  // Enable auto connect
+        return base.Initialize(defaultWorldName);
+    }
+
+    public override World CreateCustomClientWorld(string worldName)
+    {
+        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Client);
+
+        BootstrapTools.InjectSystems(ClientSystems, world, world.simulationSystemGroup, ClientGroupRemap);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+        world.presentationSystemGroup.SortSystems();
+
+        return world;
+    }
+
+    public override World CreateCustomServerWorld(string worldName)
+    {
+        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Server);
+
+        BootstrapTools.InjectSystems(ServerSystems, world, world.simulationSystemGroup, ServerGroupRemap);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+
+        return world;
+    }
+}

@@ -1,5 +1,6 @@
 {
     "name": "Latios.Psyshock",
+    "rootNamespace": "Latios.Psyshock",
     "references": [
         "Latios.Core",
         "Unity.Entities",

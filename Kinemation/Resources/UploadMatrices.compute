@@ -1,0 +1,28 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UploadMatrices
+
+uniform StructuredBuffer<float3x4> _src;
+uniform RWStructuredBuffer<float3x4> _dst;
+
+uniform ByteAddressBuffer _meta;
+
+uint _startOffset;
+
+[numthreads(64, 1, 1)]
+void UploadMatrices(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+{
+    uint3 m = _meta.Load3((groupIds.x + _startOffset) * 12);
+
+    uint srcBase = m.x;
+    uint dstBase = m.y;
+    uint elementCount = m.z;
+
+    uint i = 0;
+    for (i = 0; i + 64 < elementCount; i += 64)
+    {
+        _dst[dstBase + i + threadId] = _src[srcBase + i + threadId];
+    }
+
+    if (i + threadId < elementCount)
+        _dst[dstBase + i + threadId] = _src[srcBase + i + threadId];
+}

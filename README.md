@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.4.5]
+# Latios Framework Packages for DOTS – [0.5.0]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -10,7 +10,7 @@ may be seen as derivative works.
 The current version targets DOTS 0.50. If you are still using Entities 0.17,
 please use the framework version 0.4.4 instead.
 
-*[0.3.x] users, please read the* [*Upgrade
+*[0.4.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
@@ -24,8 +24,8 @@ survey**](https://docs.google.com/forms/d/e/1FAIpQLScgqi7IxpxdPDrAvv_Vif7lf-Ejbo
     and Physics building blocks using an alternate runtime representation
 -   [Myri Audio](Documentation~/Myri%20Audio/README.md) – Simple, scalable,
     spatialized sounds and music streaming
--   Kinemation – Authored animation, simulated animation, and everything in
-    between (No public release)
+-   [Kinemation](Documentation~/Kinemation%20Animation%20and%20Rendering/README.md)
+    – Authored animation, simulated animation, and everything in between
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
     throughput (No public release)
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public

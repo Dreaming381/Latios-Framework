@@ -240,6 +240,147 @@ namespace Latios.Psyshock
 
         // Mostly from Unity.Physics but handles more edge cases
         // Todo: Reduce branches
+        public static bool RaycastTriangle(Ray ray, simdFloat3 triPoints, out float fraction, out float3 outNormal)
+        {
+            simdFloat3 abbcca = triPoints.bcaa - triPoints;
+            float3     ab     = abbcca.a;
+            float3     ca     = triPoints.a - triPoints.c;
+            float3     normal = math.cross(ab, ca);
+            float3     aStart = ray.start - triPoints.a;
+            float3     aEnd   = ray.end - triPoints.a;
+
+            float nDotAStart    = math.dot(normal, aStart);
+            float nDotAEnd      = math.dot(normal, aEnd);
+            float productOfDots = nDotAStart * nDotAEnd;
+
+            if (productOfDots < 0f)
+            {
+                // The start and end are on opposite sides of the infinite plane.
+                fraction = nDotAStart / (nDotAStart - nDotAEnd);
+
+                // These edge normals are relative to the ray, not the plane normal.
+                simdFloat3 edgeNormals = simd.cross(abbcca, ray.displacement);
+
+                // This is the midpoint of the segment to the start point, avoiding the divide by two.
+                float3     doubleStart = ray.start + ray.start;
+                simdFloat3 r           = doubleStart - (triPoints + triPoints.bcaa);
+                float3     dots        = simd.dot(r, edgeNormals).xyz;
+                outNormal              = math.select(normal, -normal, nDotAStart >= 0f);
+                return math.all(dots <= 0f) || math.all(dots >= 0f);
+            }
+            else if (nDotAStart == 0f && nDotAEnd == 0f)
+            {
+                // The start and end are both on the infinite plane or the tri is degenerate.
+
+                // Check for the degenerate case
+                if (math.all(normal == 0f))
+                {
+                    normal = math.cross(triPoints.a - ray.start, ab);
+                    if (math.dot(normal, ray.displacement) != 0f)
+                    {
+                        fraction  = 2f;
+                        outNormal = default;
+                        return false;
+                    }
+                }
+
+                // Make sure the start isn't on the tri.
+                simdFloat3 edgeNormals = simd.cross(abbcca, normal);
+                float3     doubleStart = ray.start + ray.start;
+                simdFloat3 r           = doubleStart - (triPoints + triPoints.bcaa);
+                float3     dots        = simd.dot(r, edgeNormals).xyz;
+                if (math.all(dots <= 0f) || math.all(dots >= 0f))
+                {
+                    fraction  = 2f;
+                    outNormal = default;
+                    return false;
+                }
+
+                // Todo: This is a rare case, so we are going to do something crazy to avoid trying to solve
+                // line intersections in 3D space.
+                // Instead, inflate the plane along the normal and raycast against the planes
+                // In the case that the ray passes through one of the plane edges, this recursion will reach
+                // three levels deep, and then a full plane will be constructed against the ray.
+                var    negPoints = triPoints - normal;
+                var    posPoints = triPoints + normal;
+                var    quadA     = new simdFloat3(negPoints.a, posPoints.a, posPoints.b, negPoints.b);
+                var    quadB     = new simdFloat3(negPoints.b, posPoints.b, posPoints.c, negPoints.c);
+                var    quadC     = new simdFloat3(negPoints.c, posPoints.c, posPoints.a, negPoints.a);
+                bool3  hits      = default;
+                float3 fractions = default;
+                hits.x           = RaycastQuad(ray, quadA, out fractions.x);
+                hits.y           = RaycastQuad(ray, quadB, out fractions.y);
+                hits.z           = RaycastQuad(ray, quadC, out fractions.z);
+                fractions        = math.select(2f, fractions, hits);
+                fraction         = math.cmin(fractions);
+
+                float3 bestEdge = abbcca[math.min(2, math.csum(math.select(0, new int3(0, 1, 2), fraction == fractions)))];
+                outNormal       = math.cross(bestEdge, normal);
+                outNormal       = math.select(outNormal, -outNormal, math.dot(outNormal, ray.displacement) >= 0f);
+
+                return math.any(hits);
+            }
+            else if (nDotAStart == 0f)
+            {
+                // The start of the ray is on the infinite plane
+                // And since we ignore inside hits, we ignore this too.
+                fraction  = 2f;
+                outNormal = default;
+                return false;
+            }
+            else if (nDotAEnd == 0f)
+            {
+                // The end of the ray is on the infinite plane
+                fraction               = 1f;
+                simdFloat3 edgeNormals = simd.cross(abbcca, normal);
+                float3     doubleEnd   = ray.end + ray.end;
+                simdFloat3 r           = doubleEnd - (triPoints + triPoints.bcda);
+                float3     dots        = simd.dot(r, edgeNormals).xyz;
+                outNormal              = math.select(normal, -normal, nDotAStart >= 0f);
+                return math.all(dots <= 0f) || math.all(dots >= 0f);
+            }
+            else
+            {
+                fraction  = 2f;
+                outNormal = default;
+                return false;
+            }
+        }
+
+        public static bool RaycastRoundedTriangle(Ray ray, simdFloat3 triPoints, float radius, out float fraction, out float3 normal)
+        {
+            // Make sure the ray doesn't start inside.
+            if (PointTriangleDistance(ray.start, new TriangleCollider(triPoints.a, triPoints.b, triPoints.c), radius, out _))
+            {
+                fraction = 2f;
+                normal   = default;
+                return false;
+            }
+
+            float3 ab        = triPoints.b - triPoints.a;
+            float3 ca        = triPoints.a - triPoints.c;
+            float3 triNormal = math.cross(ab, ca);
+            triNormal        = math.select(triNormal, -triNormal, math.dot(triNormal, ray.displacement) > 0f);
+
+            // Catch degenerate tri here
+            bool  triFaceHit  = math.any(triNormal);
+            float triFraction = 2f;
+            if (triFaceHit)
+                triFaceHit           = RaycastTriangle(ray, triPoints + math.normalize(triNormal) * radius, out triFraction, out _);
+            triFraction              = math.select(2f, triFraction, triFaceHit);
+            bool4 capsuleHits        = Raycast4Capsules(ray, triPoints, triPoints.bcaa, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
+            capsuleFractions         = math.select(2f, capsuleFractions, capsuleHits);
+            simdFloat3 bestNormals   = simd.select(capsuleNormals, capsuleNormals.bacc, capsuleFractions.yxzz < capsuleFractions);
+            float4     bestFractions = math.select(capsuleFractions, capsuleFractions.yxzz, capsuleFractions.yxzz < capsuleFractions);
+            normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
+            fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
+            normal                   = math.select(normal, triNormal, triFraction < fraction);
+            fraction                 = math.select(fraction, triFraction, triFraction < fraction);
+            return fraction <= 1f;
+        }
+
+        // Mostly from Unity.Physics but handles more edge cases
+        // Todo: Reduce branches
         public static bool RaycastQuad(Ray ray, simdFloat3 quadPoints, out float fraction)
         {
             simdFloat3 abbccdda = quadPoints.bcda - quadPoints;
@@ -341,7 +482,7 @@ namespace Latios.Psyshock
         public static bool RaycastRoundedQuad(Ray ray, simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
         {
             // Make sure the ray doesn't start inside.
-            if (SpatialInternal.PointQuadDistance(ray.start, quadPoints, radius, out _))
+            if (PointQuadDistance(ray.start, quadPoints, radius, out _))
             {
                 fraction = 2f;
                 normal   = default;
@@ -370,38 +511,278 @@ namespace Latios.Psyshock
             return fraction <= 1f;
         }
 
-        public static bool RaycastRoundedQuadDebug(Ray ray, simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
+        public static bool RaycastConvex(Ray ray, ConvexCollider convex, out float fraction, out float3 normal)
         {
-            // Make sure the ray doesn't start inside.
-            if (SpatialInternal.PointQuadDistance(ray.start, quadPoints, radius, out _))
+            ref var blob       = ref convex.convexColliderBlob.Value;
+            var     scaledAabb = new Aabb(blob.localAabb.min * convex.scale, blob.localAabb.max * convex.scale);
+
+            if (!RaycastAabb(ray, scaledAabb, out float aabbFraction))
             {
-                fraction = 2f;
-                normal   = default;
-                return false;
+                if (!math.all(ray.start >= scaledAabb.min & ray.end <= scaledAabb.max))
+                {
+                    fraction = 2f;
+                    normal   = default;
+                    return false;
+                }
             }
 
-            float3 ab         = quadPoints.b - quadPoints.a;
-            float3 ca         = quadPoints.a - quadPoints.c;
-            float3 quadNormal = math.cross(ab, ca);
-            quadNormal        = math.select(quadNormal, -quadNormal, math.dot(quadNormal, ray.displacement) > 0f);
+            float3 invScale   = math.rcp(convex.scale);
+            var    dimensions = math.countbits(math.bitmask(new bool4(math.isfinite(invScale), false)));
 
-            // Catch degenerate quad here
-            bool  quadFaceHit  = math.any(quadNormal);
-            float quadFraction = 2f;
-            if (quadFaceHit)
-                quadFaceHit = RaycastQuad(ray, quadPoints + math.normalize(quadNormal) * radius, out quadFraction);
-            UnityEngine.Debug.Log($"quadFaceHit: {quadFaceHit}, quadFraction: {quadFraction}");
-            quadFraction      = math.select(2f, quadFraction, quadFaceHit);
-            bool4 capsuleHits = Raycast4Capsules(ray, quadPoints, quadPoints.bcda, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
-            capsuleFractions  = math.select(2f, capsuleFractions, capsuleHits);
-            UnityEngine.Debug.Log($"capsuleHits: {capsuleHits}, capsuleFractions: {capsuleFractions}");
-            simdFloat3 bestNormals   = simd.select(capsuleNormals, capsuleNormals.badc, capsuleFractions.yxwz < capsuleFractions);
-            float4     bestFractions = math.select(capsuleFractions, capsuleFractions.yxwz, capsuleFractions.yxwz < capsuleFractions);
-            normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
-            fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
-            normal                   = math.select(normal, quadNormal, quadFraction < fraction);
-            fraction                 = math.select(fraction, quadFraction, quadFraction < fraction);
-            return fraction <= 1f;
+            if (dimensions == 3)
+            {
+                fraction           = -2f;
+                float exitFraction = 2f;
+                int   bestIndex    = 0;
+                bool  inside       = true;
+                var   scaledRay    = new Ray(ray.start * invScale, ray.end * invScale);
+
+                for (int i = 0; i < blob.facePlaneX.Length; i++)
+                {
+                    // These are signed distances to the plane from start/end points respectively
+                    float startDot = scaledRay.start.x * blob.facePlaneX[i] + scaledRay.start.y * blob.facePlaneY[i] + scaledRay.start.z * blob.facePlaneZ[i] +
+                                     blob.facePlaneDist[i];
+                    float endDot = scaledRay.end.x * blob.facePlaneX[i] + scaledRay.end.y * blob.facePlaneY[i] + scaledRay.end.z * blob.facePlaneZ[i] + blob.facePlaneDist[i];
+
+                    // If the ray is completely outside the plane or starts on the plane and moves away, then it misses.
+                    if (startDot >= 0f && endDot >= 0f)
+                    {
+                        // If the ray is coplaner, just skip
+                        if (startDot == 0f && endDot == 0f)
+                            continue;
+
+                        normal   = default;
+                        fraction = 2f;
+                        return false;
+                    }
+
+                    // This is the distance of the ray start to the plane divided by the length of the ray projected onto the plane's normal.
+                    float newFraction = startDot / (startDot - endDot);
+
+                    if (newFraction > fraction && startDot > 0f)
+                    {
+                        fraction  = newFraction;
+                        bestIndex = i;
+                    }
+                    else if (newFraction < exitFraction && endDot > 0f)
+                    {
+                        exitFraction = newFraction;
+                    }
+                    inside &= startDot < 0f;
+                }
+                if (inside || exitFraction < fraction)
+                {
+                    normal   = default;
+                    fraction = 2f;
+                    return false;
+                }
+
+                normal = new float3(blob.facePlaneX[bestIndex], blob.facePlaneY[bestIndex], blob.facePlaneZ[bestIndex]);
+                return true;
+            }
+            else if (dimensions == 0)
+            {
+                SphereCollider sphere = new SphereCollider(0f, 0f);
+                return RaycastSphere(ray, sphere, out fraction, out normal);
+            }
+            else if (dimensions == 1)
+            {
+                CapsuleCollider capsule = new CapsuleCollider(scaledAabb.min, scaledAabb.max, 0f);
+                return RaycastCapsule(ray, capsule, out fraction, out normal);
+            }
+            else if (dimensions == 2)
+            {
+                // From the AABB check we know the ray crosses the plane. So now we just need to figure out if the ray hits
+                // the geometry.
+                var hitPoint = ray.start + ray.displacement * aabbFraction;
+
+                var mask      = math.select(1f, 0f, math.isfinite(invScale));
+                var diff      = blob.localAabb.max - blob.localAabb.min;
+                diff         *= mask;
+                var rayStart  = hitPoint - diff + blob.localAabb.min * mask;
+
+                var inflateRay      = new Ray(rayStart, rayStart + diff * 3f);
+                var inflateConvex   = convex;
+                inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
+                if (RaycastConvex(inflateRay, inflateConvex, out _, out _))
+                {
+                    fraction = aabbFraction;
+                    normal   = math.normalize(mask * ray.displacement);
+                    return true;
+                }
+            }
+            fraction = 2f;
+            normal   = default;
+            return false;
+        }
+
+        // Scale is applied before radius
+        public static bool RaycastRoundedConvex(Ray ray, ConvexCollider convex, float radius, out float fraction)
+        {
+            ref var blob       = ref convex.convexColliderBlob.Value;
+            var     scale      = convex.scale;
+            var     scaledAabb = new Aabb(blob.localAabb.min * scale - radius, blob.localAabb.max * scale + radius);
+
+            if (!RaycastAabb(ray, scaledAabb, out _))
+            {
+                if (!math.all(ray.start >= scaledAabb.min & ray.end <= scaledAabb.max))
+                {
+                    fraction = 2f;
+                    return false;
+                }
+            }
+
+            float3 invScale   = math.rcp(scale);
+            var    dimensions = math.countbits(math.bitmask(new bool4(math.isfinite(invScale), false)));
+
+            if (dimensions == 3)
+            {
+                fraction           = -2f;
+                float exitFraction = 2f;
+                int   bestIndex    = 0;
+                bool  inside       = true;
+                var   scaledRay    = new Ray(ray.start * invScale, ray.end * invScale);
+
+                for (int i = 0; i < blob.facePlaneX.Length; i++)
+                {
+                    float startDot = scaledRay.start.x * blob.facePlaneX[i] + scaledRay.start.y * blob.facePlaneY[i] + scaledRay.start.z * blob.facePlaneZ[i] +
+                                     blob.facePlaneDist[i] - radius;
+                    float endDot = scaledRay.end.x * blob.facePlaneX[i] + scaledRay.end.y * blob.facePlaneY[i] + scaledRay.end.z * blob.facePlaneZ[i] + blob.facePlaneDist[i] -
+                                   radius;
+                    // If the ray is completely outside the plane or starts on the plane and moves away, then it misses.
+                    if (startDot >= 0f && endDot >= 0f)
+                    {
+                        // If the ray is coplaner, just skip
+                        if (startDot == 0f && endDot == 0f)
+                            continue;
+
+                        fraction = 2f;
+                        return false;
+                    }
+
+                    // This is the distance of the ray start to the plane divided by the length of the ray projected onto the plane's normal.
+                    float newFraction = startDot / (startDot - endDot);
+
+                    if (newFraction > fraction && startDot > 0f)
+                    {
+                        fraction  = newFraction;
+                        bestIndex = i;
+                    }
+                    else if (newFraction < exitFraction && endDot > 0f)
+                    {
+                        exitFraction = newFraction;
+                    }
+                    inside &= startDot < 0f;
+                }
+
+                if (inside || exitFraction < fraction)
+                {
+                    fraction = 2f;
+                    return false;
+                }
+
+                // We know the inflated hit face, but we don't know if it hit the rounded part or not yet.
+                float3 scaledPoint = scaledRay.start + scaledRay.displacement * fraction;
+                var    edgeRange   = blob.edgeIndicesInFacesStartsAndCounts[bestIndex];
+                bool   hitEdge     = false;
+                bool   nearsEdge   = false;
+                for (int i = 0; i < edgeRange.y; i++)
+                {
+                    float dot = math.dot(scaledPoint.xyz1(), blob.faceEdgeOutwardPlanes[i + edgeRange.x]);
+                    if (dot > 0f)
+                    {
+                        nearsEdge   = true;
+                        var indices = blob.vertexIndicesInEdges[blob.edgeIndicesInFaces[i + edgeRange.x]];
+                        var cap     = new CapsuleCollider(new float3(blob.verticesX[indices.x], blob.verticesY[indices.x], blob.verticesZ[indices.x]),
+                                                          new float3(blob.verticesX[indices.y], blob.verticesY[indices.y], blob.verticesZ[indices.y]), radius);
+                        if (RaycastCapsule(scaledRay, cap, out float newFraction, out _))
+                        {
+                            if (!hitEdge)
+                            {
+                                fraction = newFraction;
+                                hitEdge  = true;
+                            }
+                            fraction = math.min(fraction, newFraction);
+                        }
+                    }
+                }
+
+                return nearsEdge == hitEdge;
+            }
+            else if (dimensions == 0)
+            {
+                SphereCollider sphere = new SphereCollider(0f, radius);
+                return RaycastSphere(ray, sphere, out fraction, out _);
+            }
+            else if (dimensions == 1)
+            {
+                CapsuleCollider capsule = new CapsuleCollider(scaledAabb.min + radius, scaledAabb.max - radius, 0f);
+                return RaycastCapsule(ray, capsule, out fraction, out _);
+            }
+            else if (dimensions == 2)
+            {
+                // We need to identify if the ray hits one of the planar surfaces.
+                var   mask     = math.select(1f, 0f, math.isfinite(invScale));
+                float maxStart = math.dot(ray.start.xyz1(), new float4(mask, -radius));
+                float maxEnd   = math.dot(ray.end.xyz1(), new float4(mask, -radius));
+                float minStart = math.dot(ray.start.xyz1(), new float4(-mask, radius));
+                float minEnd   = math.dot(ray.end.xyz1(), new float4(-mask, radius));
+                if (maxStart > 0f && maxEnd <= 0f)
+                {
+                    // We might have a planar hit on the max side of the AABB, so find the plane hit and raycast the original object.
+                    float  planarFraction = maxStart / (maxStart - maxEnd);
+                    float3 hitPoint       = ray.start + ray.displacement * planarFraction;
+
+                    var diff      = blob.localAabb.max - blob.localAabb.min + 2f * radius;
+                    diff         *= mask;
+                    var rayStart  = hitPoint - diff + blob.localAabb.min * mask;
+
+                    var inflateRay      = new Ray(rayStart, rayStart + diff * 3f);
+                    var inflateConvex   = convex;
+                    inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
+                    if (RaycastConvex(inflateRay, inflateConvex, out _, out _))
+                    {
+                        fraction = planarFraction;
+                        return true;
+                    }
+                }
+                else if (minStart > 0f && minEnd <= 0f)
+                {
+                    // We might have a planar hit on the max side of the AABB, so find the plane hit and raycast the original object.
+                    float  planarFraction = minStart / (minStart - minEnd);
+                    float3 hitPoint       = ray.start + ray.displacement * planarFraction;
+
+                    var diff      = blob.localAabb.max - blob.localAabb.min + 2f * radius;
+                    diff         *= mask;
+                    var rayStart  = hitPoint - diff + blob.localAabb.min * mask;
+
+                    var inflateRay      = new Ray(rayStart, rayStart + diff * 3f);
+                    var inflateConvex   = convex;
+                    inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
+                    if (RaycastConvex(inflateRay, inflateConvex, out _, out _))
+                    {
+                        fraction = planarFraction;
+                        return true;
+                    }
+                }
+
+                fraction = 2f;
+                bool hit = false;
+                for (int i = 0; i < blob.vertexIndicesInEdges.Length; i++)
+                {
+                    var indices = blob.vertexIndicesInEdges[i];
+                    var cap     = new CapsuleCollider(new float3(blob.verticesX[indices.x], blob.verticesY[indices.x], blob.verticesZ[indices.x]) * scale,
+                                                      new float3(blob.verticesX[indices.y], blob.verticesY[indices.y], blob.verticesZ[indices.y]) * scale, radius);
+                    if (RaycastCapsule(ray, cap, out float newFraction, out _))
+                    {
+                        hit      = true;
+                        fraction = math.min(fraction, newFraction);
+                    }
+                }
+                return hit;
+            }
+            fraction = 2f;
+            return false;
         }
     }
 }

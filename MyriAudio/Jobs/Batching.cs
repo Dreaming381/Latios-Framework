@@ -44,7 +44,10 @@ namespace Latios.Myri
                         int2 listenerEmitterPairIndices = listenerEmitterPairs.Read<int2>();
                         var  pairWeight                 = pairWeights.Read<Weights>();
 
-                        var               e   = emitters[listenerEmitterPairIndices.y];
+                        var e = emitters[listenerEmitterPairIndices.y];
+                        if (!e.source.clip.IsCreated)
+                            continue;
+
                         ClipFrameListener cfl = new ClipFrameListener
                         {
                             lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_spawnedAudioFrame },
@@ -101,7 +104,9 @@ namespace Latios.Myri
                         int2 listenerEmitterPairIndices = listenerEmitterPairs.Read<int2>();
                         var  pairWeight                 = pairWeights.Read<Weights>();
 
-                        var               e   = emitters[listenerEmitterPairIndices.y];
+                        var e = emitters[listenerEmitterPairIndices.y];
+                        if (!e.source.clip.IsCreated)
+                            continue;
                         ClipFrameListener cfl = new ClipFrameListener
                         {
                             lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_loopOffset },

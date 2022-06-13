@@ -2,45 +2,48 @@
 using System.Text;
 using Unity.Collections;
 
-public static class StringBuilderExtensions
+namespace Latios
 {
-    public static void Append(this StringBuilder builder, FixedString32Bytes fixedString)
+    public static class StringBuilderExtensions
     {
-        foreach (var c in fixedString)
+        public static void Append(this StringBuilder builder, in FixedString32Bytes fixedString)
         {
-            builder.Append((char)c.value);
+            foreach (var c in fixedString)
+            {
+                builder.Append((char)c.value);
+            }
         }
-    }
 
-    public static void Append(this StringBuilder builder, FixedString64Bytes fixedString)
-    {
-        foreach (var c in fixedString)
+        public static void Append(this StringBuilder builder, in FixedString64Bytes fixedString)
         {
-            builder.Append((char)c.value);
+            foreach (var c in fixedString)
+            {
+                builder.Append((char)c.value);
+            }
         }
-    }
 
-    public static void Append(this StringBuilder builder, FixedString128Bytes fixedString)
-    {
-        foreach (var c in fixedString)
+        public static void Append(this StringBuilder builder, in FixedString128Bytes fixedString)
         {
-            builder.Append((char)c.value);
+            foreach (var c in fixedString)
+            {
+                builder.Append((char)c.value);
+            }
         }
-    }
 
-    public static void Append(this StringBuilder builder, FixedString512Bytes fixedString)
-    {
-        foreach (var c in fixedString)
+        public static void Append(this StringBuilder builder, in FixedString512Bytes fixedString)
         {
-            builder.Append((char)c.value);
+            foreach (var c in fixedString)
+            {
+                builder.Append((char)c.value);
+            }
         }
-    }
 
-    public static void Append(this StringBuilder builder, FixedString4096Bytes fixedString)
-    {
-        foreach (var c in fixedString)
+        public static void Append(this StringBuilder builder, in FixedString4096Bytes fixedString)
         {
-            builder.Append((char)c.value);
+            foreach (var c in fixedString)
+            {
+                builder.Append((char)c.value);
+            }
         }
     }
 }

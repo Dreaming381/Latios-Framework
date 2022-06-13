@@ -25,14 +25,14 @@ namespace Latios.Myri
         /// <summary>
         /// The profile which specifies volume and frequency-based filtering spatialization.
         /// </summary>
-        public BlobAssetReference<IldProfileBlob> ildProfile;
+        public BlobAssetReference<ListenerProfileBlob> ildProfile;
     }
 
     /// <summary>
     /// A volume and frequency-based filtering spatialization profile.
     /// A custom variant can be constructed by overriding AudioIldProfileBuilder.
     /// </summary>
-    public struct IldProfileBlob
+    public struct ListenerProfileBlob
     {
         internal BlobArray<FrequencyFilter> filtersLeft;
         internal BlobArray<int>             channelIndicesLeft;

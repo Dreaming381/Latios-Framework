@@ -22,3 +22,13 @@ repository associated with *Game Physics Engine Development – 2nd Edition*. So
 far it has been a great book and I am using it as a guide for implementing
 simulation logic in Psyshock, since I am not as strong in that area compared to
 spatial algorithms.
+
+Component Name: ACL
+
+License Type: MIT
+
+<https://github.com/nfrechette/acl/blob/v2.0.4/LICENSE>
+
+Notes: This library is distributed in this package in binary form. However, the
+source code for the wrapper can be found here:
+<https://github.com/Dreaming381/AclUnity>

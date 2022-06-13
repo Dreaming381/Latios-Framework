@@ -10,12 +10,21 @@ using Latios.Systems;
 
 namespace Latios
 {
+    /// <summary>
+    /// A specialized runtime World which contains Latios Framework core functionality.
+    /// </summary>
     public class LatiosWorld : World
     {
+        /// <summary>
+        /// The worldBlackboardEntity associated with this world
+        /// </summary>
         public BlackboardEntity worldBlackboardEntity { get; private set; }
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         private BlackboardEntity m_sceneBlackboardEntity;
         private bool m_sceneBlackboardSafetyOverride;
+        /// <summary>
+        /// The current sceneBlackboardEntity associated with this world
+        /// </summary>
         public BlackboardEntity sceneBlackboardEntity
         {
             get
@@ -32,7 +41,10 @@ namespace Latios
 #else
         public BlackboardEntity sceneBlackboardEntity { get; private set; }
 #endif
-
+        /// <summary>
+        /// The main syncPoint system from which to get command buffers.
+        /// Command buffers retrieved from this property will have dependencies managed automatically
+        /// </summary>
         public SyncPointPlaybackSystem syncPoint
         {
             get
@@ -42,10 +54,23 @@ namespace Latios
             }
             set => m_syncPointPlaybackSystem = value;
         }
-        public LatiosInitializationSystemGroup initializationSystemGroup => m_initializationSystemGroup;
-        public LatiosSimulationSystemGroup simulationSystemGroup => m_simulationSystemGroup;
-        public LatiosPresentationSystemGroup presentationSystemGroup => m_presentationSystemGroup;
+        /// <summary>
+        /// The InitializationSystemGroup of this world for convenience
+        /// </summary>
+        public InitializationSystemGroup initializationSystemGroup => m_initializationSystemGroup;
+        /// <summary>
+        /// The SimulationSystemGroup of this world for convenience
+        /// </summary>
+        public SimulationSystemGroup simulationSystemGroup => m_simulationSystemGroup;
+        /// <summary>
+        /// The PresentationsystemGroup of this world for convenience. It is null for NetCode server worlds.
+        /// </summary>
+        public PresentationSystemGroup presentationSystemGroup => m_presentationSystemGroup;
 
+        /// <summary>
+        /// Specifies the default system ordering behavior for any newly created SuperSystems.
+        /// If true, automatic system ordering will by default be disabled for those SuperSystems.
+        /// </summary>
         public bool useExplicitSystemOrdering = false;
 
         internal ManagedStructComponentStorage ManagedStructStorage { get { return m_componentStorage; } }
@@ -61,17 +86,32 @@ namespace Latios
         private CollectionComponentStorage         m_collectionsStorage = new CollectionComponentStorage();
         private UnmanagedExtraInterfacesDispatcher m_interfacesDispatcher;
 
-        private LatiosInitializationSystemGroup         m_initializationSystemGroup;
-        private LatiosSimulationSystemGroup             m_simulationSystemGroup;
-        private LatiosPresentationSystemGroup           m_presentationSystemGroup;
+        private InitializationSystemGroup               m_initializationSystemGroup;
+        private SimulationSystemGroup                   m_simulationSystemGroup;
+        private PresentationSystemGroup                 m_presentationSystemGroup;
         private SyncPointPlaybackSystem                 m_syncPointPlaybackSystem;
         private SystemHandle<BlackboardUnmanagedSystem> m_blackboardUnmanagedSystem;
 
         private bool m_paused          = false;
         private bool m_resumeNextFrame = false;
 
-        public LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation) : base(name, flags)
+        public enum WorldRole
         {
+            Default,
+            Client,
+            Server
+        }
+
+        /// <summary>
+        /// Creates a LatiosWorld
+        /// </summary>
+        /// <param name="name">The name of the world</param>
+        /// <param name="flags">Specifies world flags</param>
+        /// <param name="role">The role of the world. Leave at default unless this is a NetCode project.</param>
+        public LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation, WorldRole role = WorldRole.Default) : base(name, flags)
+        {
+            Authoring.ConversionBootstrapUtilities.RegisterConversionWorldAction();
+
             //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentTag<>),               typeof(IManagedComponent));
             BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentSystemStateTag<>),    typeof(IManagedComponent));
             //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
@@ -87,12 +127,40 @@ namespace Latios
             bus.Struct.worldBlackboardEntity = (Entity)worldBlackboardEntity;
             bus.Struct.sceneBlackboardEntity = default;
 
-            useExplicitSystemOrdering   = true;
-            m_initializationSystemGroup = GetOrCreateSystem<LatiosInitializationSystemGroup>();
-            m_simulationSystemGroup     = GetOrCreateSystem<LatiosSimulationSystemGroup>();
-            m_presentationSystemGroup   = GetOrCreateSystem<LatiosPresentationSystemGroup>();
-            m_syncPointPlaybackSystem   = GetExistingSystem<SyncPointPlaybackSystem>();
-            useExplicitSystemOrdering   = false;
+            if (role == WorldRole.Default)
+            {
+                m_initializationSystemGroup = GetOrCreateSystem<LatiosInitializationSystemGroup>();
+                m_simulationSystemGroup     = GetOrCreateSystem<LatiosSimulationSystemGroup>();
+                m_presentationSystemGroup   = GetOrCreateSystem<LatiosPresentationSystemGroup>();
+            }
+            else if (role == WorldRole.Client)
+            {
+#if NETCODE_PROJECT
+                m_initializationSystemGroup = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientInitializationSystemGroup>();
+                m_simulationSystemGroup     = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientSimulationSystemGroup>();
+                m_presentationSystemGroup   = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientPresentationSystemGroup>();
+#endif
+            }
+            else if (role == WorldRole.Server)
+            {
+#if NETCODE_PROJECT
+                m_initializationSystemGroup = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosServerInitializationSystemGroup>();
+                m_simulationSystemGroup     = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosServerSimulationSystemGroup>();
+#endif
+            }
+
+            m_syncPointPlaybackSystem = GetExistingSystem<SyncPointPlaybackSystem>();
+        }
+
+        /// <summary>
+        /// When the Scene Manager is not installed, call this function to destroy the old sceneBlackboardEntity,
+        /// create a new one, and call the OnNewScene() method for all systems which have it.
+        /// </summary>
+        /// <returns></returns>
+        public BlackboardEntity ForceCreateNewSceneBlackboardEntityAndCallOnNewScene()
+        {
+            CreateNewSceneBlackboardEntity(true);
+            return sceneBlackboardEntity;
         }
 
         //Todo: Make this API public in the future.
@@ -100,6 +168,7 @@ namespace Latios
         internal void ResumeNextFrame() => m_resumeNextFrame = true;
         internal bool paused => m_paused;
         internal bool willResumeNextFrame => m_resumeNextFrame;
+        internal bool autoGenerateSceneBlackboardEntity = true;
 
         internal void FrameStart()
         {
@@ -108,14 +177,27 @@ namespace Latios
                 m_paused          = false;
                 m_resumeNextFrame = false;
             }
+
+            if (autoGenerateSceneBlackboardEntity)
+            {
+                CreateNewSceneBlackboardEntity();
+                autoGenerateSceneBlackboardEntity = false;
+            }
         }
 
-        internal void CreateNewSceneBlackboardEntity()
+        internal void CreateNewSceneBlackboardEntity(bool forceRecreate = false)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             m_sceneBlackboardSafetyOverride = true;
 #endif
-            if (!EntityManager.Exists(sceneBlackboardEntity) || !sceneBlackboardEntity.HasComponent<SceneBlackboardTag>())
+            bool existsAndIsValid = EntityManager.Exists(sceneBlackboardEntity) && sceneBlackboardEntity.HasComponent<SceneBlackboardTag>();
+            if (forceRecreate && existsAndIsValid)
+            {
+                EntityManager.DestroyEntity(sceneBlackboardEntity);
+                existsAndIsValid = false;
+            }
+
+            if (!existsAndIsValid)
             {
                 sceneBlackboardEntity = new BlackboardEntity(EntityManager.CreateEntity(), EntityManager);
                 sceneBlackboardEntity.AddComponentData(new SceneBlackboardTag());
@@ -289,16 +371,26 @@ namespace Latios
 
 namespace Systems
 {
+    /// <summary>
+    /// The SimulationSystemGroup for a LatiosWorld created with WorldRole.Default
+    /// </summary>
+    [DisableAutoCreation, NoGroupInjection]
     public class LatiosSimulationSystemGroup : SimulationSystemGroup
     {
         SystemSortingTracker m_tracker;
+        internal bool        skipInDeferred = false;
 
         protected override void OnUpdate()
         {
-            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
+            if (!skipInDeferred)
+                SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
         }
     }
 
+    /// <summary>
+    /// The PresentationSystemGroup for a LatiosWorld created with WorldRole.Default
+    /// </summary>
+    [DisableAutoCreation, NoGroupInjection]
     public class LatiosPresentationSystemGroup : PresentationSystemGroup
     {
         SystemSortingTracker m_tracker;

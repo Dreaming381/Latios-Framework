@@ -1,5 +1,6 @@
 {
     "name": "Latios.Core",
+    "rootNamespace": "Latios",
     "references": [
         "Unity.Entities",
         "Unity.Jobs",
@@ -9,7 +10,10 @@
         "Unity.Collections",
         "Unity.Entities.Hybrid",
         "Unity.Burst",
-        "Unity.Scenes"
+        "Unity.Scenes",
+        "Unity.Build",
+        "Unity.NetCode",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -18,6 +22,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.netcode",
+            "expression": "0.49",
+            "define": "NETCODE_PROJECT"
+        }
+    ],
     "noEngineReferences": false
 }

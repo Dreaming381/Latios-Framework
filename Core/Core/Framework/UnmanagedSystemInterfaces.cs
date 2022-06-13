@@ -10,11 +10,17 @@ using Unity.Jobs;
 
 namespace Latios
 {
+    /// <summary>
+    /// Implement this interface to get a callback whenever a new sceneBlackboardEntity is created
+    /// </summary>
     public interface ISystemNewScene
     {
         public void OnNewScene(ref SystemState state);
     }
 
+    /// <summary>
+    /// Implement this interface to get a callback for determining if this system should run
+    /// </summary>
     public interface ISystemShouldUpdate
     {
         public bool ShouldUpdateSystem(ref SystemState state);

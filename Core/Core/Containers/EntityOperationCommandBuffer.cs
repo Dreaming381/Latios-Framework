@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;

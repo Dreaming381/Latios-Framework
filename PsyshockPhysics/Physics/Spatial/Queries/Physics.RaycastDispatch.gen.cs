@@ -13,37 +13,46 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    public static partial class Physics
-    {
-        public static bool Raycast(Ray ray, Collider collider, RigidTransform colliderTransform, out RaycastResult result)
-        {
-            switch (collider.type)
-            {
-                case ColliderType.Sphere:
-                {
-                    SphereCollider col = collider;
-                    return Raycast(ray, col, colliderTransform, out result);
-                }
-                case ColliderType.Capsule:
-                {
-                    CapsuleCollider col = collider;
-                    return Raycast(ray, col, colliderTransform, out result);
-                }
-                case ColliderType.Box:
-                {
-                    BoxCollider col = collider;
-                    return Raycast(ray, col, colliderTransform, out result);
-                }
-                case ColliderType.Compound:
-                {
-                    CompoundCollider col = collider;
-                    return Raycast(ray, col, colliderTransform, out result);
-                }
-                default:
-                    result = default;
-                    return false;
-            }
-        }
-    }
+	public static partial class Physics
+	{
+		public static bool Raycast(Ray ray, Collider collider, RigidTransform colliderTransform, out RaycastResult result)
+		{
+			switch (collider.type)
+			{
+				case ColliderType.Sphere: 
+				{
+					SphereCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				case ColliderType.Capsule: 
+				{
+					CapsuleCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				case ColliderType.Box: 
+				{
+					BoxCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				case ColliderType.Triangle: 
+				{
+					TriangleCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				case ColliderType.Convex: 
+				{
+					ConvexCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				case ColliderType.Compound: 
+				{
+					CompoundCollider col = collider;
+					return Raycast(ray, col, colliderTransform, out result);
+				}
+				default:
+					result = default;
+					return false;
+			}
+		}
+	}
 }
-

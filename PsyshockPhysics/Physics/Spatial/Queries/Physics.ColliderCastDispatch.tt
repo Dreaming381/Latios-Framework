@@ -28,8 +28,9 @@ namespace Latios.Psyshock
         "Sphere",
 		"Capsule",
 		"Box",
-		//"Triangle",
-		//"Quad",
+		"Triangle",
+		//"Quad", 
+		"Convex",
 		"Compound"
     };
 	
@@ -94,7 +95,7 @@ namespace Latios.Psyshock
 #>
 				case ColliderType.<#=type#>: 
 				{
-					<#=type#>Collider colA = colliderA;
+					<#=type#>Collider colA = colliderToCast;
 					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
 				}
 <#

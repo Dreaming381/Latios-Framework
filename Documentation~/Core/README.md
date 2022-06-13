@@ -19,6 +19,12 @@ class is here for!
 -   Build a `playerloop` with custom preset loops (like one with classical
     `FixedUpdate` or one with Rendering before Simulation)
 
+Also, there’s an `ICustomConversionBootstrap` interface which allows you to
+customize conversion worlds. Do you want Psyshock to convert colliders, or are
+you using Unity Physics exclusively? Should the Hybrid Renderer convert skinned
+meshes, or should Kinemation? It used to be a pain to implement these decisions.
+But now you have full control!
+
 See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 
 ### Explicit Top-Down Hierarchical System Ordering
@@ -41,14 +47,13 @@ See more: [Super Systems](Super%20Systems.md)
 
 Ever want to copy a component from one Entity to another using its
 `ComponentType`, perhaps obtained by comparing two entities’ archetypes? I did,
-so I wrote this. It currently uses cached evil reflection hacking magic to
-invade the ECS internals, but this will be converted into Burst-friendly
-mechanisms in the future.
+so I wrote this. It uses asmref internal access hacks to implement the features
+not possible by the public API (Shared Components).
 
 ### Conditional System Updates
 
-Unity does this thing where it tries to look at your EntityQueries and decide if
-your system should update or not. While it’s certainly cute that Unity cares
+Unity does this thing where it tries to look at your Entity Queries and decide
+if your system should update or not. While it’s certainly cute that Unity cares
 about performance, you as the programmer can make much better decisions. Turn
 off Unity’s logic with the `[AlwaysUpdateSystem]` attribute and turn on your own
 by overriding `ShouldUpdateSystem()` on a `SubSystem` (`SystemBase`) or
@@ -59,7 +64,8 @@ also want to further constrain the system to a specific scene or something. I do
 this a lot.
 
 You can also apply this logic to a `SuperSystem` (`ComponentSystemGroup`) to
-enable or disable an entire group of systems.
+enable or disable an entire group of systems. This can help improve main thread
+performance.
 
 See more: [Super Systems](Super%20Systems.md)
 
@@ -95,7 +101,9 @@ do cool stuff like instantiate a new settings override from a prefab.
 
 Regardless of whether you use the authoring tools, feel free to dump components
 onto these entities. The `SceneManagerSystem `and Myri’s `AudioSystem `use the
-`worldBlackboardEntity` to expose status and settings.
+`worldBlackboardEntity` to expose status and settings. And Kinemation uses it
+heavily for internal communication and for exposing camera culling parameters to
+the custom culling API.
 
 Blackboard entities can be accessed as properties of `LatiosWorld`, `SubSystem`,
 and `SuperSystem`, or via the `SystemState` extension methods.
@@ -130,6 +138,10 @@ having most scenes be almost exclusively `MonoBehaviour`s while a couple of
 scenes use ECS is totally a thing you can do, especially since you can check
 `CurrentScene` inside `ShouldUpdateSystem`. For all you out there trying to
 shoehorn ECS into your Mono game, shoehorn no more!
+
+*This feature is no longer enabled by default for any bootstrap except the
+DreamingBootstrap. It is also not compatible with NetCode and may require tweaks
+to work correctly with systems that rely on singletons, such as Unity Physics.*
 
 See more: [Scene Management](Scene%20Management.md)
 
@@ -310,11 +322,71 @@ to.
 These new types also come with some syntax sugar methods which may make some
 complex code a little more compact and readable.
 
+### Smart Blobbers
+
+Blob Asset Conversion is tough to get right, especially if you want to use the
+more scalable `BlobAssetComputationContext` and generate blobs in parallel. In
+addition, what if multiple authoring `MonoBehaviours` want access to these blobs
+to store in custom components? Do they build the blobs themselves and risk doing
+it wrong?
+
+Smart Blobbers solve this problem and make blob asset conversion painless, even
+for large projects with complex conversion dependencies. They provide a built-in
+mechanism for other authoring logic to request blobs to be converted. Those
+requests can later be resolved into real `BlobAssetReference<>` values. Smart
+Blobbers are strategically placed in the conversion pipeline to make this
+process easy and intuitive.
+
+If you need to define your own Blob Asset Conversion, you can subclass one of
+the two SmartBlobberConversionSystem types. The classes explicitly define their
+requirements through abstract functions and interface constraints. And all the
+pieces you are expected to interact with are thoroughly documented via XML
+documentation. You get fully parallel (and Bursted if using runtime conversion)
+blob asset generation without having to worry about Unity’s convoluted blob
+asset conversion APIs.
+
+See more: [Smart Blobbers](Smart%20Blobbers.md)
+
+### UnsafeParallelBlockList
+
+This container is really unsafe. It was originally only meant for internal
+purposes. But here it is on this page. Why?
+
+It is fast! Really fast!
+
+So fast that people were finding ways to use it anyways, whether that be copying
+the code or modifying the package. Now it is public API so people don’t have to
+do those workarounds anymore.
+
+Just be warned. It really truly is a gun eager to put a bullet through your
+foot.
+
+### Better Transforms
+
+While building Kinemation, I found a whole bunch of bugs and issues with Unity’s
+transform systems, specifically with how they handle the hierarchy and hierarchy
+updates. So I fixed them.
+
+Improved Transforms is superior in pretty much every way. It resolves bugs with
+Disabled components and prefabs. It has better and more deterministic change
+filtering. And it uses a lazier algorithm for fetching matrices which in the
+worst case still outperforms Unity’s solution by 4%. It is installed by default
+in most bootstraps.
+
+Extreme Transforms is designed for extreme amounts of entities. It uses a
+breadth-first chunk iteration technique for the first 16 depth levels which
+better leverages L2 and L3 and the hardware prefetchers. However, it has a
+sizeable main-thread penalty and struggles when the majority of entity
+hierarchies undergo a structural change each frame. If you have large worker
+thread times for updating the hierarchy transforms, try this out and see if it
+wins you back a few milliseconds.
+
+Both Improved and Extreme Transforms replace ParentSystem and run fully in
+Burst. This usually cuts the ParentSystem runtime in half during frames where
+hierarchies are instantiated.
+
 ## Known Issues
 
--   This package does not work with Project Tiny. There are a few issues I need
-    to address and I will likely expose a separate Tiny version of the
-    framework.
 -   There’s a limit to how many generic components you can add at runtime before
     everything explodes. If you want to expand that limit, write a T4 script to
     generate hundreds of non-generic `IComponentData` types. Your compiler will
@@ -327,9 +399,8 @@ complex code a little more compact and readable.
 -   `IManagedComponent` and `ICollectionComponent` do not save in subscenes.
 -   `InstantiateCommandBuffer` types do not return a remappable entity when
     creating a command.
--   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of the
-    `DisposeSentinel` hack that allows `EntityCommandBufferSystem` to use
-    `Allocator.TempJob`.
+-   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of
+    `World.UpdateAllocator`.
 -   Unmanaged systems do not support automatic dependency management features,
     due to them being unable to receive an external `NativeContainer` while in
     Burst.
@@ -339,22 +410,21 @@ complex code a little more compact and readable.
     components do not function correctly when used inside `OnStartRunning()` or
     `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
     exceptions occur inside these methods.
+-   Unity’s `ParentSystem` has a bug where the order of Child entities is
+    non-deterministic. The custom transform systems inherited this bug.
+-   Custom containers do not yet support custom allocators.
 
 ## Near-Term Roadmap
 
+-   Local Allocator
+    -   Custom allocator with a per-element of loop scope
 -   Automatic `ConverterVersion` bumping on code changes
--   Exposed `UnsafeParallelBlockList` and similar data structures
 -   Gameplay Toolkit
     -   Reduce cognitive overhead of DOTS for gameplay programmers
     -   Hierarchy navigation and modification
     -   A/B systems
 -   More custom command buffer types
 -   Codegen generic components
--   Optimized transform hierarchy types and systems
-    -   Static parents
-    -   Partially static hierarchies
-    -   Faster hierarchy updates
--   World configuration settings
 -   Improved collection components
     -   Default initialization interface
     -   Dependency backup/restore for `Entities.ForEach`
@@ -362,9 +432,7 @@ complex code a little more compact and readable.
     -   Conversion and serialization
 -   Profiling tools
     -   Port and cleanup from Lsss
--   Reflection-free refactor
-    -   For Tiny support
+-   Reflection-free improvements
 -   Job-friendly safe blob management
--   Blob conversion factory
 -   Custom Lambda Code-gen
     -   If I am feeling really, really brave…

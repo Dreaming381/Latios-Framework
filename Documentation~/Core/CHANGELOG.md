@@ -6,6 +6,66 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] – 2022-6-13
+
+Officially supports Entities [0.50.1]
+
+### Added
+
+-   *New Feature:* Added experimental NetCode support
+-   *New Feature:* Added Smart Blobbers which provide a significantly better
+    workflow for Blob Asset conversion
+-   *New Feature:* Added `ICustomConversionBootstrap` which allows modifying the
+    setup of a conversion world similar to `ICustomBootstrap`
+-   *New Feature:* Added Improved Transforms and Extreme Transforms which
+    provide faster and more bug-free transform system replacements while still
+    preserving the user API
+-   Added new bootstraps and templates
+-   Exposed `UnsafeParallelBlockList` which is a fast container that can be
+    written to in parallel
+-   Added `[NoGroupInjection]` attribute to prevent a system from being injected
+    in a default group
+-   Added `CoreBootstrap` which provides installers for Scene Management and the
+    new Transform systems
+-   Added chunk component options to Fluent queries
+-   Added Fluent method `WithDelegate()` which allows using a custom delegate in
+    a Fluent query rather than an extension method
+-   Added `LatiosWorld.ForceCreateNewSceneBlackboardEntityAndCallOnNewScene()`
+    which provides an alternative to use that functionality without Scene
+    Manager installed
+-   Added `LatiosMath.RotateExtents()` overload that uses a scalar `float` for
+    `extents`
+-   Added `BlobBuilderArray.ConstructFromNativeArray<T>()` overload which uses
+    raw pointer and length as arguments
+-   Added `GetLength()` extension for Blob Assets
+
+### Changed
+
+-   Scene Manager is no longer automatically created by
+    `LatiosInitializationSystemGroup` and instead has a dedicated installer
+-   All systems inject into the base `InitializationSystemGroup` instead of the
+    Latios-prefixed version
+-   The ordering of systems in `InitializationSystemGroup` relative to Unity
+    systems have been altered
+
+### Fixed
+
+-   Added missing `readOnly` argument to `BlackboardEntity.GetBuffer()`
+-   Removed GC allocations in `EntityManager` Collection Component and Managed
+    Struct Component implementations
+-   Fixed a bug where `SuperSystem` was consuming exceptions incorrectly and
+    hiding stack traces
+-   Added missing namespace to StringBuilderExtensions
+
+### Improved
+
+-   Added significantly more XML documentation
+-   `InstantiateCommandBuffer` can now have up to 15 tags added incrementally
+
+### Removed
+
+-   Removed `[BurstPatcher]` and `[IgnoreBurstPatcher]` attributes
+
 ## [0.4.5] – 2022-3-20
 
 Officially supports Entities [0.50.0]
