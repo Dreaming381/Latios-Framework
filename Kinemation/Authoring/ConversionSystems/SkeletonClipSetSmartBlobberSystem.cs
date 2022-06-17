@@ -190,10 +190,10 @@ namespace Latios.Kinemation.Authoring.Systems
 
             converter.clipsToConvert = new UnsafeList<SkeletonClipSetConverter.SkeletonClipConversionData>(input.clips.Length, allocator);
             converter.clipsToConvert.Resize(input.clips.Length);
-            int targetClip = 0;
-            foreach (var clip in input.clips)
+            for (var i = 0; i < input.clips.Length; i++)
             {
-                converter.clipsToConvert[targetClip] = new SkeletonClipSetConverter.SkeletonClipConversionData
+                var clip = input.clips[i];
+                converter.clipsToConvert[i] = new SkeletonClipSetConverter.SkeletonClipConversionData
                 {
                     clipName               = clip.clip.name,
                     sampleRate             = clip.clip.frameRate,
