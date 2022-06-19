@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] – 2022-6-19
+
+Officially supports Entities [0.50.1]
+
+### Changed
+
+-   Updated Core to v0.5.1
+-   Updated Kinemation to v0.5.1
+-   Updated the Getting Started guide for Kinemation to reflect improvements
+
 ## [0.5.0] – 2022-6-13
 
 Officially supports Entities [0.50.1]
@@ -17,9 +27,9 @@ Officially supports Entities [0.50.1]
 
 ### Changed
 
--   Updated Core to v0.4.5
--   Updated Psyshock to v0.4.5
--   Updated Myri to v0.4.5
+-   Updated Core to v0.5.0
+-   Updated Psyshock to v0.5.0
+-   Updated Myri to v0.5.0
 
 ## [0.4.5] – 2022-3-20
 

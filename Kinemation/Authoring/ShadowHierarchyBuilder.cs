@@ -8,7 +8,10 @@ namespace Latios.Kinemation.Authoring
     {
         public static GameObject BuildShadowHierarchy(GameObject source, bool sourceIsOptimized)
         {
-            var shadow = GameObject.Instantiate(source);
+            var shadow                     = GameObject.Instantiate(source);
+            shadow.transform.localPosition = Vector3.zero;
+            shadow.transform.localRotation = Quaternion.identity;
+            shadow.transform.localScale    = Vector3.one;
 
             Recurse(source.transform, shadow.transform);
 

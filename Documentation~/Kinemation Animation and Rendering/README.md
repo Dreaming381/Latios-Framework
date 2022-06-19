@@ -188,13 +188,10 @@ expressions to the extreme!
     for this in a future release which will be more extensible and customizable.
 -   Culling callbacks are slow on the main thread when there are lots of shadow
     passes. Those systems haven’t been optimized for the main thread yet.
--   `OptimizedSkeletonHierarchyBlob` is missing a mask that specifies if a bone
-    needs to calculate an inverse scale. Such a mask would support efficient
-    allocation-free handling of `ParentScaleInverse` in optimized skeletons.
 
 ## Near-Term Roadmap
 
--   Pose sampling
+-   Pose sampling into temporary buffers
     -   Significantly faster
     -   Requires local allocator
 -   Blend Shapes

@@ -61,6 +61,7 @@ namespace Latios.Systems
 
             [ReadOnly] public ComponentTypeHandle<Parent> ParentTypeHandle;
             [ReadOnly] public EntityTypeHandle            EntityTypeHandle;
+            [ReadOnly] public BufferFromEntity<Child>     ChildFromEntity;
             public uint                                   LastSystemVersion;
 
             public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
@@ -83,7 +84,7 @@ namespace Latios.Systems
                             ParentChildrenToAdd.Add(parentEntity, childEntity);
                             UniqueParents.TryAdd(parentEntity, 0);
 
-                            if (previousParentEntity != Entity.Null)
+                            if (ChildFromEntity.HasComponent(previousParentEntity))
                             {
                                 ParentChildrenToRemove.Add(previousParentEntity, childEntity);
                                 UniqueParents.TryAdd(previousParentEntity, 0);
@@ -147,43 +148,63 @@ namespace Latios.Systems
                 return -1;
             }
 
-            void RemoveChildrenFromParent(Entity parent, DynamicBuffer<Child> children)
+            void RemoveChildrenFromParent(Entity parent, DynamicBuffer<Child> children, NativeList<Entity> entityCache)
             {
                 if (ParentChildrenToRemove.TryGetFirstValue(parent, out var child, out var it))
                 {
+                    entityCache.Clear();
                     do
                     {
-                        var childIndex = FindChildIndex(children, child);
-                        children.RemoveAtSwapBack(childIndex);
+                        entityCache.Add(child);
                     }
                     while (ParentChildrenToRemove.TryGetNextValue(out child, ref it));
+
+                    entityCache.Sort();
+                    foreach (var entity in entityCache)
+                    {
+                        var childIndex = FindChildIndex(children, entity);
+                        children.RemoveAtSwapBack(childIndex);
+                    }
                 }
             }
 
-            void AddChildrenToParent(Entity parent, DynamicBuffer<Child> children)
+            void AddChildrenToParent(Entity parent, DynamicBuffer<Child> children, NativeList<Entity> entityCache)
             {
                 if (ParentChildrenToAdd.TryGetFirstValue(parent, out var child, out var it))
                 {
+                    entityCache.Clear();
                     do
                     {
-                        children.Add(new Child() {
-                            Value = child
-                        });
+                        entityCache.Add(child);
                     }
                     while (ParentChildrenToAdd.TryGetNextValue(out child, ref it));
+
+                    entityCache.Sort();
+                    foreach (var entity in entityCache)
+                    {
+                        children.Add(new Child() {
+                            Value = entity
+                        });
+                    }
                 }
             }
 
             public void Execute()
             {
-                var parents = UniqueParents.GetKeyArray(Allocator.Temp);
+                var parents     = UniqueParents.GetKeyArray(Allocator.Temp);
+                var entityCache = new NativeList<Entity>(128, Allocator.Temp);
                 for (int i = 0; i < parents.Length; i++)
                 {
-                    var parent   = parents[i];
-                    var children = ChildFromEntity[parent];
+                    var parent = parents[i];
+                    // Todo: Until the minimum Entities is 0.51, need to use two separate queries since
+                    // TryGetBuffer is broken.
+                    if (ChildFromEntity.HasComponent(parent))
+                    {
+                        var children = ChildFromEntity[parent];
 
-                    RemoveChildrenFromParent(parent, children);
-                    AddChildrenToParent(parent, children);
+                        RemoveChildrenFromParent(parent, children, entityCache);
+                        AddChildrenToParent(parent, children, entityCache);
+                    }
                 }
             }
         }
@@ -310,6 +331,7 @@ namespace Latios.Systems
                 ParentChildrenToRemove   = parentChildrenToRemove.AsParallelWriter(),
                 UniqueParents            = uniqueParents.AsParallelWriter(),
                 PreviousParentTypeHandle = state.GetComponentTypeHandle<PreviousParent>(false),
+                ChildFromEntity          = state.GetBufferFromEntity<Child>(),
                 ParentTypeHandle         = state.GetComponentTypeHandle<Parent>(true),
                 EntityTypeHandle         = state.GetEntityTypeHandle(),
                 LastSystemVersion        = state.LastSystemVersion

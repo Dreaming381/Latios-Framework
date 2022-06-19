@@ -128,7 +128,7 @@ namespace Latios.Kinemation.Authoring
 
 namespace Latios.Kinemation.Authoring.Systems
 {
-    [ConverterVersion("Latios", 1)]
+    [ConverterVersion("Latios", 2)]
     [DisableAutoCreation]
     public class SkeletonClipSetSmartBlobberSystem : SmartBlobberConversionSystem<SkeletonClipSetBlob, SkeletonClipSetBakeData, SkeletonClipSetConverter>
     {
@@ -200,6 +200,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     settings               = clip.settings,
                     sampledLocalTransforms = SampleClip(shadowHierarchy, clip.clip, allocator)
                 };
+                targetClip++;
             }
             shadowHierarchy.Dispose();
 
@@ -230,7 +231,9 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 for (int i = 0; i < bone.childCount; i++)
                 {
-                    m_breadthQueeue.Enqueue(bone.GetChild(i));
+                    var child = bone.GetChild(i);
+                    if (child.GetComponent<SkinnedMeshRenderer>() == null)
+                        m_breadthQueeue.Enqueue(bone.GetChild(i));
                 }
             }
 
@@ -413,10 +416,13 @@ namespace Latios.Kinemation.Authoring.Systems
                 var compressedClip = AclUnity.Compression.CompressSkeletonClip(parentIndices, qvvArray, clip.sampleRate, aclSettings);
 
                 // Step 5: Build blob clip
-                blobClips[targetClip]          = default;
-                blobClips[targetClip].name     = clip.clipName;
-                blobClips[targetClip].duration = math.rcp(clip.sampleRate) * (qvvArray.Length / parents.Length);
-                var compressedData             = builder.Allocate(ref blobClips[targetClip].compressedClipDataAligned16, compressedClip.compressedDataToCopyFrom.Length, 16);
+                blobClips[targetClip]            = default;
+                blobClips[targetClip].name       = clip.clipName;
+                blobClips[targetClip].duration   = math.rcp(clip.sampleRate) * (qvvArray.Length / parents.Length);
+                blobClips[targetClip].boneCount  = root.boneCount;
+                blobClips[targetClip].sampleRate = clip.sampleRate;
+
+                var compressedData = builder.Allocate(ref blobClips[targetClip].compressedClipDataAligned16, compressedClip.compressedDataToCopyFrom.Length, 16);
                 UnsafeUtility.MemCpy(compressedData.GetUnsafePtr(), compressedClip.compressedDataToCopyFrom.GetUnsafeReadOnlyPtr(), compressedClip.compressedDataToCopyFrom.Length);
 
                 // Step 6: Dispose ACL memory and safety

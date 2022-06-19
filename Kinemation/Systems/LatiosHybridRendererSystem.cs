@@ -753,6 +753,7 @@ namespace Latios.Kinemation.Systems
         private HeapAllocator m_GPUPersistentAllocator;
         private HeapBlock     m_SharedZeroAllocation;
         private HeapBlock     m_SharedAmbientProbeAllocation;
+        private HeapBlock     m_SharedSpecCubeDecodeAllocation;
 
         private HeapAllocator m_ChunkMetadataAllocator;
 
@@ -805,8 +806,12 @@ namespace Latios.Kinemation.Systems
 #endif
 
         NativeHashMap<EntityArchetype, SharedComponentOverridesInfo> m_ArchetypeSharedOverrideInfos;
-        private SHProperties                                         m_GlobalAmbientProbe;
-        private bool                                                 m_GlobalAmbientProbeDirty;
+
+        private SHProperties m_GlobalAmbientProbe;
+        private bool         m_GlobalAmbientProbeDirty;
+
+        private float4 m_GlobalSpecCubeDecode;
+        private bool   m_GlobalSpecCubeDecodeDirty;
 
         int                          m_cullIndexThisFrame             = 0;
         uint                         m_lastSystemVersionForProperties = 0;
@@ -1092,6 +1097,8 @@ namespace Latios.Kinemation.Systems
             }
 
             AlignWithShaderReflectionChanges();
+
+            UpdateSpecCubeHDRDecode(ReflectionProbe.defaultTextureHDRDecodeValues);
 
             Profiler.BeginSample("UpdateAllBatches");
             using (var hybridChunks =
@@ -1452,7 +1459,7 @@ namespace Latios.Kinemation.Systems
             // part would only need to wait for the metadata checking, not the memcpys.
             CompleteDependency();
 
-            BlitGlobalAmbientProbe();
+            BlitGlobalValues();
 
             StartUpdate();
 
@@ -2611,7 +2618,7 @@ namespace Latios.Kinemation.Systems
             return list;
         }
 
-        private void BlitGlobalAmbientProbe()
+        private void BlitGlobalValues()
         {
             if (m_GlobalAmbientProbeDirty)
             {
@@ -2619,13 +2626,39 @@ namespace Latios.Kinemation.Systems
                 BlitBytes(m_SharedAmbientProbeAllocation, &probe, UnsafeUtility.SizeOf<SHProperties>());
                 m_GlobalAmbientProbeDirty = false;
             }
+
+            if (m_GlobalSpecCubeDecodeDirty)
+            {
+                var decodeF4 = m_GlobalSpecCubeDecode;
+                BlitBytes(m_SharedSpecCubeDecodeAllocation, &decodeF4, UnsafeUtility.SizeOf<float4>());
+                m_GlobalSpecCubeDecodeDirty = false;
+            }
+        }
+
+        internal void UpdateSpecCubeHDRDecode(Vector4 specCubeHDRDecode)
+        {
+            if (!s_HybridRendererEnabled)
+                return;
+
+            float4 decodeF4             = specCubeHDRDecode;
+            m_GlobalSpecCubeDecodeDirty =
+                m_GlobalSpecCubeDecodeDirty ||
+                math.any(decodeF4 != m_GlobalSpecCubeDecode);
+
+#if DEBUG_LOG_SPECULAR_DECODE
+            if (m_GlobalSpecCubeDecodeDirty)
+            {
+                Debug.Log($"Global specular probe decode: {decodeF4}");
+            }
+#endif
+            m_GlobalSpecCubeDecode = decodeF4;
         }
 
         private void UpdateGlobalAmbientProbe(SHProperties globalAmbientProbe)
         {
             if (!s_HybridRendererEnabled)
                 return;
-            m_GlobalAmbientProbeDirty = globalAmbientProbe != m_GlobalAmbientProbe;
+            m_GlobalAmbientProbeDirty = m_GlobalAmbientProbeDirty || globalAmbientProbe != m_GlobalAmbientProbe;
 #if DEBUG_LOG_AMBIENT_PROBE
             if (m_GlobalAmbientProbeDirty)
             {
@@ -2702,6 +2735,10 @@ namespace Latios.Kinemation.Systems
             Debug.Assert(!m_SharedAmbientProbeAllocation.Empty, "Allocation of the global ambient probe failed");
             UpdateGlobalAmbientProbe(new SHProperties());
 
+            m_SharedSpecCubeDecodeAllocation = m_GPUPersistentAllocator.Allocate((ulong)UnsafeUtility.SizeOf<float4>());
+            Debug.Assert(!m_SharedSpecCubeDecodeAllocation.Empty, "Allocation of the specular decode value failed");
+            UpdateSpecCubeHDRDecode(ReflectionProbe.defaultTextureHDRDecodeValues);
+
             ResetIds();
 
             m_MetaEntitiesForHybridRenderableChunks = GetEntityQuery(
@@ -2739,13 +2776,20 @@ namespace Latios.Kinemation.Systems
             RegisterMaterialPropertyType<BuiltinMaterialPropertyUnity_ProbesOcclusion>(
                 "unity_ProbesOcclusion",
                 defaultValue: new float4(1, 1, 1, 1));
-            RegisterSharedBuiltin("unity_SHAr", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAr);
-            RegisterSharedBuiltin("unity_SHAg", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAg);
-            RegisterSharedBuiltin("unity_SHAb", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAb);
-            RegisterSharedBuiltin("unity_SHBr", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBr);
-            RegisterSharedBuiltin("unity_SHBg", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBg);
-            RegisterSharedBuiltin("unity_SHBb", (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBb);
-            RegisterSharedBuiltin("unity_SHC",  (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHC);
+            RegisterMaterialPropertyType<BuiltinMaterialPropertyUnity_SpecCube0_HDR>(
+                "unity_SpecCube0_HDR",
+                defaultValue: new float4(1, 1, 0, 0));
+
+            RegisterSharedBuiltin("unity_SHAr",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAr);
+            RegisterSharedBuiltin("unity_SHAg",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAg);
+            RegisterSharedBuiltin("unity_SHAb",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHAb);
+            RegisterSharedBuiltin("unity_SHBr",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBr);
+            RegisterSharedBuiltin("unity_SHBg",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBg);
+            RegisterSharedBuiltin("unity_SHBb",          (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHBb);
+            RegisterSharedBuiltin("unity_SHC",           (int) m_SharedAmbientProbeAllocation.begin + SHProperties.kOffsetOfSHC);
+
+            RegisterSharedBuiltin("unity_SpecCube0_HDR", (int)m_SharedSpecCubeDecodeAllocation.begin);
+            UpdateSpecCubeHDRDecode(ReflectionProbe.defaultTextureHDRDecodeValues);
 
             foreach (var typeInfo in TypeManager.AllTypes)
             {

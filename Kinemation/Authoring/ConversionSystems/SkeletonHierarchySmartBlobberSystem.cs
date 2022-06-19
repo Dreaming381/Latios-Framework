@@ -12,7 +12,7 @@ using Unity.Transforms;
 
 namespace Latios.Kinemation.Authoring.Systems
 {
-    [ConverterVersion("Latios", 1)]
+    [ConverterVersion("Latios", 2)]
     [DisableAutoCreation]
     public class SkeletonHierarchySmartBlobberSystem : SmartBlobberConversionSystem<OptimizedSkeletonHierarchyBlob, SkeletonHierarchyBakeData, SkeletonHierarchyConverter>
     {
@@ -77,11 +77,17 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             var builder = new BlobBuilder(Allocator.Temp);
 
-            ref var root    = ref builder.ConstructRoot<OptimizedSkeletonHierarchyBlob>();
-            var     indices = builder.Allocate(ref root.parentIndices, parents.Length);
-            var     hasPSI  = builder.Allocate(ref root.hasParentScaleInverseBitmask, (int)math.ceil(parents.Length / 64f));  // length is max 16 bits so this division is safe in float.
+            ref var root        = ref builder.ConstructRoot<OptimizedSkeletonHierarchyBlob>();
+            var     indices     = builder.Allocate(ref root.parentIndices, parents.Length);
+            var     hasPSI      = builder.Allocate(ref root.hasParentScaleInverseBitmask, (int)math.ceil(parents.Length / 64f));  // length is max 16 bits so this division is safe in float.
+            var     hasChildPSI = builder.Allocate(ref root.hasChildWithParentScaleInverseBitmask, hasPSI.Length);
+
+            root.hasAnyParentScaleInverseBone = false;
             for (int i = 0; i < hasPSI.Length; i++)
-                hasPSI[i] = new BitField64(0UL);
+            {
+                hasPSI[i]      = new BitField64(0UL);
+                hasChildPSI[i] = new BitField64(0UL);
+            }
             for (int i = 0; i < parents.Length; i++)
             {
                 indices[i] = (short)parents[i];
@@ -92,6 +98,12 @@ namespace Latios.Kinemation.Authoring.Systems
                     var field = hasPSI[index];
                     field.SetBits(i % 64, true);
                     hasPSI[index] = field;
+
+                    var parentPSI = hasChildPSI[parents[i] / 64];
+                    parentPSI.SetBits(parents[i] % 64, true);
+                    hasChildPSI[parents[i]] = parentPSI;
+
+                    root.hasAnyParentScaleInverseBone = true;
                 }
             }
             return builder.CreateBlobAssetReference<OptimizedSkeletonHierarchyBlob>(Allocator.Persistent);

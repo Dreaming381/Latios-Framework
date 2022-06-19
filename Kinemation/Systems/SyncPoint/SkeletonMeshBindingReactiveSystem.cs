@@ -1013,7 +1013,6 @@ namespace Latios.Kinemation.Systems
                             {
                                 ref var entry = ref boneManager.entries.ElementAt(entryIndex);
                                 entry.overridesReferences++;
-                                resultState.boneOffsetEntryIndex = entryIndex;
                             }
                             else
                             {
@@ -1065,8 +1064,9 @@ namespace Latios.Kinemation.Systems
                             }
 
                             op.overrideBoneBindings.Dispose();
-                            resultState.skeletonBindingBlob = default;
-                            resultState.meshBindingBlob     = default;
+                            resultState.skeletonBindingBlob  = default;
+                            resultState.meshBindingBlob      = default;
+                            resultState.boneOffsetEntryIndex = entryIndex;
                         }
                         else
                         {
@@ -1075,7 +1075,6 @@ namespace Latios.Kinemation.Systems
                             {
                                 ref var entry = ref boneManager.entries.ElementAt(entryIndex);
                                 entry.pathsReferences++;
-                                resultState.boneOffsetEntryIndex = entryIndex;
                             }
                             else
                             {
@@ -1096,7 +1095,6 @@ namespace Latios.Kinemation.Systems
                                 {
                                     ref var entry = ref boneManager.entries.ElementAt(entryIndex);
                                     entry.pathsReferences++;
-                                    resultState.boneOffsetEntryIndex = entryIndex;
                                 }
                                 else
                                 {
@@ -1152,6 +1150,7 @@ namespace Latios.Kinemation.Systems
                                 resultState.skeletonBindingBlob = op.skeletonBindingPathsBlob;
                                 resultState.meshBindingBlob     = op.meshBindingPathsBlob;
                             }
+                            resultState.boneOffsetEntryIndex = entryIndex;
                         }
                     }
 

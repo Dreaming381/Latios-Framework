@@ -53,9 +53,9 @@ meshes. Even if the skeleton contains multiple armatures from a DCC application,
 the meshes get bound to the skeleton, not the armature `GameObjects`.
 
 By default, Kinemation treats anything with an `Animator` as a skeleton. That
-`GameObject` and all descendants become bones. This means the “skeleton” is
-usually also a “bone”. For optimized hierarchies, Kinemation creates a
-de-optimized shadow hierarchy and analyzes that instead.
+`GameObject` and all descendants become bones (except Skinned Meshes). This
+means the “skeleton” is usually also a “bone”. For optimized hierarchies,
+Kinemation creates a de-optimized shadow hierarchy and analyzes that instead.
 
 However, which bones are part of a skeleton can be completely overridden by a
 user.

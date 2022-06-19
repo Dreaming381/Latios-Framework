@@ -5,16 +5,20 @@ using Unity.Entities;
 
 namespace Latios.Authoring
 {
+    public delegate void OnPostCreateConversionWorldDelegate(World world, CustomConversionSettings settings);
+
     /// <summary>
     /// A subset of the settings provided to GameObject Conversion.
     /// These settings are populated by Unity and some may not be populated at all.
     /// </summary>
     public struct CustomConversionSettings
     {
-        public World           destinationWorld;
-        public Hash128         sceneGUID;
-        public string          debugConversionName;
-        public ConversionFlags conversionFlags;
+        public World                                   destinationWorld;
+        public Hash128                                 sceneGUID;
+        public string                                  debugConversionName;
+        public ConversionFlags                         conversionFlags;
+        public OnPostCreateConversionWorldEventWrapper OnPostCreateConversionWorldWrapper;
+        internal void InvokePostCreateConversionWorldEvent() => OnPostCreateConversionWorldWrapper.InvokePostCreateConversionWorldEvent(destinationWorld, this);
 #if UNITY_EDITOR
         public UnityEditor.GUID buildConfigurationGUID;
         public Unity.Build.BuildConfiguration buildConfiguration;
@@ -56,6 +60,13 @@ namespace Latios.Authoring
         {
             return system.World.GetExistingSystem<ConversionBootstrapUtilities.CustomConversionBootstrapSystem>().customConversionSettings;
         }
+    }
+
+    public class OnPostCreateConversionWorldEventWrapper
+    {
+        public event OnPostCreateConversionWorldDelegate OnPostCreateConversionWorld;
+        internal void InvokePostCreateConversionWorldEvent(World destinationWorld, CustomConversionSettings settings) => OnPostCreateConversionWorld?.Invoke(destinationWorld,
+                                                                                                                                                             settings);
     }
 
 #if UNITY_EDITOR
@@ -218,10 +229,11 @@ namespace Latios.Authoring
 
                 CustomConversionSettings customSettings = new CustomConversionSettings
                 {
-                    destinationWorld    = settings.DestinationWorld,
-                    sceneGUID           = settings.SceneGUID,
-                    debugConversionName = settings.DebugConversionName,
-                    conversionFlags     = settings.ConversionFlags,
+                    destinationWorld                   = settings.DestinationWorld,
+                    sceneGUID                          = settings.SceneGUID,
+                    debugConversionName                = settings.DebugConversionName,
+                    conversionFlags                    = settings.ConversionFlags,
+                    OnPostCreateConversionWorldWrapper = new OnPostCreateConversionWorldEventWrapper(),
 
 #if UNITY_EDITOR
                     buildConfigurationGUID = settings.BuildConfigurationGUID,
@@ -276,14 +288,16 @@ namespace Latios.Authoring
                     m_settings.ConversionWorldCreated -= OnConversionWorldCreationFinished;
                     m_ranCleanup                       = true;
 
-                    if (m_disableSet.Count == 0)
-                        return;
-
-                    foreach (var system in World.Systems)
+                    if (m_disableSet.Count != 0)
                     {
-                        if (m_disableSet.Contains(system))
-                            system.Enabled = false;
+                        foreach (var system in World.Systems)
+                        {
+                            if (m_disableSet.Contains(system))
+                                system.Enabled = false;
+                        }
                     }
+
+                    customConversionSettings.InvokePostCreateConversionWorldEvent();
                 }
             }
         }

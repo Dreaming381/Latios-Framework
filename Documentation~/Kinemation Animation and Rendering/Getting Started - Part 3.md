@@ -140,44 +140,16 @@ Let’s add our new authoring component to our character and give it a clip.
 
 And now when we press play…
 
-We get an error.
-
-What happens is that Kinemation greedily converts every descendent of the
-Animator into a bone. But one of those was the Skinned Mesh, which had its
-transform components removed during binding. To fix this, we’ll wrap our inner
-loop in one giant `if` block.
-
-```csharp
-for (int i = 1; i < bones.Length; i++)
-{
-    Entity entity = bones[i].bone;
-
-    if (HasComponent<Translation>(entity))
-    {
-        var boneTransform = clip.SampleBone(i, clipTime);
-
-        var trans = new Translation { Value = boneTransform.translation };
-        var rot   = new Rotation { Value = boneTransform.rotation };
-        var scale = new NonUniformScale { Value = boneTransform.scale };
-
-        SetComponent(entity, trans);
-        SetComponent(entity, rot);
-        SetComponent(entity, scale);
-    }
-}
-```
-
-And now when we press play…
-
 ![](media/4e7a3028c9dfe15b9869d59c7b3ca9c7.gif)
 
 ## Playing the Clip Using BoneOwningSkeletonReference
 
-Our first approach was tricky, because we had to account for bones that weren’t
-what we expected they were. Perhaps it would be a little cleaner if we iterated
-using bone entities instead. To do that, we’ll use the
-`BoneOwningSkeletonReference` to find our skeleton and get the animation clip
-and the `BoneIndex` to sample the right bone.
+Our first approach was fine, but we had to run it single-threaded because of the
+`SetComponent()` calls. Using `ComponentDataFromEntity` and
+`WithNativeDisableParallelForRestriction()` works, but perhaps it would be a
+little cleaner if we iterated using bone entities instead. To do that, we’ll use
+the `BoneOwningSkeletonReference` to find our skeleton and get the animation
+clip and the `BoneIndex` to sample the right bone.
 
 ```csharp
 Entities.ForEach((ref Translation trans, ref Rotation rot, ref NonUniformScale scale, in BoneOwningSkeletonReference skeletonRef, in BoneIndex boneIndex) =>

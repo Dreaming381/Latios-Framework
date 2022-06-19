@@ -13,17 +13,45 @@ We can do so by checking this box.
 Of course, if we wanted to have additional exported bones to attach weapons or
 accessories, we could do that with the dropdown below it.
 
+## Sampling an Entire Pose the Easy Way
+
+Unlike with exposed skeletons, optimized skeletons don’t have a transform system
+to automatically update their hierarchy. Instead, they have a buffer of
+root-relative matrices called `OptimizedBoneToRoot`. They also typically store
+their hierarchy information in `OptimizedSkeletonHierarchyBlobReference`.
+
+Calculating the matrices using the blob asset and individual local space sampled
+bones can be quite tricky. But if you just want to sample a single clip and have
+it update the entire buffer, then all you need to do is call `SamplePose()` and
+pass in the relevant arguments. It looks like this:
+
+```csharp
+Entities.ForEach((ref DynamicBuffer<OptimizedBoneToRoot> btrBuffer, in OptimizedSkeletonHierarchyBlobReference hierarchyRef, in SingleClip singleClip) =>
+{
+    ref var clip     = ref singleClip.blob.Value.clips[0];
+    var     clipTime = clip.LoopToClipTime(t);
+
+    clip.SamplePose(btrBuffer, hierarchyRef.blob, clipTime);
+}).ScheduleParallel();
+```
+
+Not only does this handle the entire hierarchy for you, it also uses a special
+fast-path making this the most performant way to play an animation.
+
+However, if you need more control over the bone transforms, such as animation
+blending, you will need to sample bones individually which is discussed in the
+next section.
+
 ## Writing to OptimizedBoneToRoot without ParentScaleInverse
 
 We’re going to assume our character does not use `ParentScaleInverse`, as that
 complicates the code quite a bit in Kinemation’s current state.
 
-Fortunately, our authoring component is already set up for us. We don’t have to
-worry about that.
+Fortunately, conversion defaults to generating skeletons without it. But if you
+are ever unsure, there is a flag in `OptimizedSkeletonHierarchyBlob` called
+`hasAnyParentScaleInverseBone` which you can check.
 
-In order to compute our optimized bone matrices, we’ll need the hierarchy
-information provided by the `OptimizedSkeletonHierarchyBlobReference`. Our code
-now looks like this:
+We’ll start by removing `SamplePose()`:
 
 ```csharp
 Entities.ForEach((ref DynamicBuffer<OptimizedBoneToRoot> btrBuffer, in OptimizedSkeletonHierarchyBlobReference hierarchyRef, in SingleClip singleClip) =>
@@ -69,9 +97,9 @@ var mat = float4x4.TRS(boneTransform.translation, boneTransform.rotation, boneTr
 ```
 
 Finally, we need to get the matrix into the skeleton’s coordinate space. To do
-that, we need to multiply the matrix by bone’s parent matrix, and then by that
-bone’s parent matrix, and then by that bone’s parent matrix, all the way up to
-the root.
+that, we need to multiply the matrix by the bone’s parent matrix, and then by
+that bone’s parent matrix, and then by that bone’s parent matrix, all the way up
+to the root.
 
 But there’s a trick. If the parent has a fully computed `OptimizedBoneToRoot`
 matrix, we only need to multiply our matrix with that. And if we iterated

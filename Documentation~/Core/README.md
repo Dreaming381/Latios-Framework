@@ -338,9 +338,9 @@ Blobbers are strategically placed in the conversion pipeline to make this
 process easy and intuitive.
 
 If you need to define your own Blob Asset Conversion, you can subclass one of
-the two SmartBlobberConversionSystem types. The classes explicitly define their
-requirements through abstract functions and interface constraints. And all the
-pieces you are expected to interact with are thoroughly documented via XML
+the two `SmartBlobberConversionSystem` types. The classes explicitly define
+their requirements through abstract functions and interface constraints. And all
+the pieces you are expected to interact with are thoroughly documented via XML
 documentation. You get fully parallel (and Bursted if using runtime conversion)
 blob asset generation without having to worry about Unity’s convoluted blob
 asset conversion APIs.
@@ -381,8 +381,8 @@ hierarchies undergo a structural change each frame. If you have large worker
 thread times for updating the hierarchy transforms, try this out and see if it
 wins you back a few milliseconds.
 
-Both Improved and Extreme Transforms replace ParentSystem and run fully in
-Burst. This usually cuts the ParentSystem runtime in half during frames where
+Both Improved and Extreme Transforms replace `ParentSystem` and run fully in
+Burst. This usually cuts the `ParentSystem` runtime in half during frames where
 hierarchies are instantiated.
 
 ## Known Issues
@@ -410,8 +410,6 @@ hierarchies are instantiated.
     components do not function correctly when used inside `OnStartRunning()` or
     `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
     exceptions occur inside these methods.
--   Unity’s `ParentSystem` has a bug where the order of Child entities is
-    non-deterministic. The custom transform systems inherited this bug.
 -   Custom containers do not yet support custom allocators.
 
 ## Near-Term Roadmap

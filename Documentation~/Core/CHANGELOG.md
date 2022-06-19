@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] – 2022-6-19
+
+Officially supports Entities [0.50.1]
+
+### Added
+
+-   Added
+    `CustomConversionSettings.OnPostCreateConversionWorldEventWrapper.OnPostCreateConversionWorld`
+    which can be used to post-process the conversion world after all systems are
+    created
+
+### Fixed
+
+-   Applied the Entities 0.51 `ParentSystem` bugfix to `ImprovedParentSystem`
+    and `ExtremeParentSystem`
+-   Made the `Child` buffer order deterministic for `ImprovedParentSystem` and
+    `ExtremeParentSystem`
+
 ## [0.5.0] – 2022-6-13
 
 Officially supports Entities [0.50.1]

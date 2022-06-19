@@ -11,7 +11,7 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring.Systems
 {
     [UpdateInGroup(typeof(GameObjectBeforeConversionGroup))]
-    [ConverterVersion("Latios", 1)]
+    [ConverterVersion("Latios", 2)]
     [DisableAutoCreation]
     public class DiscoverSkeletonsConversionSystem : GameObjectConversionSystem
     {
@@ -135,7 +135,9 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 for (int i = 0; i < bone.childCount; i++)
                 {
-                    m_breadthQueue.Enqueue((bone.GetChild(i), currentIndex));
+                    var child = bone.GetChild(i);
+                    if (child.GetComponent<SkinnedMeshRenderer>() == null)
+                        m_breadthQueue.Enqueue((bone.GetChild(i), currentIndex));
                 }
             }
 

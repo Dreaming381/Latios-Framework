@@ -1,3 +1,4 @@
+using Latios.Authoring;
 using Latios.Kinemation.Authoring.Systems;
 using Unity.Entities;
 using Unity.Rendering;
@@ -18,9 +19,11 @@ namespace Latios.Kinemation.Authoring
             if (!world.Flags.HasFlag(WorldFlags.Conversion))
                 throw new System.InvalidOperationException("Kinemation Conversion must be installed in a conversion world.");
 
-            var builtinConversionSystem = world.GetExistingSystem<SkinnedMeshRendererConversion>();
-            if (builtinConversionSystem != null)
-                builtinConversionSystem.Enabled = false;
+            {
+                var builtinConversionSystem = world.GetExistingSystem<SkinnedMeshRendererConversion>();
+                if (builtinConversionSystem != null)
+                    builtinConversionSystem.Enabled = false;
+            }
 
             BootstrapTools.InjectSystem(typeof(DiscoverSkeletonsConversionSystem),            world);
             BootstrapTools.InjectSystem(typeof(DiscoverUnboundSkinnedMeshesConversionSystem), world);
@@ -30,7 +33,15 @@ namespace Latios.Kinemation.Authoring
             BootstrapTools.InjectSystem(typeof(MeshPathsSmartBlobberSystem),                  world);
             BootstrapTools.InjectSystem(typeof(SkeletonClipSetSmartBlobberSystem),            world);
             BootstrapTools.InjectSystem(typeof(KinemationCleanupConversionSystem),            world);
-            BootstrapTools.InjectSystem(typeof(AddMasksConversionSystem),                     world);
+            var system = BootstrapTools.InjectSystem(typeof(AddMasksConversionSystem),                     world);
+
+            var cs                                                                           = system.systemManaged as GameObjectConversionSystem;
+            cs.GetSettings().OnPostCreateConversionWorldWrapper.OnPostCreateConversionWorld += (w, s) =>
+            {
+                var builtinConversionSystem = world.GetExistingSystem<SkinnedMeshRendererConversion>();
+                if (builtinConversionSystem != null)
+                    builtinConversionSystem.Enabled = false;
+            };
         }
     }
 }

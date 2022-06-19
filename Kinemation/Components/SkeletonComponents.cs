@@ -129,6 +129,16 @@ namespace Latios.Kinemation
         /// This allows animators to achieve extreme and often cartoony expressions.
         /// </summary>
         public BlobArray<BitField64> hasParentScaleInverseBitmask;
+        /// <summary>
+        /// A bit array specifying if a bone needs to calculate an inverse scale because a
+        /// child requires it for ParentScaleInverse behavior.
+        /// </summary>
+        public BlobArray<BitField64> hasChildWithParentScaleInverseBitmask;
+        /// <summary>
+        /// If true, at least one bone expects ParentScaleInverse behavior to be applied.
+        /// Some fast-paths may be enabled when this value is false.
+        /// </summary>
+        public bool hasAnyParentScaleInverseBone;
     }
 
     /// <summary>
