@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -11,11 +12,12 @@ namespace Latios.Kinemation
     /// <summary>
     /// A struct containing local-space translation, rotation, and scale.
     /// </summary>
+    [StructLayout(LayoutKind.Explicit, Size = 48)]
     public struct BoneTransform
     {
-        private quaternion m_rotation;
-        private float4     m_translation;
-        private float4     m_scale;
+        [FieldOffset(0)] private quaternion m_rotation;
+        [FieldOffset(16)] private float4    m_translation;
+        [FieldOffset(32)] private float4    m_scale;
 
         public quaternion rotation { get => m_rotation; set => m_rotation              = value; }
         public float3 translation { get => m_translation.xyz; set => m_translation.xyz = value; }
@@ -116,6 +118,29 @@ namespace Latios.Kinemation
             return new BoneTransform(qvv);
         }
 
+        public unsafe void SamplePose(ref BufferPoseBlender blender,
+                                      float blendWeight,
+                                      float time,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBlenderIsBigEnoughForClip(in blender, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (blender.sampledFirst)
+                AclUnity.Decompression.SamplePoseAosBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvv, blendWeight, time, mode);
+            else if (blendWeight == 1f)
+            {
+                AclUnity.Decompression.SamplePoseAos(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvv, time, mode);
+                blender.sampledFirst = true;
+            }
+            else
+            {
+                AclUnity.Decompression.SamplePoseAosBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvv, blendWeight, time, mode);
+                blender.sampledFirst = true;
+            }
+        }
+
         /// <summary>
         /// Samples the animation clip for the entire skeleton at the given time and computes the entire OptimizedBoneToRoot buffer.
         /// This method uses a special fast-path.
@@ -149,35 +174,46 @@ namespace Latios.Kinemation
             if (!hierarchy.Value.hasAnyParentScaleInverseBone)
             {
                 // Fast path.
-                for (int i = 0; i < boneCount; i++)
+                destinationAsArray[0] = float4x4.identity;
+
+                for (int i = 1; i < boneCount; i++)
                 {
                     var qvv = destinationAsQvv[i];
                     var mat = float4x4.TRS(qvv.translation.xyz, qvv.rotation, qvv.scale.xyz);
                     Hint.Assume(hierarchy.Value.parentIndices[i] < i);
-                    if (hierarchy.Value.parentIndices[i] >= 0)
-                        mat               = math.mul(destinationAsArray[hierarchy.Value.parentIndices[i]], mat);
+                    mat                   = math.mul(destinationAsArray[hierarchy.Value.parentIndices[i]], mat);
                     destinationAsArray[i] = mat;
                 }
             }
             else
             {
                 // Slower path because we pack inverse scale into the fourth row of each matrix.
-                for (int i = 0; i < boneCount; i++)
+
+                // We need to explicitly check for parentScaleInverse for index 0.
+                if (hierarchy.Value.hasChildWithParentScaleInverseBitmask[0].IsSet(0))
+                {
+                    var inverseScale      = math.rcp(destinationAsQvv[0].scale);
+                    var mat               = float4x4.identity;
+                    mat.c0.w              = inverseScale.x;
+                    mat.c1.w              = inverseScale.y;
+                    mat.c2.w              = inverseScale.z;
+                    destinationAsArray[0] = mat;
+                }
+
+                for (int i = 1; i < boneCount; i++)
                 {
                     var qvv = destinationAsQvv[i];
                     var mat = float4x4.TRS(qvv.translation.xyz, qvv.rotation, qvv.scale.xyz);
                     Hint.Assume(hierarchy.Value.parentIndices[i] < i);
-                    if (hierarchy.Value.parentIndices[i] >= 0)
-                    {
-                        var  parentMat             = destinationAsArray[hierarchy.Value.parentIndices[i]];
-                        bool hasParentScaleInverse = hierarchy.Value.hasParentScaleInverseBitmask[i / 64].IsSet(i % 64);
-                        var  psi                   = float4x4.Scale(math.select(1f, new float3(parentMat.c0.w, parentMat.c1.w, parentMat.c2.w), hasParentScaleInverse));
-                        parentMat.c0.w             = 0f;
-                        parentMat.c1.w             = 0f;
-                        parentMat.c2.w             = 0f;
-                        mat                        = math.mul(psi, mat);
-                        mat                        = math.mul(parentMat, mat);
-                    }
+
+                    var  parentMat             = destinationAsArray[hierarchy.Value.parentIndices[i]];
+                    bool hasParentScaleInverse = hierarchy.Value.hasParentScaleInverseBitmask[i / 64].IsSet(i % 64);
+                    var  psi                   = float4x4.Scale(math.select(1f, new float3(parentMat.c0.w, parentMat.c1.w, parentMat.c2.w), hasParentScaleInverse));
+                    parentMat.c0.w             = 0f;
+                    parentMat.c1.w             = 0f;
+                    parentMat.c2.w             = 0f;
+                    mat                        = math.mul(psi, mat);
+                    mat                        = math.mul(parentMat, mat);
 
                     bool needsInverseScale = hierarchy.Value.hasChildWithParentScaleInverseBitmask[i / 64].IsSet(i % 64);
                     var  inverseScale      = math.select(0f, math.rcp(qvv.scale), needsInverseScale);
@@ -219,6 +255,13 @@ namespace Latios.Kinemation
         /// The size of the clip in its compressed form.
         /// </summary>
         public int sizeCompressed => compressedClipDataAligned16.Length;
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckBlenderIsBigEnoughForClip(in BufferPoseBlender blender, short boneCount)
+        {
+            if (blender.bufferAs4x4.Length < boneCount)
+                throw new ArgumentException("The blender does not contain enough elements to store the sampled pose.");
+        }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckBufferIsBigEnoughForClip(DynamicBuffer<OptimizedBoneToRoot> buffer, short boneCount)

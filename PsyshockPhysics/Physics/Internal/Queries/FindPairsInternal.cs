@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -323,23 +324,39 @@ namespace Latios.Psyshock
             #region SweepMethods
             private static void SelfSweep(BucketSlices bucket, int jobIndex, T processor, bool isThreadSafe = true)
             {
+                Hint.Assume(bucket.xmins.Length == bucket.xmaxs.Length);
+                Hint.Assume(bucket.xmins.Length == bucket.yzminmaxs.Length);
+                Hint.Assume(bucket.xmins.Length == bucket.bodies.Length);
+
                 int count = bucket.xmins.Length;
                 for (int i = 0; i < count - 1; i++)
                 {
+                    var current = bucket.yzminmaxs[i];
                     for (int j = i + 1; j < count && bucket.xmins[j] <= bucket.xmaxs[i]; j++)
                     {
-                        float4 less = new float4(bucket.yzminmaxs[i].z, bucket.yzminmaxs[j].z, bucket.yzminmaxs[i].w, bucket.yzminmaxs[j].w);
-                        float4 more = new float4(bucket.yzminmaxs[j].x, bucket.yzminmaxs[i].x, bucket.yzminmaxs[j].y, bucket.yzminmaxs[i].y);
+                        float4 less = math.shuffle(current,
+                                                   bucket.yzminmaxs[j],
+                                                   math.ShuffleComponent.RightZ,
+                                                   math.ShuffleComponent.RightW,
+                                                   math.ShuffleComponent.LeftZ,
+                                                   math.ShuffleComponent.LeftW
+                                                   );
+                        float4 more = math.shuffle(current,
+                                                   bucket.yzminmaxs[j],
+                                                   math.ShuffleComponent.LeftX,
+                                                   math.ShuffleComponent.LeftY,
+                                                   math.ShuffleComponent.RightX,
+                                                   math.ShuffleComponent.RightY
+                                                   );
 
-                        bool4 tests = less < more;
-                        if (math.bitmask(tests) == 0)
+                        if (math.bitmask(less < more) == 0)
                         {
                             processor.Execute(new FindPairsResult
                             {
                                 bodyA        = bucket.bodies[i],
                                 bodyB        = bucket.bodies[j],
-                                bodyAIndex   = i,
-                                bodyBIndex   = j,
+                                bodyAIndex   = i + bucket.bucketGlobalStart,
+                                bodyBIndex   = j + bucket.bucketGlobalStart,
                                 jobIndex     = jobIndex,
                                 isThreadSafe = isThreadSafe
                             });
@@ -355,6 +372,14 @@ namespace Latios.Psyshock
                 if (countA == 0 || countB == 0)
                     return;
 
+                Hint.Assume(bucketA.xmins.Length == bucketA.xmaxs.Length);
+                Hint.Assume(bucketA.xmins.Length == bucketA.yzminmaxs.Length);
+                Hint.Assume(bucketA.xmins.Length == bucketA.bodies.Length);
+
+                Hint.Assume(bucketB.xmins.Length == bucketB.xmaxs.Length);
+                Hint.Assume(bucketB.xmins.Length == bucketB.yzminmaxs.Length);
+                Hint.Assume(bucketB.xmins.Length == bucketB.bodies.Length);
+
                 //Check for b starting in a's x range
                 int bstart = 0;
                 for (int i = 0; i < countA; i++)
@@ -366,21 +391,32 @@ namespace Latios.Psyshock
                     if (bstart >= countB)
                         break;
 
+                    var current = bucketA.yzminmaxs[i];
                     for (int j = bstart; j < countB && bucketB.xmins[j] <= bucketA.xmaxs[i]; j++)
                     {
-                        float4 less = new float4(bucketA.yzminmaxs[i].z, bucketB.yzminmaxs[j].z, bucketA.yzminmaxs[i].w, bucketB.yzminmaxs[j].w);
-                        float4 more = new float4(bucketB.yzminmaxs[j].x, bucketA.yzminmaxs[i].x, bucketB.yzminmaxs[j].y, bucketA.yzminmaxs[i].y);
+                        float4 less = math.shuffle(current,
+                                                   bucketB.yzminmaxs[j],
+                                                   math.ShuffleComponent.RightZ,
+                                                   math.ShuffleComponent.RightW,
+                                                   math.ShuffleComponent.LeftZ,
+                                                   math.ShuffleComponent.LeftW
+                                                   );
+                        float4 more = math.shuffle(current,
+                                                   bucketB.yzminmaxs[j],
+                                                   math.ShuffleComponent.LeftX,
+                                                   math.ShuffleComponent.LeftY,
+                                                   math.ShuffleComponent.RightX,
+                                                   math.ShuffleComponent.RightY
+                                                   );
 
-                        bool4 tests = less < more;
-
-                        if (math.bitmask(tests) == 0)
+                        if (math.bitmask(less < more) == 0)
                         {
                             processor.Execute(new FindPairsResult
                             {
                                 bodyA        = bucketA.bodies[i],
                                 bodyB        = bucketB.bodies[j],
-                                bodyAIndex   = i,
-                                bodyBIndex   = j,
+                                bodyAIndex   = i + bucketA.bucketGlobalStart,
+                                bodyBIndex   = j + bucketB.bucketGlobalStart,
                                 jobIndex     = jobIndex,
                                 isThreadSafe = isThreadSafe
                             });
@@ -399,21 +435,32 @@ namespace Latios.Psyshock
                     if (astart >= countA)
                         break;
 
+                    var current = bucketB.yzminmaxs[i];
                     for (int j = astart; j < countA && bucketA.xmins[j] <= bucketB.xmaxs[i]; j++)
                     {
-                        float4 less = new float4(bucketB.yzminmaxs[i].z, bucketA.yzminmaxs[j].z, bucketB.yzminmaxs[i].w, bucketA.yzminmaxs[j].w);
-                        float4 more = new float4(bucketA.yzminmaxs[j].x, bucketB.yzminmaxs[i].x, bucketA.yzminmaxs[j].y, bucketB.yzminmaxs[i].y);
+                        float4 less = math.shuffle(current,
+                                                   bucketA.yzminmaxs[j],
+                                                   math.ShuffleComponent.RightZ,
+                                                   math.ShuffleComponent.RightW,
+                                                   math.ShuffleComponent.LeftZ,
+                                                   math.ShuffleComponent.LeftW
+                                                   );
+                        float4 more = math.shuffle(current,
+                                                   bucketA.yzminmaxs[j],
+                                                   math.ShuffleComponent.LeftX,
+                                                   math.ShuffleComponent.LeftY,
+                                                   math.ShuffleComponent.RightX,
+                                                   math.ShuffleComponent.RightY
+                                                   );
 
-                        bool4 tests = less < more;
-
-                        if (math.bitmask(tests) == 0)
+                        if (math.bitmask(less < more) == 0)
                         {
                             processor.Execute(new FindPairsResult
                             {
                                 bodyA        = bucketA.bodies[j],
                                 bodyB        = bucketB.bodies[i],
-                                bodyAIndex   = i,
-                                bodyBIndex   = j,
+                                bodyAIndex   = j + bucketA.bucketGlobalStart,
+                                bodyBIndex   = i + bucketB.bucketGlobalStart,
                                 jobIndex     = jobIndex,
                                 isThreadSafe = isThreadSafe
                             });

@@ -86,23 +86,25 @@ namespace Latios.Psyshock
 
             return new BucketSlices
             {
-                xmins       = xmins.Slice(start, count),
-                xmaxs       = xmaxs.Slice(start, count),
-                yzminmaxs   = yzminmaxs.Slice(start, count),
-                bodies      = bodies.Slice(start, count),
-                bucketIndex = bucketIndex
+                xmins       = xmins.GetSubArray(start, count),
+                xmaxs       = xmaxs.GetSubArray(start, count),
+                yzminmaxs   = yzminmaxs.GetSubArray(start, count),
+                bodies      = bodies.GetSubArray(start, count),
+                bucketIndex = bucketIndex,
+                bucketGlobalStart = start
             };
         }
     }
 
     internal struct BucketSlices
     {
-        public NativeSlice<float>        xmins;
-        public NativeSlice<float>        xmaxs;
-        public NativeSlice<float4>       yzminmaxs;
-        public NativeSlice<ColliderBody> bodies;
+        public NativeArray<float>        xmins;
+        public NativeArray<float>        xmaxs;
+        public NativeArray<float4>       yzminmaxs;
+        public NativeArray<ColliderBody> bodies;
         public int count => xmins.Length;
         public int bucketIndex;
+        public int bucketGlobalStart;
     }
 
     /*public struct RayQueryLayer : IDisposable

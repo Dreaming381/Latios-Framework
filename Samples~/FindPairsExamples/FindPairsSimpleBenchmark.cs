@@ -34,6 +34,8 @@ namespace Dragons
 
         public override bool ShouldUpdateSystem()
         {
+            if (!worldBlackboardEntity.HasComponent<CurrentScene>())
+                return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name.Equals("FindPairsSimpleBenchmark");
             var currentScene = worldBlackboardEntity.GetComponentData<CurrentScene>();
             return currentScene.current.Equals("FindPairsSimpleBenchmark");
         }

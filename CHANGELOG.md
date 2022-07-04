@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] – 2022-7-3
+
+Officially supports Entities [0.50.1]
+
+### Fixed
+
+-   Fixed Physics samples in projects that don’t use SceneManager
+
+### Changed
+
+-   Updated Core to v0.5.2
+-   Updated Psyshock to v0.5.2
+-   Updated Myri to v0.5.2
+-   Updated Kinemation to v0.5.2
+-   Added Optimization Adventure Part 7
+
 ## [0.5.1] – 2022-6-19
 
 Officially supports Entities [0.50.1]

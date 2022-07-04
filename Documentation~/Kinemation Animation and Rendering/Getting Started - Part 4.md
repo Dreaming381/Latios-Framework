@@ -38,11 +38,17 @@ Entities.ForEach((ref DynamicBuffer<OptimizedBoneToRoot> btrBuffer, in Optimized
 Not only does this handle the entire hierarchy for you, it also uses a special
 fast-path making this the most performant way to play an animation.
 
-However, if you need more control over the bone transforms, such as animation
-blending, you will need to sample bones individually which is discussed in the
-next section.
+If you need more control over the bone transforms, such as animation blending,
+you can use a `BufferPoseBlender` which offers similar fast-path APIs but more
+granular control over the process. `BufferPoseBlender` will be covered in a
+future part.
 
 ## Writing to OptimizedBoneToRoot without ParentScaleInverse
+
+*This next part is provided simply for understanding purposes and those curious.
+The information here is less important as of version 0.5.2 when*
+`BufferPoseBlender` *was introduced. If* `BufferPoseBlender` *does not cover
+your use case, please report it as an issue.*
 
 We’re going to assume our character does not use `ParentScaleInverse`, as that
 complicates the code quite a bit in Kinemation’s current state.

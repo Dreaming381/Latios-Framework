@@ -171,22 +171,22 @@ namespace Latios.Myri.Authoring.Systems
         void ReadClip(AudioClip clip, NativeArray<float> data, float[] cache)
         {
             int channels = clip.channels;
-            int stride   = cache.Length / channels;
+            int stride   = cache.Length;
             for (int i = 0; i < data.Length; i += stride)
             {
-                int count = math.min(data.Length - i * channels, stride);
+                int count = math.min(data.Length - i, stride);
 
                 // Todo: This suppresses a warning but is not ideal
                 if (count < cache.Length)
                 {
                     var tempCache = new float[count];
-                    clip.GetData(tempCache, i);
-                    NativeArray<float>.Copy(tempCache, data.GetSubArray(i * channels, count), count);
+                    clip.GetData(tempCache, i / channels);
+                    NativeArray<float>.Copy(tempCache, data.GetSubArray(i, count), count);
                 }
                 else
                 {
-                    clip.GetData(cache, i);
-                    NativeArray<float>.Copy(cache, data.GetSubArray(i * channels, count), count);
+                    clip.GetData(cache, i / channels);
+                    NativeArray<float>.Copy(cache, data.GetSubArray(i, count), count);
                 }
             }
         }

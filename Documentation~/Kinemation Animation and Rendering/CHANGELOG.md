@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] – 2022-7-3
+
+Officially supports Entities [0.50.1]
+
+### Added
+
+-   Added Linux support
+-   Added `SkeletonClip.SamplePose()` overload which uses a `BufferPoseBlender`
+    and performs optimal pose sampling
+-   Added `BufferPoseBlender` which can temporarily repurpose a
+    `DynamicBuffer<OptimizedBoneToRoot>` into a working buffer of
+    `BoneTransform`s for additive pose sampling (blending) and IK and then
+    convert the resulting `BoneTransform`s back into valid `OptimizedBoneToRoot`
+    values
+
+### Fixed
+
+-   Fixed `ShaderEffectRadialBounds` which was ignored
+-   Fixed issue where root motion animation was applied directly to the
+    `OptimizedBoneToRoot` buffer when using pose sampling
+
+### Improved
+
+-   Fixed change filtering of exposed bone bounds
+-   ACL Unity plugin binaries are now built using GitHub Actions and have a
+    tagged release which includes artifacts for debug symbols as well as
+    human-readable assembly text
+
 ## [0.5.1] – 2022-6-19
 
 Officially supports Entities [0.50.1]
@@ -26,7 +54,7 @@ Officially supports Entities [0.50.1]
 
 ### Fixed
 
--   Fixed an bug where only the first skeleton archetype was used for rendering
+-   Fixed a bug where only the first skeleton archetype was used for rendering
 -   Skinned Mesh Renderers are no longer treated as bones in the skeleton during
     conversion
 -   Fixed a bug where the first clip in a `SkeletonClipSetBakeData` was

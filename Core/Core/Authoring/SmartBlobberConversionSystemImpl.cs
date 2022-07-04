@@ -399,13 +399,13 @@ namespace Latios.Authoring.Systems
             {
                 Filter(filterBlobberData, ref context, inputToFilteredMapping);
             }
-            catch (System.Exception e)
+            catch (System.Exception)
             {
                 inputConverters.Dispose();
                 inputToFilteredMapping.Dispose();
                 context.Dispose();
                 m_inputsAreLocked = false;
-                throw e;
+                throw;
             }
 
             // Step 2: Generate filtered list
@@ -461,13 +461,13 @@ namespace Latios.Authoring.Systems
             {
                 PostFilter(postFilter, ref context);
             }
-            catch(System.Exception e)
+            catch
             {
                 inputToFilteredMapping.Dispose();
                 context.Dispose();
                 filteredConverters.Dispose();
                 filteredToInputMapping.Dispose();
-                throw e;
+                throw;
             }
 
             // Step 4: Build blobs and hashes

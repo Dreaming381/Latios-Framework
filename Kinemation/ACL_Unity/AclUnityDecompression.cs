@@ -35,6 +35,46 @@ namespace AclUnity
         }
 
         // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
+        public static void SamplePoseAosBlendedFirst(void*                     compressedTransformsClip,
+                                                     NativeArray<Qvv>          outputBuffer,
+                                                     float blendFactor,
+                                                     float time,
+                                                     KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedTransformsClip);
+            CheckOutputArrayIsCreated(outputBuffer);
+
+            if (X86.Avx2.IsAvx2Supported)
+            {
+                AVX.samplePoseAOSBlendedFirst(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+            }
+            else
+            {
+                NoExtensions.samplePoseAOSBlendedFirst(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+            }
+        }
+
+        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
+        public static void SamplePoseAosBlendedAdd(void*                     compressedTransformsClip,
+                                                   NativeArray<Qvv>          outputBuffer,
+                                                   float blendFactor,
+                                                   float time,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedTransformsClip);
+            CheckOutputArrayIsCreated(outputBuffer);
+
+            if (X86.Avx2.IsAvx2Supported)
+            {
+                AVX.samplePoseAOSBlendedAdd(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+            }
+            else
+            {
+                NoExtensions.samplePoseAOSBlendedAdd(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+            }
+        }
+
+        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
         public static void SamplePoseSoa(void* compressedTransformsClip, NativeArray<float> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
@@ -138,6 +178,17 @@ namespace AclUnity
             public static extern void samplePoseAOS(void* compressedTransformTracks, float* aosOutputBuffer, float time, byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
+            public static extern void samplePoseAOSBlendedFirst(void*  compressedTransformTracks,
+                                                                float* aosOutputBuffer,
+                                                                float blendFactor,
+                                                                float time,
+                                                                byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseAOSBlendedAdd(void* compressedTransformTracks, float* aosOutputBuffer, float blendFactor, float time,
+                                                              byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
             public static extern void samplePoseSOA(void* compressedTransformTracks, float* soaOutputBuffer, float time, byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
@@ -156,6 +207,17 @@ namespace AclUnity
 
             [DllImport(dllName)]
             public static extern void samplePoseAOS(void* compressedTransformTracks, float* aosOutputBuffer, float time, byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseAOSBlendedFirst(void*  compressedTransformTracks,
+                                                                float* aosOutputBuffer,
+                                                                float blendFactor,
+                                                                float time,
+                                                                byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseAOSBlendedAdd(void* compressedTransformTracks, float* aosOutputBuffer, float blendFactor, float time,
+                                                              byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
             public static extern void samplePoseSOA(void* compressedTransformTracks, float* soaOutputBuffer, float time, byte keyframeInterpolationMode);

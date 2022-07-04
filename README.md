@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.5.0]
+# Latios Framework Packages for DOTS – [0.5.2]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -14,7 +14,7 @@ please use the framework version 0.4.4 instead.
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
-survey**](https://docs.google.com/forms/d/e/1FAIpQLScgqi7IxpxdPDrAvv_Vif7lf-EjboXEUwO7DxlNLPNZhyqi2A/viewform?usp=sf_link)**!**
+survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLXyV7BeCdCOsqfPWeWY_Ww/viewform?usp=sf_link)**!**
 
 ## Packages
 
@@ -82,6 +82,8 @@ Getting Started pages and documentation are provided with each module.
         2](Documentation~/Optimization%20Adventures/Part%205%20-%20Find%20Pairs%202.md)
     -   [Collider Cast
         1](Documentation~/Optimization%20Adventures/Part%206%20-%20ColliderCast%201.md)
+    -   [Frustum Culling
+        1](Documentation~/Optimization%20Adventures/Part%207%20-%20Frustum%20Culling%201.md)
 
 ## Proud Users of Latios Framework
 
