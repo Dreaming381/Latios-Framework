@@ -47,6 +47,7 @@ namespace Latios.Kinemation.Systems
                 boneBoundsHandle                  = GetBufferTypeHandle<OptimizedBoneBounds>(true),
                 boneToRootHandle                  = GetBufferTypeHandle<OptimizedBoneToRoot>(true),
                 ltwHandle                         = ltwHandle,
+                shaderBoundsHandle                = GetComponentTypeHandle<SkeletonShaderBoundsOffset>(true),
                 skeletonWorldBoundsReadOnlyHandle = GetComponentTypeHandle<SkeletonWorldBounds>(true),
                 skeletonWorldBoundsHandle         = GetComponentTypeHandle<SkeletonWorldBounds>(false),
                 chunkSkeletonWorldBoundsHandle    = GetComponentTypeHandle<ChunkSkeletonWorldBounds>(false),
@@ -90,11 +91,11 @@ namespace Latios.Kinemation.Systems
                 worldBounds[0]   = new BoneWorldBounds { bounds = chunkBounds };
                 for (int i = 1; i < batchInChunk.Count; i++)
                 {
-                    var newBounds  = ComputeBounds(boneBounds[i].radialOffsetInBoneSpace, ltws[i].Value);
-                    newBounds.min -= boneBounds[i].radialOffsetInWorldSpace;
-                    newBounds.max += boneBounds[i].radialOffsetInWorldSpace;
-                    worldBounds[i] = new BoneWorldBounds { bounds = newBounds };
-                    chunkBounds    = Physics.CombineAabb(chunkBounds, newBounds);
+                    var newBounds   = ComputeBounds(boneBounds[i].radialOffsetInBoneSpace, ltws[i].Value);
+                    newBounds.min  -= boneBounds[i].radialOffsetInWorldSpace;
+                    newBounds.max  += boneBounds[i].radialOffsetInWorldSpace;
+                    worldBounds[i]  = new BoneWorldBounds { bounds = newBounds };
+                    chunkBounds     = Physics.CombineAabb(chunkBounds, newBounds);
                 }
 
                 batchInChunk.SetChunkComponentData(chunkBoneWorldBoundsHandle, new ChunkBoneWorldBounds { chunkBounds = FromAabb(chunkBounds) });
@@ -113,7 +114,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public BufferTypeHandle<OptimizedBoneBounds>                                   boneBoundsHandle;
             [ReadOnly] public BufferTypeHandle<OptimizedBoneToRoot>                                   boneToRootHandle;
             [ReadOnly] public ComponentTypeHandle<LocalToWorld>                                       ltwHandle;
-            [ReadOnly] public ComponentTypeHandle<SkeletonShaderBoundsOffset> shaderBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<SkeletonShaderBoundsOffset>                         shaderBoundsHandle;
             [ReadOnly] public ComponentTypeHandle<SkeletonWorldBounds>                                skeletonWorldBoundsReadOnlyHandle;
             [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<SkeletonWorldBounds> skeletonWorldBoundsHandle;
             public ComponentTypeHandle<ChunkSkeletonWorldBounds>                                      chunkSkeletonWorldBoundsHandle;
@@ -139,21 +140,21 @@ namespace Latios.Kinemation.Systems
                 if (!needsUpdate)
                     return;
 
-                var boneBounds  = batchInChunk.GetBufferAccessor(boneBoundsHandle);
-                var boneToRoots = batchInChunk.GetBufferAccessor(boneToRootHandle);
-                var ltws        = batchInChunk.GetNativeArray(ltwHandle);
+                var boneBounds   = batchInChunk.GetBufferAccessor(boneBoundsHandle);
+                var boneToRoots  = batchInChunk.GetBufferAccessor(boneToRootHandle);
+                var ltws         = batchInChunk.GetNativeArray(ltwHandle);
                 var shaderBounds = batchInChunk.GetNativeArray(shaderBoundsHandle);
-                var worldBounds = batchInChunk.GetNativeArray(skeletonWorldBoundsHandle);
+                var worldBounds  = batchInChunk.GetNativeArray(skeletonWorldBoundsHandle);
 
                 Aabb chunkBounds = ComputeBounds(boneBounds[0], boneToRoots[0], ltws[0].Value);
                 worldBounds[0]   = new SkeletonWorldBounds { bounds = FromAabb(chunkBounds) };
                 for (int i = 1; i < batchInChunk.Count; i++)
                 {
-                    var newBounds  = ComputeBounds(boneBounds[i], boneToRoots[i], ltws[i].Value);
-                    newBounds.min -= shaderBounds[i].radialBoundsInWorldSpace;
-                    newBounds.max += shaderBounds[i].radialBoundsInWorldSpace;
-                    worldBounds[i] = new SkeletonWorldBounds { bounds = FromAabb(newBounds) };
-                    chunkBounds    = Physics.CombineAabb(chunkBounds, newBounds);
+                    var newBounds   = ComputeBounds(boneBounds[i], boneToRoots[i], ltws[i].Value);
+                    newBounds.min  -= shaderBounds[i].radialBoundsInWorldSpace;
+                    newBounds.max  += shaderBounds[i].radialBoundsInWorldSpace;
+                    worldBounds[i]  = new SkeletonWorldBounds { bounds = FromAabb(newBounds) };
+                    chunkBounds     = Physics.CombineAabb(chunkBounds, newBounds);
                 }
 
                 batchInChunk.SetChunkComponentData(chunkSkeletonWorldBoundsHandle, new ChunkSkeletonWorldBounds { chunkBounds = FromAabb(chunkBounds) });
