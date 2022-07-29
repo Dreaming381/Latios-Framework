@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] – 2022-7-28
+
+Officially supports Entities [0.50.1]
+
+### Changed
+
+-   Updated Kinemation to v0.5.4
+
 ## [0.5.3] – 2022-7-4
 
 Officially supports Entities [0.50.1]

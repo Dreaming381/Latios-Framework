@@ -22,7 +22,10 @@ namespace Latios.Kinemation.Systems
         {
             m_skeletonQuery = Fluent.WithAll<DependentSkinnedMesh>(true).WithAll<PerFrameSkeletonBufferMetadata>(false).Build();
 
-            m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
+            if (UnityEngine.SystemInfo.maxComputeWorkGroupSizeX < 1024)
+                m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning512");
+            else
+                m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
         }
 
         protected override void OnUpdate()

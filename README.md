@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.5.3]
+# Latios Framework Packages for DOTS – [0.5.4]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -86,6 +86,11 @@ Getting Started pages and documentation are provided with each module.
         1](Documentation~/Optimization%20Adventures/Part%207%20-%20Frustum%20Culling%201.md)
 
 ## Proud Users of Latios Framework
+
+### Tools
+
+-   [DMotion](https://github.com/gamedev-pro/dmotion) – Open source animation
+    state machine powered by Kinemation
 
 ### Open Projects
 

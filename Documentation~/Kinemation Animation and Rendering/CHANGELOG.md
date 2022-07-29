@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] – 2022-7-28
+
+Officially supports Entities [0.50.1]
+
+### Added
+
+-   Added Mac OS support (including Apple Silicon)
+
+### Fixed
+
+-   Fixed an issue where multiple materials on a skinned mesh would not copy
+    their skinning indices to the GPU, causing confusing rendering artifacts
+-   Fixed crash with Intel GPUs that do not support large compute thread groups
+
 ## [0.5.3] – 2022-7-4
 
 Officially supports Entities [0.50.1]
