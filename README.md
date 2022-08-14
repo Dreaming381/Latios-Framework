@@ -1,4 +1,4 @@
-# Latios Framework Packages for DOTS – [0.5.4]
+# Latios Framework Packages for DOTS – [0.5.5]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -7,8 +7,8 @@ License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages may contain code borrowed from official Unity packages and therefore
 may be seen as derivative works.
 
-The current version targets DOTS 0.50. If you are still using Entities 0.17,
-please use the framework version 0.4.4 instead.
+The current version targets DOTS 0.50 and 0.51. If you are still using Entities
+0.17, please use the framework version 0.4.4 instead.
 
 *[0.4.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
@@ -33,6 +33,27 @@ survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLX
 -   Ethereal – An NPR renderer authored in reality (No public release)
 -   Networking (Name TBD) – Snapshots + input sim = unified, testable,
     inexpensive, and hardware-friendly networking (No public release)
+
+## Why Use the Latios Framework?
+
+Typically, “frameworks” fall into one of two categories. Either, they are
+someone’s collection of convenience classes and extension methods, or they
+define a specific architecture and workflow for describing gameplay code.
+
+While the Latios Framework has some of those things, its primary concerns are at
+the engine level. Many of its tools and solutions are inspired by GDC
+presentations, technical blogs, and research papers. A key focus of the
+framework is to make these advanced technologies usable within a DOTS-based
+production environment. For technical reasons, it is a “framework”, but it acts
+more like a toolkit and stays out of the way. A developer using it should always
+feel in control. If not, there’s likely an issue worth bringing to attention.
+
+0.5 marks the end of Phase II, where focus was placed on enabling technologies
+in DOTS such as audio and animation. Phase III will focus on gameplay
+technologies such as spatial and hierarchical queries and AI tools.
+
+Long term, the Latios Framework’s mission is to dramatically reduce the
+development effort required to make highly artistic 3D games and short films.
 
 ## Getting Started
 

@@ -80,6 +80,7 @@ namespace Latios
 
             var unmanaged = world.Unmanaged;
 
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
             bool caughtException = false;
 
             try
@@ -94,6 +95,7 @@ namespace Latios
 
             if (!caughtException)
                 throw new System.InvalidOperationException("Cannot install Extreme Transforms when Improved Transforms are already installed");
+#endif
 
             try
             {

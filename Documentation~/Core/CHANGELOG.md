@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] – 2022-8-14
+
+Officially supports Entities [0.50.1] – [0.51.1]
+
+### Fixed
+
+-   Fixed Extreme Transforms crashing on startup in builds
+
 ## [0.5.2] – 2022-7-3
 
 Officially supports Entities [0.50.1]

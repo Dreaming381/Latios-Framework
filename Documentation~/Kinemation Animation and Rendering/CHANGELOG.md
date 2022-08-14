@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] – 2022-8-14
+
+Officially supports Entities [0.50.1] – [0.51.1]
+
+### Added
+
+-   Added `ClipEvents` which can be baked into `SkeletonClipSetBlob` and
+    `ParameterClipSetBlob` instances. These are purely for user use and do not
+    affect the Kinemation runtime.
+-   Added `UnityEngine.AnimationClip.ExtractKinemationClipEvents()` which
+    converts `AnimationEvent`s into a form which can be baked by the Smart
+    Blobbers
+-   Added `ParameterClipSetBlob` and an associated Smart Blobber. They can be
+    used for baking general purpose animation curves and other scalar parameters
+    into Burst-friendly compressed forms.
+-   Added `BufferPoseBlender.ComputeBoneToRoot()` which can compute a
+    `BoneToRoot` matrix for a single bone while the buffer remains in local
+    space. This may be useful for IK solvers.
+-   Added `SkeletonClipCompressionSettings.copyFirstKeyAtEnd` which can be used
+    to fix looping animations which do not match start and end poses
+
+### Fixed
+
+-   Fixed `OptimizedBoneToRoot` construction using `ParentScaleInverse`, which
+    was applying inverse scale to translation
+-   Fixed the `duration` of clips being a sample longer than they actually are
+
 ## [0.5.4] – 2022-7-28
 
 Officially supports Entities [0.50.1]

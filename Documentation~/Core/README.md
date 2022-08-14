@@ -411,6 +411,9 @@ hierarchies are instantiated.
     `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
     exceptions occur inside these methods.
 -   Custom containers do not yet support custom allocators.
+-   Compile errors are generated when using .Net Framework. Use .Net Standard.
+-   IL2CPP only works in builds in Unity 2021 LTS and requires the IL2CPP Code
+    Generation to use the “Faster (smaller) builds” option.
 
 ## Near-Term Roadmap
 

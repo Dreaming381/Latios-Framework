@@ -82,6 +82,11 @@ namespace Latios.Kinemation
         public short boneCount;
 
         /// <summary>
+        /// Events associated with the clip
+        /// </summary>
+        public ClipEvents events;
+
+        /// <summary>
         /// The name of the original authoring clip
         /// </summary>
         public FixedString128Bytes name;
@@ -203,7 +208,6 @@ namespace Latios.Kinemation
                 for (int i = 1; i < boneCount; i++)
                 {
                     var qvv = destinationAsQvv[i];
-                    var mat = float4x4.TRS(qvv.translation.xyz, qvv.rotation, qvv.scale.xyz);
                     Hint.Assume(hierarchy.Value.parentIndices[i] < i);
 
                     var  parentMat             = destinationAsArray[hierarchy.Value.parentIndices[i]];
@@ -212,7 +216,9 @@ namespace Latios.Kinemation
                     parentMat.c0.w             = 0f;
                     parentMat.c1.w             = 0f;
                     parentMat.c2.w             = 0f;
-                    mat                        = math.mul(psi, mat);
+                    var mat                    = math.mul(float4x4.Translate(qvv.translation.xyz), psi);
+                    mat                        = math.mul(mat, new float4x4(qvv.rotation, 0f));
+                    mat                        = math.mul(mat, float4x4.Scale(qvv.scale.xyz));
                     mat                        = math.mul(parentMat, mat);
 
                     bool needsInverseScale = hierarchy.Value.hasChildWithParentScaleInverseBitmask[i / 64].IsSet(i % 64);
@@ -279,6 +285,111 @@ namespace Latios.Kinemation
             if (hierarchy.Value.parentIndices.Length < boneCount)
                 throw new ArgumentException("The hierarchy blob asset represents a skeleton with less bones than the clip.");
         }
+    }
+
+    /// <summary>
+    /// Blob data containing a collection of general purpose parameter animation clips
+    /// </summary>
+    public struct ParameterClipSetBlob
+    {
+        public short                    parameterCount;
+        public BlobArray<ParameterClip> clips;
+        /// <summary>
+        /// Equivalent to the FixedString64Bytes.GetHashCode() for each parameter name
+        /// </summary>
+        public BlobArray<int>                parameterNameHashes;
+        public BlobArray<FixedString64Bytes> parameterNames;
+    }
+
+    /// <summary>
+    /// Partial blob data containing a single clip for a collection of parameters
+    /// </summary>
+    public struct ParameterClip
+    {
+        internal BlobArray<byte> compressedClipDataAligned16;
+
+        /// <summary>
+        /// The duration of the clip in seconds
+        /// </summary>
+        public float duration;
+
+        /// <summary>
+        /// The internal sample rate of the clip
+        /// </summary>
+        public float sampleRate;
+
+        /// <summary>
+        /// The number of parameters in the clip
+        /// </summary>
+        public short parameterCount;
+
+        /// <summary>
+        /// Events associated with the clip
+        /// </summary>
+        public ClipEvents events;
+
+        /// <summary>
+        /// The name of the original authoring clip
+        /// </summary>
+        public FixedString128Bytes name;
+
+        /// <summary>
+        /// Computes a wrapped time value from an unbounded time as if the clip looped infinitely
+        /// </summary>
+        /// <param name="time">The time value which may exceed the duration of the clip</param>
+        /// <returns>A clip time between 0 and the clip's duration</returns>
+        /// <remarks>If the clip is 5 seconds long, then a value of 7 would return 2, and a value of -2 would return 3.</remarks>
+        public float LoopToClipTime(float time)
+        {
+            float wrappedTime  = math.fmod(time, duration);
+            wrappedTime       += math.select(0f, duration, wrappedTime < 0f);
+            return wrappedTime;
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the given parameter index at the given time
+        /// </summary>
+        /// <param name="parameterIndex">The parameter index to sample. This value is automatically clamped to a valid value.</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        /// <returns>A parameter sampled from the clip in local space of the bone</returns>
+        public unsafe float SampleParameter(int parameterIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            // Note: ACL clamps time, so we don't need to worry about it.
+            // ACLUnity also clamps the parameterIndex, so we don't need to worry about that either.
+            return AclUnity.Decompression.SampleFloat(compressedClipDataAligned16.GetUnsafePtr(), parameterIndex, time, mode);
+        }
+
+        public unsafe void SampleAllParameters(NativeArray<float>        destination,
+                                               float time,
+                                               KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBufferIsBigEnoughForClip(destination, parameterCount);
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SampleFloats(compressedClipDataAligned16.GetUnsafePtr(), destination, time, mode);
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckBufferIsBigEnoughForClip(NativeArray<float> buffer, short parameterCount)
+        {
+            if (buffer.Length < parameterCount)
+                throw new ArgumentException("The Native Array does not contain enough elements to store all the parameters.");
+        }
+    }
+
+    /// <summary>
+    /// A time-sorted SOA of events where each event has a name and an extra int parameter
+    /// </summary>
+    public struct ClipEvents
+    {
+        public BlobArray<float>              times;
+        public BlobArray<int>                nameHashes;
+        public BlobArray<int>                parameters;
+        public BlobArray<FixedString64Bytes> names;
     }
 }
 

@@ -1,5 +1,20 @@
 # Getting Started with Latios.Core Framework
 
+## Runtime Settings
+
+In *Project Settings*, under the *Player* tab, in *Other Settings* and under the
+*Configuration* header, set the *API Compatibility Level* to *.NET Standard*.
+
+### Mono
+
+No additional settings required.
+
+### Il2Cpp
+
+The Latios Framework is only compatible with IL2CPP in 2021.3 LTS. Additionally,
+in the *Build Settings*, set the *IL2CPP Code Generation* to *Faster (smaller)
+builds*
+
 ## Bootstrap
 
 Latios Framework requires a custom bootstrap to inject its custom features into

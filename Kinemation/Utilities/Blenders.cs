@@ -10,6 +10,24 @@ namespace Latios.Kinemation
     /// <summary>
     /// A struct used to blend a full OptimizedBoneToRoot buffer. Rotations use nlerp blending.
     /// </summary>
+    /// <remarks>
+    /// A BufferPoseBlender reinterprets an OptimizedBoneToRoot as temporary storage to sample
+    /// and accumulate local space BoneTransforms. The first pose sampled for a given instance
+    /// will overwrite the storage. Additional samples will perform additive blending instead.
+    ///
+    /// To discard existing sampled poses and begin sampling new poses, simply create a new
+    /// instance of BufferPoseBlender using the same OptimizedBoneToRoot buffer.
+    ///
+    /// To finish sampling, call NormalizeRotations(). You can then get a view of the BoneTransforms
+    /// using GetLocalTransformsView().
+    ///
+    /// If you leave the buffer in this state, a new BufferPoseBlender instance can recover this
+    /// view by immediately calling GetLocalTransformsView(). This allows you to separate sampling
+    /// and IK into separate jobs.
+    ///
+    /// When you are done performing any sampling or BoneTransform manipulation, call
+    /// ApplyBoneHierarchyAndFinish().
+    /// </remarks>
     public struct BufferPoseBlender
     {
         internal NativeArray<float4x4>     bufferAs4x4;
@@ -55,6 +73,133 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
+        /// Computes a BoneToRoot matrix for a local space BoneTransform. The result can be multiplied with the skeleton's
+        /// LocalToWorld to obtain a LocalToWorld for the bone. This method does not modify state.
+        ///
+        /// Warning: This method is only valid after calling NormalizeRotations().
+        /// </summary>
+        /// <param name="boneIndex">The bone index to compute a BoneToRoot matrix for</param>
+        /// <param name="hierarchy">The skeleton hierarchy used to compute the bone's ancestors</param>
+        /// <returns>A skeleton-space matrix representing the transform of boneIndex</returns>
+        public float4x4 ComputeBoneToRoot(int boneIndex, BlobAssetReference<OptimizedSkeletonHierarchyBlob> hierarchy)
+        {
+            if (!hierarchy.Value.hasAnyParentScaleInverseBone)
+            {
+                // Fast path.
+                var parentIndex = hierarchy.Value.parentIndices[boneIndex];
+                var transform   = new BoneTransform(bufferAsQvv[boneIndex]);
+                var matrix      = float4x4.TRS(transform.translation, transform.rotation, transform.scale);
+                while (parentIndex >= 0)
+                {
+                    transform = new BoneTransform(bufferAsQvv[parentIndex]);
+                    matrix    = math.mul(float4x4.TRS(transform.translation, transform.rotation, transform.scale), matrix);
+
+                    Hint.Assume(hierarchy.Value.parentIndices[parentIndex] < parentIndex);
+                    parentIndex = hierarchy.Value.parentIndices[parentIndex];
+                }
+
+                return matrix;
+            }
+            else
+            {
+                var currentIndex = boneIndex;
+                var parentIndex  = hierarchy.Value.parentIndices[boneIndex];
+                var matrix       = float4x4.identity;
+
+                while (currentIndex >= 0)
+                {
+                    Hint.Assume(parentIndex < currentIndex);
+
+                    var transform = new BoneTransform(bufferAsQvv[currentIndex]);
+
+                    if (hierarchy.Value.hasParentScaleInverseBitmask[currentIndex / 64].IsSet(currentIndex % 64))
+                    {
+                        var mat = math.mul(float4x4.Translate(transform.translation), float4x4.Scale(math.rcp(bufferAsQvv[parentIndex].scale.xyz)));
+                        mat     = math.mul(mat, new float4x4(transform.rotation, 0f));
+                        mat     = math.mul(mat, float4x4.Scale(transform.scale));
+
+                        matrix = math.mul(mat, matrix);
+                    }
+                    else
+                    {
+                        matrix = math.mul(float4x4.TRS(transform.translation, transform.rotation, transform.scale), matrix);
+                    }
+
+                    parentIndex = hierarchy.Value.parentIndices[parentIndex];
+                }
+
+                return matrix;
+            }
+        }
+
+        /// <summary>
+        /// Computes a BoneToRoot matrix for a local space BoneTransform. The result can be multiplied with the skeleton's
+        /// LocalToWorld to obtain a LocalToWorld for the bone. This method does not modify state.
+        ///
+        /// This variant uses an already known boneToRoot of an ancestor to avoid repeating calculations.
+        ///
+        /// Warning: This method is only valid after calling NormalizeRotations().
+        /// </summary>
+        /// <param name="boneIndex">The bone index to compute a BoneToRoot matrix for</param>
+        /// <param name="hierarchy">The skeleton hierarchy used to compute the bone's ancestors</param>
+        /// <param name="cachedAncestorBoneIndex">The bone index of an ancestor whose boneToRoot is already known</param>
+        /// <param name="cachedAncestorBoneToRoot">The boneToRoot of the ancestor which is already known.</param>
+        /// <returns>A skeleton-space matrix representing the transform of boneIndex</returns>
+        public float4x4 ComputeBoneToRoot(int boneIndex,
+                                          BlobAssetReference<OptimizedSkeletonHierarchyBlob> hierarchy,
+                                          int cachedAncestorBoneIndex,
+                                          in float4x4 cachedAncestorBoneToRoot)
+        {
+            if (!hierarchy.Value.hasAnyParentScaleInverseBone)
+            {
+                // Fast path.
+                var parentIndex = hierarchy.Value.parentIndices[boneIndex];
+                var transform   = new BoneTransform(bufferAsQvv[boneIndex]);
+                var matrix      = float4x4.TRS(transform.translation, transform.rotation, transform.scale);
+                while (parentIndex > cachedAncestorBoneIndex)
+                {
+                    transform = new BoneTransform(bufferAsQvv[parentIndex]);
+                    matrix    = math.mul(float4x4.TRS(transform.translation, transform.rotation, transform.scale), matrix);
+
+                    Hint.Assume(hierarchy.Value.parentIndices[parentIndex] < parentIndex);
+                    parentIndex = hierarchy.Value.parentIndices[parentIndex];
+                }
+
+                return math.mul(cachedAncestorBoneToRoot, matrix);
+            }
+            else
+            {
+                var currentIndex = boneIndex;
+                var parentIndex  = hierarchy.Value.parentIndices[boneIndex];
+                var matrix       = float4x4.identity;
+
+                while (currentIndex > cachedAncestorBoneIndex)
+                {
+                    Hint.Assume(parentIndex < currentIndex);
+
+                    var transform = new BoneTransform(bufferAsQvv[currentIndex]);
+
+                    if (hierarchy.Value.hasParentScaleInverseBitmask[currentIndex / 64].IsSet(currentIndex % 64))
+                    {
+                        var mat = math.mul(float4x4.Translate(transform.translation), float4x4.Scale(math.rcp(bufferAsQvv[parentIndex].scale.xyz)));
+                        mat     = math.mul(mat, new float4x4(transform.rotation, 0f));
+                        mat     = math.mul(mat, float4x4.Scale(transform.scale));
+
+                        matrix = math.mul(mat, matrix);
+                    }
+                    else
+                    {
+                        matrix = math.mul(float4x4.TRS(transform.translation, transform.rotation, transform.scale), matrix);
+                    }
+
+                    parentIndex = hierarchy.Value.parentIndices[parentIndex];
+                }
+
+                return math.mul(cachedAncestorBoneToRoot, matrix);
+            }
+        }
+
+        /// <summary>
         /// Applies the hierarchy to the bone transforms and restores the validity of the dynamic buffer.
         /// Call this once after calling NormalizeRotations().
         /// The result of GetLocalTransformsView() is invalidated after calling this method.
@@ -95,7 +240,6 @@ namespace Latios.Kinemation
                 for (int i = 1; i < boneCount; i++)
                 {
                     var qvv = bufferAsQvv[i];
-                    var mat = float4x4.TRS(qvv.translation.xyz, qvv.rotation, qvv.scale.xyz);
                     Hint.Assume(hierarchy.Value.parentIndices[i] < i);
 
                     var  parentMat             = bufferAs4x4[hierarchy.Value.parentIndices[i]];
@@ -104,7 +248,9 @@ namespace Latios.Kinemation
                     parentMat.c0.w             = 0f;
                     parentMat.c1.w             = 0f;
                     parentMat.c2.w             = 0f;
-                    mat                        = math.mul(psi, mat);
+                    var mat                    = math.mul(float4x4.Translate(qvv.translation.xyz), psi);
+                    mat                        = math.mul(mat, new float4x4(qvv.rotation, 0f));
+                    mat                        = math.mul(mat, float4x4.Scale(qvv.scale.xyz));
                     mat                        = math.mul(parentMat, mat);
 
                     bool needsInverseScale = hierarchy.Value.hasChildWithParentScaleInverseBitmask[i / 64].IsSet(i % 64);
