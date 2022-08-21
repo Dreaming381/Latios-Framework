@@ -172,7 +172,7 @@ expressions to the extreme!
 
 ## Known Issues
 
--   Kinemation only supports Windows platforms. While the ACLUnity native plugin
+-   Kinemation only supports desktop platforms. While the ACLUnity native plugin
     is expected to work across all platforms, I do not have the capability to
     compile and test for other platforms. If you would like to see Kinemation
     support your target platform, please reach out to me!
@@ -200,3 +200,4 @@ expressions to the extreme!
 -   Stats and Troubleshooting Diagnostics
 -   Import-time Binding Paths Baking
     -   Avoids issues where child bones are renamed in the hierarchy
+-   IK Utilities

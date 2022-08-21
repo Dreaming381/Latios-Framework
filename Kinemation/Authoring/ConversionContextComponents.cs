@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Latios.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -31,7 +32,7 @@ namespace Latios.Kinemation.Authoring
         {
             if (m_shadowHierarchy != null)
             {
-                GameObject.Destroy(m_shadowHierarchy);
+                m_shadowHierarchy.DestroyDuringConversion();
             }
         }
     }

@@ -390,6 +390,83 @@ namespace Latios.Kinemation
         public BlobArray<int>                nameHashes;
         public BlobArray<int>                parameters;
         public BlobArray<FixedString64Bytes> names;
+
+        /// <summary>
+        /// Finds all events within the time range (previousTime, currentTime] and returns the first index and the count.
+        /// If currentTime is less than previousTime, if iterating i = firstEventIndex while i < firstEventIndex + count,
+        /// events should be indexed as [i % times.length] to account for looping behavior.
+        /// </summary>
+        /// <param name="previousTime">The previous time to start searching for events. This time value is exclusive.</param>
+        /// <param name="currentTime">The current time to end searching for events. This time value is inclusive.</param>
+        /// <param name="firstEventIndex">The index of the first event found. -1 if no events are found.</param>
+        /// <param name="eventCount">The number of events found</param>
+        /// <returns>True if events were found, false otherwise</returns>
+        public bool TryGetEventsRange(float previousTime, float currentTime, out int firstEventIndex, out int eventCount)
+        {
+            if (previousTime == currentTime || times.Length == 0)
+            {
+                firstEventIndex = -1;
+                eventCount      = 0;
+                return false;
+            }
+
+            // Todo: Vectorize and optimize
+            firstEventIndex = -1;
+            for (int i = 0; i < times.Length; i++)
+            {
+                if (times[i] > previousTime)
+                {
+                    firstEventIndex = i;
+                    break;
+                }
+            }
+            int onePastLastEventIndex = -1;
+            for (int i = 0; i < times.Length; i++)
+            {
+                if (times[i] > currentTime)
+                {
+                    onePastLastEventIndex = i;
+                    break;
+                }
+            }
+
+            if (previousTime < currentTime)
+            {
+                if (firstEventIndex == -1)
+                {
+                    eventCount = 0;
+                    return false;
+                }
+
+                if (onePastLastEventIndex == -1)
+                {
+                    // The time is beyond the last event.
+                    eventCount = times.Length - firstEventIndex;
+                    return true;
+                }
+
+                eventCount = onePastLastEventIndex - firstEventIndex;
+                return true;
+            }
+
+            // We wrapped around
+            if (onePastLastEventIndex <= 0 && firstEventIndex == -1)
+            {
+                // We start past the last event and the current time is before the first event
+                eventCount = 0;
+                return false;
+            }
+
+            if (firstEventIndex == -1)
+            {
+                firstEventIndex = 0;
+                eventCount      = onePastLastEventIndex;
+                return true;
+            }
+
+            eventCount = times.Length - firstEventIndex + onePastLastEventIndex;
+            return true;
+        }
     }
 }
 

@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.6] – 2022-8-21
+
+Officially supports Entities [0.50.1] – [0.51.1]
+
+### Added
+
+-   Added `ClipEvents.TryGetEventsRange` which can find all events between two
+    time points
+-   Added `SkeletonBindingPathsBlob.StartsWith()` and`
+    SkeletonBindingPathsBlob.TryGetFirstPathIndexThatStartWith()` for finding
+    optimized bones by name.
+
+### Fixed
+
+-   Fixed multiple issues that caused errors when destroying exposed skeleton
+    entities at runtime
+-   Fixed Editor Mode Game Object Conversion when destroying shadow hierarchies
+    used for capturing skeleton structures and animation clip samples
+
+### Improved
+
+-   Improved performance of the culling callbacks by \~15%
+
 ## [0.5.5] – 2022-8-14
 
 Officially supports Entities [0.50.1] – [0.51.1]

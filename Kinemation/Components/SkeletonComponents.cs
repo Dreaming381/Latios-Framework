@@ -1,5 +1,6 @@
 using System;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -44,6 +45,37 @@ namespace Latios.Kinemation
     {
         // Todo: Make this a BlobArray<BlobString> once supported in Burst
         public BlobArray<BlobArray<byte> > pathsInReversedNotation;
+
+        /// <summary>
+        /// Returns true if the path in reversed notation begins with the passed in string, case sensitive
+        /// </summary>
+        /// <param name="pathIndex">The index into pathsInReversedNotation, which is also a boneIndex</param>
+        /// <param name="searchString">The string to search</param>
+        /// <returns>Returns true if the string matches the start</returns>
+        public unsafe bool StartsWith(int pathIndex, in FixedString64Bytes searchString)
+        {
+            if (searchString.Length > pathsInReversedNotation[pathIndex].Length)
+                return false;
+
+            return UnsafeUtility.MemCmp(searchString.GetUnsafePtr(), pathsInReversedNotation[pathIndex].GetUnsafePtr(), searchString.Length) == 0;
+        }
+
+        /// <summary>
+        /// Searches through all paths to find one starting with the search string, case sensitive
+        /// </summary>
+        /// <param name="searchString">The string to search</param>
+        /// <param name="foundPathIndex">The first path index that began with the search string. This index corresponds to a bone index.</param>
+        /// <returns>Returns true if a match was found</returns>
+        public bool TryGetFirstPathIndexThatStartsWith(in FixedString64Bytes searchString, out int foundPathIndex)
+        {
+            for (foundPathIndex = 0; foundPathIndex < pathsInReversedNotation.Length; foundPathIndex++)
+            {
+                if (StartsWith(foundPathIndex, in searchString))
+                    return true;
+            }
+            foundPathIndex = -1;
+            return false;
+        }
     }
 
     /// <summary>

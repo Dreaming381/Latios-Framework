@@ -807,7 +807,7 @@ namespace Latios.Kinemation.Systems
             public void Execute()
             {
                 // We never shrink indices, so we can safely set indicesToClear now.
-                indicesToClear.Value = new UnsafeBitArray(cullingManager.maxIndex.Value, allocator);
+                indicesToClear.Value = new UnsafeBitArray(cullingManager.maxIndex.Value + 1, allocator);
 
                 for (int i = 0; i < deadExposedSkeletons.Length; i++)
                 {
@@ -821,7 +821,9 @@ namespace Latios.Kinemation.Systems
                 for (int i = 0; i < deadExposedSkeletons2.Length; i++)
                 {
                     var entity = deadExposedSkeletons2[i];
-                    int index  = cullingManager.skeletonToCullingIndexMap[entity];
+                    if (!cullingManager.skeletonToCullingIndexMap.ContainsKey(entity))
+                        continue;
+                    int index = cullingManager.skeletonToCullingIndexMap[entity];
                     cullingManager.indexFreeList.Add(index);
                     cullingManager.skeletonToCullingIndexMap.Remove(entity);
                     cullingManager.cullingIndexToSkeletonMap.Remove(index);

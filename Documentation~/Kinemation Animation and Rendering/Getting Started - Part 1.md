@@ -17,16 +17,19 @@ entity.
 ## Minimum Requirements
 
 -   Currently Supported Platforms
-    -   Windows Standalone
+    -   Windows
+    -   Mac OS
+    -   Linux
 -   GPU Minimum Requirements
     -   Supports Hybrid Renderer V2
     -   Supports 8 simultaneous compute buffers in compute shaders
     -   Has 32 kB of shared memory per thread group
-    -   Supports thread group dimensions of (1024, 1, 1)
+    -   Supports thread group dimensions of (512, 1, 1)
 -   Content Requirements
-    -   Skeleton size must be 341 or less (can be larger if bound meshes use
-        small number of bones each)
-    -   No limit to number of meshes bound to skeleton
+    -   Skeleton size must be 341 bones or less (can be larger if bound meshes
+        use small number of bones each)
+    -   No limit to number of meshes bound to skeleton, nor number of materials
+        per mesh
 
 ## Skeletons and Bones – Not What You Think
 

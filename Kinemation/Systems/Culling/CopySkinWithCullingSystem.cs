@@ -1,6 +1,8 @@
 using Latios;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -38,12 +40,13 @@ namespace Latios.Kinemation.Systems
                 chunkHeaderHandle              = GetComponentTypeHandle<ChunkHeader>(true),
                 chunkPerFrameMaskHandle        = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
                 referenceHandle                = GetComponentTypeHandle<ShareSkinFromEntity>(true),
-                entityHandle                   = GetEntityTypeHandle(),
                 sife                           = GetStorageInfoFromEntity(),
                 chunkPerCameraMaskHandle       = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
                 chunkMaterialPropertyDirtyMask = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
                 computeCdfe                    = GetComponentDataFromEntity<ComputeDeformShaderIndex>(false),
                 linearBlendCdfe                = GetComponentDataFromEntity<LinearBlendSkinningShaderIndex>(false),
+                computeDeformHandle            = GetComponentTypeHandle<ComputeDeformShaderIndex>(false),
+                linearBlendHandle              = GetComponentTypeHandle<LinearBlendSkinningShaderIndex>(false),
                 linearBlendMaterialMaskLower   = linearBlendMaterialMaskLower,
                 linearBlendMaterialMaskUpper   = linearBlendMaterialMaskUpper,
                 deformMaterialMaskLower        = deformMaterialMaskLower,
@@ -58,7 +61,6 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>              chunkHeaderHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask> chunkPerFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ShareSkinFromEntity>      referenceHandle;
-            [ReadOnly] public EntityTypeHandle                              entityHandle;
 
             [ReadOnly] public StorageInfoFromEntity sife;
 
@@ -67,6 +69,9 @@ namespace Latios.Kinemation.Systems
 
             [NativeDisableParallelForRestriction] public ComponentDataFromEntity<ComputeDeformShaderIndex>       computeCdfe;
             [NativeDisableParallelForRestriction] public ComponentDataFromEntity<LinearBlendSkinningShaderIndex> linearBlendCdfe;
+
+            [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<ComputeDeformShaderIndex>       computeDeformHandle;
+            [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<LinearBlendSkinningShaderIndex> linearBlendHandle;
 
             public ulong linearBlendMaterialMaskLower;
             public ulong linearBlendMaterialMaskUpper;
@@ -80,6 +85,9 @@ namespace Latios.Kinemation.Systems
                 var chunkCameraMasks        = archetypeChunk.GetNativeArray(chunkPerCameraMaskHandle);
                 var chunkFrameMasks         = archetypeChunk.GetNativeArray(chunkPerFrameMaskHandle);
                 var chunkMaterialDirtyMasks = archetypeChunk.GetNativeArray(chunkMaterialPropertyDirtyMask);
+
+                var context = new MaterialContext();
+                context.Init(linearBlendCdfe, computeCdfe, linearBlendHandle, computeDeformHandle);
 
                 for (var metaIndex = 0; metaIndex < archetypeChunk.Count; metaIndex++)
                 {
@@ -101,15 +109,12 @@ namespace Latios.Kinemation.Systems
                         //var perInstanceCull = 0 != (chunkCullingData.Flags & HybridChunkCullingData.kFlagInstanceCulling);
 
                         var chunk = chunkHeader.ArchetypeChunk;
+                        context.ResetChunk(chunk);
 
                         var references                 = chunk.GetNativeArray(referenceHandle);
-                        var entities                   = chunk.GetNativeArray(entityHandle);
                         var invertedFrameMasks         = chunkFrameMasks[metaIndex];
                         invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
                         invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
-
-                        bool linearBlendDirty   = false;
-                        bool computeDeformDirty = false;
 
                         var        lodWord = chunkEntityLodEnabled.Enabled[0];
                         BitField64 maskWordLower;
@@ -118,9 +123,8 @@ namespace Latios.Kinemation.Systems
                         {
                             bool isIn = IsReferenceVisible(references[i].sourceSkinnedEntity,
                                                            invertedFrameMasks.lower.IsSet(i),
-                                                           entities[i],
-                                                           ref linearBlendDirty,
-                                                           ref computeDeformDirty);
+                                                           i,
+                                                           ref context);
                             maskWordLower.Value |= math.select(0ul, 1ul, isIn) << i;
                         }
                         lodWord = chunkEntityLodEnabled.Enabled[1];
@@ -130,21 +134,20 @@ namespace Latios.Kinemation.Systems
                         {
                             bool isIn = IsReferenceVisible(references[i + 64].sourceSkinnedEntity,
                                                            invertedFrameMasks.upper.IsSet(i),
-                                                           entities[i + 64],
-                                                           ref linearBlendDirty,
-                                                           ref computeDeformDirty);
+                                                           i + 64,
+                                                           ref context);
                             maskWordUpper.Value |= math.select(0ul, 1ul, isIn) << i;
                         }
 
                         chunkCameraMasks[metaIndex] = new ChunkPerCameraCullingMask { lower = maskWordLower, upper = maskWordUpper };
 
                         var dirtyMask = chunkMaterialDirtyMasks[metaIndex];
-                        if (linearBlendDirty)
+                        if (context.linearBlendDirty)
                         {
                             dirtyMask.lower.Value |= linearBlendMaterialMaskLower;
                             dirtyMask.upper.Value |= linearBlendMaterialMaskUpper;
                         }
-                        if (computeDeformDirty)
+                        if (context.computeDeformDirty)
                         {
                             dirtyMask.lower.Value |= deformMaterialMaskLower;
                             dirtyMask.upper.Value |= deformMaterialMaskUpper;
@@ -154,7 +157,7 @@ namespace Latios.Kinemation.Systems
                 }
             }
 
-            bool IsReferenceVisible(Entity reference, bool needsCopy, Entity thisEntity, ref bool linearBlendDirty, ref bool computeDeformDirty)
+            bool IsReferenceVisible(Entity reference, bool needsCopy, int entityIndex, ref MaterialContext context)
             {
                 if (reference == Entity.Null || !sife.Exists(reference))
                     return false;
@@ -168,18 +171,63 @@ namespace Latios.Kinemation.Systems
                     result = referenceMask.lower.IsSet(info.IndexInChunk);
                 if (result && needsCopy)
                 {
-                    if (computeCdfe.HasComponent(thisEntity))
-                    {
-                        computeCdfe[thisEntity] = computeCdfe[reference];
-                        computeDeformDirty      = true;
-                    }
-                    if (linearBlendCdfe.HasComponent(thisEntity))
-                    {
-                        linearBlendCdfe[thisEntity] = linearBlendCdfe[reference];
-                        linearBlendDirty            = true;
-                    }
+                    context.CopySkin(entityIndex,
+                                     reference);
                 }
                 return result;
+            }
+
+            struct MaterialContext
+            {
+                bool                                                    newChunk;
+                ArchetypeChunk                                          currentChunk;
+                NativeArray<LinearBlendSkinningShaderIndex>             linearBlendChunkArray;
+                NativeArray<ComputeDeformShaderIndex>                   computeDeformChunkArray;
+                bool                                                    hasLinearBlend;
+                bool                                                    hasComputeDeform;
+                ComponentTypeHandle<LinearBlendSkinningShaderIndex>     copySkinLinearBlendHandle;
+                ComponentDataFromEntity<LinearBlendSkinningShaderIndex> referenceLinearBlendCdfe;
+                ComponentTypeHandle<ComputeDeformShaderIndex>           copySkinComputeDeformHandle;
+                ComponentDataFromEntity<ComputeDeformShaderIndex>       referenceComputeDeformCdfe;
+
+                public void Init(ComponentDataFromEntity<LinearBlendSkinningShaderIndex> lbsCdfe, ComponentDataFromEntity<ComputeDeformShaderIndex> cdsCdfe,
+                                 ComponentTypeHandle<LinearBlendSkinningShaderIndex> lbsHandle, ComponentTypeHandle<ComputeDeformShaderIndex> cdsHandle)
+                {
+                    copySkinLinearBlendHandle   = lbsHandle;
+                    referenceLinearBlendCdfe    = lbsCdfe;
+                    copySkinComputeDeformHandle = cdsHandle;
+                    referenceComputeDeformCdfe  = cdsCdfe;
+                }
+
+                public void ResetChunk(ArchetypeChunk chunk)
+                {
+                    newChunk         = true;
+                    hasComputeDeform = false;
+                    hasLinearBlend   = false;
+                    currentChunk     = chunk;
+                }
+
+                public bool linearBlendDirty => hasLinearBlend;
+                public bool computeDeformDirty => hasComputeDeform;
+
+                public void CopySkin(int entityIndex, Entity reference)
+                {
+                    if (Hint.Unlikely(newChunk))
+                    {
+                        newChunk         = false;
+                        hasLinearBlend   = currentChunk.Has(copySkinLinearBlendHandle);
+                        hasComputeDeform = currentChunk.Has(copySkinComputeDeformHandle);
+                        if (hasLinearBlend)
+                            linearBlendChunkArray = currentChunk.GetNativeArray(copySkinLinearBlendHandle);
+                        if (hasComputeDeform)
+                            computeDeformChunkArray = currentChunk.GetNativeArray(copySkinComputeDeformHandle);
+                    }
+
+                    if (hasLinearBlend)
+                        linearBlendChunkArray[entityIndex] = referenceLinearBlendCdfe[reference];
+                    if (hasComputeDeform)
+                        computeDeformChunkArray[entityIndex] = referenceComputeDeformCdfe[reference];
+                }
             }
         }
     }

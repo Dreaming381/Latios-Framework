@@ -58,13 +58,19 @@ namespace Latios.Kinemation.Systems
                 NativeArrayOptions.ClearMemory);
 
             Profiler.BeginSample("GetTypeHandles");
-            context.componentTypeCache.FetchTypeHandles(this);
-            var componentTypes = context.componentTypeCache.ToBurstCompatible(Allocator.TempJob);
+            // Getting the chunk header here ensures that CheckedState() runs before we do anything crazy.
+            var chunkHeader = GetComponentTypeHandle<ChunkHeader>(true);
+
+            //context.componentTypeCache.FetchTypeHandles(this);
+            var worldUnmanaged = World.Unmanaged;
+            ComponentTypeCacheBurstHelpers.FetchTypeHandlesBursted(ref context.componentTypeCache, SystemHandleUntyped, ref worldUnmanaged, out var typeIndicesTemp);
+            //var componentTypes = context.componentTypeCache.ToBurstCompatible(Allocator.TempJob);
+            ComponentTypeCacheBurstHelpers.MakeBurstCompatibleTypeArray(ref context.componentTypeCache, out var componentTypes, Allocator.TempJob, typeIndicesTemp);
             Profiler.EndSample();
 
             Dependency = new ComputeOperationsJob
             {
-                ChunkHeader                     = GetComponentTypeHandle<ChunkHeader>(true),
+                ChunkHeader                     = chunkHeader,
                 ChunkProperties                 = context.chunkProperties,
                 chunkPropertyDirtyMaskHandle    = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
                 chunkPerCameraCullingMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
@@ -396,6 +402,119 @@ namespace Latios.Kinemation.Systems
                     // Debug.Assert(false, "Maximum amount of GPU upload operations exceeded");
                 }
             }
+        }
+    }
+
+    [BurstCompile]
+    internal static class ComponentTypeCacheBurstHelpers
+    {
+        public static unsafe void FetchTypeHandlesBursted(ref ComponentTypeCache cache, in SystemHandleUntyped handle, ref WorldUnmanaged world, out NativeArray<int> typeIndices)
+        {
+            var statePtr = world.ResolveSystemState(handle);
+
+            //var types = cache.UsedTypes.GetKeyValueArrays(Allocator.Temp);
+            var types = UsedTypesGetKeyValueArrays(cache.UsedTypes);
+
+            if (cache.TypeDynamics == null || cache.TypeDynamics.Length < cache.MaxIndex + 1)
+                // Allocate according to Capacity so we grow with the same geometric formula as NativeList
+                cache.TypeDynamics = new DynamicComponentTypeHandle[cache.MaxIndex + 1];
+
+            ref var keys     = ref types.Keys;
+            ref var values   = ref types.Values;
+            int     numTypes = keys.Length;
+            for (int i = 0; i < numTypes; ++i)
+            {
+                int arrayIndex = keys[i];
+                int typeIndex  = values[i];
+                //cache.TypeDynamics[arrayIndex] = statePtr->GetDynamicComponentTypeHandle(
+                //    ComponentType.ReadOnly(typeIndex));
+                DynamicComponentTypeHandle typeHandle = default;
+                GetDynamicComponentTypeHandle(statePtr, typeIndex, &typeHandle);
+                cache.TypeDynamics[arrayIndex] = typeHandle;
+            }
+
+            typeIndices = types.Values;
+        }
+
+        public static unsafe void MakeBurstCompatibleTypeArray(ref ComponentTypeCache cache,
+                                                               out ComponentTypeCache.BurstCompatibleTypeArray result,
+                                                               Allocator allocator,
+                                                               NativeArray<int>                                typeIndices)
+        {
+            ComponentTypeCache.BurstCompatibleTypeArray typeArray = default;
+
+            UnityEngine.Debug.Assert(cache.UsedTypeCount > 0,                                                      "No types have been registered");
+            UnityEngine.Debug.Assert(cache.UsedTypeCount <= ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes, "Maximum supported amount of types exceeded");
+
+            typeArray.TypeIndexToArrayIndex = new NativeArray<int>(
+                cache.MaxIndex + 1,
+                allocator,
+                NativeArrayOptions.UninitializedMemory);
+            ref var toArrayIndex = ref typeArray.TypeIndexToArrayIndex;
+
+            // Use an index guaranteed to cause a crash on invalid indices
+            uint GuaranteedCrashOffset = 0x80000000;
+            //for (int i = 0; i < toArrayIndex.Length; ++i)
+            //    toArrayIndex[i] = (int)GuaranteedCrashOffset;
+            UnsafeUtility.MemCpyReplicate(toArrayIndex.GetUnsafePtr(), &GuaranteedCrashOffset, 4, toArrayIndex.Length);
+
+            //var typeIndices = UsedTypes.GetValueArray(Allocator.Temp);
+            int numTypes = math.min(typeIndices.Length, ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes);
+            var fixedT0  = &typeArray.t0;
+
+            for (int i = 0; i < numTypes; ++i)
+            {
+                int typeIndex                                             = typeIndices[i];
+                fixedT0[i]                                                = cache.Type(typeIndex);
+                toArrayIndex[ComponentTypeCache.GetArrayIndex(typeIndex)] = i;
+            }
+
+            // TODO: Is there a way to avoid this?
+            // We need valid type objects in each field.
+            {
+                var someType = cache.Type(typeIndices[0]);
+                for (int i = numTypes; i < ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes; ++i)
+                    fixedT0[i] = someType;
+            }
+
+            typeIndices.Dispose();
+
+            result = typeArray;
+        }
+
+        private static NativeKeyValueArrays<int, int> UsedTypesGetKeyValueArrays(NativeHashMap<int, int> usedTypes)
+        {
+            var keys                         = new NativeList<int>(Allocator.TempJob);
+            var values                       = new NativeList<int>(Allocator.TempJob);
+            new ExtractKeyValueArrays { keys = keys, values = values, map = usedTypes }.Run();
+            var result                       = new NativeKeyValueArrays<int, int>(keys.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            result.Keys.CopyFrom(keys);
+            result.Values.CopyFrom(values);
+            keys.Dispose();
+            values.Dispose();
+            return result;
+        }
+
+        [BurstCompile]
+        struct ExtractKeyValueArrays : IJob
+        {
+            public NativeList<int> keys;
+            public NativeList<int> values;
+
+            [ReadOnly] public NativeHashMap<int, int> map;
+
+            public void Execute()
+            {
+                var keyValues = map.GetKeyValueArrays(Allocator.Temp);
+                keys.AddRange(keyValues.Keys);
+                values.AddRange(keyValues.Values);
+            }
+        }
+
+        [BurstCompile]
+        public static unsafe void GetDynamicComponentTypeHandle(SystemState* statePtr, int typeIndex, DynamicComponentTypeHandle* handle)
+        {
+            *handle = statePtr->GetDynamicComponentTypeHandle(ComponentType.ReadOnly(typeIndex));
         }
     }
 }

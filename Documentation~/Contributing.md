@@ -12,9 +12,10 @@ Here’s how to contribute new features.
 
 ## Picking a Feature
 
-The first step is to pick a feature. Here’s a list of features to choose from.
-If you don’t see the feature you want to explore listed here or have questions
-regarding one of these features, please reach out to me.
+The first step is to pick a feature. Here’s a list of features to choose from
+that I have deprioritized for myself. If you don’t see the feature you want to
+explore listed here or have questions regarding one of these features, please
+reach out to me.
 
 ### Core
 
@@ -58,7 +59,8 @@ regarding one of these features, please reach out to me.
 
 -   Easy
     -   Platform support (requires modifying ACLUnity CMake)
-    -   Blending and IK utiltities
+        -   iOS
+    -   Blending and IK utilities
 -   Advanced
     -   Cage mesh deformation
 

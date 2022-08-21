@@ -8,6 +8,7 @@ using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
+using UnityEngine.Profiling;
 
 namespace Latios.Kinemation.Systems
 {
@@ -18,6 +19,18 @@ namespace Latios.Kinemation.Systems
 
         UnityEngine.ComputeShader m_batchSkinningShader;
 
+        int _dstMats;
+        int _dstVertices;
+        int _srcVertices;
+        int _boneWeights;
+        int _bindPoses;
+        int _boneOffsets;
+        int _metaBuffer;
+        int _skeletonMats;
+        int _startOffset;
+        int _DeformedMeshData;
+        int _SkinMatrices;
+
         protected override void OnCreate()
         {
             m_skeletonQuery = Fluent.WithAll<DependentSkinnedMesh>(true).WithAll<PerFrameSkeletonBufferMetadata>(false).Build();
@@ -26,10 +39,23 @@ namespace Latios.Kinemation.Systems
                 m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning512");
             else
                 m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
+
+            _dstMats          = UnityEngine.Shader.PropertyToID("_dstMats");
+            _dstVertices      = UnityEngine.Shader.PropertyToID("_dstVertices");
+            _srcVertices      = UnityEngine.Shader.PropertyToID("_srcVertices");
+            _boneWeights      = UnityEngine.Shader.PropertyToID("_boneWeights");
+            _bindPoses        = UnityEngine.Shader.PropertyToID("_bindPoses");
+            _boneOffsets      = UnityEngine.Shader.PropertyToID("_boneOffsets");
+            _metaBuffer       = UnityEngine.Shader.PropertyToID("_metaBuffer");
+            _skeletonMats     = UnityEngine.Shader.PropertyToID("_skeletonMats");
+            _startOffset      = UnityEngine.Shader.PropertyToID("_startOffset");
+            _DeformedMeshData = UnityEngine.Shader.PropertyToID("_DeformedMeshData");
+            _SkinMatrices     = UnityEngine.Shader.PropertyToID("_SkinMatrices");
         }
 
         protected override void OnUpdate()
         {
+            Profiler.BeginSample("Setup gather jobs");
             var skeletonChunkCount = m_skeletonQuery.CalculateChunkCountWithoutFiltering();
 
             var skinnedMeshesBufferHandle = GetBufferTypeHandle<DependentSkinnedMesh>(true);
@@ -89,6 +115,7 @@ namespace Latios.Kinemation.Systems
 
             var pool = worldBlackboardEntity.GetCollectionComponent<ComputeBufferManager>(false, out var poolJH).pool;
             poolJH.Complete();
+            Profiler.EndSample();
 
             countsArrayPrefixSumJH.Complete();
             if (totalCounts.Value.skeletonCount == 0)
@@ -105,6 +132,7 @@ namespace Latios.Kinemation.Systems
                 return;
             }
 
+            Profiler.BeginSample("Setup write jobs");
             var                       skinningMetaBuffer = pool.GetSkinningMetaBuffer(totalCounts.Value.meshCount * 2 + totalCounts.Value.skeletonCount);
             var                       skinningMetaArray  = skinningMetaBuffer.BeginWrite<uint4>(0, totalCounts.Value.meshCount * 2 + totalCounts.Value.skeletonCount);
             NativeArray<float3x4>     boneMatsArray;
@@ -161,17 +189,18 @@ namespace Latios.Kinemation.Systems
             }
 
             gpuUploadBuffersJH.Complete();
-            m_batchSkinningShader.SetBuffer(0, "_dstMats",     linearBlendSkinningBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_dstVertices", deformBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_srcVertices", gpuUploadbuffers.verticesBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_boneWeights", gpuUploadbuffers.weightsBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_bindPoses",   gpuUploadbuffers.bindPosesBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_boneOffsets", gpuUploadbuffers.boneOffsetsBuffer);
-            m_batchSkinningShader.SetBuffer(0, "_metaBuffer",  skinningMetaBuffer);
+            m_batchSkinningShader.SetBuffer(0, _dstMats,     linearBlendSkinningBuffer);
+            m_batchSkinningShader.SetBuffer(0, _dstVertices, deformBuffer);
+            m_batchSkinningShader.SetBuffer(0, _srcVertices, gpuUploadbuffers.verticesBuffer);
+            m_batchSkinningShader.SetBuffer(0, _boneWeights, gpuUploadbuffers.weightsBuffer);
+            m_batchSkinningShader.SetBuffer(0, _bindPoses,   gpuUploadbuffers.bindPosesBuffer);
+            m_batchSkinningShader.SetBuffer(0, _boneOffsets, gpuUploadbuffers.boneOffsetsBuffer);
+            m_batchSkinningShader.SetBuffer(0, _metaBuffer,  skinningMetaBuffer);
 
             int boneMatsWriteCount     = totalCounts.Value.boneCount;
             int skinningMetaWriteCount = totalCounts.Value.meshCount * 2 + totalCounts.Value.skeletonCount;
             totalCounts.Dispose();
+            Profiler.EndSample();
 
             // Alright. It is go time!
             gpuUploadBuffersJH.Complete();
@@ -180,6 +209,7 @@ namespace Latios.Kinemation.Systems
             //foreach (var metaVal in skinningMetaArray)
             //    UnityEngine.Debug.LogError(metaVal);
 
+            Profiler.BeginSample("Dispatch Compute Shaders");
             if (boneMatsBuffer != null)
                 boneMatsBuffer.EndWrite<float3x4>(boneMatsWriteCount);
             skinningMetaBuffer.EndWrite<uint4>(skinningMetaWriteCount);
@@ -189,23 +219,26 @@ namespace Latios.Kinemation.Systems
                 if (skeletonCount <= 0)
                     continue;
 
-                m_batchSkinningShader.SetBuffer(0, "_skeletonMats", boneMatsBufferList.boneMatricesBuffers[bufferId]);
+                m_batchSkinningShader.SetBuffer(0, _skeletonMats, boneMatsBufferList.boneMatricesBuffers[bufferId]);
                 for (int dispatchesRemaining = skeletonCount, offset = skeletonOffsetsByBuffer[bufferId]; dispatchesRemaining > 0;)
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
-                    m_batchSkinningShader.SetInt("_startOffset", offset);
+                    m_batchSkinningShader.SetInt(_startOffset, offset);
                     m_batchSkinningShader.Dispatch(0, dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                     //UnityEngine.Debug.Log($"Dispatching skinning dispatchCount: {dispatchCount}");
                 }
             }
-            UnityEngine.Shader.SetGlobalBuffer("_DeformedMeshData", deformBuffer);
-            UnityEngine.Shader.SetGlobalBuffer("_SkinMatrices",     linearBlendSkinningBuffer);
+            UnityEngine.Shader.SetGlobalBuffer(_DeformedMeshData, deformBuffer);
+            UnityEngine.Shader.SetGlobalBuffer(_SkinMatrices,     linearBlendSkinningBuffer);
+            Profiler.EndSample();
 
+            Profiler.BeginSample("Cleanup");
             disposeDependencies.Add(totalSkeletonCountsByBuffer.Dispose(default));
             disposeDependencies.Add(skeletonOffsetsByBuffer.Dispose(default));
             Dependency = JobHandle.CombineDependencies(disposeDependencies);
+            Profiler.EndSample();
         }
 
         struct MeshDataStreamHeader
