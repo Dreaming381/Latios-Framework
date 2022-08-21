@@ -18,7 +18,7 @@ namespace Latios
                 Object.DestroyImmediate(obj);
             }
 #else
-            Object.Destroy(go);
+            Object.Destroy(obj);
 #endif
         }
     }
