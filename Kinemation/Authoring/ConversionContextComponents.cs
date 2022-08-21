@@ -31,7 +31,7 @@ namespace Latios.Kinemation.Authoring
         {
             if (m_shadowHierarchy != null)
             {
-                GameObject.Destroy(m_shadowHierarchy);
+                m_shadowHierarchy.DestroySafe();
             }
         }
     }

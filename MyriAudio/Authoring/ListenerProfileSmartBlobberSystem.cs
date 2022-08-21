@@ -56,7 +56,7 @@ namespace Latios.Myri.Authoring.Systems
 
         protected override void OnDestroy()
         {
-            Object.Destroy(m_defaultProfile);
+            m_defaultProfile.DestroySafe();
             base.OnDestroy();
         }
 
