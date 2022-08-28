@@ -94,7 +94,7 @@ namespace Latios.Psyshock.Authoring.Systems
 
             public void Execute()
             {
-                var map = new NativeHashMap<int, int>(hashes.Length, Allocator.Temp);
+                var map = new NativeParallelHashMap<int, int>(hashes.Length, Allocator.Temp);
                 for (int i = 0; i < hashes.Length; i++)
                 {
                     if (inputToFilteredMapping[i] < 0)
@@ -133,7 +133,7 @@ namespace Latios.Psyshock.Authoring.Systems
 
             // ConvexHullBuilder doesn't seem to properly check duplicated vertices when they are nice numbers.
             // So we deduplicate things ourselves.
-            var hashedMeshVertices = new NativeHashSet<float3>(vector3Cache.Length, Allocator.Temp);
+            var hashedMeshVertices = new NativeParallelHashSet<float3>(vector3Cache.Length, Allocator.Temp);
             for (int i = 0; i < vector3Cache.Length; i++)
                 hashedMeshVertices.Add(vector3Cache[i]);
             var meshVertices = hashedMeshVertices.ToNativeArray(Allocator.Temp);
@@ -177,7 +177,7 @@ namespace Latios.Psyshock.Authoring.Systems
             var edgeIndicesInFaces                = new NativeList<int>(convexHullBuilder.numFaceVertices, Allocator.Temp);
             var edgeIndicesInFacesStartsAndCounts = new NativeList<int2>(convexHullBuilder.numFaces, Allocator.Temp);
             var vertexIndicesInEdges              = new NativeList<int2>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
-            var edgeHashMap                       = new NativeHashMap<int2, int>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
+            var edgeHashMap                       = new NativeParallelHashMap<int2, int>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
             var edgeFlippedInFaces                = new NativeList<bool>(convexHullBuilder.numFaceVertices, Allocator.Temp);
 
             var tempVerticesInFace = new NativeList<int>(Allocator.Temp);

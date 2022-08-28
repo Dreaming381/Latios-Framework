@@ -59,7 +59,7 @@ namespace Latios.Kinemation.Systems
 
             worldBlackboardEntity.AddCollectionComponent(new MeshGpuManager
             {
-                blobIndexMap        = new NativeHashMap<BlobAssetReference<MeshSkinningBlob>, int>(128, Allocator.Persistent),
+                blobIndexMap        = new NativeParallelHashMap<BlobAssetReference<MeshSkinningBlob>, int>(128, Allocator.Persistent),
                 entries             = new NativeList<MeshGpuEntry>(Allocator.Persistent),
                 indexFreeList       = new NativeList<int>(Allocator.Persistent),
                 verticesGaps        = new NativeList<int2>(Allocator.Persistent),
@@ -76,16 +76,16 @@ namespace Latios.Kinemation.Systems
                 offsets            = new NativeList<short>(Allocator.Persistent),
                 gaps               = new NativeList<int2>(Allocator.Persistent),
                 isDirty            = new NativeReference<bool>(Allocator.Persistent),
-                hashToEntryMap     = new NativeHashMap<uint2, int>(128, Allocator.Persistent),
-                pathPairToEntryMap = new NativeHashMap<PathMappingPair, int>(128, Allocator.Persistent)
+                hashToEntryMap     = new NativeParallelHashMap<uint2, int>(128, Allocator.Persistent),
+                pathPairToEntryMap = new NativeParallelHashMap<PathMappingPair, int>(128, Allocator.Persistent)
             });
 
             worldBlackboardEntity.AddCollectionComponent(new ExposedCullingIndexManager
             {
-                skeletonToCullingIndexMap = new NativeHashMap<Entity, int>(128, Allocator.Persistent),
+                skeletonToCullingIndexMap = new NativeParallelHashMap<Entity, int>(128, Allocator.Persistent),
                 indexFreeList             = new NativeList<int>(Allocator.Persistent),
                 maxIndex                  = new NativeReference<int>(Allocator.Persistent),
-                cullingIndexToSkeletonMap = new NativeHashMap<int, EntityWithBuffer<DependentSkinnedMesh> >(128, Allocator.Persistent)
+                cullingIndexToSkeletonMap = new NativeParallelHashMap<int, EntityWithBuffer<DependentSkinnedMesh> >(128, Allocator.Persistent)
             });
         }
 

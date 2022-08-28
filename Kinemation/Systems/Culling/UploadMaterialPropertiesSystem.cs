@@ -482,7 +482,7 @@ namespace Latios.Kinemation.Systems
             result = typeArray;
         }
 
-        private static NativeKeyValueArrays<int, int> UsedTypesGetKeyValueArrays(NativeHashMap<int, int> usedTypes)
+        private static NativeKeyValueArrays<int, int> UsedTypesGetKeyValueArrays(NativeParallelHashMap<int, int> usedTypes)
         {
             var keys                         = new NativeList<int>(Allocator.TempJob);
             var values                       = new NativeList<int>(Allocator.TempJob);
@@ -501,7 +501,7 @@ namespace Latios.Kinemation.Systems
             public NativeList<int> keys;
             public NativeList<int> values;
 
-            [ReadOnly] public NativeHashMap<int, int> map;
+            [ReadOnly] public NativeParallelHashMap<int, int> map;
 
             public void Execute()
             {

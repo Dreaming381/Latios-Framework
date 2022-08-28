@@ -25,7 +25,7 @@ namespace Latios.Myri
 
             public void Execute()
             {
-                var hashmap = new NativeHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
+                var hashmap = new NativeParallelHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
                 if (clipFrameLookups.Capacity < INITIAL_ALLOCATION_SIZE)
                     clipFrameLookups.Capacity = INITIAL_ALLOCATION_SIZE;
                 if (batchedWeights.Capacity < INITIAL_ALLOCATION_SIZE)
@@ -85,7 +85,7 @@ namespace Latios.Myri
 
             public void Execute()
             {
-                var hashmap = new NativeHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
+                var hashmap = new NativeParallelHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
                 if (clipFrameLookups.Capacity < INITIAL_ALLOCATION_SIZE)
                     clipFrameLookups.Capacity = INITIAL_ALLOCATION_SIZE;
                 if (batchedWeights.Capacity < INITIAL_ALLOCATION_SIZE)

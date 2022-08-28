@@ -126,7 +126,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             public void Execute()
             {
-                var map = new NativeHashMap<int, int>(hashes.Length, Allocator.Temp);
+                var map = new NativeParallelHashMap<int, int>(hashes.Length, Allocator.Temp);
                 for (int i = 0; i < hashes.Length; i++)
                 {
                     if (inputToFilteredMapping[i] < 0)

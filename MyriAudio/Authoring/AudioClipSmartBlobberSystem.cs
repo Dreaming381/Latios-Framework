@@ -199,7 +199,7 @@ namespace Latios.Myri.Authoring.Systems
 
             public void Execute()
             {
-                var map = new NativeHashMap<int2, int>(hashes.Length, Allocator.Temp);
+                var map = new NativeParallelHashMap<int2, int>(hashes.Length, Allocator.Temp);
                 for (int i = 0; i < hashes.Length; i++)
                 {
                     if (inputToFilteredMapping[i] < 0)

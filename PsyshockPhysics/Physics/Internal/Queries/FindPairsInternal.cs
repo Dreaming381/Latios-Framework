@@ -280,7 +280,7 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layer)
             {
-                var hashSet = new NativeHashSet<Entity>(layer.Count, Allocator.Temp);
+                var hashSet = new NativeParallelHashSet<Entity>(layer.Count, Allocator.Temp);
                 for (int i = 0; i < layer.Count; i++)
                 {
                     if (!hashSet.Add(layer.bodies[i].entity))
@@ -295,7 +295,7 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layerA, CollisionLayer layerB)
             {
-                var hashSet = new NativeHashSet<Entity>(layerA.Count + layerB.Count, Allocator.Temp);
+                var hashSet = new NativeParallelHashSet<Entity>(layerA.Count + layerB.Count, Allocator.Temp);
                 for (int i = 0; i < layerA.Count; i++)
                 {
                     if (!hashSet.Add(layerA.bodies[i].entity))

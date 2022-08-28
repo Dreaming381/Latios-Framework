@@ -763,7 +763,7 @@ namespace Latios.Kinemation.Systems
         private NativeList<IntPtr> m_BatchPickingMatrices;
 #endif
         private NativeArray<ChunkProperty> m_ChunkProperties;
-        private NativeHashMap<int, int>    m_ExistingBatchInternalIndices;
+        private NativeParallelHashMap<int, int>    m_ExistingBatchInternalIndices;
         private ComponentTypeCache         m_ComponentTypeCache;
 
         private NativeList<float> m_BatchAABBs;
@@ -781,9 +781,9 @@ namespace Latios.Kinemation.Systems
         private JobHandle m_AABBsCleared;
         private bool      m_AABBClearKicked;
 
-        NativeMultiHashMap<int, MaterialPropertyType> m_MaterialPropertyTypes;
-        NativeMultiHashMap<int, MaterialPropertyType> m_MaterialPropertyTypesShared;
-        NativeHashSet<int>                            m_SharedComponentOverrideTypeIndices;
+        NativeParallelMultiHashMap<int, MaterialPropertyType> m_MaterialPropertyTypes;
+        NativeParallelMultiHashMap<int, MaterialPropertyType> m_MaterialPropertyTypesShared;
+        NativeParallelHashSet<int>                            m_SharedComponentOverrideTypeIndices;
 
         // When extra debugging is enabled, store mappings from NameIDs to property names,
         // and from type indices to type names.
@@ -805,7 +805,7 @@ namespace Latios.Kinemation.Systems
         private Dictionary<Shader, bool> m_ShaderHasCompileErrors;
 #endif
 
-        NativeHashMap<EntityArchetype, SharedComponentOverridesInfo> m_ArchetypeSharedOverrideInfos;
+        NativeParallelHashMap<EntityArchetype, SharedComponentOverridesInfo> m_ArchetypeSharedOverrideInfos;
 
         private SHProperties m_GlobalAmbientProbe;
         private bool         m_GlobalAmbientProbeDirty;
@@ -2709,7 +2709,7 @@ namespace Latios.Kinemation.Systems
             m_BatchPickingMatrices = NewNativeListResized<IntPtr>(kInitialMaxBatchCount, Allocator.Persistent);
 #endif
             m_ChunkProperties              = new NativeArray<ChunkProperty>(kMaxChunkMetadata, Allocator.Persistent);
-            m_ExistingBatchInternalIndices = new NativeHashMap<int, int>(128, Allocator.Persistent);
+            m_ExistingBatchInternalIndices = new NativeParallelHashMap<int, int>(128, Allocator.Persistent);
             m_ComponentTypeCache           = new ComponentTypeCache(128);
 
             m_BatchAABBs = NewNativeListResized<float>(kInitialMaxBatchCount * (int)HybridChunkUpdater.kFloatsPerAABB, Allocator.Persistent);
@@ -2753,15 +2753,15 @@ namespace Latios.Kinemation.Systems
             });
 
             // Collect all components with [MaterialProperty] attribute
-            m_MaterialPropertyTypes              = new NativeMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
-            m_MaterialPropertyTypesShared        = new NativeMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
-            m_SharedComponentOverrideTypeIndices = new NativeHashSet<int>(256, Allocator.Persistent);
+            m_MaterialPropertyTypes              = new NativeParallelMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
+            m_MaterialPropertyTypesShared        = new NativeParallelMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
+            m_SharedComponentOverrideTypeIndices = new NativeParallelHashSet<int>(256, Allocator.Persistent);
             m_MaterialPropertyNames              = new Dictionary<int, string>();
             m_MaterialPropertyTypeNames          = new Dictionary<int, string>();
             m_MaterialPropertyDefaultValues      = new Dictionary<int, float4x4>();
             m_MaterialPropertySharedBuiltins     = new Dictionary<int, int>();
             m_ArchetypeSharedOverrideInfos       =
-                new NativeHashMap<EntityArchetype, SharedComponentOverridesInfo>(256, Allocator.Persistent);
+                new NativeParallelHashMap<EntityArchetype, SharedComponentOverridesInfo>(256, Allocator.Persistent);
 
             // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS
 #if SRP_10_0_0_OR_NEWER

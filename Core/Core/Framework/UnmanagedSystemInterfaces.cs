@@ -30,7 +30,7 @@ namespace Latios
     {
         List<DispatchBase> m_dispatches;
 
-        UnsafeHashMap<int, int> m_metaId2DispatchMapping;
+        UnsafeParallelHashMap<int, int> m_metaId2DispatchMapping;
 
         public DispatchBase GetDispatch(ref SystemState state)
         {
@@ -63,7 +63,7 @@ namespace Latios
             }
 
             m_dispatches             = new List<DispatchBase>(filteredIndices.Length);
-            m_metaId2DispatchMapping = new UnsafeHashMap<int, int>(filteredIndices.Length, Allocator.Persistent);
+            m_metaId2DispatchMapping = new UnsafeParallelHashMap<int, int>(filteredIndices.Length, Allocator.Persistent);
 
             var NewSceneType             = typeof(DispatchNewScene<>);
             var ShouldUpdateType         = typeof(DispatchShouldUpdate<>);
@@ -152,7 +152,7 @@ namespace Latios
     internal static class BurstLookupUtility
     {
         [BurstCompile]
-        public static bool BurstLookup(in UnsafeHashMap<int, int> map, int key, out int value)
+        public static bool BurstLookup(in UnsafeParallelHashMap<int, int> map, int key, out int value)
         {
             return map.TryGetValue(key, out value);
         }

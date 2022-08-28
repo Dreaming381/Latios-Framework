@@ -146,10 +146,10 @@ namespace Latios.Kinemation
 
     internal struct ExposedCullingIndexManager : ICollectionComponent
     {
-        public NativeHashMap<Entity, int>                                  skeletonToCullingIndexMap;
+        public NativeParallelHashMap<Entity, int>                                  skeletonToCullingIndexMap;
         public NativeReference<int>                                        maxIndex;
         public NativeList<int>                                             indexFreeList;
-        public NativeHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
+        public NativeParallelHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
 
         public Type AssociatedComponentType => typeof(ExposedCullingIndexManagerTag);
 
@@ -194,7 +194,7 @@ namespace Latios.Kinemation
 
     internal struct MeshGpuManager : ICollectionComponent
     {
-        public NativeHashMap<BlobAssetReference<MeshSkinningBlob>, int> blobIndexMap;
+        public NativeParallelHashMap<BlobAssetReference<MeshSkinningBlob>, int> blobIndexMap;
 
         public NativeList<MeshGpuEntry> entries;
         public NativeList<int>          indexFreeList;
@@ -258,8 +258,8 @@ namespace Latios.Kinemation
         public NativeList<int2>             gaps;
         public NativeReference<bool>        isDirty;
 
-        public NativeHashMap<uint2, int>           hashToEntryMap;
-        public NativeHashMap<PathMappingPair, int> pathPairToEntryMap;
+        public NativeParallelHashMap<uint2, int>           hashToEntryMap;
+        public NativeParallelHashMap<PathMappingPair, int> pathPairToEntryMap;
 
         public Type AssociatedComponentType => typeof(BoneOffsetsGpuManagerTag);
 

@@ -72,7 +72,7 @@ namespace Latios.Systems
             var managedSysStateTagType    = typeof(ManagedComponentSystemStateTag<>);
             var collectionSysStateTagType = typeof(CollectionComponentSystemStateTag<>);
 
-            var typePairs = new NativeHashSet<AssociatedTypeSysStateTagTypePair>(128, Allocator.TempJob);
+            var typePairs = new NativeParallelHashSet<AssociatedTypeSysStateTagTypePair>(128, Allocator.TempJob);
 
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
             foreach (var assembly in assemblies)
