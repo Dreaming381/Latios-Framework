@@ -396,14 +396,11 @@ hierarchies are instantiated.
     Under the hood, I use generic components to modify the Entity archetypes.
     Expect them to not work with a lot of query and archetype sugar. I do try to
     make them blend in where I can though.
--   `IManagedComponent` and `ICollectionComponent` do not save in subscenes.
--   `InstantiateCommandBuffer` types do not return a remappable entity when
-    creating a command.
 -   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of
-    `World.UpdateAllocator`.
+    `World.UpdateAllocator`. (Fixed in 0.6)
 -   Unmanaged systems do not support automatic dependency management features,
     due to them being unable to receive an external `NativeContainer` while in
-    Burst.
+    Burst. (Fixed in 0.6)
 -   `ISystemShouldUpdate` and `ISystemNewScene` do not work correctly with
     `SystemState` lambdas.
 -   Automatic dependency management for `latiosWorld.SyncPoint` and collection
@@ -417,9 +414,13 @@ hierarchies are instantiated.
 
 ## Near-Term Roadmap
 
+-   Latios Transforms
+    -   Transforms V2, but with local-only non-uniform scale that affects child
+        positions but not rotations nor scales
+-   Bootstrap Profiles
+    -   Allow multiple bootstraps per project for samples and tests
 -   Local Allocator
     -   Custom allocator with a per-element of loop scope
--   Automatic `ConverterVersion` bumping on code changes
 -   Gameplay Toolkit
     -   Reduce cognitive overhead of DOTS for gameplay programmers
     -   Hierarchy navigation and modification

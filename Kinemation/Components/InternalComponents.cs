@@ -147,8 +147,8 @@ namespace Latios.Kinemation
     internal struct ExposedCullingIndexManager : ICollectionComponent
     {
         public NativeParallelHashMap<Entity, int>                                  skeletonToCullingIndexMap;
-        public NativeReference<int>                                        maxIndex;
-        public NativeList<int>                                             indexFreeList;
+        public NativeReference<int>                                                maxIndex;
+        public NativeList<int>                                                     indexFreeList;
         public NativeParallelHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
 
         public Type AssociatedComponentType => typeof(ExposedCullingIndexManagerTag);
@@ -180,6 +180,11 @@ namespace Latios.Kinemation
         public int                                  verticesStart;
         public int                                  weightsStart;
         public int                                  bindPosesStart;
+        // Blob Assets can disappear before cleanup (thanks subscenes).
+        // So we cache the sizes here since that's all we need for cleanup.
+        public int verticesCount;
+        public int weightsCount;
+        public int bindPosesCount;
     }
 
     internal struct MeshGpuRequiredSizes

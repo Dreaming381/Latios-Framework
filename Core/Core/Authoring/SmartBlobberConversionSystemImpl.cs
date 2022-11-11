@@ -407,6 +407,7 @@ namespace Latios.Authoring.Systems
                 m_inputsAreLocked = false;
                 throw;
             }
+            m_inputsAreLocked = false;
 
             // Step 2: Generate filtered list
             var filteredConverters     = new NativeList<TUnmanagedConversionType>(1, Allocator.TempJob);
@@ -459,6 +460,7 @@ namespace Latios.Authoring.Systems
             };
             try
             {
+                m_inputsAreLocked = true;
                 PostFilter(postFilter, ref context);
             }
             catch
@@ -467,8 +469,10 @@ namespace Latios.Authoring.Systems
                 context.Dispose();
                 filteredConverters.Dispose();
                 filteredToInputMapping.Dispose();
+                m_inputsAreLocked = false;
                 throw;
             }
+            m_inputsAreLocked = false;
 
             // Step 4: Build blobs and hashes
             var blobs  = new NativeArray<BlobAssetReference<TBlobType> >(filteredConverters.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);

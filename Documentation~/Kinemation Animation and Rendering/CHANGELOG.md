@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] – 2022-11-10
+
+Officially supports Entities [0.51.1]
+
+### Fixed
+
+-   Fixed a crash where a `MeshSkinningBlob` is accessed after it has been
+    unloaded by a subscene
+-   Fixed `LocalToParent` being uninitialized if it was not already present on a
+    skinned mesh entity prior to binding
+-   Fixed bone bounds not being rebound correctly when a skinned mesh is removed
+-   Fixed several caching issues that resulted in bindings reading the wrong
+    cached binding data after all entities referencing a cached binding are
+    destroyed and new bindings are later created
+
 ## [0.5.7] – 2022-8-28
 
 Officially supports Entities [0.51.1]

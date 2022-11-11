@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] – 2022-11-10
+
+Officially supports Entities [0.51.1]
+
+### Added
+
+-   Added Optimization Adventure Part 8
+
+### Changed
+
+-   Updated Core to v0.5.8
+-   Updated Kinemation to v0.5.8
+
 ## [0.5.7] – 2022-8-28
 
 Officially supports Entities [0.51.1]

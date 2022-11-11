@@ -183,21 +183,24 @@ expressions to the extreme!
     masks, which Kinemation makes available. If this is going to be implemented,
     it is going to be implemented the right way.
 -   Skinned Meshes don’t work in Live Link preview. This is because the default
-    Hybrid Renderer still runs in this mode.
+    Hybrid Renderer still runs in this mode. (Fixed in 0.6)
 -   Hybrid Renderer stats don’t work. Kinemation will provide its own solution
     for this in a future release which will be more extensible and customizable.
 -   Culling callbacks are slow on the main thread when there are lots of shadow
-    passes. Those systems haven’t been optimized for the main thread yet.
+    passes. Those systems haven’t been optimized for the main thread yet. (Fixed
+    in 0.6)
+-   Skeletons are uploaded to the GPU multiple times in a frame if different
+    LODs are used in different culling passes
+-   GPU uploads are done in a way that prevent the processors from going into an
+    idle state
 
 ## Near-Term Roadmap
 
--   Pose sampling into temporary buffers
+-   Pose sampling for exposed skeletons
     -   Significantly faster
-    -   Requires local allocator
+    -   May require local allocator
 -   Blend Shapes
 -   Dual Quaternion Skinning
 -   Support for larger hierarchies
 -   Stats and Troubleshooting Diagnostics
--   Import-time Binding Paths Baking
-    -   Avoids issues where child bones are renamed in the hierarchy
 -   IK Utilities

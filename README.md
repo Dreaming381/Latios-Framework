@@ -1,4 +1,6 @@
-# Latios Framework Packages for DOTS – [0.5.7]
+![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
+
+# Latios Framework Packages for DOTS – [0.5.8]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -7,7 +9,7 @@ License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages may contain code borrowed from official Unity packages and therefore
 may be seen as derivative works.
 
-The current version targets DOTS 0.51. If you are still using Entities 0.50.1,
+This version targets Entities 0.51.1. If you are still using Entities 0.50.1,
 please use the framework version 0.5.6 instead. If you are still using Entities
 0.17, please use the framework version 0.4.4 instead.
 
@@ -45,9 +47,11 @@ While the Latios Framework has some of those things, its primary concerns are at
 the engine level. Many of its tools and solutions are inspired by GDC
 presentations, technical blogs, and research papers. A key focus of the
 framework is to make these advanced technologies usable within a DOTS-based
-production environment. For technical reasons, it is a “framework”, but it acts
-more like a toolkit and stays out of the way. A developer using it should always
-feel in control. If not, there’s likely an issue worth bringing to attention.
+production environment. But another common theme is fixing or providing
+alternatives for fundamental design issues in the official DOTS packages. For
+technical reasons, it is a “framework”, but it acts more like a toolkit and
+stays out of the way. A developer using it should always feel in control. If
+not, there’s likely an issue worth bringing to attention.
 
 0.5 marks the end of Phase II, where focus was placed on enabling technologies
 in DOTS such as audio and animation. Phase III will focus on gameplay
@@ -74,6 +78,9 @@ Getting Started pages and documentation are provided with each module.
 
 ## Learning Resources
 
+-   Social
+    -   [Discord](https://discord.gg/DHraGRkA4n)
+    -   [Forum Thread](https://forum.unity.com/threads/797685/)
 -   Videos
     -   [Intro Tour Video
         Playlist](https://www.youtube.com/watch?v=UGKtIZOolEo&list=PLFME_M84NcPylGB41xAzh2bbbT8nhb_a0)
@@ -106,6 +113,8 @@ Getting Started pages and documentation are provided with each module.
         1](Documentation~/Optimization%20Adventures/Part%206%20-%20ColliderCast%201.md)
     -   [Frustum Culling
         1](Documentation~/Optimization%20Adventures/Part%207%20-%20Frustum%20Culling%201.md)
+    -   [Find Pairs
+        3](Documentation~/Optimization%20Adventures/Part%208%20-%20Find%20Pairs%203.md)
 
 ## Proud Users of Latios Framework
 
@@ -134,9 +143,9 @@ However, **bugs are infuriating!**
 
 If you see a confusing error, send me a description of what you were doing and a
 stack trace with line numbers and the version you are using. You can use the
-GitHub issues, GitHub discussions, the DOTS forums, Unity PMs, or emails.
-Usually, I will find a bug fix locally, and provide instructions on how to apply
-the fix yourself. Then I will roll out the bug fix in my next release.
+GitHub issues, GitHub discussions, Discord, the DOTS forums, Unity PMs, or
+emails. Usually, I will find a bug fix locally, and provide instructions on how
+to apply the fix yourself. Then I will roll out the bug fix in my next release.
 
 For strange behavior that doesn’t trigger errors, a repro is the only way to
 guarantee the issue gets diagnosed, but a good description can go a long ways

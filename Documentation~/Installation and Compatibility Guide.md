@@ -38,5 +38,18 @@ Beginning with Latios Framework 0.5, features are controlled through the use of
 *installers*. You can see these installers in action by looking through the
 bootstrap templates.
 
+## Platform Support
+
+Latios Framework currently only supports Windows, Mac OS, and Linux desktop
+platforms. This is because the Kinemation module ships with a native plugin
+which is currently only built for those platforms. You can learn more about the
+plugin and how you can help extend it to work on more platforms
+[here](https://github.com/Dreaming381/AclUnity).
+
+In addition, code stripping must be set to *Minimal* or *None*, and if building
+for IL2CPP, you must build using 2021 LTS and set the code generation mode to
+*Faster (Smaller) Builds*. Some patch releases of 2021 LTS are known to be
+broken with IL2CPP.
+
 If there is some other unexpected behavior, that is likely a bug. Please report
 the issue!

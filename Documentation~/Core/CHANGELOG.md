@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.5.8] – 2022-11-10
+
+Officially supports Entities [0.51.1]
+
+### Fixed
+
+-   Fixed incorrect input locking behavior for batching Smart Blobbers that
+    caused exceptions when used with subscenes
+
 ## [0.5.7] – 2022-8-28
 
 Officially supports Entities [0.51.1]
