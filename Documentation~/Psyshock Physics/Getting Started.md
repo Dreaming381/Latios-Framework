@@ -1,6 +1,6 @@
 # Getting Started with Psyshock Physics
 
-This is the fifth preview version I am releasing out to the public. It currently
+This is the sixth preview version I am releasing out to the public. It currently
 only supports a small number of use cases. The number of supported use cases
 will grow with each release.
 
@@ -9,10 +9,11 @@ will grow with each release.
 Currently Psyshock uses the classical Physx components for authoring
 [colliders](Colliders.md). Attach a Sphere Collider, Capsule Collider, Box
 Collider, or Mesh Collider to the GameObject you wish to convert. Mesh Colliders
-must have their checkbox checked.
+must have their convex checkbox checked.
 
 There’s one exception. I added support for Compound Colliders and this uses the
-new Collider Authoring component.
+new Collider Authoring component. Though you can also create them by attaching
+more than one Physx collider component to a Game Object.
 
 ## Colliders in code
 
@@ -93,11 +94,11 @@ Next in the fluent chain, you have the ability to apply custom settings and
 options. You can customize the `CollisionLayerSettings` for better performance.
 The settings are given as follows:
 
--   worldAABB – The AABB from which to construct the multibox
+-   worldAabb – The `Aabb` from which to construct the multibox
 -   worldSubdivisionsPerAxis – How many “buckets” AKA cells to divide the world
     into along each axis
 
-*Important:* `worldAABB` *and* `worldSubdivisionsPerAxis` *MUST match when
+*Important:* `worldAabb` *and* `worldSubdivisionsPerAxis` *MUST match when
 performing queries across multiple* `CollisionLayer`*s. A safety check exists to
 detect this when safety checks are enabled.*
 
@@ -122,8 +123,8 @@ PatchQueryForBuildingCollisionLayer?*
 `FindPairs` is a broadphase algorithm that lets you immediately process pairs
 with any narrow phase or other logic you desire. `FindPairs` has unique
 threading properties that ensures the two Entities in the pair can be modified
-with `PhysicsComponentDataFromEntity` which can be implicitly constructed from a
-`ComponentDataFromEntity`.
+with `PhysicsComponentLookup` which can be implicitly constructed from a
+`ComponentLookup`.
 
 `FindPairs` uses a fluent syntax. Currently, there are two steps required.
 

@@ -3,15 +3,15 @@ using UnityEngine;
 
 namespace Latios.Myri.Authoring
 {
-    internal class DefaultListenerProfileBuilder : ListenerProfileBuilder
+    internal struct DefaultListenerProfileBuilder : IListenerProfileBuilder
     {
-        protected override void BuildProfile()
+        public void BuildProfile(ref ListenerProfileBuildContext context)
         {
             //left unblocked
-            AddChannel(new float2(math.PI / 2f, math.PI * 1.25f), new float2(-math.PI, math.PI), 1f, 0f, 1f, false);
+            context.AddChannel(new float2(math.PI / 2f, math.PI * 1.25f), new float2(-math.PI, math.PI), 1f, 0f, 1f, false);
             //left fully blocked
-            var leftFilterChannel = AddChannel(new float2(-math.PI / 4f, math.PI / 4f),   new float2(-math.PI, math.PI), 0f, 1f, 0f, false);
-            AddFilterToChannel(new FrequencyFilter
+            var leftFilterChannel = context.AddChannel(new float2(-math.PI / 4f, math.PI / 4f),   new float2(-math.PI, math.PI), 0f, 1f, 0f, false);
+            context.AddFilterToChannel(new FrequencyFilter
             {
                 cutoff         = 1500f,
                 gainInDecibels = 0f,
@@ -19,10 +19,10 @@ namespace Latios.Myri.Authoring
                 type           = FrequencyFilterType.Lowpass
             }, leftFilterChannel);
             //right unblocked
-            AddChannel(new float2(-math.PI / 4f, math.PI / 2f), new float2(-math.PI, math.PI), 1f, 0f, 1f, true);
+            context.AddChannel(new float2(-math.PI / 4f, math.PI / 2f), new float2(-math.PI, math.PI), 1f, 0f, 1f, true);
             //right fully blocked
-            var rightFilterChannel = AddChannel(new float2(math.PI * 0.75f, math.PI * 1.25f), new float2(-math.PI, math.PI), 0f, 1f, 0f, true);
-            AddFilterToChannel(new FrequencyFilter
+            var rightFilterChannel = context.AddChannel(new float2(math.PI * 0.75f, math.PI * 1.25f), new float2(-math.PI, math.PI), 0f, 1f, 0f, true);
+            context.AddFilterToChannel(new FrequencyFilter
             {
                 cutoff         = 1500f,
                 gainInDecibels = 0f,

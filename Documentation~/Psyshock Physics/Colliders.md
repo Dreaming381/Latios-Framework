@@ -1,6 +1,6 @@
 # Colliders
 
-In version 0.5.0 of Psyshock, only a small subset of colliders are supported,
+In version 0.6.0 of Psyshock, only a small subset of colliders are supported,
 and authoring for these are not complete.
 
 -   Sphere Collider
@@ -17,7 +17,8 @@ and authoring for these are not complete.
 ## Authoring
 
 Custom authoring components for all Psyshock colliders are still a
-work-in-progress. Use the following components for each collider type:
+work-in-progress. Use the following components for each collider type and ensure
+the component is enabled:
 
 ### Sphere Collider
 
@@ -54,6 +55,9 @@ check the *Generate From Children* box. Otherwise, populate the Colliders list
 with the subset of children colliders you wish to add.
 
 ![](media/75544b0cdbb419c4933bf98c8c72f543.png)
+
+You can also generate a compound collider by attaching multiple Sphere, Capsule,
+and/or Box Collider components to a single Game Object.
 
 ## Collider Types in Code
 
@@ -139,8 +143,7 @@ The core of a `ConvexCollider` is its `public
 BlobAssetReference<ConvexColliderBlob> convexColliderBlob `field. It is
 constructed using the Unity.Physics convex hull algorithm, but with the bevel
 radius disabled such that corners and edges are sharp. It can be created via
-converting a *Mesh Collider* component or via a Smart Blobber using
-`conversionSystem.CreateBlob()` and passing in a `ConvexColliderBakeData`.
+baking a *Mesh Collider* component or via a Smart Blobber.
 
 A `ConvexCollider` exposes a `public float3 scale` which can apply a non-uniform
 scale to the collider.
@@ -158,8 +161,11 @@ BlobAssetReference<CompoundColliderBlob> compoundColliderBlob` field. A
 `Aabb` which encompasses the full set of colliders in local space. In most
 cases, you will never need to read this data directly.
 
-Currently, a `CompoundColliderBlob` can only be created using the *Collider
-Authoring* component in the editor.
+There are three ways to create a `CompoundColliderBlob`:
+
+1.  Use a *Collider Authoring* component
+2.  Attach multiple primitive collider components to a Game Object
+3.  Use a Smart Blobber from within a `Baker`
 
 A `CompoundCollider` also exposes a `public float scale` which is a uniform
 scale factor to be applied to the collider. This scale factor not only scales

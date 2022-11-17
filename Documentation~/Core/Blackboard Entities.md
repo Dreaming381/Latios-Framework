@@ -62,16 +62,21 @@ public class ManagedSystem : SubSystem
 [BurstCompile]
 public struct UnmanagedSystem : ISystem
 {
+    LatiosWorldUnmanaged latiosWorld;
+
     [BurstCompile]
-    public void OnCreate(ref SystemState state) { }
+    public void OnCreate(ref SystemState state) 
+    {
+        latiosWorld = state.GetLatiosWorldUnmanaged();
+    }
     [BurstCompile]
     public void OnDestroy(ref SystemState state) { }
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        var a = state.GetWorldBlackboardEntity().GetComponentData<CompA>();
+        var a = latiosWorld.worldBlackboardEntity.GetComponentData<CompA>();
         a.count++;
-        state.GetWorldBlackboardEntity().SetComponentData(a);
+        latiosWorld.worldBlackboardEntity.SetComponentData(a);
     }
 }
 
@@ -114,8 +119,8 @@ types waiting to be cleaned up.*
 
 ## Authoring Blackboard Entities
 
-You can author global entities using the `BlackboardEntityData` component or its
-authoring equivalent:
+You can author blackboard entities using the `BlackboardEntityData` component or
+its authoring equivalent:
 
 ![](media/0c07d270e2c3b7b9620e879901487aa6.png)
 
@@ -133,15 +138,15 @@ following settings:
         entity’s component value
     -   Keep Existing – The global entity’s component value will be left
         unchanged
-    -   ErrorOnConflict – If a component is shared by both entities, an
+    -   Error On Conflict – If a component is shared by both entities, an
         exception will be thrown
 
 Some additional rules exist regardless of the settings:
 
--   Any components attached exclusively to the global entity will remain
+-   Any components attached exclusively to the blackboard entity will remain
     attached
 -   Any components attached exclusively to the source entity will be added to
-    the global entity with matching values with the exception of
+    the blackboard entity with matching values with the exception of
     `ICollectionComponent` and `IManagedComponent` which will always be ignored
 -   The source entity will always be destroyed
 -   Disabled and Prefab entities with the `BlackboardEntityData` component will

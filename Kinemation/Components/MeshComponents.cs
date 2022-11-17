@@ -62,7 +62,7 @@ namespace Latios.Kinemation
     /// Usage: Add/Write to create a custom mapping from mesh bone indices to
     /// skeleton bone indices. The length of this buffer must match the length
     /// of MeshSkinningBlob.bindPoses.
-    /// After binding, this buffer can be safely removed
+    /// After binding, this buffer can be safely removed.
     /// </summary>
     public struct OverrideSkinningBoneIndex : IBufferElementData
     {

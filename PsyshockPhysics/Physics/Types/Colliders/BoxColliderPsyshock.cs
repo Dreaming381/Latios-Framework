@@ -3,6 +3,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A local coordinate space axis-alinged box using center & extents representation
+    /// </summary>
     [Serializable]
     public struct BoxCollider
     {

@@ -6,10 +6,10 @@ namespace Latios.Psyshock
     public static partial class Physics
     {
         #region Sphere
-        public static bool DistanceBetween(SphereCollider sphereA,
-                                           RigidTransform aTransform,
-                                           SphereCollider sphereB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in SphereCollider sphereA,
+                                           in RigidTransform aTransform,
+                                           in SphereCollider sphereB,
+                                           in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -31,10 +31,10 @@ namespace Latios.Psyshock
         #endregion
 
         #region Capsule
-        public static bool DistanceBetween(CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
-                                           SphereCollider sphere,
-                                           RigidTransform sphereTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
+                                           in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -57,22 +57,22 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(SphereCollider sphere,
-                                           RigidTransform sphereTransform,
-                                           CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
+        public static bool DistanceBetween(in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
+                                           in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(capsule, capsuleTransform, sphere, sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in capsule, in capsuleTransform, in sphere, in sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsuleA,
-                                           RigidTransform aTransform,
-                                           CapsuleCollider capsuleB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsuleA,
+                                           in RigidTransform aTransform,
+                                           in CapsuleCollider capsuleB,
+                                           in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -82,16 +82,16 @@ namespace Latios.Psyshock
                                                                      math.transform(BinASpaceTransform, capsuleB.pointB),
                                                                      capsuleB.radius);
             bool hit = SpatialInternal.CapsuleCapsuleDistance(capsuleA, BinASpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
-            result   = BinAResultToWorld(localResult, aTransform);
+            result   = BinAResultToWorld(in localResult, in aTransform);
             return hit;
         }
         #endregion
 
         #region Box
-        public static bool DistanceBetween(BoxCollider box,
-                                           RigidTransform boxTransform,
-                                           SphereCollider sphere,
-                                           RigidTransform sphereTransform,
+        public static bool DistanceBetween(in BoxCollider box,
+                                           in RigidTransform boxTransform,
+                                           in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -114,22 +114,22 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(SphereCollider sphere,
-                                           RigidTransform sphereTransform,
-                                           BoxCollider box,
-                                           RigidTransform boxTransform,
+        public static bool DistanceBetween(in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
+                                           in BoxCollider box,
+                                           in RigidTransform boxTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(box, boxTransform, sphere, sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in box, in boxTransform, in sphere, in sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(BoxCollider box,
-                                           RigidTransform boxTransform,
-                                           CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
+        public static bool DistanceBetween(in BoxCollider box,
+                                           in RigidTransform boxTransform,
+                                           in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -139,27 +139,27 @@ namespace Latios.Psyshock
                                                              math.transform(capInBoxSpaceTransform, capsule.pointB),
                                                              capsule.radius);
             bool hit = SpatialInternal.BoxCapsuleDistance(box, capsuleInBoxSpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
-            result   = BinAResultToWorld(localResult, boxTransform);
+            result   = BinAResultToWorld(in localResult, in boxTransform);
 
             return hit;
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
-                                           BoxCollider box,
-                                           RigidTransform boxTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
+                                           in BoxCollider box,
+                                           in RigidTransform boxTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(box, boxTransform, capsule, capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in box, in boxTransform, in capsule, in capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(BoxCollider boxA,
-                                           RigidTransform aTransform,
-                                           BoxCollider boxB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in BoxCollider boxA,
+                                           in RigidTransform aTransform,
+                                           in BoxCollider boxB,
+                                           in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -173,16 +173,16 @@ namespace Latios.Psyshock
                                                                     aInBSpaceTransform,
                                                                     maxDistance,
                                                                     out SpatialInternal.ColliderDistanceResultInternal localResult);
-            result = BinAResultToWorld(localResult, aTransform);
+            result = BinAResultToWorld(in localResult, in aTransform);
             return hit;
         }
         #endregion
 
         #region Triangle
-        public static bool DistanceBetween(TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
-                                           SphereCollider sphere,
-                                           RigidTransform sphereTransform,
+        public static bool DistanceBetween(in TriangleCollider triangle,
+                                           in RigidTransform triangleTransform,
+                                           in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -205,22 +205,19 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(SphereCollider sphere,
-                                           RigidTransform sphereTransform,
-                                           TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
+        public static bool DistanceBetween(in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
+                                           in TriangleCollider triangle,
+                                           in RigidTransform triangleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(triangle, triangleTransform, sphere, sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in triangle, in triangleTransform, in sphere, in sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
-                                           CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
+        public static bool DistanceBetween(in TriangleCollider triangle, in RigidTransform triangleTransform, in CapsuleCollider capsule, in RigidTransform capsuleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -230,64 +227,49 @@ namespace Latios.Psyshock
                                                                   math.transform(capInTriangleSpaceTransform, capsule.pointB),
                                                                   capsule.radius);
             bool hit = SpatialInternal.TriangleCapsuleDistance(triangle, capsuleInTriangleSpace, maxDistance, out SpatialInternal.ColliderDistanceResultInternal localResult);
-            result   = BinAResultToWorld(localResult, triangleTransform);
+            result   = BinAResultToWorld(in localResult, in triangleTransform);
 
             return hit;
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
-                                           TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsule, in RigidTransform capsuleTransform, in TriangleCollider triangle, in RigidTransform triangleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(triangle, triangleTransform, capsule, capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in triangle, in triangleTransform, in capsule, in capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
-                                           BoxCollider box,
-                                           RigidTransform boxTransform,
+        public static bool DistanceBetween(in TriangleCollider triangle, in RigidTransform triangleTransform, in BoxCollider box, in RigidTransform boxTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
             // Todo: SAT algorithm similar to box vs box.
-            result = DistanceBetweenGjk(triangle, triangleTransform, box, boxTransform);
+            result = DistanceBetweenGjk(triangle, in triangleTransform, box, in boxTransform);
             return result.distance <= maxDistance;
         }
 
-        public static bool DistanceBetween(BoxCollider box,
-                                           RigidTransform boxTransform,
-                                           TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
+        public static bool DistanceBetween(in BoxCollider box, in RigidTransform boxTransform, in TriangleCollider triangle, in RigidTransform triangleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(triangle, triangleTransform, box, boxTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in triangle, in triangleTransform, in box, in boxTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(TriangleCollider triangleA,
-                                           RigidTransform aTransform,
-                                           TriangleCollider triangleB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in TriangleCollider triangleA, in RigidTransform aTransform, in TriangleCollider triangleB, in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            result = DistanceBetweenGjk(triangleA, aTransform, triangleB, bTransform);
+            result = DistanceBetweenGjk(triangleA, in aTransform, triangleB, in bTransform);
             return result.distance <= maxDistance;
         }
         #endregion
 
         #region Convex
-        public static bool DistanceBetween(ConvexCollider convex,
-                                           RigidTransform convexTransform,
-                                           SphereCollider sphere,
-                                           RigidTransform sphereTransform,
+        public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in SphereCollider sphere, in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -310,104 +292,77 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(SphereCollider sphere,
-                                           RigidTransform sphereTransform,
-                                           ConvexCollider convex,
-                                           RigidTransform convexTransform,
+        public static bool DistanceBetween(in SphereCollider sphere, in RigidTransform sphereTransform, in ConvexCollider convex, in RigidTransform convexTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(convex, convexTransform, sphere, sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in convex, in convexTransform, in sphere, in sphereTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(ConvexCollider convex,
-                                           RigidTransform convexTransform,
-                                           CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
+        public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in CapsuleCollider capsule, in RigidTransform capsuleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            result = DistanceBetweenGjk(convex, convexTransform, capsule, capsuleTransform);
+            result = DistanceBetweenGjk(convex, in convexTransform, capsule, in capsuleTransform);
             return result.distance <= maxDistance;
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
-                                           ConvexCollider convex,
-                                           RigidTransform convexTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsule, in RigidTransform capsuleTransform, in ConvexCollider convex, in RigidTransform convexTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(convex, convexTransform, capsule, capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in convex, in convexTransform, in capsule, in capsuleTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(ConvexCollider convex,
-                                           RigidTransform convexTransform,
-                                           BoxCollider box,
-                                           RigidTransform boxTransform,
+        public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in BoxCollider box, in RigidTransform boxTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            result = DistanceBetweenGjk(convex, convexTransform, box, boxTransform);
+            result = DistanceBetweenGjk(convex, in convexTransform, box, in boxTransform);
             return result.distance <= maxDistance;
         }
 
-        public static bool DistanceBetween(BoxCollider box,
-                                           RigidTransform boxTransform,
-                                           ConvexCollider convex,
-                                           RigidTransform convexTransform,
+        public static bool DistanceBetween(in BoxCollider box, in RigidTransform boxTransform, in ConvexCollider convex, in RigidTransform convexTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(convex, convexTransform, box, boxTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in convex, in convexTransform, in box, in boxTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(ConvexCollider convex,
-                                           RigidTransform convexTransform,
-                                           TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
+        public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in TriangleCollider triangle, in RigidTransform triangleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            result = DistanceBetweenGjk(convex, convexTransform, triangle, triangleTransform);
+            result = DistanceBetweenGjk(convex, in convexTransform, triangle, in triangleTransform);
             return result.distance <= maxDistance;
         }
 
-        public static bool DistanceBetween(TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
-                                           ConvexCollider convex,
-                                           RigidTransform convexTransform,
+        public static bool DistanceBetween(in TriangleCollider triangle, in RigidTransform triangleTransform, in ConvexCollider convex, in RigidTransform convexTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(convex, convexTransform, triangle, triangleTransform, maxDistance, out ColliderDistanceResult flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in convex, in convexTransform, in triangle, in triangleTransform, maxDistance, out ColliderDistanceResult flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(ConvexCollider convexA,
-                                           RigidTransform aTransform,
-                                           ConvexCollider convexB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in ConvexCollider convexA, in RigidTransform aTransform, in ConvexCollider convexB, in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            result = DistanceBetweenGjk(convexA, aTransform, convexB, bTransform);
+            result = DistanceBetweenGjk(convexA, in aTransform, convexB, in bTransform);
             return result.distance <= maxDistance;
         }
         #endregion
 
         #region Compound
-        public static bool DistanceBetween(CompoundCollider compound,
-                                           RigidTransform compoundTransform,
-                                           SphereCollider sphere,
-                                           RigidTransform sphereTransform,
+        public static bool DistanceBetween(in CompoundCollider compound, in RigidTransform compoundTransform, in SphereCollider sphere, in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -420,10 +375,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
-                                                     sphere,
-                                                     sphereTransform,
+                                                     in sphere,
+                                                     in sphereTransform,
                                                      math.min(result.distance, maxDistance),
                                                      out var newResult);
 
@@ -435,22 +390,16 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(SphereCollider sphere,
-                                           RigidTransform sphereTransform,
-                                           CompoundCollider compound,
-                                           RigidTransform compoundTransform,
+        public static bool DistanceBetween(in SphereCollider sphere, in RigidTransform sphereTransform, in CompoundCollider compound, in RigidTransform compoundTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, sphere, sphereTransform, maxDistance, out var flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in compound, in compoundTransform, in sphere, in sphereTransform, maxDistance, out var flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CompoundCollider compound,
-                                           RigidTransform compoundTransform,
-                                           CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
+        public static bool DistanceBetween(in CompoundCollider compound, in RigidTransform compoundTransform, in CapsuleCollider capsule, in RigidTransform capsuleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -463,10 +412,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
-                                                     capsule,
-                                                     capsuleTransform,
+                                                     in capsule,
+                                                     in capsuleTransform,
                                                      math.min(result.distance, maxDistance),
                                                      out var newResult);
 
@@ -478,22 +427,16 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(CapsuleCollider capsule,
-                                           RigidTransform capsuleTransform,
-                                           CompoundCollider compound,
-                                           RigidTransform compoundTransform,
+        public static bool DistanceBetween(in CapsuleCollider capsule, in RigidTransform capsuleTransform, in CompoundCollider compound, in RigidTransform compoundTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, capsule, capsuleTransform, maxDistance, out var flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in compound, in compoundTransform, in capsule, in capsuleTransform, maxDistance, out var flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CompoundCollider compound,
-                                           RigidTransform compoundTransform,
-                                           BoxCollider box,
-                                           RigidTransform boxTransform,
+        public static bool DistanceBetween(in CompoundCollider compound, in RigidTransform compoundTransform, in BoxCollider box, in RigidTransform boxTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -506,10 +449,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
-                                                     box,
-                                                     boxTransform,
+                                                     in box,
+                                                     in boxTransform,
                                                      maxDistance,
                                                      out var newResult);
 
@@ -521,22 +464,16 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(BoxCollider box,
-                                           RigidTransform boxTransform,
-                                           CompoundCollider compound,
-                                           RigidTransform compoundTransform,
+        public static bool DistanceBetween(in BoxCollider box, in RigidTransform boxTransform, in CompoundCollider compound, in RigidTransform compoundTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, box, boxTransform, maxDistance, out var flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in compound, in compoundTransform, in box, in boxTransform, maxDistance, out var flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CompoundCollider compound,
-                                           RigidTransform compoundTransform,
-                                           TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
+        public static bool DistanceBetween(in CompoundCollider compound, in RigidTransform compoundTransform, in TriangleCollider triangle, in RigidTransform triangleTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -549,10 +486,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
-                                                     triangle,
-                                                     triangleTransform,
+                                                     in triangle,
+                                                     in triangleTransform,
                                                      maxDistance,
                                                      out var newResult);
 
@@ -564,22 +501,16 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(TriangleCollider triangle,
-                                           RigidTransform triangleTransform,
-                                           CompoundCollider compound,
-                                           RigidTransform compoundTransform,
+        public static bool DistanceBetween(in TriangleCollider triangle, in RigidTransform triangleTransform, in CompoundCollider compound, in RigidTransform compoundTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, triangle, triangleTransform, maxDistance, out var flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in compound, in compoundTransform, in triangle, in triangleTransform, maxDistance, out var flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CompoundCollider compound,
-                                           RigidTransform compoundTransform,
-                                           ConvexCollider convex,
-                                           RigidTransform convexTransform,
+        public static bool DistanceBetween(in CompoundCollider compound, in RigidTransform compoundTransform, in ConvexCollider convex, in RigidTransform convexTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -592,10 +523,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
-                                                     convex,
-                                                     convexTransform,
+                                                     in convex,
+                                                     in convexTransform,
                                                      maxDistance,
                                                      out var newResult);
 
@@ -607,22 +538,16 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(ConvexCollider convex,
-                                           RigidTransform convexTransform,
-                                           CompoundCollider compound,
-                                           RigidTransform compoundTransform,
+        public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in CompoundCollider compound, in RigidTransform compoundTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            bool hit = DistanceBetween(compound, compoundTransform, convex, convexTransform, maxDistance, out var flipResult);
-            result   = FlipResult(flipResult);
+            bool hit = DistanceBetween(in compound, in compoundTransform, in convex, in convexTransform, maxDistance, out var flipResult);
+            result   = FlipResult(in flipResult);
             return hit;
         }
 
-        public static bool DistanceBetween(CompoundCollider compoundA,
-                                           RigidTransform aTransform,
-                                           CompoundCollider compoundB,
-                                           RigidTransform bTransform,
+        public static bool DistanceBetween(in CompoundCollider compoundA, in RigidTransform aTransform, in CompoundCollider compoundB, in RigidTransform bTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
@@ -635,10 +560,10 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundA.scale;
-                bool newHit        = DistanceBetween(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = DistanceBetween(ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(aTransform, blobTransform),
-                                                     compoundB,
-                                                     bTransform,
+                                                     in compoundB,
+                                                     in bTransform,
                                                      math.min(result.distance, maxDistance),
                                                      out var newResult);
 
@@ -652,7 +577,49 @@ namespace Latios.Psyshock
 
         #endregion
 
-        private static ColliderDistanceResult FlipResult(ColliderDistanceResult resultToFlip)
+        #region Layer
+        public static bool DistanceBetween(Collider collider,
+                                           RigidTransform transform,
+                                           CollisionLayer layer,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result,
+                                           out LayerBodyInfo layerBodyInfo)
+        {
+            result              = default;
+            layerBodyInfo       = default;
+            var processor       = new LayerQueryProcessors.ColliderDistanceClosestImmediateProcessor(collider, transform, maxDistance, ref result, ref layerBodyInfo);
+            var aabb            = AabbFrom(in collider, in transform);
+            var offsetDistance  = math.max(maxDistance, 0f);
+            aabb.min           -= offsetDistance;
+            aabb.max           += offsetDistance;
+            FindObjects(aabb, layer, processor).RunImmediate();
+            var hit                  = result.subColliderIndexB >= 0;
+            result.subColliderIndexB = math.max(result.subColliderIndexB, 0);
+            return hit;
+        }
+
+        public static bool DistanceBetweenAny(Collider collider,
+                                              RigidTransform transform,
+                                              CollisionLayer layer,
+                                              float maxDistance,
+                                              out ColliderDistanceResult result,
+                                              out LayerBodyInfo layerBodyInfo)
+        {
+            result              = default;
+            layerBodyInfo       = default;
+            var processor       = new LayerQueryProcessors.ColliderDistanceAnyImmediateProcessor(collider, transform, maxDistance, ref result, ref layerBodyInfo);
+            var aabb            = AabbFrom(in collider, in transform);
+            var offsetDistance  = math.max(maxDistance, 0f);
+            aabb.min           -= offsetDistance;
+            aabb.max           += offsetDistance;
+            FindObjects(aabb, layer, processor).RunImmediate();
+            var hit                  = result.subColliderIndexB >= 0;
+            result.subColliderIndexB = math.max(result.subColliderIndexB, 0);
+            return hit;
+        }
+        #endregion
+
+        private static ColliderDistanceResult FlipResult(in ColliderDistanceResult resultToFlip)
         {
             return new ColliderDistanceResult
             {
@@ -666,7 +633,7 @@ namespace Latios.Psyshock
             };
         }
 
-        private static ColliderDistanceResult BinAResultToWorld(SpatialInternal.ColliderDistanceResultInternal BinAResult, RigidTransform aTransform)
+        private static ColliderDistanceResult BinAResultToWorld(in SpatialInternal.ColliderDistanceResultInternal BinAResult, in RigidTransform aTransform)
         {
             return new ColliderDistanceResult
             {
@@ -678,13 +645,13 @@ namespace Latios.Psyshock
             };
         }
 
-        private static ColliderDistanceResult DistanceBetweenGjk(Collider colliderA, RigidTransform aTransform, Collider colliderB, RigidTransform bTransform)
+        private static ColliderDistanceResult DistanceBetweenGjk(in Collider colliderA, in RigidTransform aTransform, in Collider colliderB, in RigidTransform bTransform)
         {
             var bInATransform = math.mul(math.inverse(aTransform), bTransform);
             var gjkResult     = SpatialInternal.DoGjkEpa(colliderA, colliderB, bInATransform);
             var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
-            DistanceBetween(gjkResult.hitpointOnAInASpace + epsilon, colliderA, RigidTransform.identity, float.MaxValue, out var closestOnA);
-            DistanceBetween(gjkResult.hitpointOnBInASpace - epsilon, colliderB, bInATransform,           float.MaxValue, out var closestOnB);
+            DistanceBetween(gjkResult.hitpointOnAInASpace + epsilon, in colliderA, RigidTransform.identity, float.MaxValue, out var closestOnA);
+            DistanceBetween(gjkResult.hitpointOnBInASpace - epsilon, in colliderB, in bInATransform,        float.MaxValue, out var closestOnB);
             return BinAResultToWorld(new SpatialInternal.ColliderDistanceResultInternal
             {
                 distance  = gjkResult.distance,
@@ -696,7 +663,7 @@ namespace Latios.Psyshock
         }
 
         #region Point
-        public static bool DistanceBetween(float3 point, SphereCollider sphere, RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in SphereCollider sphere, in RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInSphereSpace = math.transform(math.inverse(sphereTransform), point);
             bool hit                = SpatialInternal.PointSphereDistance(pointInSphereSpace, sphere, maxDistance, out var localResult);
@@ -709,7 +676,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(float3 point, CapsuleCollider capsule, RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInCapSpace = math.transform(math.inverse(capsuleTransform), point);
             bool hit             = SpatialInternal.PointCapsuleDistance(pointInCapSpace, capsule, maxDistance, out var localResult);
@@ -722,7 +689,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(float3 point, BoxCollider box, RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in BoxCollider box, in RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInBoxSpace = math.transform(math.inverse(boxTransform), point);
             bool hit             = SpatialInternal.PointBoxDistance(pointInBoxSpace, box, maxDistance, out var localResult);
@@ -735,7 +702,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(float3 point, TriangleCollider triangle, RigidTransform triangleTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in TriangleCollider triangle, in RigidTransform triangleTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInTriangleSpace = math.transform(math.inverse(triangleTransform), point);
             bool hit                  = SpatialInternal.PointTriangleDistance(pointInTriangleSpace, triangle, maxDistance, out var localResult);
@@ -748,7 +715,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(float3 point, ConvexCollider convex, RigidTransform convexTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in ConvexCollider convex, in RigidTransform convexTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInConvexSpace = math.transform(math.inverse(convexTransform), point);
             bool hit                = SpatialInternal.PointConvexDistance(pointInConvexSpace, convex, maxDistance, out var localResult);
@@ -761,7 +728,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool DistanceBetween(float3 point, CompoundCollider compound, RigidTransform compoundTransform, float maxDistance, out PointDistanceResult result)
+        public static bool DistanceBetween(float3 point, in CompoundCollider compound, in RigidTransform compoundTransform, float maxDistance, out PointDistanceResult result)
         {
             bool hit              = false;
             result                = default;
@@ -773,7 +740,7 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compound.scale;
                 bool newHit        = DistanceBetween(point,
-                                                     ScaleCollider(blob.colliders[i], compoundScale),
+                                                     ScaleCollider(in blob.colliders[i], compoundScale),
                                                      math.mul(compoundTransform, blobTransform),
                                                      math.min(result.distance, maxDistance),
                                                      out var newResult);
@@ -783,6 +750,30 @@ namespace Latios.Psyshock
                 hit                        |= newHit;
                 result                      = newHit ? newResult : result;
             }
+            return hit;
+        }
+
+        public static bool DistanceBetween(float3 point, in CollisionLayer layer, float maxDistance, out PointDistanceResult result, out LayerBodyInfo layerBodyInfo)
+        {
+            result             = default;
+            layerBodyInfo      = default;
+            var processor      = new LayerQueryProcessors.PointDistanceClosestImmediateProcessor(point, maxDistance, ref result, ref layerBodyInfo);
+            var offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), layer, processor).RunImmediate();
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
+            return hit;
+        }
+
+        public static bool DistanceBetweenAny(float3 point, in CollisionLayer layer, float maxDistance, out PointDistanceResult result, out LayerBodyInfo layerBodyInfo)
+        {
+            result             = default;
+            layerBodyInfo      = default;
+            var processor      = new LayerQueryProcessors.PointDistanceAnyImmediateProcessor(point, maxDistance, ref result, ref layerBodyInfo);
+            var offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), layer, processor).RunImmediate();
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
             return hit;
         }
         #endregion

@@ -29,13 +29,11 @@ reach out to me.
     -   InstantiateCommandBufferWithRemap
     -   InstantiateCommandBuffer – dynamic buffer variants
     -   InstantiateCommandBuffer – children initialization variants
-    -   Collection Component unmanaged indexing
     -   Blackboard Entity runtime editor
 
 ### Psyshock
 
 -   Easy
-    -   SpeculativeAabbFrom
     -   Spring Force Utility
     -   PID Controller
 -   Advanced
@@ -114,7 +112,7 @@ release.
 -   All data types, enum values, and methods use PascalCase.
 -   All fields and properties use camelCase.
 -   Private fields and properties have an “m_” prefix.
--   Internal fields and properties also have an “m_” prefix if they are
+-   Internal fields and properties may also have an “m_” prefix if they are
     accompanied by public members.
 -   ECS tag components have a “Tag” suffix.
 -   ECS systems have a “System” suffix.

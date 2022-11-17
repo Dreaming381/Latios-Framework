@@ -13,561 +13,627 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-	public static partial class Physics
-	{
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, SphereCollider sphere, RigidTransform sphereTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, sphere, sphereTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+    public static partial class Physics
+    {
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in sphere, in sphereTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(SphereCollider sphere, RigidTransform sphereTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(sphere, sphereTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, CapsuleCollider capsule, RigidTransform capsuleTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, capsule, capsuleTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in SphereCollider sphere,
+                                           in RigidTransform sphereTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in sphere, in sphereTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in capsule, in capsuleTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(CapsuleCollider capsule, RigidTransform capsuleTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(capsule, capsuleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, BoxCollider box, RigidTransform boxTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, box, boxTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in CapsuleCollider capsule,
+                                           in RigidTransform capsuleTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in capsule, in capsuleTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in BoxCollider box,
+                                           in RigidTransform boxTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in box, in boxTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(BoxCollider box, RigidTransform boxTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(box, boxTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, TriangleCollider triangle, RigidTransform triangleTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, triangle, triangleTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in BoxCollider box,
+                                           in RigidTransform boxTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in box, in boxTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in TriangleCollider triangle,
+                                           in RigidTransform triangleTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in triangle, in triangleTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(TriangleCollider triangle, RigidTransform triangleTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(triangle, triangleTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, ConvexCollider convex, RigidTransform convexTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, convex, convexTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in TriangleCollider triangle,
+                                           in RigidTransform triangleTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in triangle, in triangleTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in ConvexCollider convex,
+                                           in RigidTransform convexTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in convex, in convexTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(ConvexCollider convex, RigidTransform convexTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(convex, convexTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool DistanceBetween(Collider collider, RigidTransform colliderTransform, CompoundCollider compound, RigidTransform compoundTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(col, colliderTransform, compound, compoundTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in ConvexCollider convex,
+                                           in RigidTransform convexTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in convex, in convexTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool DistanceBetween(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in CompoundCollider compound,
+                                           in RigidTransform compoundTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in collider.m_sphere, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in collider.m_capsule, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in collider.m_box, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in collider.m_triangle, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in collider.m_convex, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in collider.m_compound, in colliderTransform, in compound, in compoundTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(CompoundCollider compound, RigidTransform compoundTransform, Collider collider, RigidTransform colliderTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = collider;
-					return DistanceBetween(compound, compoundTransform, col, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in CompoundCollider compound,
+                                           in RigidTransform compoundTransform,
+                                           in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider col = collider;
+                    return DistanceBetween(in compound, in compoundTransform, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(Collider colliderA, RigidTransform aTransform, Collider colliderB, RigidTransform bTransform, float maxDistance, out ColliderDistanceResult result)
-		{
-			switch (colliderA.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider colA = colliderA;
-					return DistanceBetween(colA, aTransform, colliderB, bTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool DistanceBetween(in Collider colliderA,
+                                           in RigidTransform aTransform,
+                                           in Collider colliderB,
+                                           in RigidTransform bTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+        {
+            switch (colliderA.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider colA = colliderA;
+                    return DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB, in bTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool DistanceBetween(float3 point, Collider collider, RigidTransform colliderTransform, float maxDistance, out PointDistanceResult result)
-		{
-			switch (collider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider colA = collider;
-					return DistanceBetween(point, colA, colliderTransform, maxDistance, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-	}
+        public static bool DistanceBetween(in float3 point, in Collider collider, in RigidTransform colliderTransform, float maxDistance, out PointDistanceResult result)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    SphereCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_sphere, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    CapsuleCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_capsule, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Box:
+                {
+                    BoxCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_box, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    TriangleCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_triangle, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    ConvexCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_convex, in colliderTransform, maxDistance, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    CompoundCollider colA = collider;
+                    return DistanceBetween(point, in collider.m_compound, in colliderTransform, maxDistance, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+    }
 }
+

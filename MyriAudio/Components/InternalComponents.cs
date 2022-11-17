@@ -14,7 +14,7 @@ namespace Latios.Myri
         public DSPConnection connection;
     }
 
-    internal unsafe struct ListenerGraphState : ISystemStateComponentData
+    internal unsafe struct ListenerGraphState : ICleanupComponentData
     {
         public UnsafeList<DSPNode>                nodes;
         public UnsafeList<DSPConnection>          connections;
@@ -22,7 +22,7 @@ namespace Latios.Myri
         public BlobAssetReference<ListenerProfileBlob> lastUsedProfile;
     }
 
-    internal struct EntityOutputGraphState : ISystemStateComponentData
+    internal struct EntityOutputGraphState : ICleanupComponentData
     {
         public DSPConnection connection;
         public int           portIndex;

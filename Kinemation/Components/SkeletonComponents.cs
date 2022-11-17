@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -39,6 +40,18 @@ namespace Latios.Kinemation
     {
         public BitField64 lower;
         public BitField64 upper;
+    }
+
+    /// <summary>
+    /// A mask which specifies the visible splits for this skeleton in the
+    /// current shadow-casting light culling pass
+    /// Usage: Only write to this if performing custom skeleton LODing logic for shadows.
+    /// </summary>
+    [StructLayout(LayoutKind.Explicit)]
+    public unsafe struct ChunkPerCameraSkeletonCullingSplitsMask : IComponentData
+    {
+        [FieldOffset(0)] public fixed byte  splitMasks[128];
+        [FieldOffset(0)] public fixed ulong ulongMasks[16];  // Ensures 8 byte alignment which is helpful (16 would be better)
     }
 
     public struct SkeletonBindingPathsBlob

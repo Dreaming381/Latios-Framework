@@ -7,17 +7,17 @@ mechanism as well as the custom system update criteria mechanism.
 ## Explicit System Ordering
 
 When using the Explicit System Ordering workflow, you must specify your system
-order in the `CreateSystems()` method of your `SuperSystem` subclass. To do
-so, simply make calls to `GetOrCreateAndAddSystem<T>()` in the order you
-want the systems to run.
+order in the `CreateSystems()` method of your `SuperSystem` subclass. To do so,
+simply make calls to `GetOrCreateAndAdd*System<T>()` in the order you want the
+systems to run, where \* is replaced with either `Managed` or `Unmanaged`.
 
 ```csharp
 public class ExampleSuperSystem : SuperSystem
 {
     protected override void CreateSystems()
     {
-        GetOrCreateAndAddSystem<YourSubSystem1>();
-        GetOrCreateAndAddSystem<YourSubSystem2>();
+        GetOrCreateAndAddManagedSystem<YourSubSystem1>();
+        GetOrCreateAndAddUnmanagedSystem<YourISystem2>();
         GetOrCreateAndAddSystem<AnotherSuperSystem>();
 
         //Automatically reuses the existing TransformSystemGroup to prevent ChangeFilter fighting.
@@ -42,7 +42,6 @@ public class ExampleSuperSystem : SuperSystem
 }
 ```
 
-
 ## Hierarchical Update Culling
 
 You can cull updates of `SubSystem`s or `SuperSystem`s by overriding
@@ -54,17 +53,16 @@ detects a system is a `SuperSystem` or `SubSystem`, it will call
 appropriately. Setting the `Enabled` property triggers proper invocation and
 propagation of `OnStartRunning()` and `OnStopRunning()`.
 
-If a `SuperSystem` is disabled, its `OnUpdate()` will not be called and it
-will not iterate through its children systems, potentially saving crucial main
-thread milliseconds.
+If a `SuperSystem` is disabled, its `OnUpdate()` will not be called and it will
+not iterate through its children systems, potentially saving crucial main thread
+milliseconds.
 
-In the following example, the first frame `ShouldUpdateSystem()` returns
-false, the three children systems will immediately have `OnStopRunning()`
-called on them, but will not have `Update()` called on them. In the following
-frames where `ShouldUpdateSystem()` returns false, the children systems will
-be left untouched. This may lead to some non-obvious behavior if you are relying
-on `OnStopRunning()` for a system that is a child of multiple
-`SuperSystem`s.
+In the following example, the first frame `ShouldUpdateSystem()` returns false,
+the three children systems will immediately have `OnStopRunning()` called on
+them, but will not have `Update()` called on them. In the following frames where
+`ShouldUpdateSystem()` returns false, the children systems will be left
+untouched. This may lead to some non-obvious behavior if you are relying on
+`OnStopRunning()` for a system that is a child of multiple `SuperSystem`s.
 
 ```csharp
 public class BeastSuperSystem : SuperSystem
@@ -88,17 +86,16 @@ public class BeastSuperSystem : SuperSystem
 }
 ```
 
-
 Note: You can use hierarchical update culling while also using the system
 injection workflow. When doing so, simply do not call
 `GetOrCreateAndAddSystem<T>()`.
 
 ## Root Super Systems
 
-Unlike regular `SuperSystem`s, `RootSuperSystem`s are designed to be
-injected into traditional `ComponentSystemGroup`s. They serve as entry-points
-relative to Unity and perhaps third-party systems from which explicit system
-ordering can take over.
+Unlike regular `SuperSystem`s, `RootSuperSystem`s are designed to be injected
+into traditional `ComponentSystemGroup`s. They serve as entry-points relative to
+Unity and perhaps third-party systems from which explicit system ordering can
+take over.
 
-If a `RootSuperSystem` uses a custom `ShouldUpdateSystem()` implementation,
-how that information is relayed in the Editor may differ from `SuperSystem`.
+If a `RootSuperSystem` uses a custom `ShouldUpdateSystem()` implementation, how
+that information is relayed in the Editor may differ from `SuperSystem`.

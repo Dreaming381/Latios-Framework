@@ -22,7 +22,7 @@ are complimentary.
     -   In Unity, subscenes are loaded asynchronously, and only GameObject
         scenes can be loaded synchronously
     -   In Latios, the scene is loaded using the synchronous API and a pause
-        frame
+        frame, and all subscenes are forced to load synchronously as well
 -   Destroyed entities
     -   In Unity, only the entities that were contained within the subscene are
         destroyed
@@ -76,3 +76,9 @@ executes. If multiple entities are found to have such a component, an error will
 be logged and no scene will be loaded.
 
 The `RequestLoadScene` components are removed after processing.
+
+## DontDestroyOnSceneChangeTag
+
+You can add this component to any entity to prevent it from being destroyed
+during a scene change. This includes entities that belong to an unloaded
+subscene, allowing them to persist even after the subscene unloaded.

@@ -53,8 +53,8 @@ your use case, please report it as an issue.*
 We’re going to assume our character does not use `ParentScaleInverse`, as that
 complicates the code quite a bit in Kinemation’s current state.
 
-Fortunately, conversion defaults to generating skeletons without it. But if you
-are ever unsure, there is a flag in `OptimizedSkeletonHierarchyBlob` called
+Fortunately, baking defaults to generating skeletons without it. But if you are
+ever unsure, there is a flag in `OptimizedSkeletonHierarchyBlob` called
 `hasAnyParentScaleInverseBone` which you can check.
 
 We’ll start by removing `SamplePose()`:
@@ -72,14 +72,14 @@ Entities.ForEach((ref DynamicBuffer<OptimizedBoneToRoot> btrBuffer, in Optimized
 With optimized skeletons, we don’t have to worry about modifying the world-space
 transforms anymore. We still need to watch out for root motion animation, but if
 we don’t have that, we can start our loop at 0. However, there’s no point since
-the first matrix should always be the identity matrix, which conversion kindly
-set for us. Don’t believe me? Well let’s temporarily remove our Single Clip
+the first matrix should always be the identity matrix, which baking kindly set
+for us. Don’t believe me? Well let’s temporarily remove our Single Clip
 Authoring and look at the buffer in the inspector.
 
 ![](media/723f64ab1435586644a2f46c11c58007.png)
 
 And now you have probably seen that even optimized characters keep their pose
-during conversion. So go ahead and explore the rest of the components.
+during baking. So go ahead and explore the rest of the components.
 
 Alright, before we write our loop, let’s convert our buffer into its underlying
 type so it is easier to work with:
@@ -109,8 +109,8 @@ to the root.
 
 But there’s a trick. If the parent has a fully computed `OptimizedBoneToRoot`
 matrix, we only need to multiply our matrix with that. And if we iterated
-through our buffer from start to end, that will always be the case. Kinemation
-conversion orders the bones such that each parent is always before its children.
+through our buffer from start to end, this will always be the case. Kinemation
+baking orders the bones such that each parent is always before its children.
 That means we just have to do this:
 
 ```csharp

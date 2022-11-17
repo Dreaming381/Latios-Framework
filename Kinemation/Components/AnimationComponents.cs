@@ -123,6 +123,15 @@ namespace Latios.Kinemation
             return new BoneTransform(qvv);
         }
 
+        /// <summary>
+        /// Samples the animation clip for the entire skeleton at the given time weighted by the blendWeight.
+        /// This method uses a special fast-path.
+        /// </summary>
+        /// <param name="blender">The blender which contains context information about previous sampling operations</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
         public unsafe void SamplePose(ref BufferPoseBlender blender,
                                       float blendWeight,
                                       float time,

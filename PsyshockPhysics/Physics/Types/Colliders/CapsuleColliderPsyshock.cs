@@ -4,6 +4,9 @@ using Unity.Mathematics;
 //Note: A == B seems to work with SegmentSegmentDistance
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A capsule composed of a segment and an inflated radius around the segment
+    /// </summary>
     [Serializable]
     public struct CapsuleCollider
     {

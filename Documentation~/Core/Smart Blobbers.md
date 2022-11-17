@@ -1,12 +1,12 @@
 # Smart Blobbers
 
 Smart Blobbers provide a powerful, streamlined, and user-friendly workflow for
-generating Blob Assets during Game Object Conversion. Any authoring logic can
+generating data-intense Blob Assets during Baking. Any authoring logic can
 request a Blob Asset from a Smart Blobber and receive a handle. That handle can
 later be used to retrieve the Blob Asset after the Smart Blobber has executed.
 The Smart Blobber generates blobs in parallel, using Burst if possible. This can
-drastically speed up conversion times while keeping the logic for generating
-blob assets unified and consistent.
+drastically speed up baking times while keeping the logic for generating blob
+assets unified and consistent.
 
 ## Converting a Blob Asset using an Authoring MonoBehaviour
 
@@ -17,6 +17,7 @@ The following code demonstrates how to generate a
 using Latios.Authoring;
 using Latios.Kinemation;
 using Latios.Kinemation.Authoring;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -24,68 +25,100 @@ using UnityEngine;
 namespace Dragons.Authoring
 {
     [DisallowMultipleComponent]
-    public class SingleClipAuthoring : MonoBehaviour, IConvertGameObjectToEntity, IRequestBlobAssets
+    public class SingleClipAuthoring : MonoBehaviour
     {
         public AnimationClip clip;
+    }
 
+    struct SingleClipSmartBakeItem : ISmartBakeItem<SingleClipAuthoring>
+    {
         SmartBlobberHandle<SkeletonClipSetBlob> blob;
 
-        public void RequestBlobAssets(Entity entity, EntityManager dstEntityManager, GameObjectConversionSystem conversionSystem)
+        public bool Bake(SingleClipAuthoring authoring, IBaker baker)
         {
-            var config = new SkeletonClipConfig { clip = clip, settings = SkeletonClipCompressionSettings.kDefaultSettings };
-
-            blob = conversionSystem.CreateBlob(gameObject, new SkeletonClipSetBakeData
-            {
-                animator = GetComponent<Animator>(),
-                clips    = new SkeletonClipConfig[] { config }
-            });
+            baker.AddComponent<SingleClip>();
+            var clips = new NativeArray<SkeletonClipConfig>(1, Allocator.Temp);
+            clips[0]  = new SkeletonClipConfig { clip = authoring.clip, settings = SkeletonClipCompressionSettings.kDefaultSettings };
+            blob      = baker.RequestCreateBlobAsset(baker.GetComponent<Animator>(), clips);
+            return true;
         }
 
-        public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
+        public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
         {
-            var singleClip = new SingleClip { blob = blob.Resolve() };
-
-            dstManager.AddComponentData(entity, singleClip);
+            entityManager.SetComponentData(entity, new SingleClip { blob = blob.Resolve(entityManager) });
         }
+    }
+
+    class SingleClipBaker : SmartBaker<SingleClipAuthoring, SingleClipSmartBakeItem>
+    {
     }
 }
 ```
 
-The first thing you may notice is the new interface `IRequestBlobAssets`. This
-interface defines a method `RequestBlobAssets()` which is called after the
-`DeclareReferencedPrefabs` stage but before Convert gets called and before the
-Smart Blobbers update.
+The first thing you may notice is the new interface `ISmartBakeItem`. This
+interface defines a method `Bake()` which is called when the `SmartBaker`
+executes. At this point, the “bake item” is default-initialized.
 
-This authoring class has a non-serialized member of type `SmartBlobberHandle<>`.
-You can define as many of these as you want, pass them around wherever, and
-store them in managed containers. There is also a `SmartBlobberHandleUntyped` if
-you need it.
+In this example, the `SingleClipSmartBakeItem` has a member of type
+`SmartBlobberHandle<>`. You can define as many of these as you want, pass them
+around wherever, and store them in any component decorated with
+`[TemporaryBakingType]`. There is also a `SmartBlobberHandleUntyped` if you need
+it.
 
-Some Smart Blobbers define extension methods for `GameObjectConversionSystem`
-which allow you to request a blob asset without a reference to the Smart
-Blobber. In this case, it is called `CreateBlob()`. However, if one does not
-exist, you can still fetch a reference to the Smart Blobber (which is a system
-belonging to the conversion world) and calling `AddToConvert()` or
-`AddToConvertUntyped()`.
+`RequestCreateBlobAsset<>` is a globally-defined extension method for `IBaker`
+which can process a blob asset input request structure. However, most Smart
+Blobbers provide custom extension methods of the same name but with explicit
+arguments as a convenience. In this example, there is an overload that takes an
+Animator and a `NativeArray<SkeletonClipConfig>`. The method returns a
+`SmartBlobberHandle`.
 
-Finally, in `Convert()`, you can call `Resolve()` on the handle to get the
-generated `BlobAssetReference<T>`. This `BlobAssetReference<T>` has already been
-assigned to the `BlobAssetStore` and deduplicated across the conversion world.
+`Bake()` returns a `bool`. If you return a value of false, the bake item will be
+discarded from further operations. This is useful if your logic conditionally
+decides whether it needs to request a blob asset at all. Other operations
+performed with baker will still be applied.
 
-### Why does CreateBlob() need the gameObject?
+The second method in the interface is `PostProcessBlobRequests()`, and is called
+after all Smart Blobbers have updated, but before most other types of baking
+systems update. The second parameter is the primary entity processed by the
+Smart Baker. In this method, you can resolve any `SmartBlobberHandle` as a
+`BlobAssetReference` and assign it to components or dynamic buffers. The
+`BlobAssetReference` is deduplicated and tracked by the baking process at this
+point.
 
-Unity’s advanced blob asset API requires every blob asset to be associated with
-a `GameObject`. It will dispose all old blobs of a type the second time a
-conversion system runs using that type with the same `BlobAssetStore` instance,
-but only if those old blobs weren’t reproduced in the new run. I don’t actually
-know how that can ever happen, but it is something to keep in mind.
+While the `EntityManager` argument passed in lets you do many different things,
+it is strongly recommended you only use `Get/Set(Shared)Component` and
+`Get/SetBuffer` APIs on either the entity argument or additionally created
+entities applied to the Smart Baker and only work with types directly added in
+`Bake()`.
+
+Lastly, you need to define the `SmartBaker` type by subclassing `SmartBaker` and
+specifying both the authoring component and the `ISmartBakeItem` type as generic
+arguments. You do not need to define any other details for this class.
+
+### How does this Smart Baker thing work?
+
+Baking goes through two distinct steps. First, the Bakers themselves are
+executed. Then afterwards, baking systems execute. Smart Blobbers can only
+receive requests from `Baker`s, and the results are only made available to
+baking systems. To avoid making users write custom baking systems, Smart Bakers
+automatically generate the code for each step, and provide a stateful “bake
+item” to retain context between steps. The “bake item” is actually an
+`IComponentData` decorated with [TemporaryBakingType] which is added to a
+Baking-Only Entity created by the Smart Baker. By making temporary entities,
+each authoring component can have its own bake item.
+
+The Smart Baker will also generate a baking system which queries for the
+custom-defined bake item type (plus some internal tracking types added by the
+Smart Baker) and dispatch `PostProcessBlobRequests()`.
+
+If you would rather use a custom baking system instead of a Smart Baker, you can
+do that too. Simply store the `SmartBlobberHandle` in a custom-defined
+`[TemproaryBakingType]` component type and resolve it in your baking system.
 
 ## Creating a Simple Smart Blobber
 
 If you have your own custom blob asset types, you may want to create a Smart
-Blobber for them. Let’s walk through a simple example where the Smart Blobber
-directly reads authoring components and applies the results directly to the
-converted entities.
+Blobber for them. Let’s walk through a simple example.
 
 First, we need our blob type, component type, and authoring type.
 
@@ -109,832 +142,304 @@ public class DigitsAuthoring : MonoBehaviour
 }
 ```
 
-Note the `DigitsAuthoring` does not implement `IConvertGameObjectToEntity`. That
-responsibility is now on the Smart Blobber.
+Similar to Smart Bakers, every Smart Blobber blob request creates a baking-only
+entity. Then, Smart Blobbers use baking systems to compute blob assets for each
+of these blob baking entities. To prepare a request, you must define an
+`ISmartBlobberRequestFilter<>`. This filter is responsible for performing
+initial validation of inputs, gathering new inputs from the `IBaker`, and
+customizing the `blobBakingEntity` for the baking systems.
 
-Every Smart Blobber requires an input `struct`. This defines the inputs needed
-for each blob asset request. This is considered public API for the Smart
-Blobber.
+We will need to define custom components to contain our inputs that we can
+attach to our request entity.
 
 ```csharp
-// This is where Smart Blobber logic starts
-public struct DigitsBakeData
+[TemporaryBakingType]
+internal struct DigitsValueInput : IComponentData
+{
+    public int value;
+}
+
+[TemporaryBakingType]
+internal struct DigitsElementInput : IBufferElementData
+{
+    public int digit;
+}
+```
+
+Now we can define our filter struct.
+
+```csharp
+public struct DigitsSmartBlobberRequestFilter : ISmartBlobberRequestFilter<DigitsBlob>
 {
     public int   value;
     public int[] digits;
-}
-```
 
-The Smart Blobber also requires a converter `struct` which implements
-`ISmartBlobberSimpleBuilder<>`. This `struct` is considered an internal aspect
-of the Smart Blobber and should not be interacted with externally. However, if
-you make your Smart Blobber `public`, you will have to make this `public` as
-well.
-
-```csharp
-// This struct represents a single element in a parallel Burst job
-public struct DigitsConverter : ISmartBlobberSimpleBuilder<DigitsBlob>
-{
-    public int             value;
-    public UnsafeList<int> digits;
-
-    public unsafe BlobAssetReference<DigitsBlob> BuildBlob()
+    public bool Filter(IBaker baker, Entity blobBakingEntity)
     {
-        var     builder = new BlobBuilder(Allocator.Temp);
-        ref var root    = ref builder.ConstructRoot<DigitsBlob>();
-        root.value      = value;
-        builder.ConstructFromNativeArray(ref root.digits, digits.Ptr, digits.Length);
-        return builder.CreateBlobAssetReference<DigitsBlob>(Allocator.Persistent);
+        if (digits == null)
+            return false;
+
+        baker.AddComponent(blobBakingEntity, new DigitsValueInput { value = value });
+        var buffer = baker.AddBuffer<DigitsElementInput>(blobBakingEntity).Reinterpret<int>();
+        foreach (var digit in digits)
+            buffer.Add(digit);
+        return true;
     }
 }
 ```
 
-The member fields are the inputs needed to construct a single blob asset. Native
-Containers are not allowed, but unsafe containers are. The `BuildBlob()`
-function is where the actual blob asset is built using a `BlobBuilder` like in
-this example or the `BlobAssetReference<>` direct creation methods.
-`BuildBlob()` is only called once per converter instance.
+Just like with `ISmartBakeItem.Bake()`, `Filter()` returns a `bool` that allows
+for aborting the request.
 
-Now it is time to define our actual Smart Blobber class:
-
-```csharp
-public class DigitsSmartBlobberSystem : SmartBlobberConversionSystem<DigitsBlob, DigitsBakeData, DigitsConverter>
-{
-```
-
-Simple Smart Blobbers have **3** generic arguments.
-
-Since this Smart Blobber is processing the authoring components directly, it
-needs a list to keep track of requests.
+We could stop here, as the general-purpose `RequestCreateBlobAsset<>()` method
+takes an `ISmartBlobberRequestFilter` as input. However, we can supply our own
+custom extension method to make the API easier to use.
 
 ```csharp
-// This is used to keep track of the inputs and apply them to the outputs.
-// You only need this if you are generating runtime components directly in this system.
-struct AuthoringHandlePair
+public static class DigitsSmartBlobberBakerExtensions
 {
-    public DigitsAuthoring                authoring;
-    public SmartBlobberHandle<DigitsBlob> blobHandle;
-}
-
-List<AuthoringHandlePair> m_sourceList = new List<AuthoringHandlePair>();
-```
-
-Requests can be generated by the overriding the `virtual` method
-`GatherInputs()`. Note that a `SmartBlobberConversionSystem` subclasses
-`GameObjectConversionSystem`. Things like `Entities.ForEach`, `World`, and
-`DstEntityManager` are all accessible. `GatherInputs()` is called during the
-system’s `OnUpdate()` but before blob asset processing.
-
-```csharp
-// This is where we gather inputs and feed requests to ourselves.
-// Again, we are only doing this because this system generates runtime components directly.
-protected override void GatherInputs()
-{
-    Entities.ForEach((DigitsAuthoring authoring) =>
+    public static SmartBlobberHandle<DigitsBlob> RequestCreateBlobAsset(this IBaker baker, int value, int[] digits)
     {
-        var input      = new DigitsBakeData { value = authoring.value, digits = authoring.digits };
-        var blobHandle = AddToConvert(authoring.gameObject, input);
-        m_sourceList.Add(new AuthoringHandlePair { authoring = authoring, blobHandle = blobHandle });
-    });
-}
-```
-
-The requests can be resolved by overriding the virtual method
-`FinalizeOutputs()`. This method is called during the system’s `OnUpdate()`
-after blob asset processing.
-
-```csharp
-// And this is where we resolve blob handles and add them to entities
-protected override void FinalizeOutputs()
-{
-    foreach (var pair in m_sourceList)
-    {
-        var entity       = GetPrimaryEntity(pair.authoring);
-        var resolvedBlob = pair.blobHandle.Resolve();
-        DstEntityManager.AddComponentData(entity, new DigitsBlobReference { blob = resolvedBlob });
+        return baker.RequestCreateBlobAsset<DigitsBlob, DigitsSmartBlobberRequestFilter>(new DigitsSmartBlobberRequestFilter { value = value, digits = digits });
     }
 }
 ```
 
-The final step is to implement the `Filter()` method. This is an abstract method
-and must be implemented. It is called for each input, and it requires an
-instance of a converter to be generated. If this method returns false, the input
-will be skipped. The converter will not have `BuildBlob()` called and the handle
-associated with the input will resolve to `BlobAssetReference<>.Null`.
+If we wanted to, we could define other filter types and extension methods that
+take different sets of inputs for the same blob type, and perhaps even attach
+different sets of components to the `blobBakingEntity`. Perhaps we could accept
+a `NativeArray<int>` instead of a managed `int[]`. In such a scenario, it is
+best practice to allow any native container inputs to be allocated with
+`Allocator.Temp`.
+
+At this point, we now have the code in place to receive a blob request, and set
+up a special `blobBakingEntity` to hold our filtered inputs. Now we need to
+actually generate our blob asset inside a baking system. Every
+`blobBakingEntity` that passes the filter will have the following component
+added where you should store your generated blob asset:
 
 ```csharp
-// And now we convert our inputs into something our job-friendly converter struct can handle.
-protected override unsafe bool Filter(in DigitsBakeData input, GameObject gameObject, out DigitsConverter converter)
+[TemporaryBakingType]
+public struct SmartBlobberResult : IComponentData
 {
-    if (input.digits == null)
-    {
-        converter = default;
-        // Returning null here means that this input will be assigned a Null BlobAssetReference.
-        return false;
-    }
-
-    // It is usually a good idea to use UpdateAllocator when allocating UnsafeLists like this
-    var digits = new UnsafeList<int>(input.digits.Length, World.UpdateAllocator.ToAllocator);
-    foreach (var digit in input.digits)
-        digits.Add(digit);
-
-    converter = new DigitsConverter
-    {
-        value  = input.value,
-        digits = digits
-    };
-    return true;
+    public UnsafeUntypedBlobAssetReference blob;
 }
 ```
 
-When populating UnsafeLists and other containers stored inside converters, it is
-currently best practice to use World.UpdateAllocator.
+For this simple example, we’ll use a Burst-compiled `ISystem` as our baking
+system, and use `IJobEntity` for computing our blob assets.
+
+```csharp
+[UpdateInGroup(typeof(Latios.Authoring.Systems.SmartBlobberBakingGroup))]
+[BurstCompile]
+public partial struct DigitsSmartBlobberSystem : ISystem
+{
+    [BurstCompile]
+    public void OnDestroy(ref SystemState state)
+    {
+    }
+
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        new Job().ScheduleParallel();
+    }
+
+    [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+    [BurstCompile]
+    partial struct Job : IJobEntity
+    {
+        public void Execute(ref SmartBlobberResult result, in DigitsValueInput valueInput, in DynamicBuffer<DigitsElementInput> bufferInput)
+        {
+            var     builder = new BlobBuilder(Allocator.Temp);
+            ref var root    = ref builder.ConstructRoot<DigitsBlob>();
+            root.value      = valueInput.value;
+            builder.ConstructFromNativeArray(ref root.digits, bufferInput.Reinterpret<int>().AsNativeArray());
+            var typedBlob = builder.CreateBlobAssetReference<DigitsBlob>(Allocator.Persistent);
+            result.blob   = Unity.Entities.LowLevel.Unsafe.UnsafeUntypedBlobAssetReference.Create(typedBlob);
+        }
+    }
+}
+```
+
+First, notice the `[WithEntityQueryOptions]`. This is a general requirement of
+all queries in baking systems, but is an easy thing to forget so it is worth
+reiterating.
+
+Second, notice that the system is updated in the `SmartBlobberBakingGroup`. This
+is really important, because the magic happens shortly after this point. There
+are other baking systems which will read the `SmartBlobberResult` as well as
+some additional internal data on the `blobBakingEntity` and perform all of the
+blob asset deduplication, incremental allocation tracking, and
+`SmartBlobberHandle` resolution logic. The last step is to register the blob
+type so that these systems are aware of it. This must be done inside
+`OnCreate()` without Burst, by calling `Register()` on a temporary
+`SmartBlobberTools<>` instance.
+
+```csharp
+    public void OnCreate(ref SystemState state)
+    {
+        new SmartBlobberTools<DigitsBlob>().Register(state.World);
+    }
+```
+
+To summarize the steps:
+
+1.  Define components to store the input data for blob asset generation
+2.  Use an ISmartBlobberRequestFilter and the generic
+    RequestCreateBlobAsset\<\>() extension to configure the blobBakingEntity
+    with the input data
+3.  Use baking systems to compute blobs and write the results to
+    SmartBlobberResult
+4.  Register the blob type
 
 And that’s it. Here is the complete code:
 
 ```csharp
-using System.Collections.Generic;
-using Latios;
-using Latios.Authoring;
-using Latios.Authoring.Systems;
-using Latios.Unsafe;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
-using Unity.Entities;
-using UnityEngine;
-
-namespace Dragons
-{
-    public struct DigitsBlob
-    {
-        public int            value;
-        public BlobArray<int> digits;
-    }
-
-    public struct DigitsBlobReference : IComponentData
-    {
-        public BlobAssetReference<DigitsBlob> blob;
-    }
-
-    [DisallowMultipleComponent]
-    public class DigitsAuthoring : MonoBehaviour
-    {
-        public int   value  = 381;
-        public int[] digits = { 3, 8, 1 };
-    }
-
-    // This is where Smart Blobber logic starts
-    public struct DigitsBakeData
-    {
-        public int   value;
-        public int[] digits;
-    }
-
-    // This struct represents a single element in a parallel Burst job
-    public struct DigitsConverter : ISmartBlobberSimpleBuilder<DigitsBlob>
-    {
-        public int             value;
-        public UnsafeList<int> digits;
-
-        public unsafe BlobAssetReference<DigitsBlob> BuildBlob()
-        {
-            var     builder = new BlobBuilder(Allocator.Temp);
-            ref var root    = ref builder.ConstructRoot<DigitsBlob>();
-            root.value      = value;
-            builder.ConstructFromNativeArray(ref root.digits, digits.Ptr, digits.Length);
-            return builder.CreateBlobAssetReference<DigitsBlob>(Allocator.Persistent);
-        }
-    }
-
-    public class DigitsSmartBlobberSystem : SmartBlobberConversionSystem<DigitsBlob, DigitsBakeData, DigitsConverter>
-    {
-        // This is used to keep track of the inputs and apply them to the outputs.
-        // You only need this if you are generating runtime components directly in this system.
-        struct AuthoringHandlePair
-        {
-            public DigitsAuthoring                authoring;
-            public SmartBlobberHandle<DigitsBlob> blobHandle;
-        }
-
-        List<AuthoringHandlePair> m_sourceList = new List<AuthoringHandlePair>();
-
-        // This is where we gather inputs and feed requests to ourselves.
-        // Again, we are only doing this because this system generates runtime components directly.
-        protected override void GatherInputs()
-        {
-            Entities.ForEach((DigitsAuthoring authoring) =>
-            {
-                var input      = new DigitsBakeData { value = authoring.value, digits = authoring.digits };
-                var blobHandle = AddToConvert(authoring.gameObject, input);
-                m_sourceList.Add(new AuthoringHandlePair { authoring = authoring, blobHandle = blobHandle });
-            });
-        }
-
-        // And this is where we resolve blob handles and add them to entities
-        protected override void FinalizeOutputs()
-        {
-            foreach (var pair in m_sourceList)
-            {
-                var entity       = GetPrimaryEntity(pair.authoring);
-                var resolvedBlob = pair.blobHandle.Resolve();
-                DstEntityManager.AddComponentData(entity, new DigitsBlobReference { blob = resolvedBlob });
-            }
-        }
-
-        // And now we convert our inputs into something our job-friendly converter struct can handle.
-        protected override unsafe bool Filter(in DigitsBakeData input, GameObject gameObject, out DigitsConverter converter)
-        {
-            if (input.digits == null)
-            {
-                converter = default;
-                // Returning null here means that this input will be assigned a Null BlobAssetReference.
-                return false;
-            }
-
-            // It is usually a good idea to use UpdateAllocator when allocating UnsafeLists like this
-            var digits = new UnsafeList<int>(input.digits.Length, World.UpdateAllocator.ToAllocator);
-            foreach (var digit in input.digits)
-                digits.Add(digit);
-
-            converter = new DigitsConverter
-            {
-                value  = input.value,
-                digits = digits
-            };
-            return true;
-        }
-    }
-}
-```
-
-### Why not just use BlobAssetStore.AddUniqueBlobAsset()?
-
-In the case where the Smart Blobber is processing Game Objects directly and
-using a simple variant, this may not have many advantages.
-
-One advantage is that Blob Assets are generated in parallel in Burst. There’s
-more going on than just copying data to `BlobArray<>` fields.
-`BlobBuilder.CreateBlobAssetReference()` does a non-trivial amount of work to
-organize the relative offsets of the blob asset and put everything together.
-This cost can become significant as the blob asset increases in complexity. It
-also hashes the entire blob data near the end of generation.
-
-The second advantage is that a Smart Blobber can start receiving requests from
-other conversion later on in development. Requirements change as projects
-evolve, and so can whether or not only one type of component is allowed to have
-a type of blob asset.
-
-### What if I need main-thread access to build my blob?
-
-It might be the blob is heavily based on polymorphic Scriptable Objects or some
-other paradigm that makes it difficult to benefit from a parallel Burst job. In
-that case, construct the blob asset inside of `Filter()` and assign it to the
-converter. The converter simply has to return the blob asset in its
-`BuildBlob()` method.
-
-## Creating a Batching Smart Blobber
-
-There is a more advanced type of Smart Blobber which is able to reason about all
-blobs at once throughout most of the pipeline. This allows for input
-deduplication and sharing Native Containers across converters via a context
-object. This example will create a `TriangleSoupBlob` derived from `Mesh`
-instances. It will also provide a streamlined request API.
-
-This will be the blob and runtime component definitions:
-
-```csharp
-public struct TriangleSoupBlob
-{
-    public Aabb                        aabb;
-    public BlobArray<Aabb>             batch32Aabbs;
-    public BlobArray<Aabb>             triangleAabbs;
-    public BlobArray<TriangleCollider> triangles;
-    public FixedString128Bytes         originalMeshName;
-}
-
-public struct TriangleSoupBlobReference : IComponentData
-{
-    public BlobAssetReference<TriangleSoupBlob> blob;
-}
-```
-
-`TriangleSoupBlob` has a 3-level AABB hierarchy in order to demonstrate more
-complex precomputation in a Smart Blobber. The `Aabb` and `TriangleCollider`
-types come from Psyshock.
-
-This is an example authoring component that uses the desired streamlined API:
-
-```csharp
-// This is the consumer of the Smart Blobber
-[DisallowMultipleComponent]
-public class TriangleSoupAuthoring : MonoBehaviour, IRequestBlobAssets, IConvertGameObjectToEntity
-{
-    public Mesh mesh;
-
-    SmartBlobberHandle<TriangleSoupBlob> blobHandle;
-
-    public void RequestBlobAssets(Entity entity, EntityManager dstEntityManager, GameObjectConversionSystem conversionSystem)
-    {
-        blobHandle = conversionSystem.CreateBlob(gameObject, new TriangleSoupBakeData { mesh = mesh });
-    }
-
-    public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
-    {
-        dstManager.AddComponentData(entity, new TriangleSoupBlobReference { blob = blobHandle.Resolve() });
-    }
-}
-```
-
-In order to provide this streamlined API, write extension methods for any
-`GameObjectConversionSystem` which fetches the Smart Blobber and calls the
-appropriate method. Input for this Smart Blobber functions the same as the
-simple Smart Blobber.
-
-```csharp
-// This is the Smart Blobber streamlined API
-public struct TriangleSoupBakeData
-{
-    public Mesh mesh;
-}
-
-public static class TriangleSoupSmartBlobberApiExtensions
-{
-    public static SmartBlobberHandle<TriangleSoupBlob> CreateBlob(this GameObjectConversionSystem conversionSystem,
-                                                                    GameObject gameObject,
-                                                                    TriangleSoupBakeData bakeData)
-    {
-        return conversionSystem.World.GetExistingSystem<TriangleSoupSmartBlobberSystem>().AddToConvert(gameObject, bakeData);
-    }
-
-    public static SmartBlobberHandleUntyped CreateBlobUntyped(this GameObjectConversionSystem conversionSystem,
-                                                                GameObject gameObject,
-                                                                TriangleSoupBakeData bakeData)
-    {
-        return conversionSystem.World.GetExistingSystem<TriangleSoupSmartBlobberSystem>().AddToConvertUntyped(gameObject, bakeData);
-    }
-}
-```
-
-This Smart Blobber will need to read meshes inside the converters which run in a
-parallel job. Therefore, this Smart Blobber will use a MeshDataArray accessible
-to all converters. This is done through a context object.
-
-```csharp
-// This is where the Smart Blobber internal logic starts
-public struct TriangleSoupContext : System.IDisposable
-{
-    [ReadOnly] public Mesh.MeshDataArray meshes;
-
-    public void Dispose() => meshes.Dispose();
-}
-```
-
-Note that context objects must implement `System.IDisposable`. There is only one
-context object per Smart Blobber. The context object is a field in the parallel
-blob asset generation job, so it is shallow-copied to every worker thread
-instance. Normal job struct rules apply here.
-
-The converter now implements the `ISmartBlobberContextBuilder<>` interface, and
-receives three arguments. The first argument is an index which corresponds to
-the `Filter()` method of the Smart Blobber. The second argument is an index
-which corresponds to the `PostFilter()` method of the Smart Blobber. The final
-argument is a reference to the shallow-copied thread-local context object.
-
-```csharp
-public struct TriangleSoupConverter : ISmartBlobberContextBuilder<TriangleSoupBlob, TriangleSoupContext>
-{
-    public FixedString128Bytes meshName;
-
-    public BlobAssetReference<TriangleSoupBlob> BuildBlob(int prefilterIndex, int postfilterIndex, ref TriangleSoupContext context)
-    {
-        var mesh = context.meshes[postfilterIndex];
-
-        NativeArray<int> indices;
-        // We need to convert to int to get a common interface
-        if (mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16)
-        {
-            var meshIndices = mesh.GetIndexData<ushort>();
-            indices         = new NativeArray<int>(meshIndices.Length, Allocator.Temp);
-            for (int i = 0; i < meshIndices.Length; i++)
-                indices[i] = meshIndices[i];
-        }
-        else
-        {
-            var meshIndices = mesh.GetIndexData<uint>();
-            indices         = new NativeArray<int>(meshIndices.Length, Allocator.Temp);
-            for (int i = 0; i < meshIndices.Length; i++)
-                indices[i] = (int)meshIndices[i];
-        }
-
-        // If our index buffer uses triangle strips or lines or something, quit.
-        // Smart Blobbers check for Null blobs and handle them appropriately.
-        if (indices.Length % 3 != 0 || indices.Length == 0)
-            return default;
-
-        var vertices = new NativeArray<Vector3>(mesh.vertexCount, Allocator.Temp);
-        mesh.GetVertices(vertices);
-
-        var     builder   = new BlobBuilder(Allocator.Temp);
-        ref var root      = ref builder.ConstructRoot<TriangleSoupBlob>();
-        var     triangles = builder.Allocate(ref root.triangles, indices.Length / 3);
-        var     aabbs     = builder.Allocate(ref root.triangleAabbs, triangles.Length);
-
-        for (int i = 0; i < triangles.Length; i++)
-        {
-            float3 a = vertices[indices[i * 3 + 0]];
-            float3 b = vertices[indices[i * 3 + 1]];
-            float3 c = vertices[indices[i * 3 + 2]];
-
-            triangles[i] = new TriangleCollider(a, b, c);
-            aabbs[i]     = Physics.AabbFrom(triangles[i], RigidTransform.identity);
-        }
-
-        int batchCount = aabbs.Length / 32;
-        if (aabbs.Length % 32 != 0)
-            batchCount++;
-
-        var batchAabbs = builder.Allocate(ref root.batch32Aabbs, batchCount);
-        var fullAabb   = aabbs[0];
-        for (int batchIndex = 0; batchIndex < batchCount; batchIndex++)
-        {
-            int triangleBaseIndex    = batchIndex * 32;
-            int triangleCountInBatch = math.min(aabbs.Length - triangleBaseIndex, 32);
-            var currentBatchAabb     = aabbs[triangleBaseIndex];
-            for (int triangleIndex = 1; triangleIndex < triangleCountInBatch; triangleIndex++)
-            {
-                currentBatchAabb = Physics.CombineAabb(currentBatchAabb, aabbs[triangleBaseIndex + triangleIndex]);
-            }
-            batchAabbs[batchIndex] = currentBatchAabb;
-            fullAabb               = Physics.CombineAabb(fullAabb, currentBatchAabb);
-        }
-
-        root.aabb             = fullAabb;
-        root.originalMeshName = meshName;
-
-        return builder.CreateBlobAssetReference<TriangleSoupBlob>(Allocator.Persistent);
-    }
-}
-```
-
-There’s a lot of code here. Much of it is processing and constructing the actual
-blob. Hopefully the benefit of generating blob assets in parallel has become
-obvious. There are two other things to note. First, in some cases, the converter
-will return a `default` (`Null`) blob asset. This is legal for converters in
-Smart Blobbers. Second, the mesh is indexed using `postfilterIndex`. The reason
-for this will become apparent soon.
-
-The Smart Blobber class is defined like so:
-
-```csharp
-public class TriangleSoupSmartBlobberSystem : SmartBlobberConversionSystem<TriangleSoupBlob, TriangleSoupBakeData, TriangleSoupConverter, TriangleSoupContext>
-{
-```
-
-This time, there are **4** generic arguments, with the fourth being the context
-object type.
-
-This Smart Blobber does not process authoring components directly, so it does
-not need to override `GatherInputs()` or `FinalizeOutputs()`. It is legal for a
-Smart Blobber to provide both a streamlined API and also process authoring
-components directly for a specific type. For example, Myri’s Smart Blobber
-converts Audio Source components directly. However, if user can still request a
-list of audio clips to be converted into blobs so that the user can store them
-in a user-defined dynamic buffer.
-
-The Filter() method is a little different. The first argument,
-FilterBlobberData, provides access to the inputs, associated GameObject
-references, and uninitialized converters. The second argument is a
-default-initialized context object. The final argument is a mapping
-NativeArray\<int\> initialized with the values 0, 1, 2, 3, 4… up to the number
-of inputs.
-
-While the converters and context object can be initialized in this method, it is
-not necessary to initialize them at this time. However, the mapping array must
-be properly configured here, as it replaces the return value of the simple Smart
-Blobber’s Filter() method.
-
-To skip an input, set its corresponding element in the mapping array to a
-negative value.
-
-To specify that an input is a clone of another input, set its corresponding
-element to the lowest-indexed element it duplicates.
-
-The following is an implementation of this method which performs validation and
-skipping in managed code, but uses a job to detect duplicate meshes.
-
-```csharp
-protected override void Filter(FilterBlobberData blobberData, ref TriangleSoupContext context, NativeArray<int> inputToFilteredMapping)
-{
-    var hashes = new NativeArray<int>(blobberData.Count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-    for (int i = 0; i < blobberData.Count; i++)
-    {
-        var input = blobberData.input[i];
-        if (input.mesh == null || !input.mesh.isReadable)
-        {
-            if (input.mesh != null && !input.mesh.isReadable)
-                Debug.LogError($"Failed to convert mesh {input.mesh.name}. The mesh was not marked as readable. Please correct this in the mesh asset's import settings.");
-
-            hashes[i]                 = default;
-            inputToFilteredMapping[i] = -1;
-        }
-        else
-        {
-            DeclareAssetDependency(blobberData.associatedObject[i], input.mesh);
-            hashes[i] = input.mesh.GetInstanceID();
-        }
-    }
-
-    new DeduplicateJob { hashes = hashes, inputToFilteredMapping = inputToFilteredMapping }.Run();
-    hashes.Dispose();
-}
-
-[BurstCompile]
-struct DeduplicateJob : IJob
-{
-    [ReadOnly] public NativeArray<int> hashes;
-    public NativeArray<int>            inputToFilteredMapping;
-
-    public void Execute()
-    {
-        var map = new NativeHashMap<int, int>(hashes.Length, Allocator.Temp);
-        for (int i = 0; i < hashes.Length; i++)
-        {
-            if (inputToFilteredMapping[i] < 0)
-                continue;
-
-            if (map.TryGetValue(hashes[i], out int index))
-                inputToFilteredMapping[i] = index;
-            else
-                map.Add(hashes[i], i);
-        }
-    }
-} 
-```
-
-One aspect to point out is the presence of `DeclareAssetDependency()`.
-Dependency declarations are still required, even in Smart Blobbers.
-
-Because this Smart Blobber did not initialize the converters or context object
-in `Filter()`, it needs to override `PostFilter()` and initialize them there.
-
-The `PostFilter()` method provides similar arguments to the `Filter()` method,
-except this time all the invalid and duplicated elements have been removed. To
-recover the original input index for any element, use the provided
-`filteredToInputMapping` `NativeArray<int>`.
-
-The `PostFilter()` method for this Smart Blobber is implemented as follows:
-
-```csharp
-protected override void PostFilter(PostFilterBlobberData blobberData, ref TriangleSoupContext context)
-{
-    var meshList = new List<Mesh>();
-
-    var converters = blobberData.converters;
-
-    for (int i = 0; i < blobberData.Count; i++)
-    {
-        var mesh = blobberData.input[i].mesh;
-        meshList.Add(mesh);
-
-        converters[i] = new TriangleSoupConverter
-        {
-            meshName = mesh.name
-        };
-    }
-
-    context.meshes = Mesh.AcquireReadOnlyMeshData(meshList);
-}
-```
-
-After that, the base class Smart Blobber dispatches the parallel job and handles
-the mappings such that all handles associated with the inputs resolve to the
-correct blob assets.
-
-Here is what it looks like in its complete form:
-
-```csharp
-using System.Collections.Generic;
-using Latios;
-using Latios.Authoring;
-using Latios.Authoring.Systems;
-using Latios.Psyshock;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
-using Unity.Mathematics;
 using UnityEngine;
 
-using Physics = Latios.Psyshock.Physics;
+using Latios;
+using Latios.Authoring;
 
-namespace Dragons
+public struct DigitsBlob
 {
-    public struct TriangleSoupBlob
+    public int            value;
+    public BlobArray<int> digits;
+}
+
+public struct DigitsBlobReference : IComponentData
+{
+    public BlobAssetReference<DigitsBlob> blob;
+}
+
+[DisallowMultipleComponent]
+public class DigitsAuthoring : MonoBehaviour
+{
+    public int   value  = 381;
+    public int[] digits = { 3, 8, 1 };
+}
+
+public struct DigitsBakeItem : ISmartBakeItem<DigitsAuthoring>
+{
+    SmartBlobberHandle<DigitsBlob> blob;
+
+    public bool Bake(DigitsAuthoring authoring, IBaker baker)
     {
-        public Aabb                        aabb;
-        public BlobArray<Aabb>             batch32Aabbs;
-        public BlobArray<Aabb>             triangleAabbs;
-        public BlobArray<TriangleCollider> triangles;
-        public FixedString128Bytes         originalMeshName;
+        baker.AddComponent<DigitsBlobReference>();
+        blob = baker.RequestCreateBlobAsset(authoring.value, authoring.digits);
+        return true;
     }
 
-    public struct TriangleSoupBlobReference : IComponentData
+    public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
     {
-        public BlobAssetReference<TriangleSoupBlob> blob;
+        entityManager.SetComponentData(entity, new DigitsBlobReference { blob = blob.Resolve(entityManager) });
+    }
+}
+
+public class DigitsBaker : SmartBaker<DigitsAuthoring, DigitsBakeItem> { }
+
+// Begin Custom Smart Blobber code
+
+public static class DigitsSmartBlobberBakerExtensions
+{
+    public static SmartBlobberHandle<DigitsBlob> RequestCreateBlobAsset(this IBaker baker, int value, int[] digits)
+    {
+        return baker.RequestCreateBlobAsset<DigitsBlob, DigitsSmartBlobberRequestFilter>(new DigitsSmartBlobberRequestFilter { value = value, digits = digits });
+    }
+}
+
+[TemporaryBakingType]
+internal struct DigitsValueInput : IComponentData
+{
+    public int value;
+}
+
+[TemporaryBakingType]
+internal struct DigitsElementInput : IBufferElementData
+{
+    public int digit;
+}
+
+public struct DigitsSmartBlobberRequestFilter : ISmartBlobberRequestFilter<DigitsBlob>
+{
+    public int   value;
+    public int[] digits;
+
+    public bool Filter(IBaker baker, Entity blobBakingEntity)
+    {
+        if (digits == null)
+            return false;
+
+        baker.AddComponent(blobBakingEntity, new DigitsValueInput { value = value });
+        var buffer                                                        = baker.AddBuffer<DigitsElementInput>(blobBakingEntity).Reinterpret<int>();
+        foreach (var digit in digits)
+            buffer.Add(digit);
+        return true;
+    }
+}
+
+[UpdateInGroup(typeof(Latios.Authoring.Systems.SmartBlobberBakingGroup))]
+[BurstCompile]
+public partial struct DigitsSmartBlobberSystem : ISystem
+{
+    public void OnCreate(ref SystemState state)
+    {
+        new SmartBlobberTools<DigitsBlob>().Register(state.World);
     }
 
-    // This is the consumer of the Smart Blobber
-    [DisallowMultipleComponent]
-    public class TriangleSoupAuthoring : MonoBehaviour, IRequestBlobAssets, IConvertGameObjectToEntity
+    [BurstCompile]
+    public void OnDestroy(ref SystemState state)
     {
-        public Mesh mesh;
-
-        SmartBlobberHandle<TriangleSoupBlob> blobHandle;
-
-        public void RequestBlobAssets(Entity entity, EntityManager dstEntityManager, GameObjectConversionSystem conversionSystem)
-        {
-            blobHandle = conversionSystem.CreateBlob(gameObject, new TriangleSoupBakeData { mesh = mesh });
-        }
-
-        public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
-        {
-            dstManager.AddComponentData(entity, new TriangleSoupBlobReference { blob = blobHandle.Resolve() });
-        }
     }
 
-    // This is the Smart Blobber streamlined API
-    public struct TriangleSoupBakeData
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
     {
-        public Mesh mesh;
+        new Job().ScheduleParallel();
     }
 
-    public static class TriangleSoupSmartBlobberApiExtensions
+    [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+    [BurstCompile]
+    partial struct Job : IJobEntity
     {
-        public static SmartBlobberHandle<TriangleSoupBlob> CreateBlob(this GameObjectConversionSystem conversionSystem,
-                                                                      GameObject gameObject,
-                                                                      TriangleSoupBakeData bakeData)
+        public void Execute(ref SmartBlobberResult result, in DigitsValueInput valueInput, in DynamicBuffer<DigitsElementInput> bufferInput)
         {
-            return conversionSystem.World.GetExistingSystem<TriangleSoupSmartBlobberSystem>().AddToConvert(gameObject, bakeData);
-        }
-
-        public static SmartBlobberHandleUntyped CreateBlobUntyped(this GameObjectConversionSystem conversionSystem,
-                                                                  GameObject gameObject,
-                                                                  TriangleSoupBakeData bakeData)
-        {
-            return conversionSystem.World.GetExistingSystem<TriangleSoupSmartBlobberSystem>().AddToConvertUntyped(gameObject, bakeData);
-        }
-    }
-
-    // This is where the Smart Blobber internal logic starts
-    public struct TriangleSoupContext : System.IDisposable
-    {
-        [ReadOnly] public Mesh.MeshDataArray meshes;
-
-        public void Dispose() => meshes.Dispose();
-    }
-
-    public struct TriangleSoupConverter : ISmartBlobberContextBuilder<TriangleSoupBlob, TriangleSoupContext>
-    {
-        public FixedString128Bytes meshName;
-
-        public BlobAssetReference<TriangleSoupBlob> BuildBlob(int prefilterIndex, int postfilterIndex, ref TriangleSoupContext context)
-        {
-            var mesh = context.meshes[postfilterIndex];
-
-            NativeArray<int> indices;
-            // We need to convert to int to get a common interface
-            if (mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16)
-            {
-                var meshIndices = mesh.GetIndexData<ushort>();
-                indices         = new NativeArray<int>(meshIndices.Length, Allocator.Temp);
-                for (int i = 0; i < meshIndices.Length; i++)
-                    indices[i] = meshIndices[i];
-            }
-            else
-            {
-                var meshIndices = mesh.GetIndexData<uint>();
-                indices         = new NativeArray<int>(meshIndices.Length, Allocator.Temp);
-                for (int i = 0; i < meshIndices.Length; i++)
-                    indices[i] = (int)meshIndices[i];
-            }
-
-            // If our index buffer uses triangle strips or lines or something, quit.
-            // Smart Blobbers check for Null blobs and handle them appropriately.
-            if (indices.Length % 3 != 0 || indices.Length == 0)
-                return default;
-
-            var vertices = new NativeArray<Vector3>(mesh.vertexCount, Allocator.Temp);
-            mesh.GetVertices(vertices);
-
-            var     builder   = new BlobBuilder(Allocator.Temp);
-            ref var root      = ref builder.ConstructRoot<TriangleSoupBlob>();
-            var     triangles = builder.Allocate(ref root.triangles, indices.Length / 3);
-            var     aabbs     = builder.Allocate(ref root.triangleAabbs, triangles.Length);
-
-            for (int i = 0; i < triangles.Length; i++)
-            {
-                float3 a = vertices[indices[i * 3 + 0]];
-                float3 b = vertices[indices[i * 3 + 1]];
-                float3 c = vertices[indices[i * 3 + 2]];
-
-                triangles[i] = new TriangleCollider(a, b, c);
-                aabbs[i]     = Physics.AabbFrom(triangles[i], RigidTransform.identity);
-            }
-
-            int batchCount = aabbs.Length / 32;
-            if (aabbs.Length % 32 != 0)
-                batchCount++;
-
-            var batchAabbs = builder.Allocate(ref root.batch32Aabbs, batchCount);
-            var fullAabb   = aabbs[0];
-            for (int batchIndex = 0; batchIndex < batchCount; batchIndex++)
-            {
-                int triangleBaseIndex    = batchIndex * 32;
-                int triangleCountInBatch = math.min(aabbs.Length - triangleBaseIndex, 32);
-                var currentBatchAabb     = aabbs[triangleBaseIndex];
-                for (int triangleIndex = 1; triangleIndex < triangleCountInBatch; triangleIndex++)
-                {
-                    currentBatchAabb = Physics.CombineAabb(currentBatchAabb, aabbs[triangleBaseIndex + triangleIndex]);
-                }
-                batchAabbs[batchIndex] = currentBatchAabb;
-                fullAabb               = Physics.CombineAabb(fullAabb, currentBatchAabb);
-            }
-
-            root.aabb             = fullAabb;
-            root.originalMeshName = meshName;
-
-            return builder.CreateBlobAssetReference<TriangleSoupBlob>(Allocator.Persistent);
-        }
-    }
-
-    public class TriangleSoupSmartBlobberSystem : SmartBlobberConversionSystem<TriangleSoupBlob, TriangleSoupBakeData, TriangleSoupConverter, TriangleSoupContext>
-    {
-        protected override void Filter(FilterBlobberData blobberData, ref TriangleSoupContext context, NativeArray<int> inputToFilteredMapping)
-        {
-            var hashes = new NativeArray<int>(blobberData.Count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < blobberData.Count; i++)
-            {
-                var input = blobberData.input[i];
-                if (input.mesh == null || !input.mesh.isReadable)
-                {
-                    if (input.mesh != null && !input.mesh.isReadable)
-                        Debug.LogError($"Failed to convert mesh {input.mesh.name}. The mesh was not marked as readable. Please correct this in the mesh asset's import settings.");
-
-                    hashes[i]                 = default;
-                    inputToFilteredMapping[i] = -1;
-                }
-                else
-                {
-                    DeclareAssetDependency(blobberData.associatedObject[i], input.mesh);
-                    hashes[i] = input.mesh.GetInstanceID();
-                }
-            }
-
-            new DeduplicateJob { hashes = hashes, inputToFilteredMapping = inputToFilteredMapping }.Run();
-            hashes.Dispose();
-        }
-
-        [BurstCompile]
-        struct DeduplicateJob : IJob
-        {
-            [ReadOnly] public NativeArray<int> hashes;
-            public NativeArray<int>            inputToFilteredMapping;
-
-            public void Execute()
-            {
-                var map = new NativeHashMap<int, int>(hashes.Length, Allocator.Temp);
-                for (int i = 0; i < hashes.Length; i++)
-                {
-                    if (inputToFilteredMapping[i] < 0)
-                        continue;
-
-                    if (map.TryGetValue(hashes[i], out int index))
-                        inputToFilteredMapping[i] = index;
-                    else
-                        map.Add(hashes[i], i);
-                }
-            }
-        }
-
-        protected override void PostFilter(PostFilterBlobberData blobberData, ref TriangleSoupContext context)
-        {
-            var meshList = new List<Mesh>();
-
-            var converters = blobberData.converters;
-
-            for (int i = 0; i < blobberData.Count; i++)
-            {
-                var mesh = blobberData.input[i].mesh;
-                meshList.Add(mesh);
-
-                converters[i] = new TriangleSoupConverter
-                {
-                    meshName = mesh.name
-                };
-            }
-
-            context.meshes = Mesh.AcquireReadOnlyMeshData(meshList);
+            var     builder = new BlobBuilder(Allocator.Temp);
+            ref var root    = ref builder.ConstructRoot<DigitsBlob>();
+            root.value      = valueInput.value;
+            builder.ConstructFromNativeArray(ref root.digits, bufferInput.Reinterpret<int>().AsNativeArray());
+            var typedBlob = builder.CreateBlobAssetReference<DigitsBlob>(Allocator.Persistent);
+            result.blob   = Unity.Entities.LowLevel.Unsafe.UnsafeUntypedBlobAssetReference.Create(typedBlob);
         }
     }
 }
 ```
+
+### Why not just use Baker.AddBlobAsset()?
+
+For trivially computed blob assets (including our example), using a Smart
+Blobber is likely overkill. The overhead of preparing the blobBakingEntity
+outweighs the cost of creating the blob immediately. But often, blob assets are
+not so trivial to compute. In such cases, Smart Blobbers offer several
+advantages.
+
+One advantage is that Blob Assets can be generated in parallel in Burst. There’s
+more going on than just copying data to `BlobArray<>` fields.
+`BlobBuilder.CreateBlobAssetReference()` does a non-trivial amount of work to
+organize the relative offsets of the blob asset and put everything together.
+This cost can become significant as the blob asset increases in complexity. The
+mehtod also hashes the entire blob data near the end of generation.
+
+The second advantage is that a Smart Blobber can reason about multiple blob
+assets at once to further reduce the cost. This is especially useful when
+populating a subscene with many copies of a prefab. But it can also be useful
+when different types of blob assets can share resources. For example, many of
+Kinemation’s Smart Blobbers leverage a “shadow hierarchy” which describes the
+hierarchy information of an optimized Animator.
+
+The third advantage is that input transformations can be reasoned about in an
+ECS fashion. It may help break down the problem for extremely complex blob
+assets.

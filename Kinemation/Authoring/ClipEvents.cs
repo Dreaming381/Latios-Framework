@@ -32,10 +32,10 @@ namespace Latios.Kinemation.Authoring
         /// Generates an array of ClipEvent which can be used for generating Kinemation animation clip blobs.
         /// For each AnimationEvent in the clip, functionName, intParameter, and time are extracted.
         /// </summary>
-        public static ClipEvent[] ExtractKinemationClipEvents(this AnimationClip clip)
+        public static NativeArray<ClipEvent> ExtractKinemationClipEvents(this AnimationClip clip, AllocatorManager.AllocatorHandle allocator)
         {
             var srcEvents = clip.events;
-            var dstEvents = new ClipEvent[srcEvents.Length];
+            var dstEvents = CollectionHelper.CreateNativeArray<ClipEvent>(srcEvents.Length, allocator, NativeArrayOptions.UninitializedMemory);
 
             for (int i = 0; i < srcEvents.Length; i++)
             {
@@ -55,7 +55,7 @@ namespace Latios.Kinemation.Authoring
 
     internal static class ClipEventsBlobHelpers
     {
-        internal static void Convert(ref ClipEvents dstEvents, ref BlobBuilder builder, UnsafeList<ClipEvent> srcEvents)
+        internal static void Convert(ref ClipEvents dstEvents, ref BlobBuilder builder, NativeArray<ClipEvent> srcEvents)
         {
             if (srcEvents.IsCreated)
             {

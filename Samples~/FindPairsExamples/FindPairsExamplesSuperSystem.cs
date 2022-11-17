@@ -8,9 +8,9 @@ namespace Dragons
     {
         protected override void CreateSystems()
         {
-            GetOrCreateAndAddSystem<FindPairsOverlapsExampleSystem>();
-            GetOrCreateAndAddSystem<FindPairsSimpleBenchmark>();
-            GetOrCreateAndAddSystem<FindPairsBuildLayerExample>();
+            GetOrCreateAndAddManagedSystem<FindPairsOverlapsExampleSystem>();
+            GetOrCreateAndAddManagedSystem<FindPairsSimpleBenchmark>();
+            GetOrCreateAndAddManagedSystem<FindPairsBuildLayerExample>();
         }
     }
 }

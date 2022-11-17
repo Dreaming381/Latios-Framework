@@ -1,6 +1,6 @@
 # Getting Started with Myri Audio
 
-This is the second preview version released publicly. It currently supports
+This is the fourth preview version released publicly. It currently supports
 simple use cases appropriate for game jams, experiments, and maybe even some
 commercial projects. However, it likely lacks the necessary control features
 required to deliver a final product. I unfortunately lack the expertise to
@@ -8,8 +8,8 @@ implement this, and so I will require the help of you and the community to take
 Myri to that level.
 
 With that said, I do believe that at the time of writing, Myri is the closest to
-a production-ready ECS audio solution for Unity Engine proper (not Tiny). So I
-hope you enjoy trying it out and feel free to send feedback!
+a production-ready ECS audio solution for Unity Engine proper. So I hope you
+enjoy trying it out and feel free to send feedback!
 
 ## Authoring
 
@@ -66,8 +66,8 @@ any effect.
 
 The mixing thread updates at a fixed interval independent of the application
 framerate. In Myri’s world, these are referred to as “audio frames”. The audio
-framerate is platform-dependent but is equivalent to: \`sampleBufferSize /
-sampleRate\` in seconds. For a buffer size of 1024 sampled at 48 kHz, this
+framerate is platform-dependent but is equivalent to: `sampleBufferSize /
+sampleRate` in seconds. For a buffer size of 1024 sampled at 48 kHz, this
 approximates to 20 milliseconds or 50 AFPS. Myri performs sampling synchronized
 with the main thread rather than the mixing thread, and transmits the samples
 over to the mixing thread with each update. If the main thread were to stall,
@@ -107,7 +107,7 @@ a value of 1 or greater will accomplish this.
 ### Optimizing Clips for Performance
 
 Every audio clip has a sample rate, typically measured in kHz. Common sample
-rates may be 44.1 kHz and 48 kHz. The audio output of the device may have a
+rates are 44.1 kHz and 48 kHz. The audio output of the device may have a
 different sample rate than the audio clip. When this happens, Myri needs to
 “resample” the clip to compensate at runtime, which may have a measurable
 performance impact for complex audio workloads. Therefore, it is recommended to
@@ -150,7 +150,7 @@ that avoids sampling the source.
 
 The clip fields in the above components come in the form of a
 `BlobAssetReference<AudioClipBlob>`. The most useful field for you is likely the
-name, which is the original `name` of the clip asset when it was converted. The
+name, which is the original `name` of the clip asset when it was baked. The
 `Length` of `loopedOffsets` is the number of unique voices for that clip when
 played by looped sources.
 
@@ -159,11 +159,13 @@ played by looped sources.
 The `AudioListener` component is very simple, containing only three values. The
 volume is the most useful. The `itdResolution` (inter-aural time difference
 resolution) will be clamped to [0, 15]. The value measures the number of steps
-from center to either side. The `ildProfile` (inter-aural level difference
-profile) contains the metadata used to describe the spatialization filtering.
+from center to either side that audio will be delayed by. Higher values increase
+fidelity but decrease the effectiveness of voice-combining, which comes with a
+performance cost. The `listenerProfile` contains the metadata used to describe
+the spatialization filtering.
 
 Unlike audio sources, the internal listener state is stored in
-`ISystemStateComponentData`. The structural change commands are sent to
+`ICleanupComponentData`. The structural change commands are sent to
 `SyncPointPlaybackSystem`. You typically do not have to worry about these
 components.
 
@@ -176,9 +178,11 @@ other Myri components, this component is read asynchronously from jobs.
 
 ## Creating a Custom Listener Response Profile
 
-To create a custom profile, you must subclass `AudioIldProfileBuilder` and
+To create a custom profile, you may subclass `ListenerProfileBuilder` and
 implement the `BuildProfile()` method. This is a `ScriptableObject`, so you can
-expose settings and create custom editors for it if you wish.
+expose settings and create custom editors for it if you wish. As an alternative,
+you can implement the `IListenerProfileBuilder` on a struct type, but you are
+responsible for applying the profile to an `AudioListener` component.
 
 When building a profile, you create *channels*. A channel is a rectangular area
 on a unit sphere which contains a unique set of volume controls and filters.

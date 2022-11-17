@@ -2,6 +2,10 @@
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A ray that is used for raycasts. It is better to use a Ray instance when
+    /// raycasting multiple elements using the same start and end points
+    /// </summary>
     public struct Ray
     {
         public float3 start

@@ -1,15 +1,15 @@
 {
   "name": "com.latios.latiosframework",
   "displayName": "Latios Framework for DOTS",
-  "version": "0.5.8",
-  "unity": "2020.3",
+  "version": "0.6.0",
+  "unity": "2022.2",
   "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\u25aa Kinemation Animation and Rendering\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.4.5\n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos",
   "dependencies": {
-    "com.unity.entities": "0.51.1-preview.21",
+    "com.unity.entities": "1.0.0-exp.12",
     "com.unity.audio.dspgraph": "0.1.0-preview.22",
-    "com.unity.rendering.hybrid": "0.51.1-preview.21"
+    "com.unity.entities.graphics": "1.0.0-exp.14"
   },
-  "unityRelease": "30f1",
+  "unityRelease": "0b10",
   "keywords": [
     "dots",
     "latios",

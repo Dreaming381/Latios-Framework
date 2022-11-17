@@ -1,72 +1,91 @@
 using System.Diagnostics;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
-namespace Latios.Kinemation.Systems
-{
+// Currently disabled until a new optimization for Entities.Graphics 1.0 is decided upon.
+// For now, no count caching is performed.
+/*
+   namespace Latios.Kinemation.Systems
+   {
     [DisableAutoCreation]
-    public partial class UpdateChunkComputeDeformMetadataSystem : SubSystem
+    [BurstCompile]
+    public partial struct UpdateChunkComputeDeformMetadataSystem : ISystem
     {
-        EntityQuery m_query;
+        EntityQuery          m_query;
+        LatiosWorldUnmanaged latiosWorld;
 
-        protected override void OnCreate()
+        ComponentTypeHandle<SkeletonDependent>                m_skeletonDependentHandle;
+        ComponentTypeHandle<ChunkComputeDeformMemoryMetadata> m_chunkComputeDeformMemoryMetadataHandle;
+
+        public void OnCreate(ref SystemState state)
         {
-            m_query = Fluent.WithAll<SkeletonDependent>(true).WithAll<ChunkComputeDeformMemoryMetadata>(false, true).Build();
-        }
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+            m_query     = state.Fluent().WithAll<SkeletonDependent>(true).WithAll<ChunkComputeDeformMemoryMetadata>(false, true).Build();
 
-        protected override void OnUpdate()
-        {
-            worldBlackboardEntity.SetComponentData(new MaxRequiredDeformVertices { verticesCount = 0 });
-
-            var lastSystemVersion = LastSystemVersion;
-            var blobHandle        = GetComponentTypeHandle<SkeletonDependent>(true);
-            var metaHandle        = GetComponentTypeHandle<ChunkComputeDeformMemoryMetadata>(false);
-
-            Dependency = new UpdateChunkVertexCountsJob
-            {
-                blobHandle        = blobHandle,
-                metaHandle        = metaHandle,
-                lastSystemVersion = lastSystemVersion
-            }.ScheduleParallel(m_query, Dependency);
+            m_skeletonDependentHandle                = state.GetComponentTypeHandle<SkeletonDependent>(true);
+            m_chunkComputeDeformMemoryMetadataHandle = state.GetComponentTypeHandle<ChunkComputeDeformMemoryMetadata>(false);
         }
 
         [BurstCompile]
-        struct UpdateChunkVertexCountsJob : IJobEntityBatch
+        public void OnUpdate(ref SystemState state)
+        {
+            latiosWorld.worldBlackboardEntity.SetComponentData(new MaxRequiredDeformVertices { verticesCount = 0 });
+
+            var lastSystemVersion = state.LastSystemVersion;
+
+            m_skeletonDependentHandle.Update(ref state);
+            m_chunkComputeDeformMemoryMetadataHandle.Update(ref state);
+
+            state.Dependency = new UpdateChunkVertexCountsJob
+            {
+                blobHandle        = m_skeletonDependentHandle,
+                metaHandle        = m_chunkComputeDeformMemoryMetadataHandle,
+                lastSystemVersion = lastSystemVersion
+            }.ScheduleParallel(m_query, state.Dependency);
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
+        {
+        }
+
+        [BurstCompile]
+        struct UpdateChunkVertexCountsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>     blobHandle;
             public ComponentTypeHandle<ChunkComputeDeformMemoryMetadata> metaHandle;
             public uint                                                  lastSystemVersion;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsUpdate  = batchInChunk.DidChange(blobHandle, lastSystemVersion);
-                needsUpdate      |= batchInChunk.DidOrderChange(lastSystemVersion);
+                bool needsUpdate  = chunk.DidChange(blobHandle, lastSystemVersion);
+                needsUpdate      |= chunk.DidOrderChange(lastSystemVersion);
                 if (!needsUpdate)
                     return;
 
-                var blobs       = batchInChunk.GetNativeArray(blobHandle);
+                var blobs       = chunk.GetNativeArray(blobHandle);
                 int minVertices = int.MaxValue;
                 int maxVertices = int.MinValue;
 
-                for (int i = 0; i < batchInChunk.Count; i++)
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     int c       = blobs[i].skinningBlob.Value.verticesToSkin.Length;
                     minVertices = math.min(minVertices, c);
                     maxVertices = math.max(maxVertices, c);
                 }
 
-                CheckVertexCountMismatch(minVertices, maxVertices);
+                //CheckVertexCountMismatch(minVertices, maxVertices);
 
-                var metadata = batchInChunk.GetChunkComponentData(metaHandle);
-                if (metadata.verticesPerMesh != maxVertices || metadata.entitiesInChunk != batchInChunk.Count)
+                var metadata = chunk.GetChunkComponentData(metaHandle);
+                if (metadata.verticesPerMesh != maxVertices || metadata.entitiesInChunk != chunk.Count)
                 {
                     metadata.verticesPerMesh = maxVertices;
-                    metadata.entitiesInChunk = batchInChunk.Count;
-                    batchInChunk.SetChunkComponentData(metaHandle, metadata);
+                    metadata.entitiesInChunk = chunk.Count;
+                    chunk.SetChunkComponentData(metaHandle, metadata);
                 }
             }
 
@@ -75,9 +94,10 @@ namespace Latios.Kinemation.Systems
             {
                 if (min != max)
                     UnityEngine.Debug.LogWarning(
-                        "A chunk contains multiple Mesh Skinning Blobs. Because Mesh Skinning Blobs are tied to their RenderMesh of which there is only one per chunk, this is likely a bug. Did you forget to change the Mesh Skinning Blob Reference when changing a Render Mesh?");
+                        "A chunk contains multiple Mesh Skinning Blobs with different vertex counts. Because Mesh Skinning Blobs are tied to their RenderMesh of which there is only one per chunk, this is likely a bug. Did you forget to change the Mesh Skinning Blob Reference when changing a Render Mesh?");
             }
         }
     }
-}
+   }
+ */
 

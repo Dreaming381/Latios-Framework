@@ -11,6 +11,8 @@ License Type: CC-BY-3.0 US
 
 Notes: A subset was adapted for use in C\#
 
+\--------
+
 Component Name: Cyclone Physics
 
 License Type: MIT
@@ -23,6 +25,8 @@ far it has been a great book and I am using it as a guide for implementing
 simulation logic in Psyshock, since I am not as strong in that area compared to
 spatial algorithms.
 
+\--------
+
 Component Name: ACL
 
 License Type: MIT
@@ -32,3 +36,14 @@ License Type: MIT
 Notes: This library is distributed in this package in binary form. However, the
 source code for the wrapper can be found here:
 <https://github.com/Dreaming381/AclUnity>
+
+\--------
+
+Component Name: arraylayout
+
+License Type: Creative Commons Attribution 4.0 International License (CC BY 4.0)
+
+<https://github.com/patmorin/arraylayout/blob/master/src/LICENSE.md>
+
+Notes: Some of the algorithms presented in this repository have been adapted for
+use in interval trees

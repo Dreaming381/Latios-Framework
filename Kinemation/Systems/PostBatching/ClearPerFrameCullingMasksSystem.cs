@@ -1,44 +1,54 @@
 using Unity.Burst;
-using Unity.Collections;
+using Unity.Burst.Intrinsics;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
-using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class ClearPerFrameCullingMasksSystem : SubSystem
+    [BurstCompile]
+    public partial struct ClearPerFrameCullingMasksSystem : ISystem
     {
         EntityQuery m_metaQuery;
 
-        protected override void OnCreate()
-        {
-            m_metaQuery = Fluent.WithAll<ChunkPerFrameCullingMask>(false).WithAll<ChunkHeader>(true).Build();
-        }
+        ComponentTypeHandle<ChunkPerFrameCullingMask> m_handle;
 
-        protected override void OnUpdate()
+        public void OnCreate(ref SystemState state)
         {
-            Dependency = new ClearJob
-            {
-                handle            = GetComponentTypeHandle<ChunkPerFrameCullingMask>(false),
-                lastSystemVersion = LastSystemVersion
-            }.ScheduleParallel(m_metaQuery, Dependency);
+            m_metaQuery = state.Fluent().WithAll<ChunkPerFrameCullingMask>(false).WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkHeader>(true).Build();
+            m_handle    = state.GetComponentTypeHandle<ChunkPerFrameCullingMask>(false);
         }
 
         [BurstCompile]
-        struct ClearJob : IJobEntityBatch
+        public void OnUpdate(ref SystemState state)
+        {
+            m_handle.Update(ref state);
+            state.Dependency = new ClearJob
+            {
+                handle            = m_handle,
+                lastSystemVersion = state.LastSystemVersion
+            }.ScheduleParallel(m_metaQuery, state.Dependency);
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
+        {
+        }
+
+        [BurstCompile]
+        struct ClearJob : IJobChunk
         {
             public ComponentTypeHandle<ChunkPerFrameCullingMask> handle;
             public uint                                          lastSystemVersion;
 
-            public unsafe void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (batchInChunk.DidChange(handle, lastSystemVersion))
+                if (chunk.DidChange(handle, lastSystemVersion))
                 {
-                    var ptr = batchInChunk.GetComponentDataPtrRW(ref handle);
-                    UnsafeUtility.MemClear(ptr, sizeof(ChunkPerFrameCullingMask) * batchInChunk.Count);
+                    var ptr = chunk.GetComponentDataPtrRW(ref handle);
+                    UnsafeUtility.MemClear(ptr, sizeof(ChunkPerFrameCullingMask) * chunk.Count);
                 }
             }
         }

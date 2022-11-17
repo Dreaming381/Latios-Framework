@@ -6,13 +6,15 @@ namespace Latios.Psyshock
 {
     public static partial class Physics
     {
-        public static Collider ScaleCollider(Collider collider, PhysicsScale scale)
+        public static Collider ScaleCollider(in Collider collider, PhysicsScale scale)
         {
             switch (collider.type)
             {
                 case ColliderType.Sphere: return ScaleCollider((SphereCollider)collider, scale);
                 case ColliderType.Capsule: return ScaleCollider((CapsuleCollider)collider, scale);
                 case ColliderType.Box: return ScaleCollider((BoxCollider)collider, scale);
+                case ColliderType.Triangle: return ScaleCollider((TriangleCollider)collider, scale);
+                case ColliderType.Convex: return ScaleCollider((ConvexCollider)collider, scale);
                 case ColliderType.Compound: return ScaleCollider((CompoundCollider)collider, scale);
                 default: ThrowUnsupportedType(); return new Collider();
             }

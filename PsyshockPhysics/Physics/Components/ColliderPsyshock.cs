@@ -43,34 +43,37 @@ namespace Latios.Psyshock
         Storage m_storage;
 
         [FieldOffset(0)]
-        SphereCollider m_sphere;
-
-        [FieldOffset(0)]
-        CapsuleCollider m_capsule;
-
-        [FieldOffset(0)]
-        BoxCollider m_box;
-
-        [FieldOffset(0)]
-        TriangleCollider m_triangle;
-
-        [FieldOffset(48)]
-        UnsafeUntypedBlobAssetReference m_blobRef;
-
-        [FieldOffset(56)]
-        float m_reservedFloat;
-
-        [FieldOffset(60)]
-        byte m_reservedByte1;
-
-        [FieldOffset(61)]
-        byte m_reservedByte2;
-
-        [FieldOffset(62)]
-        byte m_reservedByte3;
-
-        [FieldOffset(63)]
         ColliderType m_type;
+
+        [FieldOffset(16)]
+        internal SphereCollider m_sphere;
+
+        [FieldOffset(16)]
+        internal CapsuleCollider m_capsule;
+
+        [FieldOffset(16)]
+        internal BoxCollider m_box;
+
+        [FieldOffset(16)]
+        internal TriangleCollider m_triangle;
+
+        [FieldOffset(8)]
+        internal ConvexCollider m_convex;
+
+        //[FieldOffset(8)]
+        internal ref CompoundCollider m_compound
+        {
+            get
+            {
+                CompoundCollider* ret;
+                fixed (void*      ptr = &m_convex)
+                ret                   = (CompoundCollider*)ptr;
+                return ref *ret;
+            }
+        }
+
+        //[FieldOffset(8)]
+        //UnsafeUntypedBlobAssetReference m_blobRef;
 
         public ColliderType type => m_type;
 

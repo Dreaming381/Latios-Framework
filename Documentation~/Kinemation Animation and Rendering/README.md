@@ -6,8 +6,8 @@ Kinemation is an animation and rendering solution for Entities which aims to
 tightly integrate gameplay and animation for large-scale worlds. Kinemation is
 still under active development, and it has only laid down the foundations
 towards what it aims to achieve. Yet those foundations are already usable in
-projects. As of Unity DOTS 0.50 (when the first version was released), no
-official Entities-based animation solution exists.
+projects. As of Unity DOTS 1.0 experimental, no official Entities-based
+animation solution exists.
 
 Check out the [Getting Started](Getting%20Started%20-%20Part%201.md) page!
 
@@ -21,15 +21,15 @@ Objects, the character deforms.
 
 Well guess what?
 
-When you convert that Game Object to an entity, it remains posed. And when you
-rotate the converted entities, the character deforms. It works just like Game
+When you bake that Game Object to an entity, it remains posed. And when you
+rotate the baked entities, the character deforms. It works just like Game
 Objects, except way faster!
 
 But there’s more.
 
-With Game Objects you can optimize the hierarchy. Not only can Kinemation
-convert these hierarchies, but it will also convert them to its own optimized
-hierarchy using the same exported bone settings. But there’s one big difference.
+With Game Objects you can optimize the hierarchy. Not only can Kinemation bake
+these hierarchies, but it will also bake them to its own optimized hierarchy
+using the same exported bone settings. But there’s one big difference.
 Kinemation provides direct access to the optimized hierarchy buffer, so that you
 can always remain in complete control.
 
@@ -50,23 +50,22 @@ its stretched out arms are right in front of the camera.
 
 Kinemation doesn’t care how your character’s bones got where they are. It will
 find a bounding box around all your character’s vertices and not much else. It
-does this using a special precomputation step during conversion which maps
+does this using a special precomputation step during baking which maps
 relationships between vertices and bones. From this, it only needs the bone
 positions and a small table to find a suitable bounding box.
 
 You don’t need to do anything. It works automatically using the full potential
 of jobs and Burst.
 
-### A Better Hybrid Renderer
+### A Better Entities Graphics
 
-A large amount of the Hybrid Renderer has been rewritten to better take
-advantage of culling and to support far more characters in open worlds. Now,
-chunks of entities that aren’t visible won’t upload data to the GPU. And the
-skinning dispatcher will only allocate skinning buffers for the visible
-entities, drastically reducing VRAM usage. Compute deform skinning now benefits
-from LODs.
+A large amount of Entities Graphics has been rewritten to better take advantage
+of culling and to support far more characters in open worlds. Now, chunks of
+entities that aren’t visible won’t upload data to the GPU. And the skinning
+dispatcher will only allocate skinning buffers for the visible entities,
+drastically reducing VRAM usage. Compute deform skinning now benefits from LODs.
 
-Both classical Unity and the unaltered Hybrid Renderer perform skinning
+Both classical Unity and the unaltered Entities Graphics perform skinning
 mesh-by-mesh (the Hybrid Renderer at least processes all instances of a mesh at
 once). Kinemation handles all meshes for all skeletons at once using a special
 compute shader. This removes resource stalls and allows the GPU to use all
@@ -74,13 +73,13 @@ available cores to perform skinning as fast as possible and move on to
 rendering.
 
 Because of this, Kinemation handles modular characters composed of multiple
-meshes and materials incredibly well. Combining meshes no longer is an
-optimization. Instead, focus on instancing character accessories across multiple
-characters using shader graph properties to add variance.
+meshes and materials incredibly well. Combining meshes is no longer much of an
+optimization. Instead, focus on sharing the same base materials and shaders to
+improve batching, and check that your skinned mesh chunk occupancy is good.
 
-A rewritten Hybrid Renderer might sound really scary, but Kinemation takes great
-care to preserve existing workflows and behaviors where they make sense. It is
-compatible with all existing shaders written for the Hybrid Renderer, and
+A rewritten Entities Graphics might sound really scary, but Kinemation takes
+great care to preserve existing workflows and behaviors where they make sense.
+It is compatible with all existing shaders written for Entities Graphics, and
 material instance properties still work as expected.
 
 But now, the culling process is completely open as public API. You can add your
@@ -88,6 +87,22 @@ own culling systems to alter the visibilities of entities without structural
 changes or hacks. Or you can react to existing visibility information for
 gameplay purposes. You can even mimic what Kinemation does and reserve some
 heavy compute shader dispatches for only the entities that will be rendered.
+
+Kinemation’s culling algorithm is also much more aggressive, using an ECS-based
+filtering order that removes many computationally expensive checks early in the
+pipeline, all while preserving fancy culling features like shadow map splits,
+picking, and highlighting.
+
+### Linear Blend Skinning
+
+Entities Graphics removed support for the Linear Blend Skinning node, which was
+a strange decision, because this mode of skinning is much faster. Sure, it is
+limited to only four bones per vertex and won’t work with blend shapes, but for
+lower LODs, the drastic decrease in memory usage and bandwidth make it quite
+viable.
+
+Kinemation still supports Linear Blend Skinning, and intends to support the
+feature as long as possible.
 
 ### Easy Binding System
 
@@ -113,13 +128,13 @@ While Kinemation’s rendering stack mimic’s Myri’s philosophy where stuff j
 works without code, animation takes the approach of Psyshock where nothing
 happens except your code.
 
-During conversion, you request which clips to convert and which Animator to bake
-them for. You then get a blob asset containing that collection of clips. Then at
-any time from any thread, with or without the skeleton at hand, you can sample
-the clip. You can get the local transform of all bones, or just a single bone.
-And what you do with that sampled transform is completely up to you. You can
-blend it, discard it, perform some physics analysis on it, or you know, write it
-to the bone entity’s transform components.
+During baking, you request which clips to bake and which Animator to bake them
+for. You then get a blob asset containing that collection of clips. At runtime
+from any thread, with or without the skeleton at hand, you can sample the clip.
+You can get the local transform of all bones, or just a single bone. And what
+you do with that sampled transform is completely up to you. You can blend it,
+discard it, perform some physics analysis on it, or you know, write it to the
+bone entity’s transform components.
 
 You remain in complete control over animation, and can fully customize it for
 your project’s needs. KISS animation is trivial. And if you want to build an
@@ -145,9 +160,9 @@ Burst.
 
 ACL allows for specifying hard limits to quality loss, so that compression
 artifacts are imperceptible. Those controls are now within your power whenever
-you request an animation clip to convert into a blob asset. And if you choose to
-use the defaults, you’ll get significantly higher quality than Unity’s defaults,
-with even smaller compressed sizes.
+you request an animation clip to be baked into a blob asset. And if you choose
+to use the defaults, you’ll get significantly higher quality than Unity’s
+defaults, with even smaller compressed sizes.
 
 Now if only Myri had something this good…
 
@@ -158,17 +173,10 @@ natural way to express this using skeletal animation is to non-uniformly scale
 bones. But that doesn’t work in game engines. The issue game engines have is
 that the scaling causes child transforms to shear in undesirable ways.
 
-Unity.Transforms provides a unique little component called `ParentScaleInverse`,
-which can get rid of that unwanted shear. Kinemation is not only aware of it,
-but can even compress animation clips with the component in mind.
-
-That means real squash and stretch is finally here!
-
-Animators, rejoice!
-
-You still need to tell Kinemation which bones should not inherit scale from
-their parents. But besides that, there’s nothing stopping you from pushing those
-expressions to the extreme!
+*Native Support for Squash and Stretch was a key feature in Latios Frameowrk
+0.5, but has been temporarily removed in 0.6. It is being redesigned to work
+out-of-the-box in 0.7 with the new Transform system which will be available in
+that version.*
 
 ## Known Issues
 
@@ -177,25 +185,26 @@ expressions to the extreme!
     compile and test for other platforms. If you would like to see Kinemation
     support your target platform, please reach out to me!
 -   Kinemation supports a max hierarchy count of 341. It can go a little higher
-    depending on which meshes are bound.
--   Occlusion Culling is not supported. The way it works assumes visibility
-    indices have already been written. But that’s way slower than visibility
-    masks, which Kinemation makes available. If this is going to be implemented,
-    it is going to be implemented the right way.
--   Skinned Meshes don’t work in Live Link preview. This is because the default
-    Hybrid Renderer still runs in this mode. (Fixed in 0.6)
--   Hybrid Renderer stats don’t work. Kinemation will provide its own solution
+    depending on which meshes are bound. Higher amounts should be possible in a
+    future release.
+-   Occlusion Culling is not supported. Support should be possible in a future
+    release.
+-   Entities Graphics stats don’t work. Kinemation will provide its own solution
     for this in a future release which will be more extensible and customizable.
--   Culling callbacks are slow on the main thread when there are lots of shadow
-    passes. Those systems haven’t been optimized for the main thread yet. (Fixed
-    in 0.6)
 -   Skeletons are uploaded to the GPU multiple times in a frame if different
-    LODs are used in different culling passes
+    LODs are used in different culling passes.
 -   GPU uploads are done in a way that prevent the processors from going into an
-    idle state
+    idle state.
+-   `AddMissingMaskSystem` queries for the wrong component types. This will be
+    fixed in a patch release.
 
 ## Near-Term Roadmap
 
+-   Procedural Mesh Baking
+-   Native Squash and Stretch
+-   Skinned Motion Vectors
+-   Animation Aspects
+-   Forced Optimized Skeletons Mode from Exposed Game Objects
 -   Pose sampling for exposed skeletons
     -   Significantly faster
     -   May require local allocator

@@ -15,20 +15,23 @@ For more details, see [LatiosWorld in detail](LatiosWorld%20in%20Detail.md).
 ## Customizing Features
 
 Beginning with Latios Framework 0.5, many features come as optional components
-which can be installed via the two bootstrap interfaces `ICustomBootstrap` and
-`ICustomConversionBootstrap`. These installers inject systems into their
-respective worlds and may also disable existing systems which they intend to
-replace.
+which can be installed via the three bootstrap interfaces `ICustomBootstrap`,
+`ICustomBakingBootstrap`, and `ICustomEditorBootstrap`. These installers inject
+systems into their respective worlds and may also disable existing systems which
+they intend to replace.
 
 Installers can be found in the following static classes:
 
--   Runtime World
+-   Runtime or Editor World
     -   Latios.CoreBootstrap
     -   Latios.Myri.MyriBootstrap
     -   Latios.Kinemation.KinemationBootstrap
--   Conversion World
+-   Baking World
     -   Latios.Psyshock.Authoring.PsyshockConversionBootstrap
     -   Latios.Kinemation.Authoring.KinemationConversionBootstrap
+
+`ICustomBakingBootstrap` also provides granular control for enabling and
+disabling Baker types.
 
 ## Customizing Explicit System Ordering
 

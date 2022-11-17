@@ -142,7 +142,7 @@ namespace Latios.Psyshock
                             support2 = new float3(0, 0, 1);
                             break;
                         case 2:
-                            mathex.getDualPerpendicularNormalized(math.normalize(simplex.b.pos - simplex.a.pos), out support0, out support1);
+                            mathex.GetDualPerpendicularNormalized(math.normalize(simplex.b.pos - simplex.a.pos), out support0, out support1);
                             support2 = float3.zero;
                             break;
                         default:
@@ -205,7 +205,7 @@ namespace Latios.Psyshock
                         {
                             float3 edge      = math.normalize(simplex.b.pos - simplex.a.pos);
                             float3 direction = math.cross(math.cross(edge, simplex.a.pos), edge);
-                            mathex.getDualPerpendicularNormalized(edge, out float3 safeNormal, out _);  // backup, take any direction perpendicular to the edge
+                            mathex.GetDualPerpendicularNormalized(edge, out float3 safeNormal, out _);  // backup, take any direction perpendicular to the edge
                             float3 normal                     = math.normalizesafe(direction, safeNormal);
                             result.distance                   = math.dot(normal, simplex.a.pos);
                             normalizedOriginToClosestCsoPoint = -normal;

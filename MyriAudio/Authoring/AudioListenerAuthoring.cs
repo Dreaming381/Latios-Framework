@@ -1,5 +1,4 @@
 ﻿using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 
 namespace Latios.Myri.Authoring
@@ -17,6 +16,28 @@ namespace Latios.Myri.Authoring
 
         [Tooltip("A custom volume and frequency spatialization profile. If empty, a default profile will be used.")]
         public ListenerProfileBuilder listenerResponseProfile;
+    }
+
+    public class AudioListenerBaker : Baker<AudioListenerAuthoring>
+    {
+        public override void Bake(AudioListenerAuthoring authoring)
+        {
+            BlobAssetReference<ListenerProfileBlob> blob;
+            if (authoring.listenerResponseProfile == null)
+            {
+                var defaultBuilder = new DefaultListenerProfileBuilder();
+                blob               = this.BuildAndRegisterListenerProfileBlob(defaultBuilder);
+            }
+            else
+                blob = this.BuildAndRegisterListenerProfileBlob(authoring.listenerResponseProfile);
+
+            AddComponent(new AudioListener
+            {
+                ildProfile    = blob,
+                itdResolution = authoring.interauralTimeDifferenceResolution,
+                volume        = authoring.volume
+            });
+        }
     }
 }
 

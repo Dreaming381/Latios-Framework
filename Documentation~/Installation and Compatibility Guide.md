@@ -6,6 +6,10 @@ framework.
 
 ## Installation
 
+Latios Framework 0.6 uses Transforms V1. If your project does not use Unity
+Physics or NetCode, you need to enable Transforms V1 by adding
+`ENABLE_TRANSFORM_V1` to the scripting define symbols of your project.
+
 Nearly all Latios Framework functionality requires that the World instance be a
 subclass instance called `LatiosWorld`. If your project currently uses default
 world initialization, you simply have to go to your project window, *right
@@ -47,9 +51,7 @@ plugin and how you can help extend it to work on more platforms
 [here](https://github.com/Dreaming381/AclUnity).
 
 In addition, code stripping must be set to *Minimal* or *None*, and if building
-for IL2CPP, you must build using 2021 LTS and set the code generation mode to
-*Faster (Smaller) Builds*. Some patch releases of 2021 LTS are known to be
-broken with IL2CPP.
+for IL2CPP, you must set the code generation mode to *Faster (Smaller) Builds*.
 
 If there is some other unexpected behavior, that is likely a bug. Please report
 the issue!

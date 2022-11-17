@@ -20,8 +20,7 @@ namespace Latios.Psyshock
 {
     public unsafe partial struct Collider : IComponentData
     {
-        #region TypeCasting
-        public unsafe static implicit operator Collider(SphereCollider sphereCollider)
+        public static implicit operator Collider(SphereCollider sphereCollider)
         {
             Collider collider = default;
             collider.m_type   = ColliderType.Sphere;
@@ -29,13 +28,13 @@ namespace Latios.Psyshock
             return collider;
         }
 
-        public unsafe static implicit operator SphereCollider(Collider collider)
+        public static implicit operator SphereCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Sphere);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Sphere);
             return collider.m_sphere;
         }
 
-        public unsafe static implicit operator Collider(CapsuleCollider capsuleCollider)
+        public static implicit operator Collider(CapsuleCollider capsuleCollider)
         {
             Collider collider  = default;
             collider.m_type    = ColliderType.Capsule;
@@ -43,13 +42,13 @@ namespace Latios.Psyshock
             return collider;
         }
 
-        public unsafe static implicit operator CapsuleCollider(Collider collider)
+        public static implicit operator CapsuleCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Capsule);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Capsule);
             return collider.m_capsule;
         }
 
-        public unsafe static implicit operator Collider(BoxCollider boxCollider)
+        public static implicit operator Collider(BoxCollider boxCollider)
         {
             Collider collider = default;
             collider.m_type   = ColliderType.Box;
@@ -57,13 +56,13 @@ namespace Latios.Psyshock
             return collider;
         }
 
-        public unsafe static implicit operator BoxCollider(Collider collider)
+        public static implicit operator BoxCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Box);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Box);
             return collider.m_box;
         }
 
-        public unsafe static implicit operator Collider(TriangleCollider triangleCollider)
+        public static implicit operator Collider(TriangleCollider triangleCollider)
         {
             Collider collider   = default;
             collider.m_type     = ColliderType.Box;
@@ -71,44 +70,42 @@ namespace Latios.Psyshock
             return collider;
         }
 
-        public unsafe static implicit operator TriangleCollider(Collider collider)
+        public static implicit operator TriangleCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Triangle);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Triangle);
             return collider.m_triangle;
         }
 
-        public unsafe static implicit operator Collider(ConvexCollider convexCollider)
+        public static implicit operator Collider(ConvexCollider convexCollider)
         {
-            Collider collider        = default;
-            collider.m_type          = ColliderType.Convex;
-            collider.m_storage.a.xyz = convexCollider.scale;
-            collider.m_blobRef       = UnsafeUntypedBlobAssetReference.Create(convexCollider.convexColliderBlob);
+            Collider collider = default;
+            collider.m_type   = ColliderType.Convex;
+            collider.m_convex = convexCollider;
             return collider;
         }
 
-        public unsafe static implicit operator ConvexCollider(Collider collider)
+        public static implicit operator ConvexCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Convex);
-            return new ConvexCollider(collider.m_blobRef.Reinterpret<ConvexColliderBlob>(), collider.m_storage.a.xyz);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Convex);
+            return collider.m_convex;
         }
 
-        public unsafe static implicit operator Collider(CompoundCollider compoundCollider)
+        public static implicit operator Collider(CompoundCollider compoundCollider)
         {
-            Collider collider      = default;
-            collider.m_type        = ColliderType.Compound;
-            collider.m_storage.a.x = compoundCollider.scale;
-            collider.m_blobRef     = UnsafeUntypedBlobAssetReference.Create(compoundCollider.compoundColliderBlob);
+            Collider collider   = default;
+            collider.m_type     = ColliderType.Compound;
+            collider.m_compound = compoundCollider;
             return collider;
         }
 
-        public unsafe static implicit operator CompoundCollider(Collider collider)
+        public static implicit operator CompoundCollider(Collider collider)
         {
-            CheckColliderIsCastTargetType(collider, ColliderType.Compound);
-            return new CompoundCollider(collider.m_blobRef.Reinterpret<CompoundColliderBlob>(), collider.m_storage.a.x);
+            CheckColliderIsCastTargetType(in collider, ColliderType.Compound);
+            return collider.m_compound;
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckColliderIsCastTargetType(Collider c, ColliderType targetType)
+        internal static void CheckColliderIsCastTargetType(in Collider c, ColliderType targetType)
         {
             if (c.m_type != targetType)
             {
@@ -124,8 +121,6 @@ namespace Latios.Psyshock
                 }
             }
         }
-
-        #endregion TypeCasting
     }
 }
 

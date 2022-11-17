@@ -1,6 +1,6 @@
 # Getting Started with Kinemation – Part 3
 
-In this part, we’ll cover converted an animation clip, and playing it on our
+In this part, we’ll cover baking an animation clip, and playing it on our
 character in a system.
 
 ## Defining our Clip Player Component
@@ -11,10 +11,10 @@ First, we will need add the following namespace:
 using Latios.Kinemation;
 ```
 
-Converted Animation Clips are stored in SkeletonClipSetBlob blobs. Multiple
-clips can be stored in a single blob. But if you only want to store a single
-clip per blob and have multiple blobs, you can do that too. In our case, we will
-define a component which stores a single blob with a single clip.
+Baked Animation Clips are stored in `SkeletonClipSetBlob` blobs. Multiple clips
+can be stored in a single blob. But if you only want to store a single clip per
+blob and have multiple blobs, you can do that too. In our case, we will define a
+component which stores a single blob with a single clip.
 
 ```csharp
 public struct SingleClip : IComponentData
@@ -23,38 +23,35 @@ public struct SingleClip : IComponentData
 }
 ```
 
-## Converting the Clip
+## Baking the Clip
 
-Animation Clips are converted using a [Smart
-Blobber](../Core/Smart%20Blobbers.md). Open up that link in a separate tab and
-read through the first section that has code.
+Animation Clips are baked using a [Smart Blobber](../Core/Smart%20Blobbers.md).
+Open up that link in a separate tab and read through the first section that has
+code.
 
-By the way, that code, that’s our authoring script that converts the animation
+By the way, that code, that’s our authoring script that bakes the animation
 clip. So let’s talk about the parts that the Smart Blobber guide didn’t discuss.
 
-First, we need to create a `SkeletonClipConfig` for every clip we want to
-convert. That takes two fields, the source animation clip, and the compression
-settings. In this case, we specify the default settings which are usually pretty
-good. But you can create your own settings if you want and see what happens.
+First, we need to create a `SkeletonClipConfig` for every clip we want to bake.
+That takes two fields, the source animation clip, and the compression settings.
+In this case, we specify the default settings which are usually pretty good. But
+you can create your own settings if you want.
 
-We then need to create a `SkeletonClipSetBakeData` and pass it an array of our
-`SkeletonClipConfig` objects. We also need to give it an `Animator` we want to
+We create a blob request using that array as well as the `Animator` we want to
 bake the clips for. Kinemation doesn’t yet support runtime retargeting of human
 animations, but you can bake any human animation for a humanoid `Animator`.
 
-After that, we call `CreateBlob()` and shove our request off to the Smart
-Blobber. That Smart Blobber will create a temporary clone of the `Animator`,
-sample all the animation clips, and finally send those samples to ACL for
-compression.
+The Smart Blobber will create a temporary clone of the `Animator`, sample all
+the animation clips, and send those samples to ACL for compression.
 
-Finally, in `Convert()` we get back a fresh-baked blob asset with our animation
-clip inside. We can add that to our entity, which for now we’ll assume is our
-skeleton entity.
+Finally, in `PostProcessBlobRequests()` we get back a fresh-baked blob asset
+with our animation clip inside. We can add that to our entity, which for now
+we’ll assume is our skeleton entity.
 
 ## Playing the Clip Using BoneReference
 
 There are multiple ways to play an animation clip. In all of the examples, we’ll
-use Time.ElapsedTime to keep track of time. Normally you would want to keep
+use `Time.ElapsedTime` to keep track of time. Normally you would want to keep
 track of time some other way. But this will suffice for this demo.
 
 Our first example will iterate skeletons. We’ll define our system like this:
@@ -74,7 +71,7 @@ namespace Dragons
     {
         protected override void OnUpdate()
         {
-            float t = (float)Time.ElapsedTime;
+            float t = (float)SystemAPI.Time.ElapsedTime;
 
             Entities.ForEach((in DynamicBuffer<BoneReference> bones, in SingleClip singleClip) =>
             {
@@ -132,7 +129,7 @@ for (int i = 1; i < bones.Length; i++)
 animation data to that, we would lose our world-space position and rotation. Our
 animation does not have root motion, so the character would be snapped to the
 origin. However, if our animation did have root motion, we would want to compare
-it to the previous frame’s sample and ADD it to our Translation.*
+it to the previous frame’s sample and ADD the difference to our Translation.*
 
 Let’s add our new authoring component to our character and give it a clip.
 
@@ -145,7 +142,7 @@ And now when we press play…
 ## Playing the Clip Using BoneOwningSkeletonReference
 
 Our first approach was fine, but we had to run it single-threaded because of the
-`SetComponent()` calls. Using `ComponentDataFromEntity` and
+`SetComponent()` calls. Using `ComponentLookup` and
 `WithNativeDisableParallelForRestriction()` works, but perhaps it would be a
 little cleaner if we iterated using bone entities instead. To do that, we’ll use
 the `BoneOwningSkeletonReference` to find our skeleton and get the animation
@@ -177,6 +174,9 @@ Wouldn’t it be great if we didn’t have to look up the skeleton entity to get
 clip? What if we had the clip ready for every bone?
 
 To do that, we’ll need to make a slight change to our authoring component.
+
+Todo: Not sure what the best way to do this in the new baking workflow is.
+Please skip this section.
 
 ```csharp
 public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)

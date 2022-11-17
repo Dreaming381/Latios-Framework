@@ -1,27 +1,30 @@
-using Latios;
 using Unity.Burst;
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
-using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class AddMissingMatrixCacheSystem : SubSystem
+    [BurstCompile]
+    public partial struct AddMissingMatrixCacheSystem : ISystem
     {
         EntityQuery m_query;
 
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            m_query = Fluent.WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>(true).Without<MatrixPreviousCache>().IncludeDisabled().IncludePrefabs().Build();
+            m_query = state.Fluent().WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>(true).Without<MatrixPreviousCache>().IncludeDisabled().IncludePrefabs().Build();
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            EntityManager.AddComponent<MatrixPreviousCache>(m_query);
+            state.EntityManager.AddComponent<MatrixPreviousCache>(m_query);
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
+        {
         }
     }
 }

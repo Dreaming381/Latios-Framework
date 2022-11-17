@@ -9,7 +9,7 @@ namespace Latios.Myri
 {
     internal static class CullingAndWeighting
     {
-        public const int BATCH_SIZE = 128;
+        public const int kBatchSize = 128;
 
         //Parallel
         //The weighting algorithm is fairly pricey
@@ -44,8 +44,8 @@ namespace Latios.Myri
                     baseWeights[i] = w;
                 }
 
-                listenerEmitterPairs.BeginForEachIndex(startIndex / BATCH_SIZE);
-                weights.BeginForEachIndex(startIndex / BATCH_SIZE);
+                listenerEmitterPairs.BeginForEachIndex(startIndex / kBatchSize);
+                weights.BeginForEachIndex(startIndex / kBatchSize);
 
                 for (int i = startIndex; i < startIndex + count; i++)
                 {
@@ -114,8 +114,8 @@ namespace Latios.Myri
                     baseWeights[i] = w;
                 }
 
-                listenerEmitterPairs.BeginForEachIndex(startIndex / BATCH_SIZE);
-                weights.BeginForEachIndex(startIndex / BATCH_SIZE);
+                listenerEmitterPairs.BeginForEachIndex(startIndex / kBatchSize);
+                weights.BeginForEachIndex(startIndex / kBatchSize);
 
                 for (int i = startIndex; i < startIndex + count; i++)
                 {

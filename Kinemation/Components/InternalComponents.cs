@@ -19,7 +19,7 @@ namespace Latios.Kinemation
     }
 
     [WriteGroup(typeof(LocalToParent))]
-    internal struct SkeletonDependent : ISystemStateComponentData
+    internal struct SkeletonDependent : ICleanupComponentData
     {
         public EntityWith<SkeletonRootTag>                  root;
         public BlobAssetReference<MeshSkinningBlob>         skinningBlob;
@@ -30,7 +30,7 @@ namespace Latios.Kinemation
         public float                                        shaderEffectRadialBounds;
     }
 
-    [MaterialProperty("_ComputeMeshIndex", MaterialPropertyFormat.Float)]
+    [MaterialProperty("_ComputeMeshIndex")]
     internal struct ComputeDeformShaderIndex : IComponentData
     {
         public uint firstVertexIndex;
@@ -40,11 +40,9 @@ namespace Latios.Kinemation
     internal struct ChunkComputeDeformMemoryMetadata : IComponentData
     {
         public int vertexStartPrefixSum;
-        public int verticesPerMesh;
-        public int entitiesInChunk;
     }
 
-    [MaterialProperty("_SkinMatrixIndex", MaterialPropertyFormat.Float)]
+    [MaterialProperty("_SkinMatrixIndex")]
     internal struct LinearBlendSkinningShaderIndex : IComponentData
     {
         public int firstMatrixIndex;
@@ -54,21 +52,19 @@ namespace Latios.Kinemation
     internal struct ChunkLinearBlendSkinningMemoryMetadata : IComponentData
     {
         public int bonesStartPrefixSum;
-        public int bonesPerMesh;
-        public int entitiesInChunk;
     }
 
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     internal struct ChunkCopySkinShaderData : IComponentData
     {
         // Todo: Can chunk components be tags?
-        internal byte dummy;
+        //internal byte dummy;
     }
 
     // All skeletons
     // This is system state to prevent copies on instantiate
     [InternalBufferCapacity(1)]
-    internal struct DependentSkinnedMesh : ISystemStateBufferElementData
+    internal struct DependentSkinnedMesh : ICleanupBufferElementData
     {
         public EntityWith<SkeletonDependent> skinnedMesh;
         public int                           meshVerticesStart;
@@ -87,7 +83,7 @@ namespace Latios.Kinemation
     }
 
     // Exposed skeletons
-    internal struct ExposedSkeletonCullingIndex : ISystemStateComponentData
+    internal struct ExposedSkeletonCullingIndex : ICleanupComponentData
     {
         public int cullingIndex;
     }
@@ -117,7 +113,7 @@ namespace Latios.Kinemation
 
     // There's currently no other system state for optimized skeletons, so we need something
     // to track conversions between skeleton types.
-    internal struct OptimizedSkeletonTag : ISystemStateComponentData { }
+    internal struct OptimizedSkeletonTag : ICleanupComponentData { }
 
     internal struct SkeletonShaderBoundsOffset : IComponentData
     {
@@ -146,15 +142,18 @@ namespace Latios.Kinemation
 
     internal struct ExposedCullingIndexManager : ICollectionComponent
     {
-        public NativeParallelHashMap<Entity, int>                                  skeletonToCullingIndexMap;
-        public NativeReference<int>                                                maxIndex;
-        public NativeList<int>                                                     indexFreeList;
-        public NativeParallelHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
+        public NativeHashMap<Entity, int>                                  skeletonToCullingIndexMap;
+        public NativeReference<int>                                        maxIndex;
+        public NativeList<int>                                             indexFreeList;
+        public NativeHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
 
-        public Type AssociatedComponentType => typeof(ExposedCullingIndexManagerTag);
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ExposedCullingIndexManagerTag>();
 
-        public JobHandle Dispose(JobHandle inputDeps)
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
+            if (!skeletonToCullingIndexMap.IsCreated)
+                return inputDeps;
+
             inputDeps = skeletonToCullingIndexMap.Dispose(inputDeps);
             inputDeps = maxIndex.Dispose(inputDeps);
             inputDeps = indexFreeList.Dispose(inputDeps);
@@ -199,7 +198,7 @@ namespace Latios.Kinemation
 
     internal struct MeshGpuManager : ICollectionComponent
     {
-        public NativeParallelHashMap<BlobAssetReference<MeshSkinningBlob>, int> blobIndexMap;
+        public NativeHashMap<BlobAssetReference<MeshSkinningBlob>, int> blobIndexMap;
 
         public NativeList<MeshGpuEntry> entries;
         public NativeList<int>          indexFreeList;
@@ -210,10 +209,13 @@ namespace Latios.Kinemation
         public NativeList<MeshGpuUploadCommand>      uploadCommands;
         public NativeReference<MeshGpuRequiredSizes> requiredBufferSizes;
 
-        public Type AssociatedComponentType => typeof(MeshGpuManagerTag);
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuManagerTag>();
 
-        public JobHandle Dispose(JobHandle inputDeps)
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
+            if (!blobIndexMap.IsCreated)
+                return inputDeps;
+
             inputDeps = blobIndexMap.Dispose(inputDeps);
             inputDeps = entries.Dispose(inputDeps);
             inputDeps = indexFreeList.Dispose(inputDeps);
@@ -263,13 +265,16 @@ namespace Latios.Kinemation
         public NativeList<int2>             gaps;
         public NativeReference<bool>        isDirty;
 
-        public NativeParallelHashMap<uint2, int>           hashToEntryMap;
-        public NativeParallelHashMap<PathMappingPair, int> pathPairToEntryMap;
+        public NativeHashMap<uint2, int>           hashToEntryMap;
+        public NativeHashMap<PathMappingPair, int> pathPairToEntryMap;
 
-        public Type AssociatedComponentType => typeof(BoneOffsetsGpuManagerTag);
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BoneOffsetsGpuManagerTag>();
 
-        public JobHandle Dispose(JobHandle inputDeps)
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
+            if (!entries.IsCreated)
+                return inputDeps;
+
             inputDeps = entries.Dispose(inputDeps);
             inputDeps = offsets.Dispose(inputDeps);
             inputDeps = indexFreeList.Dispose(inputDeps);
@@ -283,7 +288,7 @@ namespace Latios.Kinemation
 
     internal struct GpuUploadBuffersTag : IComponentData { }
 
-    internal struct GpuUploadBuffers : ICollectionComponent
+    internal struct GpuUploadBuffers : IManagedStructComponent
     {
         // Not owned by this
         public UnityEngine.ComputeBuffer verticesBuffer;
@@ -298,64 +303,86 @@ namespace Latios.Kinemation
         public UnityEngine.ComputeBuffer weightsUploadMetaBuffer;
         public UnityEngine.ComputeBuffer bindPosesUploadMetaBuffer;
         public UnityEngine.ComputeBuffer boneOffsetsUploadMetaBuffer;
-        public int                       verticesUploadBufferWriteCount;
-        public int                       weightsUploadBufferWriteCount;
-        public int                       bindPosesUploadBufferWriteCount;
-        public int                       boneOffsetsUploadBufferWriteCount;
-        public int                       verticesUploadMetaBufferWriteCount;
-        public int                       weightsUploadMetaBufferWriteCount;
-        public int                       bindPosesUploadMetaBufferWriteCount;
-        public int                       boneOffsetsUploadMetaBufferWriteCount;
-        public bool                      needsMeshCommitment;
-        public bool                      needsBoneOffsetCommitment;
 
-        public Type AssociatedComponentType => typeof(GpuUploadBuffersTag);
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GpuUploadBuffersTag>();
+    }
 
-        public JobHandle Dispose(JobHandle inputDeps) => inputDeps;
+    internal struct GpuUploadBuffersMappedTag : IComponentData { }
+
+    internal struct GpuUploadBuffersMapped : ICollectionComponent
+    {
+        // No actual containers here, but represents the mappings of the compute buffers.
+        public int  verticesUploadBufferWriteCount;
+        public int  weightsUploadBufferWriteCount;
+        public int  bindPosesUploadBufferWriteCount;
+        public int  boneOffsetsUploadBufferWriteCount;
+        public int  verticesUploadMetaBufferWriteCount;
+        public int  weightsUploadMetaBufferWriteCount;
+        public int  bindPosesUploadMetaBufferWriteCount;
+        public int  boneOffsetsUploadMetaBufferWriteCount;
+        public bool needsMeshCommitment;
+        public bool needsBoneOffsetCommitment;
+
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GpuUploadBuffersMappedTag>();
+
+        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
 
     internal struct ComputeBufferManagerTag : IComponentData { }
 
-    internal struct ComputeBufferManager : ICollectionComponent
+    internal struct ComputeBufferManager : IManagedStructComponent
     {
         public ComputeBufferTrackingPool pool;
 
-        public Type AssociatedComponentType => typeof(ComputeBufferManagerTag);
-
-        public JobHandle Dispose(JobHandle inputDeps)
-        {
-            pool.Dispose();
-            return inputDeps;
-        }
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ComputeBufferManagerTag>();
     }
 
     internal struct BrgCullingContextTag : IComponentData { }
 
     internal unsafe struct BrgCullingContext : ICollectionComponent
     {
-        public BatchCullingContext cullingContext;
-        public NativeArray<int>    internalToExternalMappingIds;
+        //public BatchCullingContext cullingContext;
+        //public NativeArray<int>    internalToExternalMappingIds;
+        public ThreadLocalAllocator                            cullingThreadLocalAllocator;
+        public BatchCullingOutput                              batchCullingOutput;
+        public NativeParallelHashMap<int, BatchFilterSettings> batchFilterSettingsByRenderFilterSettingsSharedIndex;
+#if UNITY_EDITOR
+        public NativeParallelHashMap<int, BatchEditorRenderData> batchEditorSharedIndexToSceneMaskMap;
+        public IncludeExcludeListFilter includeExcludeListFilter;
+#endif
 
-        public Type AssociatedComponentType => typeof(BrgCullingContextTag);
-        public JobHandle Dispose(JobHandle inputDeps)
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BrgCullingContextTag>();
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
             // We don't own this data
             return inputDeps;
         }
     }
 
+    internal struct PackedCullingSplitsTag : IComponentData { }
+
+    internal struct PackedCullingSplits : ICollectionComponent
+    {
+        public NativeReference<CullingSplits> packedSplits;
+
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<PackedCullingSplitsTag>();
+        public JobHandle TryDispose(JobHandle inputDeps)
+        {
+            // The collections inside packedSplits is managed by a RewindableAllocator,
+            // but the NativeReference is allocated persistently.
+            if (packedSplits.IsCreated)
+                return packedSplits.Dispose(inputDeps);
+            return inputDeps;
+        }
+    }
+
     internal struct BoneMatricesPerFrameBuffersManagerTag : IComponentData { }
 
-    internal struct BoneMatricesPerFrameBuffersManager : ICollectionComponent
+    internal struct BoneMatricesPerFrameBuffersManager : IManagedStructComponent
     {
         public List<UnityEngine.ComputeBuffer> boneMatricesBuffers;
 
-        public Type AssociatedComponentType => typeof(BoneMatricesPerFrameBuffersManagerTag);
-        public JobHandle Dispose(JobHandle inputDeps)
-        {
-            // We don't own the buffers.
-            return inputDeps;
-        }
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BoneMatricesPerFrameBuffersManagerTag>();
     }
 
     internal struct MaxRequiredDeformVertices : IComponentData
@@ -372,15 +399,13 @@ namespace Latios.Kinemation
 
     internal struct MaterialPropertiesUploadContext : ICollectionComponent
     {
-        public NativeList<DefaultValueBlitDescriptor> defaultValueBlits;
-        public int                                    requiredPersistentBufferSize;
+        public NativeList<ValueBlitDescriptor> valueBlits;
 
         public int                        hybridRenderedChunkCount;
         public NativeArray<ChunkProperty> chunkProperties;
-        public ComponentTypeCache         componentTypeCache;
 
-        public Type AssociatedComponentType => typeof(MaterialPropertiesUploadContextTag);
-        public JobHandle Dispose(JobHandle inputDeps)
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MaterialPropertiesUploadContextTag>();
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
             // We don't own this data
             return inputDeps;
@@ -395,9 +420,12 @@ namespace Latios.Kinemation
         public NativeList<AABB> batchedAabbs;
         public const int        kCountPerBatch = 32;  // Todo: Is there a better size?
 
-        public Type AssociatedComponentType => typeof(ExposedSkeletonBoundsArraysTag);
-        public JobHandle Dispose(JobHandle inputDeps)
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ExposedSkeletonBoundsArraysTag>();
+        public JobHandle TryDispose(JobHandle inputDeps)
         {
+            if (!allAabbs.IsCreated)
+                return inputDeps;
+
             inputDeps = allAabbs.Dispose(inputDeps);
             return batchedAabbs.Dispose(inputDeps);
         }

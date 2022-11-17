@@ -1,15 +1,16 @@
-﻿using Unity.Mathematics;
+﻿using System.Diagnostics;
+using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
     public static partial class Physics
     {
         #region Sphere
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             var cso     = targetSphere;
@@ -21,7 +22,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform  = castStart;
                 hitTransform.pos += raycastResult.position - start;
-                DistanceBetween(sphereToCast, hitTransform, targetSphere, targetSphereTransform, 1f, out var distanceResult);
+                DistanceBetween(in sphereToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -38,11 +39,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
             var cso     = targetCapsule;
@@ -54,7 +55,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform  = castStart;
                 hitTransform.pos += raycastResult.position - start;
-                DistanceBetween(sphereToCast, hitTransform, targetCapsule, targetCapsuleTransform, 1f, out var distanceResult);
+                DistanceBetween(in sphereToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -71,11 +72,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+                                        in BoxCollider targetBox,
+                                        in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
             var  targetBoxTransformInverse = math.inverse(targetBoxTransform);
@@ -87,7 +88,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(sphereToCast, hitTransform, targetBox, targetBoxTransform, 1f, out var distanceResult);
+                DistanceBetween(in sphereToCast, in hitTransform, in targetBox, in targetBoxTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -104,11 +105,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
             var  targetTriangleTransformInverse = math.inverse(targetTriangleTransform);
@@ -125,7 +126,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(sphereToCast, hitTransform, targetTriangle, targetTriangleTransform, 1f, out var distanceResult);
+                DistanceBetween(in sphereToCast, in hitTransform, in targetTriangle, in targetTriangleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -142,11 +143,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
             var  targetConvexTransformInverse = math.inverse(targetConvexTransform);
@@ -162,7 +163,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(sphereToCast, hitTransform, targetConvex, targetConvexTransform, 1f, out var distanceResult);
+                DistanceBetween(in sphereToCast, in hitTransform, in targetConvex, in targetConvexTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -179,17 +180,17 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(SphereCollider sphereToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(sphereToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in sphereToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -200,7 +201,7 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= targetCompound.scale;
-                bool newHit        = ColliderCast(sphereToCast, castStart, castEnd, ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(in sphereToCast, in castStart, castEnd, ScaleCollider(in blob.colliders[i], compoundScale),
                                                   math.mul(targetCompoundTransform, blobTransform),
                                                   out var newResult);
 
@@ -214,11 +215,11 @@ namespace Latios.Psyshock
         #endregion
 
         #region Capsule
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             var cso           = capsuleToCast;
@@ -231,7 +232,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform  = castStart;
                 hitTransform.pos -= raycastResult.position - start;
-                DistanceBetween(capsuleToCast, hitTransform, targetSphere, targetSphereTransform, 1f, out var distanceResult);
+                DistanceBetween(in capsuleToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -248,11 +249,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
             var csoRadius           = capsuleToCast.radius + targetCapsule.radius;
@@ -270,7 +271,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(capsuleToCast, hitTransform, targetCapsule, targetCapsuleTransform, 1f, out var distanceResult);
+                DistanceBetween(in capsuleToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -287,14 +288,14 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+                                        in BoxCollider targetBox,
+                                        in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(capsuleToCast, castStart, targetBox, targetBoxTransform, 0f, out _))
+            if (DistanceBetween(in capsuleToCast, in castStart, in targetBox, in targetBoxTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -384,7 +385,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(capsuleToCast, hitTransform, targetBox, targetBoxTransform, 1f, out var distanceResult);
+                DistanceBetween(in capsuleToCast, in hitTransform, in targetBox, in targetBoxTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -401,14 +402,14 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(capsuleToCast, castStart, targetTriangle, targetTriangleTransform, 0f, out _))
+            if (DistanceBetween(in capsuleToCast, in castStart, in targetTriangle, in targetTriangleTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -445,7 +446,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(capsuleToCast, hitTransform, targetTriangle, targetTriangleTransform, 1f, out var distanceResult);
+                DistanceBetween(in capsuleToCast, in hitTransform, in targetTriangle, in targetTriangleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -462,14 +463,14 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(capsuleToCast, castStart, targetConvex, targetConvexTransform, 0f, out _))
+            if (DistanceBetween(in capsuleToCast, in castStart, in targetConvex, in targetConvexTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -550,7 +551,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(capsuleToCast, hitTransform, targetConvex, targetConvexTransform, 1f, out var distanceResult);
+                DistanceBetween(in capsuleToCast, in hitTransform, in targetConvex, in targetConvexTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -567,17 +568,17 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(CapsuleCollider capsuleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(capsuleToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in capsuleToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -587,7 +588,7 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= targetCompound.scale;
-                bool newHit        = ColliderCast(capsuleToCast, castStart, castEnd, ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(in capsuleToCast, in castStart, castEnd, ScaleCollider(in blob.colliders[i], compoundScale),
                                                   math.mul(targetCompoundTransform, blobTransform),
                                                   out var newResult);
 
@@ -601,11 +602,11 @@ namespace Latios.Psyshock
         #endregion
 
         #region Box
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             var  castReverse        = castStart.pos - castEnd;
@@ -617,7 +618,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(boxToCast, hitTransform, targetSphere, targetSphereTransform, 1f, out var distanceResult);
+                DistanceBetween(in boxToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -634,14 +635,14 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(boxToCast, castStart, targetCapsule, targetCapsuleTransform, 0f, out _))
+            if (DistanceBetween(in boxToCast, in castStart, in targetCapsule, in targetCapsuleTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -731,7 +732,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(boxToCast, hitTransform, targetCapsule, targetCapsuleTransform, 1f, out var distanceResult);
+                DistanceBetween(in boxToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -748,47 +749,43 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
-                                        float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+        public static bool ColliderCast(in BoxCollider boxToCast, in RigidTransform castStart, float3 castEnd, in BoxCollider targetBox, in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(boxToCast, castStart, castEnd, targetBox, targetBoxTransform, out result);
+            return ColliderCastMpr(boxToCast, in castStart, castEnd,  targetBox, in targetBoxTransform, out result);
         }
 
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(boxToCast, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
+            return ColliderCastMpr(boxToCast, in castStart, castEnd,  targetTriangle, in targetTriangleTransform, out result);
         }
 
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(boxToCast, castStart, castEnd, targetConvex, targetConvexTransform, out result);
+            return ColliderCastMpr(boxToCast, in castStart, castEnd,  targetConvex, in targetConvexTransform, out result);
         }
 
-        public static bool ColliderCast(BoxCollider boxToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(boxToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in boxToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -798,7 +795,7 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= targetCompound.scale;
-                bool newHit        = ColliderCast(boxToCast, castStart, castEnd, ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(in boxToCast, in castStart, castEnd, ScaleCollider(in blob.colliders[i], compoundScale),
                                                   math.mul(targetCompoundTransform, blobTransform),
                                                   out var newResult);
 
@@ -812,11 +809,11 @@ namespace Latios.Psyshock
         #endregion
 
         #region Triangle
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             var  castReverse        = castStart.pos - castEnd;
@@ -828,7 +825,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(triangleToCast, hitTransform, targetSphere, targetSphereTransform, 1f, out var distanceResult);
+                DistanceBetween(in triangleToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -845,14 +842,14 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(triangleToCast, castStart, targetCapsule, targetCapsuleTransform, 0f, out _))
+            if (DistanceBetween(in triangleToCast, in castStart, in targetCapsule, in targetCapsuleTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -889,7 +886,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(triangleToCast, hitTransform, targetCapsule, targetCapsuleTransform, 1f, out var distanceResult);
+                DistanceBetween(in triangleToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -906,47 +903,47 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+                                        in BoxCollider targetBox,
+                                        in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(triangleToCast, castStart, castEnd, targetBox, targetBoxTransform, out result);
+            return ColliderCastMpr(triangleToCast, in castStart, castEnd,  targetBox, in targetBoxTransform, out result);
         }
 
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(triangleToCast, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
+            return ColliderCastMpr(triangleToCast, in castStart, castEnd,  targetTriangle, in targetTriangleTransform, out result);
         }
 
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(triangleToCast, castStart, castEnd, targetConvex, targetConvexTransform, out result);
+            return ColliderCastMpr(triangleToCast, in castStart, castEnd,  targetConvex, in targetConvexTransform, out result);
         }
 
-        public static bool ColliderCast(TriangleCollider triangleToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(triangleToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in triangleToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -956,7 +953,7 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= targetCompound.scale;
-                bool newHit        = ColliderCast(triangleToCast, castStart, castEnd, ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(in triangleToCast, in castStart, castEnd, ScaleCollider(in blob.colliders[i], compoundScale),
                                                   math.mul(targetCompoundTransform, blobTransform),
                                                   out var newResult);
 
@@ -970,11 +967,11 @@ namespace Latios.Psyshock
         #endregion
 
         #region Convex
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             var  castReverse        = castStart.pos - castEnd;
@@ -986,7 +983,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(convexToCast, hitTransform, targetSphere, targetSphereTransform, 1f, out var distanceResult);
+                DistanceBetween(in convexToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -1003,14 +1000,14 @@ namespace Latios.Psyshock
             return false;
         }
         // Todo: Capsule
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(convexToCast, castStart, targetCapsule, targetCapsuleTransform, 0f, out _))
+            if (DistanceBetween(in convexToCast, in castStart, in targetCapsule, in targetCapsuleTransform, 0f, out _))
             {
                 result = default;
                 return false;
@@ -1091,7 +1088,7 @@ namespace Latios.Psyshock
             {
                 var hitTransform = castStart;
                 hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(convexToCast, hitTransform, targetCapsule, targetCapsuleTransform, 1f, out var distanceResult);
+                DistanceBetween(in convexToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
                 result = new ColliderCastResult
                 {
                     hitpointOnCaster         = distanceResult.hitpointA,
@@ -1108,47 +1105,43 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
-                                        float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+        public static bool ColliderCast(in ConvexCollider convexToCast, in RigidTransform castStart, float3 castEnd, in BoxCollider targetBox, in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(convexToCast, castStart, castEnd, targetBox, targetBoxTransform, out result);
+            return ColliderCastMpr(convexToCast, in castStart, castEnd,  targetBox, in targetBoxTransform, out result);
         }
 
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(convexToCast, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
+            return ColliderCastMpr(convexToCast, in castStart, castEnd,  targetTriangle, in targetTriangleTransform, out result);
         }
 
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
-            return ColliderCastMpr(convexToCast, castStart, castEnd, targetConvex, targetConvexTransform, out result);
+            return ColliderCastMpr(convexToCast, in castStart, castEnd,  targetConvex, in targetConvexTransform, out result);
         }
 
-        public static bool ColliderCast(ConvexCollider convexToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(convexToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in convexToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -1158,7 +1151,7 @@ namespace Latios.Psyshock
             {
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= targetCompound.scale;
-                bool newHit        = ColliderCast(convexToCast, castStart, castEnd, ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(in convexToCast, in castStart, castEnd, ScaleCollider(in blob.colliders[i], compoundScale),
                                                   math.mul(targetCompoundTransform, blobTransform),
                                                   out var newResult);
 
@@ -1172,17 +1165,17 @@ namespace Latios.Psyshock
         #endregion
 
         #region Compound
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        SphereCollider targetSphere,
-                                        RigidTransform targetSphereTransform,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetSphere, targetSphereTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetSphere, in targetSphereTransform, 0f, out _))
             {
                 return false;
             }
@@ -1193,10 +1186,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetSphere,
-                                                  targetSphereTransform,
+                                                  in targetSphere,
+                                                  in targetSphereTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1207,17 +1200,17 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CapsuleCollider targetCapsule,
-                                        RigidTransform targetCapsuleTransform,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetCapsule, targetCapsuleTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetCapsule, in targetCapsuleTransform, 0f, out _))
             {
                 return false;
             }
@@ -1228,10 +1221,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetCapsule,
-                                                  targetCapsuleTransform,
+                                                  in targetCapsule,
+                                                  in targetCapsuleTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1242,17 +1235,17 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        BoxCollider targetBox,
-                                        RigidTransform targetBoxTransform,
+                                        in BoxCollider targetBox,
+                                        in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetBox, targetBoxTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetBox, in targetBoxTransform, 0f, out _))
             {
                 return false;
             }
@@ -1263,10 +1256,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetBox,
-                                                  targetBoxTransform,
+                                                  in targetBox,
+                                                  in targetBoxTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1277,17 +1270,17 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        TriangleCollider targetTriangle,
-                                        RigidTransform targetTriangleTransform,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetTriangle, targetTriangleTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetTriangle, in targetTriangleTransform, 0f, out _))
             {
                 return false;
             }
@@ -1298,10 +1291,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetTriangle,
-                                                  targetTriangleTransform,
+                                                  in targetTriangle,
+                                                  in targetTriangleTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1312,17 +1305,17 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        ConvexCollider targetConvex,
-                                        RigidTransform targetConvexTransform,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetConvex, targetConvexTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetConvex, in targetConvexTransform, 0f, out _))
             {
                 return false;
             }
@@ -1333,10 +1326,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetConvex,
-                                                  targetConvexTransform,
+                                                  in targetConvex,
+                                                  in targetConvexTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1347,17 +1340,17 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool ColliderCast(CompoundCollider compoundToCast,
-                                        RigidTransform castStart,
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
                                         float3 castEnd,
-                                        CompoundCollider targetCompound,
-                                        RigidTransform targetCompoundTransform,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
                                         out ColliderCastResult result)
         {
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(compoundToCast, castStart, targetCompound, targetCompoundTransform, 0f, out _))
+            if (DistanceBetween(in compoundToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
             {
                 return false;
             }
@@ -1368,10 +1361,10 @@ namespace Latios.Psyshock
                 var blobTransform  = blob.transforms[i];
                 blobTransform.pos *= compoundToCast.scale;
                 var  start         = math.mul(castStart, blobTransform);
-                bool newHit        = ColliderCast(ScaleCollider(blob.colliders[i], compoundScale),
+                bool newHit        = ColliderCast(ScaleCollider(in blob.colliders[i], compoundScale),
                                                   start, start.pos + (castEnd - castStart.pos),
-                                                  targetCompound,
-                                                  targetCompoundTransform,
+                                                  in targetCompound,
+                                                  in targetCompoundTransform,
                                                   out var newResult);
 
                 newResult.subColliderIndexOnCaster  = i;
@@ -1383,25 +1376,58 @@ namespace Latios.Psyshock
         }
         #endregion
 
+        #region Layer
+
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in CollisionLayer layer,
+                                        out ColliderCastResult result,
+                                        out LayerBodyInfo layerBodyInfo)
+        {
+            result        = default;
+            layerBodyInfo = default;
+            var processor = new LayerQueryProcessors.ColliderCastClosestImmediateProcessor(colliderToCast, castStart, castEnd, ref result, ref layerBodyInfo);
+            FindObjects(AabbFrom(in colliderToCast, in castStart, castEnd), layer, processor).RunImmediate();
+            var hit                         = result.subColliderIndexOnTarget >= 0;
+            result.subColliderIndexOnTarget = math.max(result.subColliderIndexOnTarget, 0);
+            return hit;
+        }
+
+        public static bool ColliderCastAny(in Collider colliderToCast,
+                                           in RigidTransform castStart,
+                                           float3 castEnd,
+                                           in CollisionLayer layer,
+                                           out ColliderCastResult result,
+                                           out LayerBodyInfo layerBodyInfo)
+        {
+            result        = default;
+            layerBodyInfo = default;
+            var processor = new LayerQueryProcessors.ColliderCastAnyImmediateProcessor(colliderToCast, castStart, castEnd, ref result, ref layerBodyInfo);
+            FindObjects(AabbFrom(in colliderToCast, in castStart, castEnd), layer, processor).RunImmediate();
+            var hit                         = result.subColliderIndexOnTarget >= 0;
+            result.subColliderIndexOnTarget = math.max(result.subColliderIndexOnTarget, 0);
+            return hit;
+        }
+
+        #endregion
+
         #region Internal
-        internal static bool ColliderCastMpr(Collider colliderToCast,
-                                             RigidTransform castStart,
-                                             float3 castEnd,
-                                             Collider targetCollider,
-                                             RigidTransform targetTransform,
+        internal static bool ColliderCastMpr(in Collider colliderToCast, in RigidTransform castStart, float3 castEnd, in Collider targetCollider, in RigidTransform targetTransform,
                                              out ColliderCastResult result)
         {
             var  castStartInverse             = math.inverse(castStart);
             var  targetInCasterSpaceTransform = math.mul(castStartInverse, targetTransform);
             var  castDirection                = math.rotate(castStartInverse, castEnd - castStart.pos);
             var  normalizedCastDirection      = math.normalize(castDirection);
-            bool hit                          = SpatialInternal.MprCastNoRoundness(colliderToCast,
-                                                                                   targetCollider,
-                                                                                   targetInCasterSpaceTransform,
+            bool hit                          = SpatialInternal.MprCastNoRoundness(in colliderToCast,
+                                                                                   in targetCollider,
+                                                                                   in targetInCasterSpaceTransform,
                                                                                    normalizedCastDirection,
                                                                                    math.length(castDirection),
                                                                                    out float distanceOfImpact,
                                                                                    out bool somethingWentWrong);
+            CheckMprResolved(somethingWentWrong);
             if (!hit || distanceOfImpact <= 0f)
             {
                 result = default;
@@ -1411,7 +1437,7 @@ namespace Latios.Psyshock
             var castHitOffset       = math.rotate(castStart, normalizedCastDirection * distanceOfImpact);
             var casterHitTransform  = castStart;
             casterHitTransform.pos += castHitOffset;
-            DistanceBetween(colliderToCast, casterHitTransform, targetCollider, targetTransform, float.MaxValue, out var distanceResult);
+            DistanceBetween(in colliderToCast, in casterHitTransform, in targetCollider, in targetTransform, float.MaxValue, out var distanceResult);
 
             result = new ColliderCastResult
             {
@@ -1425,6 +1451,13 @@ namespace Latios.Psyshock
             };
 
             return true;
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        internal static void CheckMprResolved(bool somethingWentWrong)
+        {
+            if (somethingWentWrong)
+                UnityEngine.Debug.LogWarning("MPR failed to resolve within the allotted number of iterations. If you see this, please report a bug.");
         }
         #endregion
     }

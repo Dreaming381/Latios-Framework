@@ -8,14 +8,14 @@ using Unity.Transforms;
 
 namespace Dragons
 {
-    [AlwaysUpdateSystem, DisableAutoCreation]
+    [DisableAutoCreation]
     public partial class FindPairsSimpleBenchmark : SubSystem
     {
         private struct DestroyOnCollisionProcessor : IFindPairsProcessor
         {
             public DestroyCommandBuffer.ParallelWriter dcb;
 
-            public void Execute(FindPairsResult result)
+            public void Execute(in FindPairsResult result)
             {
                 if (Physics.DistanceBetween(result.bodyA.collider, result.bodyA.transform, result.bodyB.collider, result.bodyB.transform, 0f, out ColliderDistanceResult _))
                 {
@@ -58,7 +58,7 @@ namespace Dragons
             CollisionLayerSettings settings = new CollisionLayerSettings
             {
                 worldSubdivisionsPerAxis = new int3(1, 4, 4),
-                worldAABB                = new Aabb(-2000f, 2000f),
+                worldAabb                = new Aabb(-2000f, 2000f),
             };
 
             for (int i = 0; i < 3; i++)

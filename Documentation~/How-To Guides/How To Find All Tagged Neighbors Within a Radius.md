@@ -35,11 +35,11 @@ struct FindNeighborsProcessor : IFindPairsProcessor
 
 It can use `NativeContainers` with and without attributes just like a job. In
 this case, we want write access to the Neighbor buffer. However, writing to a
-`BufferFromEntity` in parallel is not allowed, so we use
-`PhysicsBufferFromEntity` instead.
+`BufferLookup` in parallel is not allowed, so we use `PhysicsBufferLookup`
+instead.
 
 ```csharp
-public PhysicsBufferFromEntity<Neighbor> neighborBfe;
+public PhysicsBufferLookup<Neighbor> neighborLookup;
 ```
 
 Finally, we need to implement the interface’s `Execute` method. FindPairs passes
@@ -62,8 +62,8 @@ Lastly, we can add our neighbors like this:
 
 ```csharp
 {
-    neighborBfe[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
-    neighborBfe[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
+    neighborLookup[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
+    neighborLookup[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
 }
 ```
 
@@ -72,14 +72,14 @@ Overall, our processor looks like this:
 ```csharp
 struct FindNeighborsProcessor : IFindPairsProcessor
 {
-    public PhysicsBufferFromEntity<Neighbor> neighborBfe;
+    public PhysicsBufferLookup<Neighbor> neighborLookup;
 
-    public void Execute(FindPairsResult result)
+    public void Execute(in FindPairsResult result)
     {
-        if (Physics.DistanceBetween(result.bodyA.collider, result.bodyA.transform, result.bodyB.collider, result.bodyB.transform, 0f, out _))
+        if (Physics.DistanceBetween(result.colliderA, result.transformA, result.colliderB, result.transformB, 0f, out _))
         {
-            neighborBfe[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
-            neighborBfe[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
+            neighborLookup[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
+            neighborLookup[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
         }
     }
 }
@@ -170,7 +170,7 @@ The final step is to invoke FindPairs with our custom `FindNeighborsProcessor`.
 ```csharp
 var processor = new FindNeighborsProcessor
 {
-    neighborBfe = GetBufferFromEntity<Neighbor>()
+    neighborLookup = GetBufferLookup<Neighbor>()
 };
 Dependency = Physics.FindPairs(layer, processor).ScheduleParallel(Dependency);
 Dependency = layer.Dispose(Dependency);
@@ -209,7 +209,7 @@ public class FindNeighborsSystem : SystemBase
 
         var processor = new FindNeighborsProcessor
         {
-            neighborBfe = GetBufferFromEntity<Neighbor>()
+            neighborLookup = GetBufferLookup<Neighbor>()
         };
         Dependency = Physics.FindPairs(layer, processor).ScheduleParallel(Dependency);
         Dependency = layer.Dispose(Dependency);
@@ -217,14 +217,14 @@ public class FindNeighborsSystem : SystemBase
 
     struct FindNeighborsProcessor : IFindPairsProcessor
     {
-        public PhysicsBufferFromEntity<Neighbor> neighborBfe;
+        public PhysicsBufferLookup<Neighbor> neighborLookup;
 
-        public void Execute(FindPairsResult result)
+        public void Execute(in FindPairsResult result)
         {
-            if (Physics.DistanceBetween(result.bodyA.collider, result.bodyA.transform, result.bodyB.collider, result.bodyB.transform, 0f, out _))
+            if (Physics.DistanceBetween(result.colliderA, result.transformA, result.colliderB, result.transformB, 0f, out _))
             {
-                neighborBfe[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
-                neighborBfe[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
+                neighborLookup[result.entityA].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityB } });
+                neighborLookup[result.entityB].Add(new Neighbor { prefabEntity = new EntityWith<TheTag> { entity = result.entityA } });
             }
         }
     }

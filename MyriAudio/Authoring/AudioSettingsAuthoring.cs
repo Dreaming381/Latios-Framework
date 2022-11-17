@@ -6,7 +6,7 @@ namespace Latios.Myri.Authoring
 {
     [DisallowMultipleComponent]
     [AddComponentMenu("Latios/Audio (Myri)/Audio Settings")]
-    public class AudioSettingsAuthoring : MonoBehaviour, IConvertGameObjectToEntity
+    public class AudioSettingsAuthoring : MonoBehaviour
     {
         [Tooltip("The number of additional audio frames to generate in case the main thread stalls")]
         public int safetyAudioFrames = 2;
@@ -16,15 +16,18 @@ namespace Latios.Myri.Authoring
         public int lookaheadAudioFrames = 0;
         [Tooltip("If enabled, the audio thread will log when it runs out of samples. It is normal for it to log during initialization.")]
         public bool logWarningIfBuffersAreStarved = false;
+    }
 
-        public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
+    public class AudioSettingsBaker : Baker<AudioSettingsAuthoring>
+    {
+        public override void Bake(AudioSettingsAuthoring authoring)
         {
-            dstManager.AddComponentData(entity, new AudioSettings
+            AddComponent(new AudioSettings
             {
-                safetyAudioFrames             = safetyAudioFrames,
-                audioFramesPerUpdate          = audioFramesPerUpdate,
-                lookaheadAudioFrames          = lookaheadAudioFrames,
-                logWarningIfBuffersAreStarved = logWarningIfBuffersAreStarved
+                safetyAudioFrames             = authoring.safetyAudioFrames,
+                audioFramesPerUpdate          = authoring.audioFramesPerUpdate,
+                lookaheadAudioFrames          = authoring.lookaheadAudioFrames,
+                logWarningIfBuffersAreStarved = authoring.logWarningIfBuffersAreStarved
             });
         }
     }

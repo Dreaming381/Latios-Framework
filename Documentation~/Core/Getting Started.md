@@ -4,6 +4,7 @@
 
 In *Project Settings*, under the *Player* tab, in *Other Settings* and under the
 *Configuration* header, set the *API Compatibility Level* to *.NET Standard*.
+Also, you may need to add the scripting define symbol `ENABLE_TRANSFORM_V1`.
 
 ### Mono
 
@@ -11,8 +12,7 @@ No additional settings required.
 
 ### Il2Cpp
 
-The Latios Framework is only compatible with IL2CPP in 2021.3 LTS. Additionally,
-in the *Build Settings*, set the *IL2CPP Code Generation* to *Faster (smaller)
+In the *Build Settings*, set the *IL2CPP Code Generation* to *Faster (smaller)
 builds*
 
 ## Bootstrap
@@ -20,11 +20,12 @@ builds*
 Latios Framework requires a custom bootstrap to inject its custom features into
 the ECS runtime.
 
-You can create one from one of the two templates using the Project folder’s
-create menu and selecting *Latios-\>Bootstrap*.
+You can create one from one of the templates using the Project folder’s create
+menu and selecting *Latios-\>Bootstrap*.
 
 For beginners, it is recommended to choose the *Standard-Injection Workflow*
-variant, as this matches the default Unity behavior.
+variant, as this matches the default Unity behavior while brining in all Latios
+Framework features.
 
 For those who prefer explicit ordering of systems, you may find the *Explicit
 Workflow* more enticing. This workflow will automatically inject Unity systems,
@@ -44,12 +45,16 @@ After the bootstrap is created, it can be
 -   [LatiosWorld](LatiosWorld%20in%20Detail.md) – a `World` subclass which
     contains the extra data structures and systems required for the framework’s
     features to work
--   [SubSystem](Sub-Systems.md) – a `SystemBase` subclass
--   [SuperSystem](Super%20Systems.md) – a `ComponentSystemGroup` subclass
+-   [LatiosWorldUnmanaged](ISystem%20Support.md) – a struct which provides a
+    subset of the `LatiosWorld` API for Burst-compiled unmanaged systems
+-   [SubSystem](Sub-Systems.md) – a `SystemBase` subclass with Latios Framework
+    API conveniences
+-   [SuperSystem](Super%20Systems.md) – a `ComponentSystemGroup` subclass that
+    supports Latios Framework features
 -   [RootSuperSystem](Super%20Systems.md) – a `SuperSystem` subclass designed to
     be auto-injected into non-Latios `ComponentSystemGroup`s
--   [IManagedComponent](Collection%20and%20Managed%20Struct%20Components.md) – a
-    struct type component that can store reference types
+-   [IManagedStructComponent](Collection%20and%20Managed%20Struct%20Components.md)
+    – a struct type component that can store reference types
 -   [ICollectionComponent](Collection%20and%20Managed%20Struct%20Components.md)
     – a struct type component that can store NativeCollection types and keeps
     associated dependencies
@@ -57,8 +62,8 @@ After the bootstrap is created, it can be
     apply `EntityManager` operations on it
 -   [Rng](Rng%20and%20RngToolkit.md) – a struct with a powerful thread-safe,
     deterministic, fire-and-forget workflow for random number generation
--   [Smart Blobber](Smart%20Blobbers.md) – a specialized
-    `GameObjectConversionSystem` used for generating blob assets
+-   [Smart Blobber](Smart%20Blobbers.md) – a specialized baking API used for
+    generating blob assets
 
 ### Components
 
@@ -83,7 +88,7 @@ After the bootstrap is created, it can be
 
 ## Conventions
 
-### Only one unique instance of a SubSystem
+### Only one unique instance of a System
 
 To understand why it is a bad idea to have multiple instances of the same type
 of system (other than a `SuperSystem`), imagine you have a `PositionClampSystem`

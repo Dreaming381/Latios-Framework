@@ -24,26 +24,27 @@ namespace Latios.Kinemation.Systems
 
         protected override void OnUpdate()
         {
-            var buffers = worldBlackboardEntity.GetCollectionComponent<GpuUploadBuffers>(false, out var jh);
-            jh.Complete();
+            var buffersMapped = worldBlackboardEntity.GetCollectionComponent<GpuUploadBuffersMapped>(false);
+            var buffers       = worldBlackboardEntity.GetManagedStructComponent<GpuUploadBuffers>();
+            CompleteDependency();
 
-            if (!buffers.needsMeshCommitment && !buffers.needsBoneOffsetCommitment)
+            if (!buffersMapped.needsMeshCommitment && !buffersMapped.needsBoneOffsetCommitment)
                 return;
 
-            if (buffers.needsMeshCommitment)
+            if (buffersMapped.needsMeshCommitment)
             {
-                buffers.verticesUploadBuffer.EndWrite<VertexToSkin>(buffers.verticesUploadBufferWriteCount);
-                buffers.verticesUploadMetaBuffer.EndWrite<uint3>(buffers.verticesUploadMetaBufferWriteCount);
-                buffers.weightsUploadBuffer.EndWrite<BoneWeightLinkedList>(buffers.weightsUploadBufferWriteCount);
-                buffers.weightsUploadMetaBuffer.EndWrite<uint3>(buffers.weightsUploadMetaBufferWriteCount);
-                buffers.bindPosesUploadBuffer.EndWrite<float3x4>(buffers.bindPosesUploadBufferWriteCount);
-                buffers.bindPosesUploadMetaBuffer.EndWrite<uint3>(buffers.bindPosesUploadMetaBufferWriteCount);
+                buffers.verticesUploadBuffer.EndWrite<VertexToSkin>(buffersMapped.verticesUploadBufferWriteCount);
+                buffers.verticesUploadMetaBuffer.EndWrite<uint3>(buffersMapped.verticesUploadMetaBufferWriteCount);
+                buffers.weightsUploadBuffer.EndWrite<BoneWeightLinkedList>(buffersMapped.weightsUploadBufferWriteCount);
+                buffers.weightsUploadMetaBuffer.EndWrite<uint3>(buffersMapped.weightsUploadMetaBufferWriteCount);
+                buffers.bindPosesUploadBuffer.EndWrite<float3x4>(buffersMapped.bindPosesUploadBufferWriteCount);
+                buffers.bindPosesUploadMetaBuffer.EndWrite<uint3>(buffersMapped.bindPosesUploadMetaBufferWriteCount);
 
                 m_verticesUploadShader.SetBuffer(0, "_dst",  buffers.verticesBuffer);
                 m_verticesUploadShader.SetBuffer(0, "_src",  buffers.verticesUploadBuffer);
                 m_verticesUploadShader.SetBuffer(0, "_meta", buffers.verticesUploadMetaBuffer);
 
-                for (int dispatchesRemaining = buffers.verticesUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
+                for (int dispatchesRemaining = buffersMapped.verticesUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_verticesUploadShader.SetInt("_startOffset", offset);
@@ -57,7 +58,7 @@ namespace Latios.Kinemation.Systems
                 m_bytesUploadShader.SetBuffer(0, "_meta", buffers.weightsUploadMetaBuffer);
                 m_bytesUploadShader.SetInt("_elementSizeInBytes", 8);
 
-                for (int dispatchesRemaining = buffers.weightsUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
+                for (int dispatchesRemaining = buffersMapped.weightsUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_bytesUploadShader.SetInt("_startOffset", offset);
@@ -70,7 +71,7 @@ namespace Latios.Kinemation.Systems
                 m_matricesUploadShader.SetBuffer(0, "_src",  buffers.bindPosesUploadBuffer);
                 m_matricesUploadShader.SetBuffer(0, "_meta", buffers.bindPosesUploadMetaBuffer);
 
-                for (int dispatchesRemaining = buffers.bindPosesUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
+                for (int dispatchesRemaining = buffersMapped.bindPosesUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_matricesUploadShader.SetInt("_startOffset", offset);
@@ -78,20 +79,20 @@ namespace Latios.Kinemation.Systems
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                 }
-                buffers.needsMeshCommitment = false;
+                buffersMapped.needsMeshCommitment = false;
             }
 
-            if (buffers.needsBoneOffsetCommitment)
+            if (buffersMapped.needsBoneOffsetCommitment)
             {
-                buffers.boneOffsetsUploadBuffer.EndWrite<uint>(buffers.boneOffsetsUploadBufferWriteCount);
-                buffers.boneOffsetsUploadMetaBuffer.EndWrite<uint3>(buffers.boneOffsetsUploadMetaBufferWriteCount);
+                buffers.boneOffsetsUploadBuffer.EndWrite<uint>(buffersMapped.boneOffsetsUploadBufferWriteCount);
+                buffers.boneOffsetsUploadMetaBuffer.EndWrite<uint3>(buffersMapped.boneOffsetsUploadMetaBufferWriteCount);
 
                 m_bytesUploadShader.SetBuffer(0, "_dst",  buffers.boneOffsetsBuffer);
                 m_bytesUploadShader.SetBuffer(0, "_src",  buffers.boneOffsetsUploadBuffer);
                 m_bytesUploadShader.SetBuffer(0, "_meta", buffers.boneOffsetsUploadMetaBuffer);
                 m_bytesUploadShader.SetInt("_elementSizeInBytes", 4);
 
-                for (int dispatchesRemaining = buffers.boneOffsetsUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
+                for (int dispatchesRemaining = buffersMapped.boneOffsetsUploadMetaBufferWriteCount, offset = 0; dispatchesRemaining > 0;)
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_bytesUploadShader.SetInt("_startOffset", offset);
@@ -99,10 +100,10 @@ namespace Latios.Kinemation.Systems
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                 }
-                buffers.needsBoneOffsetCommitment = false;
+                buffersMapped.needsBoneOffsetCommitment = false;
             }
 
-            worldBlackboardEntity.SetCollectionComponentAndDisposeOld(buffers);
+            worldBlackboardEntity.SetCollectionComponentAndDisposeOld(buffersMapped);
         }
     }
 }

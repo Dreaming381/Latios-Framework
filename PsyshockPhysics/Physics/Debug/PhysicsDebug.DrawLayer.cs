@@ -9,6 +9,13 @@ namespace Latios.Psyshock
 {
     public static partial class PhysicsDebug
     {
+        /// <summary>
+        /// Draws the bounding boxes of a CollisionLayer using UnityEngine.Debug.DrawLine calls.
+        /// The boxes are color-coded by the cell they exist in.
+        /// This is the start of a Fluent chain.
+        /// </summary>
+        /// <param name="layer">The collision layer to draw.</param>
+        /// <returns>A context object from which a scheduler should be invoked.</returns>
         public static DrawLayerConfig DrawLayer(CollisionLayer layer)
         {
             var colors                         = new FixedList512Bytes<Color>();
@@ -26,9 +33,9 @@ namespace Latios.Psyshock
 
         public struct DrawLayerConfig
         {
-            internal CollisionLayer      layer;
+            internal CollisionLayer           layer;
             internal FixedList512Bytes<Color> colors;
-            internal Color               crossColor;
+            internal Color                    crossColor;
 
             public DrawLayerConfig WithColors(FixedList512Bytes<Color> colors, Color crossBucketColor)
             {
@@ -37,6 +44,9 @@ namespace Latios.Psyshock
                 return this;
             }
 
+            /// <summary>
+            /// Run immediately without using the job system.
+            /// </summary>
             public void RunImmediate()
             {
                 var job = new DebugDrawLayerJob
@@ -51,6 +61,9 @@ namespace Latios.Psyshock
                 }
             }
 
+            /// <summary>
+            /// Run on the same thread using a Burst job.
+            /// </summary>
             public void Run()
             {
                 new DebugDrawLayerJob
@@ -61,6 +74,11 @@ namespace Latios.Psyshock
                 }.Run(layer.BucketCount);
             }
 
+            /// <summary>
+            /// Schedule a single-threaded job to perform the drawing operations
+            /// </summary>
+            /// <param name="inputDeps">The JobHandle that this job should wait for before executing</param>
+            /// <returns>A job handle associated with the scheduled job</returns>
             public JobHandle ScheduleSingle(JobHandle inputDeps = default)
             {
                 return new DebugDrawLayerJob
@@ -68,9 +86,14 @@ namespace Latios.Psyshock
                     layer      = layer,
                     colors     = colors,
                     crossColor = crossColor
-                }.Schedule(layer.BucketCount, inputDeps);
+                }.Schedule(inputDeps);
             }
 
+            /// <summary>
+            /// Schedule a multi-threaded job to perform the drawing operations
+            /// </summary>
+            /// <param name="inputDeps">The JobHandle that this job should wait for before executing</param>
+            /// <returns>A job handle associated with the scheduled job</returns>
             public JobHandle ScheduleParallel(JobHandle inputDeps = default)
             {
                 return new DebugDrawLayerJob
@@ -78,10 +101,16 @@ namespace Latios.Psyshock
                     layer      = layer,
                     colors     = colors,
                     crossColor = crossColor
-                }.ScheduleParallel(layer.BucketCount, 1, inputDeps);
+                }.Schedule(layer.BucketCount, 1, inputDeps);
             }
         }
 
+        /// <summary>
+        /// Draws overlapping AABBs within the layer using UnityEngine.Debug.DrawLine calls
+        /// This is the start of a Fluent chain.
+        /// </summary>
+        /// <param name="layer">The layer to draw</param>
+        /// <returns>A config object from which a scheduler should be called</returns>
         public static DrawFindPairsConfig DrawFindPairs(CollisionLayer layer)
         {
             return new DrawFindPairsConfig
@@ -94,6 +123,13 @@ namespace Latios.Psyshock
             };
         }
 
+        /// <summary>
+        /// Draws overlapping AABBs between two layers using UnityEngine.Debug.DrawLine calls
+        /// This is the start of a Fluent chain.
+        /// </summary>
+        /// <param name="layerA">The first layer to draw</param>
+        /// <param name="layerB">The second layer to draw</param>
+        /// <returns>A config object from which a scheduler should be called</returns>
         public static DrawFindPairsConfig DrawFindPairs(CollisionLayer layerA, CollisionLayer layerB)
         {
             return new DrawFindPairsConfig
@@ -116,6 +152,13 @@ namespace Latios.Psyshock
             internal bool           drawMisses;
             internal bool           isLayerLayer;
 
+            /// <summary>
+            /// Override the default colors drawn and set whether or not to draw non-overlapping
+            /// </summary>
+            /// <param name="overlapColor">The color for when two AABBs overlap</param>
+            /// <param name="nonOverlapColor">The color for when an AABB does not overlap with anything</param>
+            /// <param name="drawNonOverlapping">If true, AABBs which do not overlap with anything will be drawn using the nonOverlapColor</param>
+            /// <returns>A config object from which a scheduler should be called</returns>
             public DrawFindPairsConfig WithColors(Color overlapColor, Color nonOverlapColor, bool drawNonOverlapping = true)
             {
                 hitColor   = overlapColor;
@@ -124,6 +167,9 @@ namespace Latios.Psyshock
                 return this;
             }
 
+            /// <summary>
+            /// Run immediately without using the job system.
+            /// </summary>
             public void RunImmediate()
             {
                 if (isLayerLayer)
@@ -171,6 +217,9 @@ namespace Latios.Psyshock
                 }
             }
 
+            /// <summary>
+            /// Run on the same thread using Burst jobs
+            /// </summary>
             public void Run()
             {
                 if (isLayerLayer)
@@ -211,6 +260,11 @@ namespace Latios.Psyshock
                 }
             }
 
+            /// <summary>
+            /// Schedule single-threadeds job to perform the drawing operations
+            /// </summary>
+            /// <param name="inputDeps">The JobHandle that these jobs should wait for before executing</param>
+            /// <returns>A job handle associated with the scheduled jobs</returns>
             public JobHandle ScheduleSingle(JobHandle inputDeps = default)
             {
                 if (isLayerLayer)
@@ -227,10 +281,10 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    jh           = job.Schedule(layerA.Count, jh);
+                    jh           = job.Schedule(jh);
                     job.hitArray = hitArrayB;
                     job.layer    = layerB;
-                    jh           = job.Schedule(layerB.Count, jh);
+                    jh           = job.Schedule(jh);
                     jh           = hitArrayA.Dispose(jh);
                     return hitArrayB.Dispose(jh);
                 }
@@ -246,11 +300,16 @@ namespace Latios.Psyshock
                         hitColor   = hitColor,
                         missColor  = missColor,
                         drawMisses = drawMisses
-                    }.Schedule(layerA.Count, jh);
+                    }.Schedule(jh);
                     return hitArray.Dispose(jh);
                 }
             }
 
+            /// <summary>
+            /// Schedule multi-threaded jobs to perform the drawing operations
+            /// </summary>
+            /// <param name="inputDeps">The JobHandle that these jobs should wait for before executing</param>
+            /// <returns>A job handle associated with the scheduled jobs</returns>
             public JobHandle ScheduleParallel(JobHandle inputDeps = default)
             {
                 if (isLayerLayer)
@@ -267,10 +326,10 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    jh           = job.ScheduleParallel(layerA.Count, 64, jh);
+                    jh           = job.Schedule(layerA.Count, 64, jh);
                     job.hitArray = hitArrayB;
                     job.layer    = layerB;
-                    jh           = job.ScheduleParallel(layerB.Count, 64, jh);
+                    jh           = job.Schedule(layerB.Count, 64, jh);
                     jh           = hitArrayA.Dispose(jh);
                     return hitArrayB.Dispose(jh);
                 }
@@ -286,12 +345,17 @@ namespace Latios.Psyshock
                         hitColor   = hitColor,
                         missColor  = missColor,
                         drawMisses = drawMisses
-                    }.ScheduleParallel(layerA.Count, 64, jh);
+                    }.Schedule(layerA.Count, 64, jh);
                     return hitArray.Dispose(jh);
                 }
             }
         }
 
+        /// <summary>
+        /// Draw an AABB wireframe using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="aabb">The AABB to draw</param>
+        /// <param name="color">The color of the wireframe</param>
         public static void DrawAabb(Aabb aabb, Color color)
         {
             float3 leftTopFront     = new float3(aabb.min.x, aabb.max.y, aabb.min.z);
@@ -321,11 +385,17 @@ namespace Latios.Psyshock
 
         #region DrawLayerUtils
         [BurstCompile]
-        private struct DebugDrawLayerJob : IJobFor
+        private struct DebugDrawLayerJob : IJob, IJobParallelFor
         {
             [ReadOnly] public CollisionLayer layer;
-            public FixedList512Bytes<Color>       colors;
+            public FixedList512Bytes<Color>  colors;
             public Color                     crossColor;
+
+            public void Execute()
+            {
+                for (int i = 0; i < layer.BucketCount; i++)
+                    Execute(i);
+            }
 
             public void Execute(int index)
             {
@@ -335,7 +405,7 @@ namespace Latios.Psyshock
                     var   slices = layer.GetBucketSlices(index);
                     for (int i = 0; i < slices.count; i++)
                     {
-                        Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
+                        Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], -slices.yzminmaxs[i].zw));
                         DrawAabb(aabb, color);
                     }
                 }
@@ -345,7 +415,7 @@ namespace Latios.Psyshock
                     var   slices = layer.GetBucketSlices(index);
                     for (int i = 0; i < slices.count; i++)
                     {
-                        Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], slices.yzminmaxs[i].zw));
+                        Aabb aabb = new Aabb(new float3(slices.xmins[i], slices.yzminmaxs[i].xy), new float3(slices.xmaxs[i], -slices.yzminmaxs[i].zw));
                         DrawAabb(aabb, color);
                     }
                 }
@@ -358,10 +428,10 @@ namespace Latios.Psyshock
         {
             public NativeBitArray hitArray;
 
-            public void Execute(FindPairsResult result)
+            public void Execute(in FindPairsResult result)
             {
-                hitArray.Set(result.bodyAIndex, true);
-                hitArray.Set(result.bodyBIndex, true);
+                hitArray.Set(result.indexA, true);
+                hitArray.Set(result.indexB, true);
             }
         }
 
@@ -370,15 +440,15 @@ namespace Latios.Psyshock
             public NativeBitArray hitArrayA;
             public NativeBitArray hitArrayB;
 
-            public void Execute(FindPairsResult result)
+            public void Execute(in FindPairsResult result)
             {
-                hitArrayA.Set(result.bodyAIndex, true);
-                hitArrayB.Set(result.bodyBIndex, true);
+                hitArrayA.Set(result.indexA, true);
+                hitArrayB.Set(result.indexB, true);
             }
         }
 
         [BurstCompile]
-        private struct DebugFindPairsDrawJob : IJobFor
+        private struct DebugFindPairsDrawJob : IJob, IJobParallelFor
         {
             [ReadOnly] public CollisionLayer layer;
             [ReadOnly] public NativeBitArray hitArray;
@@ -386,10 +456,16 @@ namespace Latios.Psyshock
             public Color                     missColor;
             public bool                      drawMisses;
 
+            public void Execute()
+            {
+                for (int i = 0; i < layer.Count; i++)
+                    Execute(i);
+            }
+
             public void Execute(int i)
             {
                 float3 min  = new float3(layer.xmins[i], layer.yzminmaxs[i].xy);
-                float3 max  = new float3(layer.xmaxs[i], layer.yzminmaxs[i].zw);
+                float3 max  = new float3(layer.xmaxs[i], -layer.yzminmaxs[i].zw);
                 var    aabb = new Aabb(min, max);
                 if (hitArray.IsSet(i))
                 {

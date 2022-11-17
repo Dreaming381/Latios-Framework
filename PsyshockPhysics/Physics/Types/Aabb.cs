@@ -3,6 +3,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A Min-Max representation of an Axis-Aligned Bounding Box
+    /// </summary>
     [Serializable]
     public struct Aabb
     {

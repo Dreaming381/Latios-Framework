@@ -3,6 +3,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A sphere defined by a center and a radius
+    /// </summary>
     [Serializable]
     public struct SphereCollider
     {

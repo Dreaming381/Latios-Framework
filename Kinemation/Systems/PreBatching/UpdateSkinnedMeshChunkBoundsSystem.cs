@@ -1,68 +1,85 @@
-using System.Runtime.InteropServices;
 using Latios.Psyshock;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
 
 namespace Latios.Kinemation.Systems
 {
     // This exists because setting the chunk bounds to an extreme value breaks shadows.
     // Instead we calculate the combined chunk bounds for all skeletons and then write them to all skinned mesh chunk bounds.
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class UpdateSkinnedMeshChunkBoundsSystem : SubSystem
+    [BurstCompile]
+    public partial struct UpdateSkinnedMeshChunkBoundsSystem : ISystem
     {
         EntityQuery m_exposedMetaQuery;
         EntityQuery m_optimizedMetaQuery;
         EntityQuery m_skinnedMeshMetaQuery;
 
-        protected override void OnCreate()
+        ComponentTypeHandle<ChunkBoneWorldBounds>     m_chunkBoneWorldBoundsHandle;
+        ComponentTypeHandle<ChunkSkeletonWorldBounds> m_chunkSkeletonWorldBoundsHandle;
+        ComponentTypeHandle<ChunkWorldRenderBounds>   m_chunkWorldRenderBoundsHandle;
+
+        public void OnCreate(ref SystemState state)
         {
-            m_exposedMetaQuery     = Fluent.WithAll<ChunkHeader>(true).WithAll<ChunkBoneWorldBounds>(true).Build();
-            m_optimizedMetaQuery   = Fluent.WithAll<ChunkHeader>(true).WithAll<ChunkSkeletonWorldBounds>(true).Build();
-            m_skinnedMeshMetaQuery = Fluent.WithAll<ChunkHeader>(true).WithAll<ChunkWorldRenderBounds>(false)
+            m_exposedMetaQuery     = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkBoneWorldBounds>(true).Build();
+            m_optimizedMetaQuery   = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkSkeletonWorldBounds>(true).Build();
+            m_skinnedMeshMetaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkWorldRenderBounds>(false)
                                      .WithAny<ChunkComputeDeformMemoryMetadata>(true).WithAny<ChunkLinearBlendSkinningMemoryMetadata>(true).Build();
-        }
 
-        protected override void OnUpdate()
-        {
-            var combinedBounds   = new NativeReference<Aabb>(World.UpdateAllocator.ToAllocator);
-            combinedBounds.Value = new Aabb(float.MaxValue, float.MinValue);
-
-            Dependency = new CombineExposedJob
-            {
-                handle         = GetComponentTypeHandle<ChunkBoneWorldBounds>(true),
-                combinedBounds = combinedBounds
-            }.Schedule(m_exposedMetaQuery, Dependency);
-
-            Dependency = new CombineOptimizedJob
-            {
-                handle         = GetComponentTypeHandle<ChunkSkeletonWorldBounds>(true),
-                combinedBounds = combinedBounds
-            }.Schedule(m_optimizedMetaQuery, Dependency);
-
-            Dependency = new ApplyChunkBoundsToSkinnedMeshesJob
-            {
-                handle         = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
-                combinedBounds = combinedBounds
-            }.Schedule(m_skinnedMeshMetaQuery, Dependency);
+            m_chunkBoneWorldBoundsHandle     = state.GetComponentTypeHandle<ChunkBoneWorldBounds>(true);
+            m_chunkSkeletonWorldBoundsHandle = state.GetComponentTypeHandle<ChunkSkeletonWorldBounds>(true);
+            m_chunkWorldRenderBoundsHandle   = state.GetComponentTypeHandle<ChunkWorldRenderBounds>();
         }
 
         [BurstCompile]
-        struct CombineExposedJob : IJobEntityBatch
+        public void OnUpdate(ref SystemState state)
+        {
+            m_chunkBoneWorldBoundsHandle.Update(ref state);
+            m_chunkSkeletonWorldBoundsHandle.Update(ref state);
+            m_chunkWorldRenderBoundsHandle.Update(ref state);
+
+            var combinedBounds   = new NativeReference<Aabb>(state.WorldUpdateAllocator);
+            combinedBounds.Value = new Aabb(float.MaxValue, float.MinValue);
+
+            state.Dependency = new CombineExposedJob
+            {
+                handle         = m_chunkBoneWorldBoundsHandle,
+                combinedBounds = combinedBounds
+            }.Schedule(m_exposedMetaQuery, state.Dependency);
+
+            state.Dependency = new CombineOptimizedJob
+            {
+                handle         = m_chunkSkeletonWorldBoundsHandle,
+                combinedBounds = combinedBounds
+            }.Schedule(m_optimizedMetaQuery, state.Dependency);
+
+            state.Dependency = new ApplyChunkBoundsToSkinnedMeshesJob
+            {
+                handle         = m_chunkWorldRenderBoundsHandle,
+                combinedBounds = combinedBounds
+            }.Schedule(m_skinnedMeshMetaQuery, state.Dependency);
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state) {
+        }
+
+        [BurstCompile]
+        struct CombineExposedJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<ChunkBoneWorldBounds> handle;
             public NativeReference<Aabb>                                combinedBounds;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 Aabb aabb   = new Aabb(float.MaxValue, float.MinValue);
-                var  bounds = batchInChunk.GetNativeArray(handle);
-                for (int i = 0; i < batchInChunk.Count; i++)
+                var  bounds = chunk.GetNativeArray(handle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var b = bounds[i].chunkBounds;
                     aabb  = Physics.CombineAabb(aabb, new Aabb(b.Min, b.Max));
@@ -72,16 +89,16 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        struct CombineOptimizedJob : IJobEntityBatch
+        struct CombineOptimizedJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<ChunkSkeletonWorldBounds> handle;
             public NativeReference<Aabb>                                    combinedBounds;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 Aabb aabb   = new Aabb(float.MaxValue, float.MinValue);
-                var  bounds = batchInChunk.GetNativeArray(handle);
-                for (int i = 0; i < batchInChunk.Count; i++)
+                var  bounds = chunk.GetNativeArray(handle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var b = bounds[i].chunkBounds;
                     aabb  = Physics.CombineAabb(aabb, new Aabb(b.Min, b.Max));
@@ -91,16 +108,16 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        struct ApplyChunkBoundsToSkinnedMeshesJob : IJobEntityBatch
+        struct ApplyChunkBoundsToSkinnedMeshesJob : IJobChunk
         {
             [ReadOnly] public NativeReference<Aabb>            combinedBounds;
             public ComponentTypeHandle<ChunkWorldRenderBounds> handle;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var aabb   = new ChunkWorldRenderBounds { Value = FromAabb(combinedBounds.Value) };
-                var bounds                                      = batchInChunk.GetNativeArray(handle);
-                for (int i = 0; i < batchInChunk.Count; i++)
+                var bounds                                      = chunk.GetNativeArray(handle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     bounds[i] = aabb;
                 }

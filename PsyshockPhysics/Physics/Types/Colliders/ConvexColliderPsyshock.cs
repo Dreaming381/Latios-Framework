@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -6,10 +7,11 @@ using Unity.Mathematics;
 namespace Latios.Psyshock
 {
     [Serializable]
+    [StructLayout(LayoutKind.Explicit)]
     public struct ConvexCollider
     {
-        public BlobAssetReference<ConvexColliderBlob> convexColliderBlob;
-        public float3                                 scale;
+        [FieldOffset(0)] public BlobAssetReference<ConvexColliderBlob> convexColliderBlob;
+        [FieldOffset(8)] public float3                                 scale;
 
         public ConvexCollider(BlobAssetReference<ConvexColliderBlob> convexColliderBlob) : this(convexColliderBlob, new float3(1f, 1f, 1f)) {
         }

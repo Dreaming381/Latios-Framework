@@ -1,5 +1,6 @@
 using Latios.Psyshock;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -12,6 +13,7 @@ using UnityEngine.Profiling;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     public partial class SkinningDispatchSystem : SubSystem
     {
@@ -30,6 +32,9 @@ namespace Latios.Kinemation.Systems
         int _startOffset;
         int _DeformedMeshData;
         int _SkinMatrices;
+
+        CollectMeshMetadataJob m_collectChunkJob;
+        WriteBuffersJob        m_writeChunkJob;
 
         protected override void OnCreate()
         {
@@ -51,6 +56,31 @@ namespace Latios.Kinemation.Systems
             _startOffset      = UnityEngine.Shader.PropertyToID("_startOffset");
             _DeformedMeshData = UnityEngine.Shader.PropertyToID("_DeformedMeshData");
             _SkinMatrices     = UnityEngine.Shader.PropertyToID("_SkinMatrices");
+
+            m_collectChunkJob = new CollectMeshMetadataJob
+            {
+                entityHandle                         = GetEntityTypeHandle(),
+                skinnedMeshesBufferHandle            = GetBufferTypeHandle<DependentSkinnedMesh>(true),
+                perFrameMetadataHandle               = GetComponentTypeHandle<PerFrameSkeletonBufferMetadata>(true),
+                skeletonCullingMaskHandle            = GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(true),
+                boneReferenceBufferHandle            = GetBufferTypeHandle<BoneReference>(true),
+                optimizedBoneBufferHandle            = GetBufferTypeHandle<OptimizedBoneToRoot>(true),
+                meshPerCameraCullingMaskHandle       = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                meshPerFrameCullingMaskHandle        = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                computeDeformShaderIndexLookup       = GetComponentLookup<ComputeDeformShaderIndex>(true),
+                linearBlendSkinningShaderIndexLookup = GetComponentLookup<LinearBlendSkinningShaderIndex>(true),
+                esiLookup                            = GetEntityStorageInfoLookup(),
+            };
+
+            m_writeChunkJob = new WriteBuffersJob
+            {
+                skinnedMeshesBufferHandle = m_collectChunkJob.skinnedMeshesBufferHandle,
+                boneReferenceBufferHandle = m_collectChunkJob.boneReferenceBufferHandle,
+                optimizedBoneBufferHandle = m_collectChunkJob.optimizedBoneBufferHandle,
+                ltwLookup                 = GetComponentLookup<LocalToWorld>(true),
+                ltwHandle                 = GetComponentTypeHandle<LocalToWorld>(true),
+                perFrameMetadataHandle    = GetComponentTypeHandle<PerFrameSkeletonBufferMetadata>(false),
+            };
         }
 
         protected override void OnUpdate()
@@ -58,51 +88,46 @@ namespace Latios.Kinemation.Systems
             Profiler.BeginSample("Setup gather jobs");
             var skeletonChunkCount = m_skeletonQuery.CalculateChunkCountWithoutFiltering();
 
-            var skinnedMeshesBufferHandle = GetBufferTypeHandle<DependentSkinnedMesh>(true);
-            var boneReferenceBufferHandle = GetBufferTypeHandle<BoneReference>(true);
-            var optimizedBoneBufferHandle = GetBufferTypeHandle<OptimizedBoneToRoot>(true);
+            var meshDataStream = new NativeStream(skeletonChunkCount, WorldUpdateAllocator);
+            var countsArray    = CollectionHelper.CreateNativeArray<CountsElement>(skeletonChunkCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
-            var meshDataStream = new NativeStream(skeletonChunkCount, Allocator.TempJob);
-            var countsArray    = new NativeArray<CountsElement>(skeletonChunkCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var boneMatsBufferList = worldBlackboardEntity.GetManagedStructComponent<BoneMatricesPerFrameBuffersManager>();
 
-            var boneMatsBufferList = worldBlackboardEntity.GetCollectionComponent<BoneMatricesPerFrameBuffersManager>(false, out var boneMatsBufferJH);
-            boneMatsBufferJH.Complete();
+            var skeletonCountsByBufferByBatch = CollectionHelper.CreateNativeArray<int>(skeletonChunkCount * (boneMatsBufferList.boneMatricesBuffers.Count + 1),
+                                                                                        WorldUpdateAllocator,
+                                                                                        NativeArrayOptions.ClearMemory);
 
-            var skeletonCountsByBufferByBatch = new NativeArray<int>(skeletonChunkCount * (boneMatsBufferList.boneMatricesBuffers.Count + 1),
-                                                                     Allocator.TempJob,
-                                                                     NativeArrayOptions.ClearMemory);
+            m_collectChunkJob.entityHandle.Update(this);
+            m_collectChunkJob.skinnedMeshesBufferHandle.Update(this);
+            m_collectChunkJob.perFrameMetadataHandle.Update(this);
+            m_collectChunkJob.skeletonCullingMaskHandle.Update(this);
+            m_collectChunkJob.boneReferenceBufferHandle.Update(this);
+            m_collectChunkJob.optimizedBoneBufferHandle.Update(this);
+            m_collectChunkJob.meshPerCameraCullingMaskHandle.Update(this);
+            m_collectChunkJob.meshPerFrameCullingMaskHandle.Update(this);
+            m_collectChunkJob.computeDeformShaderIndexLookup.Update(this);
+            m_collectChunkJob.linearBlendSkinningShaderIndexLookup.Update(this);
+            m_collectChunkJob.esiLookup.Update(this);
+            m_collectChunkJob.meshDataStream                = meshDataStream.AsWriter();
+            m_collectChunkJob.countsArray                   = countsArray;
+            m_collectChunkJob.skeletonCountsByBufferByBatch = skeletonCountsByBufferByBatch;
+            m_collectChunkJob.bufferId                      = boneMatsBufferList.boneMatricesBuffers.Count;
 
-            Dependency = new CollectMeshMetadataJob
-            {
-                entityHandle                       = GetEntityTypeHandle(),
-                skinnedMeshesBufferHandle          = skinnedMeshesBufferHandle,
-                perFrameMetadataHandle             = GetComponentTypeHandle<PerFrameSkeletonBufferMetadata>(true),
-                skeletonCullingMaskHandle          = GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(true),
-                boneReferenceBufferHandle          = boneReferenceBufferHandle,
-                optimizedBoneBufferHandle          = optimizedBoneBufferHandle,
-                meshPerCameraCullingMaskHandle     = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                meshPerFrameCullingMaskHandle      = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
-                computeDeformShaderIndexCdfe       = GetComponentDataFromEntity<ComputeDeformShaderIndex>(true),
-                linearBlendSkinningShaderIndexCdfe = GetComponentDataFromEntity<LinearBlendSkinningShaderIndex>(true),
-                sife                               = GetStorageInfoFromEntity(),
-                meshDataStream                     = meshDataStream.AsWriter(),
-                countsArray                        = countsArray,
-                skeletonCountsByBufferByBatch      = skeletonCountsByBufferByBatch,
-                bufferId                           = boneMatsBufferList.boneMatricesBuffers.Count
-            }.ScheduleParallel(m_skeletonQuery, Dependency);
+            Dependency = m_collectChunkJob.ScheduleParallelByRef(m_skeletonQuery, Dependency);
 
-            var totalCounts            = new NativeReference<CountsElement>(Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var totalCounts            = new NativeReference<CountsElement>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
             var countsArrayPrefixSumJH = new PrefixSumCountsJob
             {
                 array       = countsArray,
                 finalValues = totalCounts
             }.Schedule(Dependency);
 
-            var totalSkeletonCountsByBuffer =
-                new NativeArray<int>(boneMatsBufferList.boneMatricesBuffers.Count + 1, Allocator.TempJob, NativeArrayOptions.ClearMemory);
-            var skeletonOffsetsByBuffer = new NativeArray<int>(boneMatsBufferList.boneMatricesBuffers.Count + 1,
-                                                               Allocator.TempJob,
-                                                               NativeArrayOptions.UninitializedMemory);
+            var totalSkeletonCountsByBuffer = CollectionHelper.CreateNativeArray<int>(boneMatsBufferList.boneMatricesBuffers.Count + 1,
+                                                                                      WorldUpdateAllocator,
+                                                                                      NativeArrayOptions.ClearMemory);
+            var skeletonOffsetsByBuffer = CollectionHelper.CreateNativeArray<int>(boneMatsBufferList.boneMatricesBuffers.Count + 1,
+                                                                                  WorldUpdateAllocator,
+                                                                                  NativeArrayOptions.UninitializedMemory);
             var skeletonCountsByBufferByBatchPrefixSumJH = new PrefixSumPerBufferIdSkeletonCountsJob
             {
                 counts          = skeletonCountsByBufferByBatch,
@@ -113,22 +138,13 @@ namespace Latios.Kinemation.Systems
 
             JobHandle.ScheduleBatchedJobs();
 
-            var pool = worldBlackboardEntity.GetCollectionComponent<ComputeBufferManager>(false, out var poolJH).pool;
-            poolJH.Complete();
+            var pool = worldBlackboardEntity.GetManagedStructComponent<ComputeBufferManager>().pool;
             Profiler.EndSample();
 
             countsArrayPrefixSumJH.Complete();
             if (totalCounts.Value.skeletonCount == 0)
             {
-                // Cleanup and early exit.
-                var dependencyList = new NativeList<JobHandle>(6, Allocator.Temp);
-                dependencyList.Add(meshDataStream.Dispose(default));
-                dependencyList.Add(countsArray.Dispose(default));
-                dependencyList.Add(skeletonCountsByBufferByBatch.Dispose(skeletonCountsByBufferByBatchPrefixSumJH));
-                dependencyList.Add(totalCounts.Dispose(default));
-                dependencyList.Add(totalSkeletonCountsByBuffer.Dispose(skeletonCountsByBufferByBatchPrefixSumJH));
-                dependencyList.Add(skeletonOffsetsByBuffer.Dispose(skeletonCountsByBufferByBatchPrefixSumJH));
-                Dependency = JobHandle.CombineDependencies(dependencyList);
+                // Early exit.
                 return;
             }
 
@@ -145,26 +161,25 @@ namespace Latios.Kinemation.Systems
             }
             else
             {
-                boneMatsArray = new NativeArray<float3x4>(0, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                boneMatsArray = CollectionHelper.CreateNativeArray<float3x4>(0, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
             }
 
-            Dependency = new WriteBuffersJob
-            {
-                skinnedMeshesBufferHandle     = skinnedMeshesBufferHandle,
-                boneReferenceBufferHandle     = boneReferenceBufferHandle,
-                optimizedBoneBufferHandle     = optimizedBoneBufferHandle,
-                ltwCdfe                       = GetComponentDataFromEntity<LocalToWorld>(true),
-                ltwHandle                     = GetComponentTypeHandle<LocalToWorld>(true),
-                meshDataStream                = meshDataStream.AsReader(),
-                countsArray                   = countsArray,
-                skeletonOffsetsByBuffer       = skeletonOffsetsByBuffer,
-                perFrameMetadataHandle        = GetComponentTypeHandle<PerFrameSkeletonBufferMetadata>(false),
-                skeletonCountsByBufferByBatch = skeletonCountsByBufferByBatch,
-                boneMatsBuffer                = boneMatsArray,
-                metaBuffer                    = skinningMetaArray,
-                skeletonCount                 = totalCounts.Value.skeletonCount,
-                bufferId                      = boneMatsBufferList.boneMatricesBuffers.Count,
-            }.ScheduleParallel(m_skeletonQuery, skeletonCountsByBufferByBatchPrefixSumJH);
+            m_writeChunkJob.skinnedMeshesBufferHandle.Update(this);
+            m_writeChunkJob.boneReferenceBufferHandle.Update(this);
+            m_writeChunkJob.optimizedBoneBufferHandle.Update(this);
+            m_writeChunkJob.ltwLookup.Update(this);
+            m_writeChunkJob.ltwHandle.Update(this);
+            m_writeChunkJob.perFrameMetadataHandle.Update(this);
+            m_writeChunkJob.meshDataStream                = meshDataStream.AsReader();
+            m_writeChunkJob.countsArray                   = countsArray;
+            m_writeChunkJob.skeletonOffsetsByBuffer       = skeletonOffsetsByBuffer;
+            m_writeChunkJob.skeletonCountsByBufferByBatch = skeletonCountsByBufferByBatch;
+            m_writeChunkJob.boneMatsBuffer                = boneMatsArray;
+            m_writeChunkJob.metaBuffer                    = skinningMetaArray;
+            m_writeChunkJob.skeletonCount                 = totalCounts.Value.skeletonCount;
+            m_writeChunkJob.bufferId                      = boneMatsBufferList.boneMatricesBuffers.Count;
+
+            Dependency = m_writeChunkJob.ScheduleParallelByRef(m_skeletonQuery, skeletonCountsByBufferByBatchPrefixSumJH);
 
             JobHandle.ScheduleBatchedJobs();
 
@@ -173,22 +188,13 @@ namespace Latios.Kinemation.Systems
             var deformBuffer              = pool.GetDeformBuffer(verticesRequired);
             int matricesRequired          = worldBlackboardEntity.GetComponentData<MaxRequiredLinearBlendMatrices>().matricesCount;
             var linearBlendSkinningBuffer = pool.GetLbsMatsBuffer(matricesRequired);
-            var gpuUploadbuffers          = worldBlackboardEntity.GetCollectionComponent<GpuUploadBuffers>(false, out var gpuUploadBuffersJH);
+            var gpuUploadbuffers          = worldBlackboardEntity.GetManagedStructComponent<GpuUploadBuffers>();
 
-            var disposeDependencies = new NativeList<JobHandle>(Allocator.Temp);
-            disposeDependencies.Add(meshDataStream.Dispose(Dependency));
-            disposeDependencies.Add(countsArray.Dispose(Dependency));
-            disposeDependencies.Add(skeletonCountsByBufferByBatch.Dispose(Dependency));
-            if (boneMatsBuffer == null)
-            {
-                disposeDependencies.Add(boneMatsArray.Dispose(Dependency));
-            }
-            else
+            if (boneMatsBuffer != null)
             {
                 boneMatsBufferList.boneMatricesBuffers.Add(boneMatsBuffer);
             }
 
-            gpuUploadBuffersJH.Complete();
             m_batchSkinningShader.SetBuffer(0, _dstMats,     linearBlendSkinningBuffer);
             m_batchSkinningShader.SetBuffer(0, _dstVertices, deformBuffer);
             m_batchSkinningShader.SetBuffer(0, _srcVertices, gpuUploadbuffers.verticesBuffer);
@@ -199,11 +205,9 @@ namespace Latios.Kinemation.Systems
 
             int boneMatsWriteCount     = totalCounts.Value.boneCount;
             int skinningMetaWriteCount = totalCounts.Value.meshCount * 2 + totalCounts.Value.skeletonCount;
-            totalCounts.Dispose();
             Profiler.EndSample();
 
             // Alright. It is go time!
-            gpuUploadBuffersJH.Complete();
             CompleteDependency();
 
             //foreach (var metaVal in skinningMetaArray)
@@ -227,17 +231,10 @@ namespace Latios.Kinemation.Systems
                     m_batchSkinningShader.Dispatch(0, dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
-                    //UnityEngine.Debug.Log($"Dispatching skinning dispatchCount: {dispatchCount}");
                 }
             }
             UnityEngine.Shader.SetGlobalBuffer(_DeformedMeshData, deformBuffer);
             UnityEngine.Shader.SetGlobalBuffer(_SkinMatrices,     linearBlendSkinningBuffer);
-            Profiler.EndSample();
-
-            Profiler.BeginSample("Cleanup");
-            disposeDependencies.Add(totalSkeletonCountsByBuffer.Dispose(default));
-            disposeDependencies.Add(skeletonOffsetsByBuffer.Dispose(default));
-            Dependency = JobHandle.CombineDependencies(disposeDependencies);
             Profiler.EndSample();
         }
 
@@ -267,7 +264,7 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        struct CollectMeshMetadataJob : IJobEntityBatch
+        struct CollectMeshMetadataJob : IJobChunk
         {
             [ReadOnly] public EntityTypeHandle                                       entityHandle;
             [ReadOnly] public BufferTypeHandle<DependentSkinnedMesh>                 skinnedMeshesBufferHandle;
@@ -277,11 +274,11 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public BufferTypeHandle<BoneReference>       boneReferenceBufferHandle;
             [ReadOnly] public BufferTypeHandle<OptimizedBoneToRoot> optimizedBoneBufferHandle;
 
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>          meshPerCameraCullingMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>           meshPerFrameCullingMaskHandle;
-            [ReadOnly] public ComponentDataFromEntity<ComputeDeformShaderIndex>       computeDeformShaderIndexCdfe;
-            [ReadOnly] public ComponentDataFromEntity<LinearBlendSkinningShaderIndex> linearBlendSkinningShaderIndexCdfe;
-            [ReadOnly] public StorageInfoFromEntity                                   sife;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>  meshPerCameraCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>   meshPerFrameCullingMaskHandle;
+            [ReadOnly] public ComponentLookup<ComputeDeformShaderIndex>       computeDeformShaderIndexLookup;
+            [ReadOnly] public ComponentLookup<LinearBlendSkinningShaderIndex> linearBlendSkinningShaderIndexLookup;
+            [ReadOnly] public EntityStorageInfoLookup                         esiLookup;
 
             [NativeDisableParallelForRestriction] public NativeStream.Writer        meshDataStream;
             [NativeDisableParallelForRestriction] public NativeArray<CountsElement> countsArray;
@@ -289,25 +286,25 @@ namespace Latios.Kinemation.Systems
 
             public int bufferId;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                meshDataStream.BeginForEachIndex(batchIndex);
+                meshDataStream.BeginForEachIndex(unfilteredChunkIndex);
                 int boneCount     = 0;
                 int skeletonCount = 0;
                 int meshCount     = 0;
 
                 int stride                 = bufferId + 1;
-                var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * batchIndex, stride);
-                if (batchInChunk.Has(boneReferenceBufferHandle))
+                var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * unfilteredChunkIndex, stride);
+                if (chunk.Has(boneReferenceBufferHandle))
                 {
-                    ProcessExposed(batchInChunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
+                    ProcessExposed(chunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
                 }
-                else if (batchInChunk.Has(optimizedBoneBufferHandle))
+                else if (chunk.Has(optimizedBoneBufferHandle))
                 {
-                    ProcessOptimized(batchInChunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
+                    ProcessOptimized(chunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
                 }
 
-                countsArray[batchIndex] = new CountsElement
+                countsArray[unfilteredChunkIndex] = new CountsElement
                 {
                     boneCount     = boneCount,
                     skeletonCount = skeletonCount,
@@ -393,7 +390,7 @@ namespace Latios.Kinemation.Systems
                         continue;
                     }
 
-                    var  storageInfo = sife[meshEntity];
+                    var  storageInfo = esiLookup[meshEntity];
                     var  cameraMask  = storageInfo.Chunk.GetChunkComponentData(meshPerCameraCullingMaskHandle);
                     var  frameMask   = storageInfo.Chunk.GetChunkComponentData(meshPerFrameCullingMaskHandle);
                     bool isNewMesh   = false;
@@ -417,13 +414,13 @@ namespace Latios.Kinemation.Systems
                             header->meshCount            = 0;
                         }
 
-                        bool hasComputeDeform = computeDeformShaderIndexCdfe.HasComponent(meshEntity);
-                        bool hasLinearBlend   = linearBlendSkinningShaderIndexCdfe.HasComponent(meshEntity);
+                        bool hasComputeDeform = computeDeformShaderIndexLookup.HasComponent(meshEntity);
+                        bool hasLinearBlend   = linearBlendSkinningShaderIndexLookup.HasComponent(meshEntity);
 
                         meshDataStream.Write(new MeshDataStreamElement
                         {
-                            computeDeformShaderIndex = hasComputeDeform ? computeDeformShaderIndexCdfe[meshEntity].firstVertexIndex : 0,
-                            linearBlendShaderIndex   = hasLinearBlend ? linearBlendSkinningShaderIndexCdfe[meshEntity].firstMatrixIndex : 0,
+                            computeDeformShaderIndex = hasComputeDeform ? computeDeformShaderIndexLookup[meshEntity].firstVertexIndex : 0,
+                            linearBlendShaderIndex   = hasLinearBlend ? linearBlendSkinningShaderIndexLookup[meshEntity].firstMatrixIndex : 0,
                             indexInDependentBuffer   = i,
                             operationsCode           = math.select(0, MeshDataStreamElement.linearBlendOpCode, hasLinearBlend) +
                                                        math.select(0, MeshDataStreamElement.computeSkinningFromSrcOpCode, hasComputeDeform)
@@ -491,15 +488,15 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        struct WriteBuffersJob : IJobEntityBatch
+        struct WriteBuffersJob : IJobChunk
         {
             [ReadOnly] public BufferTypeHandle<DependentSkinnedMesh> skinnedMeshesBufferHandle;
 
             [ReadOnly] public BufferTypeHandle<BoneReference>       boneReferenceBufferHandle;
             [ReadOnly] public BufferTypeHandle<OptimizedBoneToRoot> optimizedBoneBufferHandle;
 
-            [ReadOnly] public ComponentDataFromEntity<LocalToWorld> ltwCdfe;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>     ltwHandle;
+            [ReadOnly] public ComponentLookup<LocalToWorld>     ltwLookup;
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld> ltwHandle;
 
             [ReadOnly] public NativeStream.Reader        meshDataStream;
             [ReadOnly] public NativeArray<CountsElement> countsArray;
@@ -515,26 +512,26 @@ namespace Latios.Kinemation.Systems
             public int skeletonCount;
             public int bufferId;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                int count = meshDataStream.BeginForEachIndex(batchIndex);
+                int count = meshDataStream.BeginForEachIndex(unfilteredChunkIndex);
                 if (count == 0)
                 {
                     meshDataStream.EndForEachIndex();
                     return;
                 }
 
-                var countsElement          = countsArray[batchIndex];
+                var countsElement          = countsArray[unfilteredChunkIndex];
                 int stride                 = bufferId + 1;
-                var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * batchIndex, stride);
+                var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * unfilteredChunkIndex, stride);
 
-                if (batchInChunk.Has(boneReferenceBufferHandle))
+                if (chunk.Has(boneReferenceBufferHandle))
                 {
-                    ProcessExposed(batchInChunk, countsElement, count, skeletonCountsByBuffer);
+                    ProcessExposed(chunk, countsElement, count, skeletonCountsByBuffer);
                 }
-                else if (batchInChunk.Has(optimizedBoneBufferHandle))
+                else if (chunk.Has(optimizedBoneBufferHandle))
                 {
-                    ProcessOptimized(batchInChunk, countsElement, count, skeletonCountsByBuffer);
+                    ProcessOptimized(chunk, countsElement, count, skeletonCountsByBuffer);
                 }
 
                 meshDataStream.EndForEachIndex();
@@ -576,7 +573,7 @@ namespace Latios.Kinemation.Systems
                         for (int i = 0; i < bones.Length; i++)
                         {
                             var entity                     = bones[i].bone;
-                            var boneToWorld                = ltwCdfe[entity].Value;
+                            var boneToWorld                = ltwLookup[entity].Value;
                             var boneToRoot                 = math.mul(worldToRoot, boneToWorld);
                             boneMatsBuffer[boneOffset + i] = Shrink(boneToRoot);
                         }

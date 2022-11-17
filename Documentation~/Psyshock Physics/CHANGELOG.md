@@ -6,6 +6,76 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] – 2022-11-16
+
+Officially supports Entities [1.0.0 experimental]
+
+### Added
+
+-   *New Feature:* Added `Physics.FindObjects()` which allows for querying a
+    single `Aabb` against a `CollisionLayer` in less than O(n)
+-   *New Feature:* Added `Physics.Raycast()`, `Physics.ColliderCast()`, and
+    `Physics.DistanceBetween()` overloads as well as `Any` counterparts which
+    all perform queries against a `CollisionLayer`.
+-   Added `CompoundColliderBlob` Smart Blobber
+-   Added support for multiple `Collider` authoring components to be attached to
+    a Game Object, and such components will be baked into a `CompoundCollider`
+-   Added `PhysicsDebug.LogBucketCountsForLayer()` for tuning the distribution
+    of cells via `CollisionLayerSettings`
+-   Added `BuildCollisionLayerTypeHandles` which can cache the type handles used
+    for building a `CollisionLayer` inside `OnCreate()` and later used in
+    `OnUpdate()` in an `ISystem`
+-   Added `AabbFrom()` overload which accepts a Ray
+-   Added `AabbFrom()` overloads which compute bounds around a casted collider
+-   Added layer, collider, AABB, and transform properties to `FindPairsResult`
+-   Added `WithCrossCache()` extension to FindPairs fluent chain which finds
+    more pairs in parallel, but performs extra write and read operations to
+    dispatch them safely
+-   Added `Raycast()` overloads which accept `start` and `end` arguments instead
+    of a `Ray` argument
+-   Added `PhysicsComponentLookup.TryGetComponent()`
+
+### Changed
+
+-   **Breaking:** `IFindPairsProcessor` now requires the `Execute()` method pass
+    the `FindPairsResult` as an `in` parameter
+-   **Breaking:** Authoring has been completely rewritten to use baking workflow
+-   **Breaking:**
+    `PsyshockConversionBootstrap.InstallLegacyColliderConversion()` has been
+    replaced with `PsyshockBakingBootstrap.InstallLegacyColliderBakers()`
+-   **Breaking:** Renamed `CollisionLayerSettings.worldAABB` to
+    `CollisionLayerSettings.worldAabb`
+-   **Breaking:** Renamed `PhysicsComponentDataFromEntity` to
+    `PhysicsComponentLookup` and `PhysicsBufferFromEntity` to
+    `PhysicsBufferLookup`
+-   `Aabb`s with `NaN` values are now stored in a dedicated `NaN` bucket inside
+    a `CollisionLayer`
+-   `Physics.FindPairs()` now returns a different config object type depending
+    on which overload is used, reducing the number of Jobs Burst will compile by
+    half
+-   `FindPairsResult` uses properties instead of fields for all data
+-   Baking will now skip authoring colliders which are disabled
+
+### Fixed
+
+-   `Physics.ScaleCollider()` overload that takes a `Collider` will now dispatch
+    Triangle and Convex colliders
+
+### Improved
+
+-   The Collider type’s internal structure was reworked to improve cache loading
+    performance
+-   Many methods now accept `in` parameters which can improve performance in
+    some situations.
+-   `BuildCollisionLayer` and other Psyshock API now support custom allocators
+
+### Removed
+
+-   Removed `DontConvertColliderTag`
+-   Removed extension methods for `SystemBase` for retrieving a
+    `PhysicsComponentDataFromEntity`, as the implicit operator is sufficient for
+    all use cases
+
 ## [0.5.7] – 2022-8-28
 
 Officially supports Entities [0.51.1]

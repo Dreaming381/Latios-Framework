@@ -79,24 +79,28 @@ Currently, the `LatiosInitializationSystemGroup` orders itself as follows:
 
 ## LatiosWorld Creation in Detail
 
-When a `LatiosWorld` is created, it first creates instances of
+When a `LatiosWorld` is created, it first scans the list of unmanaged systems
+and generates generic classes for `ISystemShouldUpdate` and `ISystemNewScene`.
+It also injects generic types used by the reactive systems which track
+collection and managed struct components into the `TypeManager` so that Unity’s
+ECS recognizes them, assuming they haven’t been injected already.
+
+Second, it creates a `LatiosWorldUnmanagedSystem`, which is an unmanaged system
+that does not update but rather governs the lifecycle of the
+`LatiosWorldUnmanagedImpl`. The impl creates instances of
 `ManagedStructComponentStorage` and `CollectionComponentStorage`. As their names
 imply, these objects store the collection components and managed struct
 components that can be attached to entities. `CollectionComponentStorage` also
-stores the `JobHandle`s and allocation flags with each collection component.
+stores the `JobHandle`s with each collection component.
+`ManagedStructComponentStorage` is lazily initialized to ensure it is
+initialized in a non-Burst-compiled context. `CollectionComponentStorage` can be
+initialized fully within Burst.
 
-Second, it scans the list of unmanaged systems and generates generic classes for
-`ISystemShouldUpdate` and `ISystemNewScene`. It also creates an unmanaged system
-providing access to the blackboard entities from a Burst `ISystem`.
+Third, it creates `worldBlackboardEntity`.
 
-Third, it creates a cache of the collection component dependencies pending
-update of an executing `SubSystem.Dependency`’s final value.
-
-Fourth, it injects generic types used by the reactive systems which track
-collection and managed struct components into the `TypeManager` so that Unity’s
-ECS recognizes them.
-
-Fifth, it creates `worldBlackboardEntity`.
+Fourth, it creates a cache of the collection component dependencies pending
+update of an executing `SystemState.Dependency`’s final value. The cache is
+stored in the impl.
 
 Finally, it creates the `LatiosInitializationSystemGroup`, the
 `LatiosSimulationSystemGroup`, and the `LatiosPresentationSystemGroup` which are
@@ -114,3 +118,7 @@ which tells `SuperSystem`s if they should enable system sorting by default. This
 is used by the bootstrap templates to set the appropriate workflow. However, a
 `SuperSystem` may override this setting for itself in `CreateSystems()` by
 setting the `EnableSystemSorting` flag.
+
+And lastly, The `LatiosWorld` contains a public `zeroToleranceForExceptions`
+flag which will automatically stop all system execution when an exception is
+caught by one of the Latios Framework system dispatchers.

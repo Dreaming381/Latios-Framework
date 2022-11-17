@@ -3,268 +3,444 @@ using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
+using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
 namespace Latios.Myri.Authoring
 {
-    public struct AudioClipBakeData
+    public static class AudioClipBlobberAPIExtensions
+    {
+        /// <summary>
+        /// Requests the creation of a AudioClipBlob Blob Asset
+        /// </summary>
+        /// <param name="clip">The audio clip to bake</param>
+        /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
+        public static SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker, AudioClip clip, int numVoices = 0)
+        {
+            return baker.RequestCreateBlobAsset<AudioClipBlob, AudioClipBakeData>(new AudioClipBakeData { clip = clip, numVoices = numVoices });
+        }
+    }
+
+    public struct AudioClipBakeData : ISmartBlobberRequestFilter<AudioClipBlob>
     {
         public AudioClip clip;
         public int       numVoices;
+
+        public AudioClipBakeData(AudioClip clip, int numVoices)
+        {
+            this.clip      = clip;
+            this.numVoices = numVoices;
+        }
+
+        public bool Filter(IBaker baker, Entity blobBakingEntity)
+        {
+            if (clip == null)
+                return false;
+
+            baker.DependsOn(clip);
+            if (clip.samples == 0)
+                return false;
+            if (clip.channels > 2)
+            {
+                Debug.LogError($"Myri failed to bake clip {clip.name}. Only mono and stereo clips are supported.");
+                return false;
+            }
+            baker.AddComponent(blobBakingEntity, new AudioClipBlobBakeData { clip = clip, numVoices = numVoices });
+            return true;
+        }
     }
 
-    public static class AudioClipBlobberAPIExtensions
+    [TemporaryBakingType]
+    internal struct AudioClipBlobBakeData : IComponentData
     {
-        public static SmartBlobberHandle<AudioClipBlob> CreateBlob(this GameObjectConversionSystem conversionSystem,
-                                                                   GameObject gameObject,
-                                                                   AudioClipBakeData bakeData)
-        {
-            return conversionSystem.World.GetExistingSystem<Systems.AudioClipSmartBlobberSystem>().AddToConvert(gameObject, bakeData);
-        }
-
-        public static SmartBlobberHandleUntyped CreateBlobUntyped(this GameObjectConversionSystem conversionSystem,
-                                                                  GameObject gameObject,
-                                                                  AudioClipBakeData bakeData)
-        {
-            return conversionSystem.World.GetExistingSystem<Systems.AudioClipSmartBlobberSystem>().AddToConvertUntyped(gameObject, bakeData);
-        }
+        public UnityObjectRef<AudioClip> clip;
+        public int                       numVoices;
     }
 }
 
 namespace Latios.Myri.Authoring.Systems
 {
-    [ConverterVersion("Latios", 4)]
-    public sealed class AudioClipSmartBlobberSystem : SmartBlobberConversionSystem<AudioClipBlob, AudioClipBakeData, AudioClipConverter, AudioClipContext>
+    [RequireMatchingQueriesForUpdate]
+    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
+    [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
+    public unsafe sealed partial class AudioClipSmartBlobberSystem : SystemBase
     {
-        struct AuthoringHandlePair
+        EntityQuery m_query;
+
+        struct UniqueItem
         {
-            public AudioSourceAuthoring              authoring;
-            public SmartBlobberHandle<AudioClipBlob> blobHandle;
+            public AudioClipBlobBakeData             bakeData;
+            public BlobAssetReference<AudioClipBlob> blob;
         }
 
-        List<AuthoringHandlePair> m_sourceList = new List<AuthoringHandlePair>();
-
-        protected override void GatherInputs()
+        protected override void OnCreate()
         {
-            m_sourceList.Clear();
-            Entities.ForEach((AudioSourceAuthoring authoring) =>
+            new SmartBlobberTools<AudioClipBlob>().Register(World);
+        }
+
+        protected override void OnUpdate()
+        {
+            int count = m_query.CalculateEntityCountWithoutFiltering();
+
+            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, Allocator.TempJob);
+            var mapWriter = hashmap.AsParallelWriter();
+
+            Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in AudioClipBlobBakeData data) =>
             {
-                var pair = new AuthoringHandlePair { authoring = authoring };
-                if (authoring.clip != null)
+                mapWriter.TryAdd(data.clip.GetInstanceID(), new UniqueItem { bakeData = data });
+            }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
+
+            var clips    = new NativeList<UnityObjectRef<AudioClip> >(Allocator.TempJob);
+            var builders = new NativeList<AudioClipBuilder>(Allocator.TempJob);
+
+            Job.WithCode(() =>
+            {
+                int count = hashmap.Count();
+                if (count == 0)
+                    return;
+
+                clips.ResizeUninitialized(count);
+                builders.ResizeUninitialized(count);
+
+                int i = 0;
+                foreach (var pair in hashmap)
                 {
-                    pair.blobHandle = AddToConvert(authoring.gameObject, new AudioClipBakeData { clip = authoring.clip, numVoices = authoring.voices });
+                    clips[i]    = pair.Value.bakeData.clip;
+                    builders[i] = new AudioClipBuilder { numVoices = pair.Value.bakeData.numVoices };
                 }
-                m_sourceList.Add(pair);
-            });
+            }).Schedule();
+
+            CompleteDependency();
+
+            for (int i = 0; i < clips.Length; i++)
+            {
+                var clip           = clips[i].Value;
+                var builder        = builders[i];
+                builder.isStereo   = clip.channels == 2;
+                builder.name       = clip.name;
+                builder.sampleRate = clip.frequency;
+                ReadClip(clip, ref builder.samples);
+                builders[i] = builder;
+            }
+
+            Dependency = new BuildBlobsJob
+            {
+                builders = builders.AsArray()
+            }.ScheduleParallel(builders.Length, 1, Dependency);
+
+            Job.WithCode(() =>
+            {
+                for (int i = 0; i < clips.Length; i++)
+                {
+                    var element                       = hashmap[clips[i].GetInstanceID()];
+                    element.blob                      = builders[i].result;
+                    hashmap[clips[i].GetInstanceID()] = element;
+                }
+            }).Schedule();
+
+            Entities.ForEach((ref SmartBlobberResult result, in AudioClipBlobBakeData data) =>
+            {
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.clip.GetInstanceID()].blob);
+            }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
+
+            Dependency = hashmap.Dispose(Dependency);
+            Dependency = clips.Dispose(Dependency);
+            Dependency = builders.Dispose(Dependency);
         }
 
-        protected override void FinalizeOutputs()
-        {
-            foreach (var pair in m_sourceList)
-            {
-                var authoring = pair.authoring;
-                var blob      = pair.blobHandle.IsValid ? pair.blobHandle.Resolve() : default;
+        #region Cache
+        float[] m_cache1;
+        float[] m_cache4;
+        float[] m_cache16;
+        float[] m_cache64;
+        float[] m_cache256;
+        float[] m_cache1024;
+        float[] m_cache4096;
+        float[] m_cache16384;
+        float[] m_cache65536;
 
-                var entity = GetPrimaryEntity(authoring);
-                if (!authoring.looping)
+        void* m_cache1Ptr;
+        void* m_cache4Ptr;
+        void* m_cache16Ptr;
+        void* m_cache64Ptr;
+        void* m_cache256Ptr;
+        void* m_cache1024Ptr;
+        void* m_cache4096Ptr;
+        void* m_cache16384Ptr;
+        void* m_cache65536Ptr;
+
+        ulong m_cache1Handle;
+        ulong m_cache4Handle;
+        ulong m_cache16Handle;
+        ulong m_cache64Handle;
+        ulong m_cache256Handle;
+        ulong m_cache1024Handle;
+        ulong m_cache4096Handle;
+        ulong m_cache16384Handle;
+        ulong m_cache65536Handle;
+        #endregion
+
+        void ReadClip(AudioClip clip, ref UnsafeList<float> samples)
+        {
+            int sampleCount = clip.samples * clip.channels;
+            samples         = new UnsafeList<float>(sampleCount, Allocator.TempJob);
+            //samples.Resize(sampleCount, NativeArrayOptions.UninitializedMemory);
+
+            int sampleCountRemaining     = sampleCount;
+            int mergedSamplesAccumulated = 0;
+
+            if (sampleCountRemaining / 65536 > 0)
+            {
+                if (m_cache65536 == null)
                 {
-                    DstEntityManager.AddComponentData(entity, new AudioSourceOneShot
+                    m_cache65536    = new float[65536];
+                    m_cache65536Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache65536, out m_cache65536Handle);
+                }
+
+                int stride = 65536 / clip.channels;
+
+                while (sampleCountRemaining / 65536 > 0)
+                {
+                    clip.GetData(m_cache65536, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache65536Ptr, 65536);
+                    sampleCountRemaining     -= 65536;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 16384 > 0)
+            {
+                if (m_cache16384 == null)
+                {
+                    m_cache16384    = new float[16384];
+                    m_cache16384Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache16384, out m_cache16384Handle);
+                }
+
+                int stride = 16384 / clip.channels;
+
+                while (sampleCountRemaining / 16384 > 0)
+                {
+                    clip.GetData(m_cache16384, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache16384Ptr, 16384);
+                    sampleCountRemaining     -= 16384;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 4096 > 0)
+            {
+                if (m_cache4096 == null)
+                {
+                    m_cache4096    = new float[4096];
+                    m_cache4096Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache4096, out m_cache4096Handle);
+                }
+
+                int stride = 4096 / clip.channels;
+
+                while (sampleCountRemaining / 4096 > 0)
+                {
+                    clip.GetData(m_cache4096, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache4096Ptr, 4096);
+                    sampleCountRemaining     -= 4096;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 1024 > 0)
+            {
+                if (m_cache1024 == null)
+                {
+                    m_cache1024    = new float[1024];
+                    m_cache1024Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache1024, out m_cache1024Handle);
+                }
+
+                int stride = 1024 / clip.channels;
+
+                while (sampleCountRemaining / 1024 > 0)
+                {
+                    clip.GetData(m_cache1024, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache1024Ptr, 1024);
+                    sampleCountRemaining     -= 1024;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 256 > 0)
+            {
+                if (m_cache256 == null)
+                {
+                    m_cache256    = new float[256];
+                    m_cache256Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache256, out m_cache256Handle);
+                }
+
+                int stride = 256 / clip.channels;
+
+                while (sampleCountRemaining / 256 > 0)
+                {
+                    clip.GetData(m_cache256, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache256Ptr, 256);
+                    sampleCountRemaining     -= 256;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 64 > 0)
+            {
+                if (m_cache64 == null)
+                {
+                    m_cache64    = new float[64];
+                    m_cache64Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache64, out m_cache64Handle);
+                }
+
+                int stride = 64 / clip.channels;
+
+                while (sampleCountRemaining / 64 > 0)
+                {
+                    clip.GetData(m_cache64, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache64Ptr, 64);
+                    sampleCountRemaining     -= 64;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 16 > 0)
+            {
+                if (m_cache16 == null)
+                {
+                    m_cache16    = new float[16];
+                    m_cache16Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache16, out m_cache16Handle);
+                }
+
+                int stride = 16 / clip.channels;
+
+                while (sampleCountRemaining / 16 > 0)
+                {
+                    clip.GetData(m_cache16, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache16Ptr, 16);
+                    sampleCountRemaining     -= 16;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 4 > 0)
+            {
+                if (m_cache4 == null)
+                {
+                    m_cache4    = new float[4];
+                    m_cache4Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache4, out m_cache4Handle);
+                }
+
+                int stride = 4 / clip.channels;
+
+                while (sampleCountRemaining / 4 > 0)
+                {
+                    clip.GetData(m_cache4, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache4Ptr, 4);
+                    sampleCountRemaining     -= 4;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+            if (sampleCountRemaining / 1 > 0)
+            {
+                if (m_cache1 == null)
+                {
+                    m_cache1    = new float[1];
+                    m_cache1Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache1, out m_cache1Handle);
+                }
+
+                int stride = 1 / clip.channels;
+
+                while (sampleCountRemaining / 1 > 0)
+                {
+                    clip.GetData(m_cache1, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache1Ptr, 1);
+                    sampleCountRemaining     -= 1;
+                    mergedSamplesAccumulated += stride;
+                }
+            }
+        }
+
+        protected override void OnDestroy()
+        {
+            if (m_cache1Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache1Handle);
+            if (m_cache4Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache4Handle);
+            if (m_cache16Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache16Handle);
+            if (m_cache64Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache64Handle);
+            if (m_cache256Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache256Handle);
+            if (m_cache1024Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache1024Handle);
+            if (m_cache4096Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache4096Handle);
+            if (m_cache16384Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache16384Handle);
+            if (m_cache65536Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache65536Handle);
+        }
+
+        struct AudioClipBuilder
+        {
+            public UnsafeList<float>                 samples;
+            public int                               sampleRate;
+            public int                               numVoices;
+            public FixedString128Bytes               name;
+            public bool                              isStereo;
+            public BlobAssetReference<AudioClipBlob> result;
+
+            public void BuildBlob()
+            {
+                var     builder  = new BlobBuilder(Allocator.Temp);
+                ref var root     = ref builder.ConstructRoot<AudioClipBlob>();
+                var     blobLeft = builder.Allocate(ref root.samplesLeftOrMono, samples.Length / math.select(1, 2, isStereo));
+                if (isStereo)
+                {
+                    var blobRight = builder.Allocate(ref root.samplesRight, samples.Length / 2);
+                    for (int i = 0; i < samples.Length; i++)
                     {
-                        clip            = blob,
-                        innerRange      = authoring.innerRange,
-                        outerRange      = authoring.outerRange,
-                        rangeFadeMargin = authoring.rangeFadeMargin,
-                        volume          = authoring.volume
-                    });
-                    if (authoring.autoDestroyOnFinish)
-                    {
-                        DstEntityManager.AddComponent<AudioSourceDestroyOneShotWhenFinished>(entity);
+                        blobLeft[i / 2] = samples[i];
+                        i++;
+                        blobRight[i / 2] = samples[i];
                     }
                 }
                 else
                 {
-                    DstEntityManager.AddComponentData(entity, new AudioSourceLooped
+                    var blobRight = builder.Allocate(ref root.samplesRight, 1);
+                    blobRight[0]  = 0f;
+                    for (int i = 0; i < samples.Length; i++)
                     {
-                        m_clip               = blob,
-                        innerRange           = authoring.innerRange,
-                        outerRange           = authoring.outerRange,
-                        rangeFadeMargin      = authoring.rangeFadeMargin,
-                        volume               = authoring.volume,
-                        offsetIsBasedOnSpawn = authoring.playFromBeginningAtSpawn
-                    });
+                        blobLeft[i] = samples[i];
+                    }
                 }
-                if (authoring.useCone)
+                int offsetCount = math.max(numVoices, 1);
+                int stride      = blobLeft.Length / offsetCount;
+                var offsets     = builder.Allocate(ref root.loopedOffsets, offsetCount);
+                for (int i = 0; i < offsetCount; i++)
                 {
-                    DstEntityManager.AddComponentData(entity, new AudioSourceEmitterCone
-                    {
-                        cosInnerAngle         = math.cos(math.radians(authoring.innerAngle)),
-                        cosOuterAngle         = math.cos(math.radians(authoring.outerAngle)),
-                        outerAngleAttenuation = authoring.outerAngleVolume
-                    });
+                    offsets[i] = i * stride;
                 }
-            }
-        }
+                root.sampleRate = sampleRate;
+                root.name       = name;
 
-        protected override void Filter(FilterBlobberData blobberData, ref AudioClipContext context, NativeArray<int> inputToFilteredMapping)
-        {
-            var hashes = new NativeArray<int2>(blobberData.Count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < blobberData.Count; i++)
-            {
-                var input = blobberData.input[i];
-                if (input.clip == null || input.clip.channels > 2)
-                {
-                    if (input.clip != null && input.clip.channels > 2)
-                        Debug.LogError($"Myri failed to convert clip {input.clip.name}. Only mono and stereo clips are supported.");
+                samples.Dispose();
 
-                    hashes[i]                 = default;
-                    inputToFilteredMapping[i] = -1;
-                }
-                else
-                {
-                    DeclareAssetDependency(blobberData.associatedObject[i], input.clip);
-                    hashes[i] = new int2(input.clip.GetInstanceID(), input.numVoices);
-                }
-            }
-
-            new DeduplicateJob { hashes = hashes, inputToFilteredMapping = inputToFilteredMapping }.Run();
-            hashes.Dispose();
-        }
-
-        protected override void PostFilter(PostFilterBlobberData blobberData, ref AudioClipContext context)
-        {
-            int sampleCount = 0;
-            for (int i = 0; i < blobberData.Count; i++)
-            {
-                var clip     = blobberData.input[i].clip;
-                sampleCount += clip.samples * clip.channels;
-            }
-
-            context.samples = new NativeArray<float>(sampleCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            var cache       = new float[1024 * 8];
-
-            var converters = blobberData.converters;
-
-            int sampleStart = 0;
-            for (int i = 0; i < blobberData.Count; i++)
-            {
-                var clip  = blobberData.input[i].clip;
-                int count = clip.samples * clip.channels;
-                ReadClip(clip, context.samples.GetSubArray(sampleStart, count), cache);
-
-                converters[i] = new AudioClipConverter
-                {
-                    count      = count,
-                    isStereo   = clip.channels == 2,
-                    name       = clip.name,
-                    numVoices  = blobberData.input[i].numVoices,
-                    sampleRate = clip.frequency,
-                    start      = sampleStart
-                };
-
-                sampleStart += count;
-            }
-        }
-
-        void ReadClip(AudioClip clip, NativeArray<float> data, float[] cache)
-        {
-            int channels = clip.channels;
-            int stride   = cache.Length;
-            for (int i = 0; i < data.Length; i += stride)
-            {
-                int count = math.min(data.Length - i, stride);
-
-                // Todo: This suppresses a warning but is not ideal
-                if (count < cache.Length)
-                {
-                    var tempCache = new float[count];
-                    clip.GetData(tempCache, i / channels);
-                    NativeArray<float>.Copy(tempCache, data.GetSubArray(i, count), count);
-                }
-                else
-                {
-                    clip.GetData(cache, i / channels);
-                    NativeArray<float>.Copy(cache, data.GetSubArray(i, count), count);
-                }
+                result = builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent);
             }
         }
 
         [BurstCompile]
-        struct DeduplicateJob : IJob
+        struct BuildBlobsJob : IJobFor
         {
-            [ReadOnly] public NativeArray<int2> hashes;
-            public NativeArray<int>             inputToFilteredMapping;
+            public NativeArray<AudioClipBuilder> builders;
 
-            public void Execute()
+            public void Execute(int i)
             {
-                var map = new NativeParallelHashMap<int2, int>(hashes.Length, Allocator.Temp);
-                for (int i = 0; i < hashes.Length; i++)
-                {
-                    if (inputToFilteredMapping[i] < 0)
-                        continue;
-
-                    if (map.TryGetValue(hashes[i], out int index))
-                        inputToFilteredMapping[i] = index;
-                    else
-                        map.Add(hashes[i], i);
-                }
+                var builder = builders[i];
+                builder.BuildBlob();
+                builders[i] = builder;
             }
         }
-    }
-
-    public struct AudioClipConverter : ISmartBlobberContextBuilder<AudioClipBlob, AudioClipContext>
-    {
-        internal int                 start;
-        internal int                 count;
-        internal int                 sampleRate;
-        internal int                 numVoices;
-        internal FixedString128Bytes name;
-        internal bool                isStereo;
-
-        public BlobAssetReference<AudioClipBlob> BuildBlob(int _, int index, ref AudioClipContext context)
-        {
-            var     builder  = new BlobBuilder(Allocator.Temp);
-            ref var root     = ref builder.ConstructRoot<AudioClipBlob>();
-            var     blobLeft = builder.Allocate(ref root.samplesLeftOrMono, count / math.select(1, 2, isStereo));
-            if (isStereo)
-            {
-                var blobRight = builder.Allocate(ref root.samplesRight, count / 2);
-                for (int i = 0; i < count; i++)
-                {
-                    blobLeft[i / 2] = context.samples[start + i];
-                    i++;
-                    blobRight[i / 2] = context.samples[start + i];
-                }
-            }
-            else
-            {
-                var blobRight = builder.Allocate(ref root.samplesRight, 1);
-                blobRight[0]  = 0f;
-                for (int i = 0; i < count; i++)
-                {
-                    blobLeft[i] = context.samples[start + i];
-                }
-            }
-            int offsetCount = math.max(numVoices, 1);
-            int stride      = blobLeft.Length / offsetCount;
-            var offsets     = builder.Allocate(ref root.loopedOffsets, offsetCount);
-            for (int i = 0; i < offsetCount; i++)
-            {
-                offsets[i] = i * stride;
-            }
-            root.sampleRate = sampleRate;
-            root.name       = name;
-
-            return builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent);
-        }
-    }
-
-    public struct AudioClipContext : System.IDisposable
-    {
-        [ReadOnly] internal NativeArray<float> samples;
-        public void Dispose() => samples.Dispose();
     }
 }
 

@@ -1,83 +1,101 @@
 using System.Diagnostics;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
-namespace Latios.Kinemation.Systems
-{
+// Currently disabled until a new optimization for Entities.Graphics 1.0 is decided upon.
+// For now, no count caching is performed.
+/*
+   namespace Latios.Kinemation.Systems
+   {
     [DisableAutoCreation]
-    public partial class UpdateChunkLinearBlendMetadataSystem : SubSystem
+    [BurstCompile]
+    public partial struct UpdateChunkLinearBlendMetadataSystem : ISystem
     {
-        EntityQuery m_query;
+        EntityQuery          m_query;
+        LatiosWorldUnmanaged latiosWorld;
 
-        protected override void OnCreate()
+        ComponentTypeHandle<SkeletonDependent>                      m_skeletonDependentHandle;
+        ComponentTypeHandle<ChunkLinearBlendSkinningMemoryMetadata> m_chunkLinearBlendSkinningMemoryMetadataHandle;
+
+        public void OnCreate(ref SystemState state)
         {
-            m_query = Fluent.WithAll<SkeletonDependent>(true).WithAll<ChunkLinearBlendSkinningMemoryMetadata>(false, true).Build();
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+            m_query     = state.Fluent().WithAll<SkeletonDependent>(true).WithAll<ChunkLinearBlendSkinningMemoryMetadata>(false, true).Build();
+
+            m_skeletonDependentHandle                      = state.GetComponentTypeHandle<SkeletonDependent>(true);
+            m_chunkLinearBlendSkinningMemoryMetadataHandle = state.GetComponentTypeHandle<ChunkLinearBlendSkinningMemoryMetadata>(false);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            worldBlackboardEntity.SetComponentData(new MaxRequiredLinearBlendMatrices { matricesCount = 0 });
+            latiosWorld.worldBlackboardEntity.SetComponentData(new MaxRequiredLinearBlendMatrices { matricesCount = 0 });
 
-            var lastSystemVersion = LastSystemVersion;
-            var blobHandle        = GetComponentTypeHandle<SkeletonDependent>(true);
-            var metaHandle        = GetComponentTypeHandle<ChunkLinearBlendSkinningMemoryMetadata>(false);
+            var lastSystemVersion = state.LastSystemVersion;
+            var blobHandle        = state.GetComponentTypeHandle<SkeletonDependent>(true);
+            var metaHandle        = state.GetComponentTypeHandle<ChunkLinearBlendSkinningMemoryMetadata>(false);
 
-            Dependency = new UpdateChunkVertexCountsJob
+            state.Dependency = new UpdateChunkMatrixCountsJob
             {
                 blobHandle        = blobHandle,
                 metaHandle        = metaHandle,
                 lastSystemVersion = lastSystemVersion
-            }.ScheduleParallel(m_query, Dependency);
+            }.ScheduleParallel(m_query, state.Dependency);
         }
 
         [BurstCompile]
-        struct UpdateChunkVertexCountsJob : IJobEntityBatch
+        public void OnDestroy(ref SystemState state) {
+        }
+
+        [BurstCompile]
+        struct UpdateChunkMatrixCountsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>           blobHandle;
             public ComponentTypeHandle<ChunkLinearBlendSkinningMemoryMetadata> metaHandle;
             public uint                                                        lastSystemVersion;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsUpdate  = batchInChunk.DidChange(blobHandle, lastSystemVersion);
-                needsUpdate      |= batchInChunk.DidOrderChange(lastSystemVersion);
+                bool needsUpdate  = chunk.DidChange(blobHandle, lastSystemVersion);
+                needsUpdate      |= chunk.DidOrderChange(lastSystemVersion);
                 if (!needsUpdate)
                     return;
 
-                var blobs       = batchInChunk.GetNativeArray(blobHandle);
+                var blobs       = chunk.GetNativeArray(blobHandle);
                 int minMatrices = int.MaxValue;
                 int maxMatrices = int.MinValue;
 
-                for (int i = 0; i < batchInChunk.Count; i++)
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     int c       = blobs[i].skinningBlob.Value.bindPoses.Length;
                     minMatrices = math.min(minMatrices, c);
                     maxMatrices = math.max(maxMatrices, c);
                 }
 
-                CheckVertexCountMismatch(minMatrices, maxMatrices);
+                //CheckMatrixCountMismatch(minMatrices, maxMatrices);
 
-                var metadata = batchInChunk.GetChunkComponentData(metaHandle);
-                if (metadata.bonesPerMesh != maxMatrices || metadata.entitiesInChunk != batchInChunk.Count)
+                var metadata = chunk.GetChunkComponentData(metaHandle);
+                if (metadata.bonesPerMesh != maxMatrices || metadata.entitiesInChunk != chunk.Count)
                 {
                     metadata.bonesPerMesh    = maxMatrices;
-                    metadata.entitiesInChunk = batchInChunk.Count;
-                    batchInChunk.SetChunkComponentData(metaHandle, metadata);
+                    metadata.entitiesInChunk = chunk.Count;
+                    chunk.SetChunkComponentData(metaHandle, metadata);
                 }
             }
 
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-            void CheckVertexCountMismatch(int min, int max)
+            void CheckMatrixCountMismatch(int min, int max)
             {
                 if (min != max)
                     UnityEngine.Debug.LogWarning(
-                        "A chunk contains multiple Mesh Skinning Blobs. Because Mesh Skinning Blobs are tied to their RenderMesh of which there is only one per chunk, this is likely a bug. Did you forget to change the Mesh Skinning Blob Reference when changing a Render Mesh?");
+                        "A chunk contains multiple Mesh Skinning Blobs with different matrix counts. Because Mesh Skinning Blobs are tied to their RenderMesh of which there is only one per chunk, this is likely a bug. Did you forget to change the Mesh Skinning Blob Reference when changing a Render Mesh?");
             }
         }
     }
-}
+   }
+ */
 

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
@@ -12,30 +13,35 @@ namespace Latios.Myri
     {
         //Parallel
         [BurstCompile]
-        public struct DestroyOneshotsWhenFinishedJob : IJobEntityBatch
+        public struct DestroyOneshotsWhenFinishedJob : IJobChunk
         {
             public DestroyCommandBuffer.ParallelWriter                dcb;
             [ReadOnly] public ComponentTypeHandle<AudioSourceOneShot> oneshotHandle;
             [ReadOnly] public EntityTypeHandle                        entityHandle;
             [ReadOnly] public NativeReference<int>                    audioFrame;
             [ReadOnly] public NativeReference<int>                    lastPlayedAudioFrame;
-            [ReadOnly] public ComponentDataFromEntity<AudioSettings>  settingsCdfe;
+            [ReadOnly] public ComponentLookup<AudioSettings>          settingsLookup;
             public Entity                                             worldBlackboardEntity;
             public int                                                sampleRate;
             public int                                                samplesPerFrame;
 
-            public void Execute(ArchetypeChunk chunk, int chunkIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var oneshots = chunk.GetNativeArray(oneshotHandle);
                 var entities = chunk.GetNativeArray(entityHandle);
                 for (int i = 0; i < oneshots.Length; i++)
                 {
-                    var    os           = oneshots[i];
+                    var os = oneshots[i];
+                    if (!os.m_clip.IsCreated)
+                    {
+                        dcb.Add(entities[i], unfilteredChunkIndex);
+                        continue;
+                    }
                     int    playedFrames = lastPlayedAudioFrame.Value - os.m_spawnedAudioFrame;
                     double resampleRate = os.clip.Value.sampleRate / (double)sampleRate;
                     if (os.isInitialized && os.clip.Value.samplesLeftOrMono.Length < resampleRate * playedFrames * samplesPerFrame)
                     {
-                        dcb.Add(entities[i], chunkIndex);
+                        dcb.Add(entities[i], unfilteredChunkIndex);
                     }
                 }
             }
@@ -43,7 +49,7 @@ namespace Latios.Myri
 
         //Single
         [BurstCompile]
-        public struct UpdateListenersJob : IJobEntityBatch
+        public struct UpdateListenersJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<AudioListener> listenerHandle;
             [ReadOnly] public ComponentTypeHandle<Translation>   translationHandle;
@@ -51,7 +57,7 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<LocalToWorld>  ltwHandle;
             public NativeList<ListenerWithTransform>             listenersWithTransforms;
 
-            public void Execute(ArchetypeChunk chunk, int chunkIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var listeners = chunk.GetNativeArray(listenerHandle);
                 if (chunk.Has(ltwHandle))
@@ -106,23 +112,26 @@ namespace Latios.Myri
         //Parallel
         //Todo: It might be worth it to cull here rather than write to the emitters array.
         [BurstCompile]
-        public struct UpdateOneshotsJob : IJobEntityBatchWithIndex
+        public struct UpdateOneshotsJob : IJobChunk
         {
-            public ComponentTypeHandle<AudioSourceOneShot>                oneshotHandle;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone> coneHandle;
-            [ReadOnly] public ComponentTypeHandle<Translation>            translationHandle;
-            [ReadOnly] public ComponentTypeHandle<Rotation>               rotationHandle;
-            [ReadOnly] public ComponentTypeHandle<Parent>                 parentHandle;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>           ltwHandle;
-            public NativeArray<OneshotEmitter>                            emitters;
-            [ReadOnly] public NativeReference<int>                        audioFrame;
-            [ReadOnly] public NativeReference<int>                        lastPlayedAudioFrame;
-            [ReadOnly] public NativeReference<int>                        lastConsumedBufferId;
-            public int                                                    bufferId;
+            public ComponentTypeHandle<AudioSourceOneShot>                           oneshotHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>            coneHandle;
+            [ReadOnly] public ComponentTypeHandle<Translation>                       translationHandle;
+            [ReadOnly] public ComponentTypeHandle<Rotation>                          rotationHandle;
+            [ReadOnly] public ComponentTypeHandle<Parent>                            parentHandle;
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld>                      ltwHandle;
+            [NativeDisableParallelForRestriction] public NativeArray<OneshotEmitter> emitters;
+            [ReadOnly] public NativeReference<int>                                   audioFrame;
+            [ReadOnly] public NativeReference<int>                                   lastPlayedAudioFrame;
+            [ReadOnly] public NativeReference<int>                                   lastConsumedBufferId;
+            public int                                                               bufferId;
 
-            public void Execute(ArchetypeChunk chunk, int chunkIndex, int firstEntityIndex)
+            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<int> firstEntityInChunkIndices;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var oneshots = chunk.GetNativeArray(oneshotHandle);
+                var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
+                var oneshots         = chunk.GetNativeArray(oneshotHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var oneshot = oneshots[i];
@@ -340,25 +349,28 @@ namespace Latios.Myri
         //Parallel
         //Todo: It might be worth it to cull here rather than write to the emitters array.
         [BurstCompile]
-        public struct UpdateLoopedsJob : IJobEntityBatchWithIndex
+        public struct UpdateLoopedJob : IJobChunk
         {
-            public ComponentTypeHandle<AudioSourceLooped>                 loopedHandle;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone> coneHandle;
-            [ReadOnly] public ComponentTypeHandle<Translation>            translationHandle;
-            [ReadOnly] public ComponentTypeHandle<Rotation>               rotationHandle;
-            [ReadOnly] public ComponentTypeHandle<Parent>                 parentHandle;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>           ltwHandle;
-            public NativeArray<LoopedEmitter>                             emitters;
-            [ReadOnly] public NativeReference<int>                        audioFrame;
-            [ReadOnly] public NativeReference<int>                        lastConsumedBufferId;
-            public int                                                    bufferId;
-            public int                                                    sampleRate;
-            public int                                                    samplesPerFrame;
+            public ComponentTypeHandle<AudioSourceLooped>                           loopedHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>           coneHandle;
+            [ReadOnly] public ComponentTypeHandle<Translation>                      translationHandle;
+            [ReadOnly] public ComponentTypeHandle<Rotation>                         rotationHandle;
+            [ReadOnly] public ComponentTypeHandle<Parent>                           parentHandle;
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld>                     ltwHandle;
+            [NativeDisableParallelForRestriction] public NativeArray<LoopedEmitter> emitters;
+            [ReadOnly] public NativeReference<int>                                  audioFrame;
+            [ReadOnly] public NativeReference<int>                                  lastConsumedBufferId;
+            public int                                                              bufferId;
+            public int                                                              sampleRate;
+            public int                                                              samplesPerFrame;
 
-            public void Execute(ArchetypeChunk chunk, int chunkIndex, int firstEntityIndex)
+            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<int> firstEntityInChunkIndices;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var rng    = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, chunkIndex)));
-                var looped = chunk.GetNativeArray(loopedHandle);
+                var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
+                var rng              = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
+                var looped           = chunk.GetNativeArray(loopedHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var l = looped[i];

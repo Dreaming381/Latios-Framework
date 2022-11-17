@@ -4,20 +4,50 @@ namespace Latios.Psyshock
 {
     public static partial class Physics
     {
+        /// <summary>
+        /// Computes the acceleration given a force and an inverse mass the force is acting upon
+        /// </summary>
         public static float AccelerationFrom(float force, float inverseMass) => force * inverseMass;
+        /// <summary>
+        /// Computes the acceleration given a force and an inverse mass the force is acting upon
+        /// </summary>
         public static float2 AccelerationFrom(float2 force, float2 inverseMass) => force * inverseMass;
+        /// <summary>
+        /// Computes the acceleration given a force and an inverse mass the force is acting upon
+        /// </summary>
         public static float3 AccelerationFrom(float3 force, float3 inverseMass) => force * inverseMass;
 
         // Simplified model
-        public static float DragFrom(float velocity, float k1, float k2) => - (k1 * velocity + k2 * velocity * velocity);
-        public static float2 DragFrom(float2 velocity, float k1, float k2)
+        /// <summary>
+        /// Computes a drag force using simplified drag coefficients
+        /// </summary>
+        /// <param name="velocity">The speed and direction of travel</param>
+        /// <param name="k1">The drag coefficient scaled by the velocity's magnitude</param>
+        /// <param name="k2">The drag coefficient scaled by the velocity's magnitude squared</param>
+        /// <returns>A force caused by the drag</returns>
+        public static float DragForceFrom(float velocity, float k1, float k2) => - (k1 * velocity + k2 * velocity * velocity);
+        /// <summary>
+        /// Computes a drag force using simplified drag coefficients
+        /// </summary>
+        /// <param name="velocity">The speed and direction of travel</param>
+        /// <param name="k1">The drag coefficient scaled by the velocity's magnitude</param>
+        /// <param name="k2">The drag coefficient scaled by the velocity's magnitude squared</param>
+        /// <returns>A force caused by the drag</returns>
+        public static float2 DragForceFrom(float2 velocity, float k1, float k2)
         {
             float speedSq = math.lengthsq(velocity);
             float speed   = math.sqrt(speedSq);
             var   unit    = velocity / speed;
             return -unit * (k1 * speed + k2 * speedSq);
         }
-        public static float3 DragFrom(float3 velocity, float k1, float k2)
+        /// <summary>
+        /// Computes a drag force using simplified drag coefficients
+        /// </summary>
+        /// <param name="velocity">The speed and direction of travel</param>
+        /// <param name="k1">The drag coefficient scaled by the velocity's magnitude</param>
+        /// <param name="k2">The drag coefficient scaled by the velocity's magnitude squared</param>
+        /// <returns>A force caused by the drag</returns>
+        public static float3 DragForceFrom(float3 velocity, float k1, float k2)
         {
             float speedSq = math.lengthsq(velocity);
             float speed   = math.sqrt(speedSq);
@@ -26,7 +56,16 @@ namespace Latios.Psyshock
         }
 
         // Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4786048/
-        public static float3 DragFrom(float3 velocity, float objectRadius, float3 fluidVelocity, float fluidViscosity, float fluidDensity)
+        /// <summary>
+        /// Computes a drag force using an approximation of a sphere inside a flowing fluid (such as wind or water)
+        /// </summary>
+        /// <param name="velocity">The velocity of the spherical object</param>
+        /// <param name="objectRadius">The spherical object's radius</param>
+        /// <param name="fluidVelocity">The velocity of the flowing fluid</param>
+        /// <param name="fluidViscosity">The viscosity of the fluid</param>
+        /// <param name="fluidDensity">The density of the fluid</param>
+        /// <returns>A drag force to be applied to the spherical object</returns>
+        public static float3 DragForceFrom(float3 velocity, float objectRadius, float3 fluidVelocity, float fluidViscosity, float fluidDensity)
         {
             float3 combinedVelocity = fluidVelocity - velocity;
             float  speed            = math.length(combinedVelocity);
@@ -45,11 +84,26 @@ namespace Latios.Psyshock
             return 0.5f * fluidDensity * cd * speed * math.PI * objectRadius * objectRadius * combinedVelocity;
         }
 
-        public static float3 BouyancyFrom(float3 gravity, float objectRadius, float fluidDensity)
+        /// <summary>
+        /// Computes a bouyancy force of a fluid applied to a fully submersed spherical object
+        /// </summary>
+        /// <param name="gravity">The acceleration vector of gravity</param>
+        /// <param name="objectRadius">The spherical object's radius</param>
+        /// <param name="fluidDensity">The density of the fluid</param>
+        /// <returns>A bouyancy force to be applied to the spherical object</returns>
+        public static float3 BouyancyForceFrom(float3 gravity, float objectRadius, float fluidDensity)
         {
             return fluidDensity * 4f / 3f * objectRadius * objectRadius * objectRadius * -gravity;
         }
 
+        /// <summary>
+        /// Computes the required mass and gravity multipliers to preserve the same kinetic energy and ballistic trajectory
+        /// of an object moving significantly slower in simulation relative to real-world velocities
+        /// </summary>
+        /// <param name="referenceSpeed">The speed the object would move in the real world</param>
+        /// <param name="desiredSpeed">The speed the object should move in the simulation</param>
+        /// <param name="massMultiplier">A multiplier to be applied to the mass</param>
+        /// <param name="gravityMultiplier">A multiplier to be applied to gravity</param>
         public static void WarpPropertiesForDesiredSpeed(float referenceSpeed, float desiredSpeed, out float massMultiplier, out float gravityMultiplier)
         {
             float factor      = referenceSpeed / desiredSpeed;

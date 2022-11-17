@@ -1,10 +1,11 @@
 using System;
-using Unity.Collections;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A triangle defined by three distinct points
+    /// </summary>
     [Serializable]
     public struct TriangleCollider
     {

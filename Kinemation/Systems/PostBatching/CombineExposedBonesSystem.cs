@@ -1,6 +1,7 @@
 using Latios;
 using Latios.Psyshock;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -11,74 +12,94 @@ using Unity.Transforms;
 
 namespace Latios.Kinemation
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class CombineExposedBonesSystem : SubSystem
+    [BurstCompile]
+    public partial struct CombineExposedBonesSystem : ISystem
     {
         EntityQuery m_query;
 
-        protected override void OnCreate()
-        {
-            m_query = Fluent.WithAll<BoneWorldBounds>(true).WithAll<BoneCullingIndex>(true).Build();
+        LatiosWorldUnmanaged latiosWorld;
 
-            worldBlackboardEntity.AddCollectionComponent(new ExposedSkeletonBoundsArrays
+        ComponentTypeHandle<BoneWorldBounds>  m_boneWorldBoundsHandle;
+        ComponentTypeHandle<BoneCullingIndex> m_boneCullingIndexHandle;
+
+        public void OnCreate(ref SystemState state)
+        {
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_query = state.Fluent().WithAll<BoneWorldBounds>(true).WithAll<BoneCullingIndex>(true).Build();
+
+            latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new ExposedSkeletonBoundsArrays
             {
                 allAabbs     = new NativeList<AABB>(Allocator.Persistent),
                 batchedAabbs = new NativeList<AABB>(Allocator.Persistent)
             });
+
+            m_boneWorldBoundsHandle  = state.GetComponentTypeHandle<BoneWorldBounds>(true);
+            m_boneCullingIndexHandle = state.GetComponentTypeHandle<BoneCullingIndex>(true);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
         {
-            var exposedCullingIndexManager = worldBlackboardEntity.GetCollectionComponent<ExposedCullingIndexManager>(true, out var cullingJH);
-            var boundsArrays               = worldBlackboardEntity.GetCollectionComponent<ExposedSkeletonBoundsArrays>(false);
-            cullingJH.Complete();
+        }
 
-            var perThreadBitArrays = World.UpdateAllocator.AllocateNativeArray<UnsafeBitArray>(JobsUtility.MaxJobThreadCount);
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            m_boneWorldBoundsHandle.Update(ref state);
+            m_boneCullingIndexHandle.Update(ref state);
+
+            var exposedCullingIndexManager = latiosWorld.worldBlackboardEntity.GetCollectionComponent<ExposedCullingIndexManager>(true);
+            var boundsArrays               = latiosWorld.worldBlackboardEntity.GetCollectionComponent<ExposedSkeletonBoundsArrays>(false);
+
+            var perThreadBitArrays = state.WorldUnmanaged.UpdateAllocator.AllocateNativeArray<UnsafeBitArray>(JobsUtility.MaxJobThreadCount);
             for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
                 perThreadBitArrays[i] = default;
 
-            Dependency = new FindDirtyBoundsJob
+            state.Dependency = new FindDirtyBoundsJob
             {
-                boundsHandle       = GetComponentTypeHandle<BoneWorldBounds>(true),
-                indexHandle        = GetComponentTypeHandle<BoneCullingIndex>(true),
+                boundsHandle       = m_boneWorldBoundsHandle,
+                indexHandle        = m_boneCullingIndexHandle,
                 maxBitIndex        = exposedCullingIndexManager.maxIndex,
                 perThreadBitArrays = perThreadBitArrays,
-                allocator          = World.UpdateAllocator.ToAllocator,
-                lastSystemVersion  = LastSystemVersion,
-            }.ScheduleParallel(m_query, Dependency);
+                allocator          = state.WorldUpdateAllocator,
+                lastSystemVersion  = state.LastSystemVersion,
+            }.ScheduleParallel(m_query, state.Dependency);
 
-            Dependency = new CollapseBitsJob
+            state.Dependency = new CollapseBitsJob
             {
                 perThreadBitArrays = perThreadBitArrays
-            }.Schedule(Dependency);
+            }.Schedule(state.Dependency);
 
-            var perThreadBoundsArrays = World.UpdateAllocator.AllocateNativeArray<UnsafeList<Aabb> >(JobsUtility.MaxJobThreadCount);
+            var perThreadBoundsArrays = state.WorldUnmanaged.UpdateAllocator.AllocateNativeArray<UnsafeList<Aabb> >(JobsUtility.MaxJobThreadCount);
             for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
                 perThreadBoundsArrays[i] = default;
 
-            Dependency = new CombineBoundsPerThreadJob
+            state.Dependency = new CombineBoundsPerThreadJob
             {
-                boundsHandle            = GetComponentTypeHandle<BoneWorldBounds>(true),
-                indexHandle             = GetComponentTypeHandle<BoneCullingIndex>(true),
+                boundsHandle            = m_boneWorldBoundsHandle,
+                indexHandle             = m_boneCullingIndexHandle,
                 maxBitIndex             = exposedCullingIndexManager.maxIndex,
                 perThreadBitArrays      = perThreadBitArrays,
                 perThreadBoundsArrays   = perThreadBoundsArrays,
-                allocator               = World.UpdateAllocator.ToAllocator,
+                allocator               = state.WorldUpdateAllocator,
                 finalAabbsToResize      = boundsArrays.allAabbs,
                 finalBatchAabbsToResize = boundsArrays.batchedAabbs
-            }.ScheduleParallel(m_query, Dependency);
+            }.ScheduleParallel(m_query, state.Dependency);
 
-            Dependency = new MergeThreadBoundsJob
+            state.Dependency = new MergeThreadBoundsJob
             {
                 perThreadBitArrays    = perThreadBitArrays,
                 perThreadBoundsArrays = perThreadBoundsArrays,
                 finalAabbs            = boundsArrays.allAabbs,
                 finalBatchAabbs       = boundsArrays.batchedAabbs
-            }.ScheduleBatch(exposedCullingIndexManager.maxIndex.Value + 1, 32, Dependency);
+            }.ScheduleBatch(exposedCullingIndexManager.maxIndex.Value + 1, 32, state.Dependency);
         }
 
         [BurstCompile]
-        struct FindDirtyBoundsJob : IJobEntityBatch
+        struct FindDirtyBoundsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<BoneWorldBounds>                   boundsHandle;
             [ReadOnly] public ComponentTypeHandle<BoneCullingIndex>                  indexHandle;
@@ -89,9 +110,9 @@ namespace Latios.Kinemation
 
             [NativeSetThreadIndex] int m_NativeThreadIndex;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (batchInChunk.DidChange(boundsHandle, lastSystemVersion) || batchInChunk.DidChange(indexHandle, lastSystemVersion))
+                if (chunk.DidChange(boundsHandle, lastSystemVersion) || chunk.DidChange(indexHandle, lastSystemVersion))
                 {
                     var perThreadBitArray = perThreadBitArrays[m_NativeThreadIndex];
                     if (!perThreadBitArray.IsCreated)
@@ -102,8 +123,8 @@ namespace Latios.Kinemation
                         perThreadBitArrays[m_NativeThreadIndex] = perThreadBitArray;
                     }
 
-                    var indices = batchInChunk.GetNativeArray(indexHandle);
-                    for (int i = 0; i < batchInChunk.Count; i++)
+                    var indices = chunk.GetNativeArray(indexHandle);
+                    for (int i = 0; i < chunk.Count; i++)
                     {
                         perThreadBitArray.Set(indices[i].cullingIndex, true);
                     }
@@ -154,7 +175,7 @@ namespace Latios.Kinemation
         }
 
         [BurstCompile]
-        struct CombineBoundsPerThreadJob : IJobEntityBatch
+        struct CombineBoundsPerThreadJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<BoneWorldBounds>                      boundsHandle;
             [ReadOnly] public ComponentTypeHandle<BoneCullingIndex>                     indexHandle;
@@ -168,7 +189,7 @@ namespace Latios.Kinemation
 
             [NativeSetThreadIndex] int m_NativeThreadIndex;
 
-            public void Execute(ArchetypeChunk batchInChunk, int batchIndex)
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 if (!perThreadBitArrays[0].IsCreated)
                     return;
@@ -185,9 +206,9 @@ namespace Latios.Kinemation
                     }
                 }
 
-                var indices = batchInChunk.GetNativeArray(indexHandle);
-                var bounds  = batchInChunk.GetNativeArray(boundsHandle);
-                for (int i = 0; i < batchInChunk.Count; i++)
+                var indices = chunk.GetNativeArray(indexHandle);
+                var bounds  = chunk.GetNativeArray(boundsHandle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var index = indices[i].cullingIndex;
                     if (perThreadBitArrays[0].IsSet(index))
@@ -196,7 +217,7 @@ namespace Latios.Kinemation
                     }
                 }
 
-                if (batchIndex == 0)
+                if (unfilteredChunkIndex == 0)
                 {
                     // We do the resizing in this job to remove a single-threaded bubble.
                     int indexCount = maxBitIndex.Value + 1;
@@ -204,8 +225,8 @@ namespace Latios.Kinemation
                     {
                         finalAabbsToResize.Length = indexCount;
 
-                        int batchCount = indexCount / 16;
-                        if (indexCount % 16 != 0)
+                        int batchCount = indexCount / 32;
+                        if (indexCount % 32 != 0)
                             batchCount++;
 
                         if (finalBatchAabbsToResize.Length < batchCount)

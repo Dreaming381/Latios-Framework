@@ -11,37 +11,40 @@ namespace Latios.Kinemation.Systems
     [DisableAutoCreation]
     public partial class BeginPerFrameMeshSkinningBuffersUploadSystem : SubSystem
     {
+        ComputeBufferTrackingPool m_pool;
+
         protected override void OnCreate()
         {
-            worldBlackboardEntity.AddCollectionComponent(new ComputeBufferManager
+            m_pool = new ComputeBufferTrackingPool();
+            worldBlackboardEntity.AddManagedStructComponent(new ComputeBufferManager
             {
-                pool = new ComputeBufferTrackingPool(),
-            }, true);
+                pool = m_pool,
+            });
 
-            worldBlackboardEntity.AddCollectionComponent(new GpuUploadBuffers());
+            worldBlackboardEntity.AddManagedStructComponent(new GpuUploadBuffers());
+            worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new GpuUploadBuffersMapped());
+        }
+
+        protected override void OnDestroy()
+        {
+            m_pool.Dispose();
         }
 
         protected override void OnUpdate()
         {
-            var meshGpuManager        = worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(false, out var meshGpuJH);
-            var boneOffsetsGpuManager = worldBlackboardEntity.GetCollectionComponent<BoneOffsetsGpuManager>(false, out var boneOffsetsGpuJH);
-            var bufferManager         = worldBlackboardEntity.GetCollectionComponent<ComputeBufferManager>(false, out var computeBufferJH);
-            worldBlackboardEntity.GetCollectionComponent<GpuUploadBuffers>(false, out var meshUploadJH);
+            var meshGpuManager        = worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(false);
+            var boneOffsetsGpuManager = worldBlackboardEntity.GetCollectionComponent<BoneOffsetsGpuManager>(false);
+            var bufferManager         = worldBlackboardEntity.GetManagedStructComponent<ComputeBufferManager>();
 
             bufferManager.pool.Update();
-            var jhs = new NativeList<JobHandle>(4, Allocator.Temp);
-            jhs.Add(meshGpuJH);
-            jhs.Add(boneOffsetsGpuJH);
-            jhs.Add(computeBufferJH);
-            jhs.Add(meshUploadJH);
             CompleteDependency();
-            JobHandle.CompleteAll(jhs);
 
             JobHandle jhv = default;
             JobHandle jhw = default;
             JobHandle jhb = default;
 
-            GpuUploadBuffers newBuffers = default;
+            GpuUploadBuffers       newBuffers       = default;
+            GpuUploadBuffersMapped newBuffersMapped = default;
 
             var requiredSizes          = meshGpuManager.requiredBufferSizes.Value;
             newBuffers.verticesBuffer  = bufferManager.pool.GetMeshVerticesBuffer(requiredSizes.requiredVertexBufferSize);
@@ -50,26 +53,26 @@ namespace Latios.Kinemation.Systems
 
             if (!meshGpuManager.uploadCommands.IsEmpty)
             {
-                var uploadCount                                = meshGpuManager.uploadCommands.Length;
-                newBuffers.verticesUploadBuffer                = bufferManager.pool.GetMeshVerticesUploadBuffer(requiredSizes.requiredVertexUploadSize);
-                newBuffers.weightsUploadBuffer                 = bufferManager.pool.GetMeshWeightsUploadBuffer(requiredSizes.requiredWeightUploadSize);
-                newBuffers.bindPosesUploadBuffer               = bufferManager.pool.GetMeshBindPosesUploadBuffer(requiredSizes.requiredBindPoseUploadSize);
-                newBuffers.verticesUploadMetaBuffer            = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.weightsUploadMetaBuffer             = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.bindPosesUploadMetaBuffer           = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.verticesUploadBufferWriteCount      = requiredSizes.requiredVertexUploadSize;
-                newBuffers.weightsUploadBufferWriteCount       = requiredSizes.requiredWeightUploadSize;
-                newBuffers.bindPosesUploadBufferWriteCount     = requiredSizes.requiredBindPoseUploadSize;
-                newBuffers.verticesUploadMetaBufferWriteCount  = uploadCount;
-                newBuffers.weightsUploadMetaBufferWriteCount   = uploadCount;
-                newBuffers.bindPosesUploadMetaBufferWriteCount = uploadCount;
-                var mappedVertices                             = newBuffers.verticesUploadBuffer.BeginWrite<VertexToSkin>(0, requiredSizes.requiredVertexUploadSize);
-                var mappedWeights                              = newBuffers.weightsUploadBuffer.BeginWrite<BoneWeightLinkedList>(0, requiredSizes.requiredWeightUploadSize);  // Unity uses T for sizing so we don't need to *2 here.
-                var mappedBindPoses                            = newBuffers.bindPosesUploadBuffer.BeginWrite<float3x4>(0, requiredSizes.requiredBindPoseUploadSize);
-                var mappedVerticesMeta                         = newBuffers.verticesUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
-                var mappedWeightsMeta                          = newBuffers.weightsUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
-                var mappedBindPosesMeta                        = newBuffers.bindPosesUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
-                newBuffers.needsMeshCommitment                 = true;
+                var uploadCount                                      = meshGpuManager.uploadCommands.Length;
+                newBuffers.verticesUploadBuffer                      = bufferManager.pool.GetMeshVerticesUploadBuffer(requiredSizes.requiredVertexUploadSize);
+                newBuffers.weightsUploadBuffer                       = bufferManager.pool.GetMeshWeightsUploadBuffer(requiredSizes.requiredWeightUploadSize);
+                newBuffers.bindPosesUploadBuffer                     = bufferManager.pool.GetMeshBindPosesUploadBuffer(requiredSizes.requiredBindPoseUploadSize);
+                newBuffers.verticesUploadMetaBuffer                  = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
+                newBuffers.weightsUploadMetaBuffer                   = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
+                newBuffers.bindPosesUploadMetaBuffer                 = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
+                newBuffersMapped.verticesUploadBufferWriteCount      = requiredSizes.requiredVertexUploadSize;
+                newBuffersMapped.weightsUploadBufferWriteCount       = requiredSizes.requiredWeightUploadSize;
+                newBuffersMapped.bindPosesUploadBufferWriteCount     = requiredSizes.requiredBindPoseUploadSize;
+                newBuffersMapped.verticesUploadMetaBufferWriteCount  = uploadCount;
+                newBuffersMapped.weightsUploadMetaBufferWriteCount   = uploadCount;
+                newBuffersMapped.bindPosesUploadMetaBufferWriteCount = uploadCount;
+                var mappedVertices                                   = newBuffers.verticesUploadBuffer.BeginWrite<VertexToSkin>(0, requiredSizes.requiredVertexUploadSize);
+                var mappedWeights                                    = newBuffers.weightsUploadBuffer.BeginWrite<BoneWeightLinkedList>(0, requiredSizes.requiredWeightUploadSize);  // Unity uses T for sizing so we don't need to *2 here.
+                var mappedBindPoses                                  = newBuffers.bindPosesUploadBuffer.BeginWrite<float3x4>(0, requiredSizes.requiredBindPoseUploadSize);
+                var mappedVerticesMeta                               = newBuffers.verticesUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
+                var mappedWeightsMeta                                = newBuffers.weightsUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
+                var mappedBindPosesMeta                              = newBuffers.bindPosesUploadMetaBuffer.BeginWrite<uint3>(0, uploadCount);
+                newBuffersMapped.needsMeshCommitment                 = true;
 
                 ref var allocator     = ref World.UpdateAllocator;
                 var     verticesSums  = allocator.AllocateNativeArray<int>(meshGpuManager.uploadCommands.Length);
@@ -77,36 +80,36 @@ namespace Latios.Kinemation.Systems
                 var     bindPosesSums = allocator.AllocateNativeArray<int>(meshGpuManager.uploadCommands.Length);
                 jhv                   = new PrefixSumVerticesCountsJob
                 {
-                    commands = meshGpuManager.uploadCommands,
+                    commands = meshGpuManager.uploadCommands.AsArray(),
                     sums     = verticesSums
                 }.Schedule();
                 jhw = new PrefixSumWeightsCountsJob
                 {
-                    commands = meshGpuManager.uploadCommands,
+                    commands = meshGpuManager.uploadCommands.AsArray(),
                     sums     = weightsSums
                 }.Schedule();
                 jhb = new PrefixSumBindPosesCountsJob
                 {
-                    commands = meshGpuManager.uploadCommands,
+                    commands = meshGpuManager.uploadCommands.AsArray(),
                     sums     = bindPosesSums
                 }.Schedule();
                 jhv = new UploadMeshesVerticesJob
                 {
-                    commands       = meshGpuManager.uploadCommands,
+                    commands       = meshGpuManager.uploadCommands.AsArray(),
                     prefixSums     = verticesSums,
                     mappedVertices = mappedVertices,
                     mappedMeta     = mappedVerticesMeta
                 }.ScheduleParallel(uploadCount, 1, jhv);
                 jhw = new UploadMeshesWeightsJob
                 {
-                    commands      = meshGpuManager.uploadCommands,
+                    commands      = meshGpuManager.uploadCommands.AsArray(),
                     prefixSums    = weightsSums,
                     mappedWeights = mappedWeights,
                     mappedMeta    = mappedWeightsMeta
                 }.ScheduleParallel(uploadCount, 1, jhw);
                 jhb = new UploadMeshesBindPosesJob
                 {
-                    commands        = meshGpuManager.uploadCommands,
+                    commands        = meshGpuManager.uploadCommands.AsArray(),
                     prefixSums      = bindPosesSums,
                     mappedBindPoses = mappedBindPoses,
                     mappedMeta      = mappedBindPosesMeta
@@ -121,33 +124,34 @@ namespace Latios.Kinemation.Systems
 
             if (boneOffsetsGpuManager.isDirty.Value)
             {
-                int metaCount                                    = (int)math.ceil(boneOffsetsGpuSize / 64f);
-                newBuffers.boneOffsetsUploadBuffer               = bufferManager.pool.GetBoneOffsetsUploadBuffer(boneOffsetsGpuSize);
-                newBuffers.boneOffsetsUploadMetaBuffer           = bufferManager.pool.GetUploadMetaBuffer(boneOffsetsGpuSize);
-                newBuffers.boneOffsetsUploadBufferWriteCount     = boneOffsetsGpuSize;
-                newBuffers.boneOffsetsUploadMetaBufferWriteCount = metaCount;
-                var mappedBoneOffsets                            = newBuffers.boneOffsetsUploadBuffer.BeginWrite<uint>(0, boneOffsetsGpuSize);
-                var mappedBoneOffsetsMeta                        = newBuffers.boneOffsetsUploadMetaBuffer.BeginWrite<uint3>(0, metaCount);
-                newBuffers.needsBoneOffsetCommitment             = true;
+                int metaCount                                          = (int)math.ceil(boneOffsetsGpuSize / 64f);
+                newBuffers.boneOffsetsUploadBuffer                     = bufferManager.pool.GetBoneOffsetsUploadBuffer(boneOffsetsGpuSize);
+                newBuffers.boneOffsetsUploadMetaBuffer                 = bufferManager.pool.GetUploadMetaBuffer(boneOffsetsGpuSize);
+                newBuffersMapped.boneOffsetsUploadBufferWriteCount     = boneOffsetsGpuSize;
+                newBuffersMapped.boneOffsetsUploadMetaBufferWriteCount = metaCount;
+                var mappedBoneOffsets                                  = newBuffers.boneOffsetsUploadBuffer.BeginWrite<uint>(0, boneOffsetsGpuSize);
+                var mappedBoneOffsetsMeta                              = newBuffers.boneOffsetsUploadMetaBuffer.BeginWrite<uint3>(0, metaCount);
+                newBuffersMapped.needsBoneOffsetCommitment             = true;
 
                 jho = new UploadBoneOffsetsJob
                 {
                     mappedBoneOffsets = mappedBoneOffsets,
                     mappedMeta        = mappedBoneOffsetsMeta,
-                    offsets           = boneOffsetsGpuManager.offsets
+                    offsets           = boneOffsetsGpuManager.offsets.AsArray()
                 }.ScheduleBatch(boneOffsetsGpuManager.offsets.Length, 128);
             }
 
-            jhs.Clear();
+            var jhs = new NativeList<JobHandle>(4, Allocator.Temp);
             jhs.Add(jhv);
             jhs.Add(jhw);
             jhs.Add(jhb);
             jhs.Add(jho);
-            Dependency = JobHandle.CombineDependencies(jhs);
+            Dependency = JobHandle.CombineDependencies(jhs.AsArray());
 
-            if (newBuffers.needsMeshCommitment || newBuffers.needsBoneOffsetCommitment)
+            if (newBuffersMapped.needsMeshCommitment || newBuffersMapped.needsBoneOffsetCommitment)
             {
-                worldBlackboardEntity.SetCollectionComponentAndDisposeOld(newBuffers);
+                worldBlackboardEntity.SetManagedStructComponent(newBuffers);
+                worldBlackboardEntity.SetCollectionComponentAndDisposeOld(newBuffersMapped);
                 Dependency = new ClearCommandsJob { commands = meshGpuManager.uploadCommands, isDirty = boneOffsetsGpuManager.isDirty }.Schedule(Dependency);
             }
         }

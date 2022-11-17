@@ -7,7 +7,7 @@ using Unity.Mathematics;
 
 namespace Dragons
 {
-    [AlwaysUpdateSystem, DisableAutoCreation]
+    [DisableAutoCreation]
     public partial class FindPairsBuildLayerExample : SubSystem
     {
         private EntityQuery m_query;
@@ -29,7 +29,7 @@ namespace Dragons
             CollisionLayerSettings settings = new CollisionLayerSettings
             {
                 worldSubdivisionsPerAxis = new int3(2, 2, 2),
-                worldAABB                = new Aabb { min = new float3(-50f, -50f, -50f), max = new float3(50f, 50f, 50f) },
+                worldAabb                = new Aabb { min = new float3(-50f, -50f, -50f), max = new float3(50f, 50f, 50f) },
             };
             Dependency = Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob, Dependency);
             Dependency = PhysicsDebug.DrawLayer(layer).ScheduleParallel(Dependency);

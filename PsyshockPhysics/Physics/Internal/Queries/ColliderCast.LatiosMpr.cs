@@ -7,9 +7,9 @@ namespace Latios.Psyshock
 {
     internal static partial class SpatialInternal
     {
-        internal static bool MprCastNoRoundness(Collider caster,
-                                                Collider target,
-                                                RigidTransform targetInCasterSpace,
+        internal static bool MprCastNoRoundness(in Collider caster,
+                                                in Collider target,
+                                                in RigidTransform targetInCasterSpace,
                                                 float3 normalizedCastDirectionInCasterSpace,
                                                 float maxCastDistance,
                                                 out float distanceOfImpact,
@@ -18,9 +18,9 @@ namespace Latios.Psyshock
             somethingWentWrong = false;
 
             // First, test if the caster can even reach the target
-            SupportPoint portalA     = GetSupport(caster, target, normalizedCastDirectionInCasterSpace, targetInCasterSpace);
+            SupportPoint portalA     = GetSupport(in caster, in target, normalizedCastDirectionInCasterSpace, targetInCasterSpace);
             float        minDistance =
-                math.dot(GetSupport(caster, target, -normalizedCastDirectionInCasterSpace, targetInCasterSpace).pos, normalizedCastDirectionInCasterSpace);
+                math.dot(GetSupport(in caster, in target, -normalizedCastDirectionInCasterSpace, targetInCasterSpace).pos, normalizedCastDirectionInCasterSpace);
             float maxDistance = math.dot(portalA.pos, normalizedCastDirectionInCasterSpace) + maxCastDistance;
             if (minDistance > 0f || maxDistance < 0f)
             {
@@ -29,7 +29,7 @@ namespace Latios.Psyshock
             }
 
             // Second, check if the caster's AABB reaches the target's AABB laterally
-            var initialCsoAabb = GetCsoAabb(caster, target, targetInCasterSpace);
+            var initialCsoAabb = GetCsoAabb(in caster, in target, targetInCasterSpace);
             if (math.all(initialCsoAabb.max < 0f | initialCsoAabb.min > 0f))
             {
                 // The origin is not in the Aabb. Cast the ray in both directions
@@ -44,7 +44,7 @@ namespace Latios.Psyshock
             }
 
             // Third, check if the caster reaches the target laterally using planar MPR
-            if (!Mpr.DoPlanarMpr(caster, target, targetInCasterSpace, normalizedCastDirectionInCasterSpace, portalA.pos, out var portalB, out var portalC,
+            if (!Mpr.DoPlanarMpr(in caster, in target, in targetInCasterSpace, normalizedCastDirectionInCasterSpace, portalA.pos, out var portalB, out var portalC,
                                  ref somethingWentWrong))
             {
                 distanceOfImpact = Mpr.k_missDistance;
@@ -58,9 +58,9 @@ namespace Latios.Psyshock
             slidTargetInCasterSpace.pos            -= slideDistance * normalizedCastDirectionInCasterSpace;
             // Because our space has been slid, we need to recover our supports using the IDs and the new space
 
-            portalA = Get3DSupportFromPlanar(caster, target, slidTargetInCasterSpace, portalA);
-            portalB = Get3DSupportFromPlanar(caster, target, slidTargetInCasterSpace, portalB);
-            portalC = Get3DSupportFromPlanar(caster, target, slidTargetInCasterSpace, portalC);
+            portalA = Get3DSupportFromPlanar(in caster, in target, slidTargetInCasterSpace, portalA);
+            portalB = Get3DSupportFromPlanar(in caster, in target, slidTargetInCasterSpace, portalB);
+            portalC = Get3DSupportFromPlanar(in caster, in target, slidTargetInCasterSpace, portalC);
 
             // Our planar supports might be interior supports due to the axis reduction.
             //portalA = GetSupport(caster, target, portalA.pos, slidTargetInCasterSpace);
@@ -68,12 +68,12 @@ namespace Latios.Psyshock
             //portalC = GetSupport(caster, target, portalC.pos, slidTargetInCasterSpace);
 
             // Catch the case where the ray misses the portal triangle. It is frustrating that it happens, but this should catch it.
-            Mpr.DoMprPortalSearch(caster, target, slidTargetInCasterSpace, normalizedCastDirectionInCasterSpace, ref portalA, ref portalB, ref portalC,
+            Mpr.DoMprPortalSearch(in caster, in target, in slidTargetInCasterSpace, normalizedCastDirectionInCasterSpace, ref portalA, ref portalB, ref portalC,
                                   ref somethingWentWrong);
 
-            float mprDistance = Mpr.DoMprRefine3D(caster,
-                                                  target,
-                                                  slidTargetInCasterSpace,
+            float mprDistance = Mpr.DoMprRefine3D(in caster,
+                                                  in target,
+                                                  in slidTargetInCasterSpace,
                                                   normalizedCastDirectionInCasterSpace,
                                                   portalA,
                                                   portalB,
@@ -177,9 +177,9 @@ namespace Latios.Psyshock
         {
             internal const float k_missDistance = 2f;
 
-            internal static void DoMprPortalSearch(Collider colliderA,
-                                                   Collider colliderB,
-                                                   RigidTransform bInASpace,
+            internal static void DoMprPortalSearch(in Collider colliderA,
+                                                   in Collider colliderB,
+                                                   in RigidTransform bInASpace,
                                                    float3 normalizedSearchDirectionInASpace,
                                                    ref SupportPoint portalA,
                                                    ref SupportPoint portalB,
@@ -197,15 +197,15 @@ namespace Latios.Psyshock
                     bool4 isWrongSide      = simd.dot(normals, normalizedSearchDirectionInASpace) < 0f;
                     if (isWrongSide.x)
                     {
-                        portalC = GetSupport(colliderA, colliderB, -normals.a, bInASpace);
+                        portalC = GetSupport(in colliderA, in colliderB, -normals.a, bInASpace);
                     }
                     else if (isWrongSide.y)
                     {
-                        portalA = GetSupport(colliderA, colliderB, -normals.b, bInASpace);
+                        portalA = GetSupport(in colliderA, in colliderB, -normals.b, bInASpace);
                     }
                     else if (isWrongSide.z)
                     {
-                        portalB = GetSupport(colliderA, colliderB, -normals.c, bInASpace);
+                        portalB = GetSupport(in colliderA, in colliderB, -normals.c, bInASpace);
                     }
                     else
                     {
@@ -220,9 +220,9 @@ namespace Latios.Psyshock
                 somethingWentWrong |= true;
             }
 
-            internal static float DoMprRefine3D(Collider colliderA,
-                                                Collider colliderB,
-                                                RigidTransform bInASpace,
+            internal static float DoMprRefine3D(in Collider colliderA,
+                                                in Collider colliderB,
+                                                in RigidTransform bInASpace,
                                                 float3 normalizedSearchDirectionInASpace,
                                                 SupportPoint portalA,
                                                 SupportPoint portalB,
@@ -249,7 +249,7 @@ namespace Latios.Psyshock
                     iters--;
 
                     // Find a new support out through the portal.
-                    SupportPoint newSupport = GetSupport(colliderA, colliderB, portalUnscaledNormal, bInASpace);
+                    SupportPoint newSupport = GetSupport(in colliderA, in colliderB, portalUnscaledNormal, bInASpace);
 
                     // If the new support is actually one of our portal supports, then terminate.
                     uint3 ids = new uint3(portalA.id, portalB.id, portalC.id);
@@ -367,7 +367,7 @@ namespace Latios.Psyshock
                 // Our portal is now the surface triangle of the CSO our ray passes through.
                 // Find the distance to the plane of the portal and return.
                 // We don't use triangle raycast here because precision issues could cause our ray to miss.
-                Plane plane = mathex.planeFrom(portalA.pos, portalB.pos - portalA.pos, portalC.pos - portalA.pos);
+                Plane plane = mathex.PlaneFrom(portalA.pos, portalB.pos - portalA.pos, portalC.pos - portalA.pos);
                 float denom = math.dot(plane.normal, normalizedSearchDirectionInASpace);
                 if (math.abs(denom) < math.EPSILON)
                 {
@@ -440,9 +440,9 @@ namespace Latios.Psyshock
                 return math.abs(plane.distanceFromOrigin / denom);
             }
 
-            internal static bool DoPlanarMpr(Collider colliderA,
-                                             Collider colliderB,
-                                             RigidTransform bInASpace,
+            internal static bool DoPlanarMpr(in Collider colliderA,
+                                             in Collider colliderB,
+                                             in RigidTransform bInASpace,
                                              float3 planeNormal,
                                              float3 searchStart,
                                              out SupportPoint planarSupportIdA,
@@ -455,7 +455,7 @@ namespace Latios.Psyshock
                 float3 center = searchStart - math.project(searchStart, planeNormal);
                 float3 ray    = -center;
 
-                SupportPoint portalA = GetPlanarSupport(colliderA, colliderB, -center, bInASpace, planeNormal);
+                SupportPoint portalA = GetPlanarSupport(in colliderA, in colliderB, -center, bInASpace, planeNormal);
                 // We are sliding everything such that (0, 0, 0) is the ray start and the ray is the original origin
                 portalA.pos              += ray;
                 planarSupportIdA          = portalA;
@@ -478,18 +478,18 @@ namespace Latios.Psyshock
                     {
                         if (math.all(searchDirection == 0f))
                         {
-                            mathex.getDualPerpendicularNormalized(planeNormal, out var dirA, out var dirB);
-                            planarSupportIdA = GetPlanarSupport(colliderA, colliderB, dirA, bInASpace, planeNormal);
-                            planarSupportIdB = GetPlanarSupport(colliderA, colliderB, dirB, bInASpace, planeNormal);
+                            mathex.GetDualPerpendicularNormalized(planeNormal, out var dirA, out var dirB);
+                            planarSupportIdA = GetPlanarSupport(in colliderA, in colliderB, dirA, bInASpace, planeNormal);
+                            planarSupportIdB = GetPlanarSupport(in colliderA, in colliderB, dirB, bInASpace, planeNormal);
                         }
                         else
                         {
                             // We still need a second planar support, so just find a cross product and test both directions
                             searchDirection  = math.cross(searchDirection, planeNormal);
-                            planarSupportIdB = GetPlanarSupport(colliderA, colliderB, searchDirection, bInASpace, planeNormal);
+                            planarSupportIdB = GetPlanarSupport(in colliderA, in colliderB, searchDirection, bInASpace, planeNormal);
                             if (planarSupportIdB.id == planarSupportIdA.id)
                             {
-                                planarSupportIdB = GetPlanarSupport(colliderA, colliderB, -searchDirection, bInASpace, planeNormal);
+                                planarSupportIdB = GetPlanarSupport(in colliderA, in colliderB, -searchDirection, bInASpace, planeNormal);
                                 if (planarSupportIdB.id == planarSupportIdA.id)
                                 {
                                     somethingWentWrong |= true;
@@ -507,7 +507,7 @@ namespace Latios.Psyshock
                 // If our search direction is really small, scale it up.
                 searchDirection = math.select(searchDirection, searchDirection * k_normalScaler, math.all(math.abs(searchDirection) < k_smallNormal));
                 // Find a new support point orthogonal to our ray away from the first support point
-                SupportPoint portalB  = GetPlanarSupport(colliderA, colliderB, searchDirection, bInASpace, planeNormal);
+                SupportPoint portalB  = GetPlanarSupport(in colliderA, in colliderB, searchDirection, bInASpace, planeNormal);
                 portalB.pos          += ray;
                 planarSupportIdB      = portalB;
                 // Get the portal normal facing away from the center
@@ -526,7 +526,7 @@ namespace Latios.Psyshock
                     iters--;
 
                     // Find a new support out through the portal.
-                    SupportPoint newSupport  = GetSupport(colliderA, colliderB, portalUnscaledNormal, bInASpace);
+                    SupportPoint newSupport  = GetSupport(in colliderA, in colliderB, portalUnscaledNormal, bInASpace);
                     newSupport.pos          += ray;
                     // If the new support is actually one of our portal supports, then terminate.
                     if (newSupport.id == portalA.id || newSupport.id == portalB.id)
@@ -780,7 +780,7 @@ namespace Latios.Psyshock
                 // Our portal is now the surface triangle of the CSO our ray passes through.
                 // Find the distance to the plane of the portal and return.
                 // We don't use triangle raycast here because precision issues could cause our ray to miss.
-                Plane plane = mathex.planeFrom(portalA.pos, portalB.pos - portalA.pos, portalC.pos - portalA.pos);
+                Plane plane = mathex.PlaneFrom(portalA.pos, portalB.pos - portalA.pos, portalC.pos - portalA.pos);
                 float denom = math.dot(plane.normal, normalizedSearchDirectionInASpace);
                 UnityEngine.Debug.Log($"plane: {plane.normal}, {plane.distanceFromOrigin}, denom: {denom}");
                 if (math.abs(denom) < math.EPSILON)
@@ -897,7 +897,7 @@ namespace Latios.Psyshock
                         if (math.all(searchDirection == 0f))
                         {
                             UnityEngine.Debug.Log("Search direction is 0. Getting both planar supports and exiting.");
-                            mathex.getDualPerpendicularNormalized(planeNormal, out var dirA, out var dirB);
+                            mathex.GetDualPerpendicularNormalized(planeNormal, out var dirA, out var dirB);
                             planarSupportIdA = GetPlanarSupport(colliderA, colliderB, dirA, bInASpace, planeNormal);
                             planarSupportIdB = GetPlanarSupport(colliderA, colliderB, dirB, bInASpace, planeNormal);
                         }

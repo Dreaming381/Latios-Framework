@@ -20,9 +20,9 @@ namespace Latios.Myri
             public NativeReference<int>  lastPlayedAudioFrame;
             public NativeReference<int>  lastReadBufferId;
 
-            public NativeQueue<AudioFrameBufferHistoryElement>       audioFrameHistory;
-            [ReadOnly] public ComponentDataFromEntity<AudioSettings> audioSettingsCdfe;
-            public Entity                                            worldBlackboardEntity;
+            public NativeQueue<AudioFrameBufferHistoryElement> audioFrameHistory;
+            [ReadOnly] public ComponentLookup<AudioSettings>   audioSettingsLookup;
+            public Entity                                      worldBlackboardEntity;
 
             public unsafe void Execute()
             {
@@ -35,7 +35,7 @@ namespace Latios.Myri
                 {
                     audioFrameHistory.Dequeue();
                 }
-                int targetFrame = frame + 1 + math.max(audioSettingsCdfe[worldBlackboardEntity].lookaheadAudioFrames, 0);
+                int targetFrame = frame + 1 + math.max(audioSettingsLookup[worldBlackboardEntity].lookaheadAudioFrames, 0);
                 if (!audioFrameHistory.IsEmpty() && audioFrameHistory.Peek().bufferId == bufferId)
                 {
                     targetFrame = math.max(audioFrameHistory.Peek().expectedNextUpdateFrame, targetFrame);
@@ -50,15 +50,15 @@ namespace Latios.Myri
         // [BurstCompile]
         public struct UpdateListenersGraphJob : IJob
         {
-            [ReadOnly] public NativeArray<Entity>                    listenerEntities;
-            [ReadOnly] public NativeArray<Entity>                    destroyedListenerEntities;
-            [ReadOnly] public ComponentDataFromEntity<AudioListener> listenerCdfe;
-            public ComponentDataFromEntity<ListenerGraphState>       listenerGraphStateCdfe;
-            public ComponentDataFromEntity<EntityOutputGraphState>   listenerOutputGraphStateCdfe;
-            public EntityCommandBuffer                               ecb;
+            [ReadOnly] public NativeArray<Entity>            listenerEntities;
+            [ReadOnly] public NativeArray<Entity>            destroyedListenerEntities;
+            [ReadOnly] public ComponentLookup<AudioListener> listenerLookup;
+            public ComponentLookup<ListenerGraphState>       listenerGraphStateLookup;
+            public ComponentLookup<EntityOutputGraphState>   listenerOutputGraphStateLookup;
+            public EntityCommandBuffer                       ecb;
 
-            [ReadOnly] public ComponentDataFromEntity<AudioSettings> audioSettingsCdfe;
-            public Entity                                            worldBlackboardEntity;
+            [ReadOnly] public ComponentLookup<AudioSettings> audioSettingsLookup;
+            public Entity                                    worldBlackboardEntity;
 
             [ReadOnly] public NativeReference<int>             audioFrame;
             public NativeQueue<AudioFrameBufferHistoryElement> audioFrameHistory;
@@ -90,7 +90,7 @@ namespace Latios.Myri
                 int  megaBufferSampleCount  = 0;
                 var  channelCounts          = new NativeArray<int>(listenerBufferParameters.Length, Allocator.Temp);
 
-                var audioSettings                  = audioSettingsCdfe[worldBlackboardEntity];
+                var audioSettings                  = audioSettingsLookup[worldBlackboardEntity];
                 audioSettings.audioFramesPerUpdate = math.max(audioSettings.audioFramesPerUpdate, 1);
                 audioSettings.safetyAudioFrames    = math.max(audioSettings.safetyAudioFrames, 0);
                 audioSettings.lookaheadAudioFrames = math.max(audioSettings.lookaheadAudioFrames, 0);
@@ -100,11 +100,11 @@ namespace Latios.Myri
                 {
                     var entity                   = destroyedListenerEntities[i];
                     dirty                        = true;
-                    var listenerOutputGraphState = listenerOutputGraphStateCdfe[entity];
+                    var listenerOutputGraphState = listenerOutputGraphStateLookup[entity];
                     commandBlock.Disconnect(listenerOutputGraphState.connection);
                     systemMixNodePortFreelist.Add(listenerOutputGraphState.portIndex);
 
-                    var listenerGraphState = listenerGraphStateCdfe[entity];
+                    var listenerGraphState = listenerGraphStateLookup[entity];
                     for (int j = 0; j < listenerGraphState.connections.Length; j++)
                     {
                         commandBlock.Disconnect(listenerGraphState.connections[j]);
@@ -130,10 +130,10 @@ namespace Latios.Myri
                 {
                     var entity = listenerEntities[i];
 
-                    if (!listenerGraphStateCdfe.HasComponent(entity))
+                    if (!listenerGraphStateLookup.HasComponent(entity))
                     {
                         dirty                  = true;
-                        var listener           = listenerCdfe[entity];
+                        var listener           = listenerLookup[entity];
                         var listenerGraphState = new ListenerGraphState
                         {
                             connections     = new UnsafeList<DSPConnection>(8, Allocator.Persistent),
@@ -191,14 +191,14 @@ namespace Latios.Myri
                     }
                     else
                     {
-                        var     listener           = listenerCdfe[entity];
+                        var     listener           = listenerLookup[entity];
                         ref var profile            = ref listener.ildProfile.Value;
-                        var     listenerGraphState = listenerGraphStateCdfe[entity];
+                        var     listenerGraphState = listenerGraphStateLookup[entity];
                         if (listener.ildProfile != listenerGraphState.lastUsedProfile)
                         {
                             dirty = true;
                             //Swap the old MixPortsToStereoNode with a new one
-                            var listenerOutputGraphState = listenerOutputGraphStateCdfe[entity];
+                            var listenerOutputGraphState = listenerOutputGraphStateLookup[entity];
                             var listenerMixNode          =
                                 commandBlock.CreateDSPNode<MixPortsToStereoNode.Parameters, MixPortsToStereoNode.SampleProviders, MixPortsToStereoNode>();
                             commandBlock.AddOutletPort(listenerMixNode, 2);
@@ -229,8 +229,8 @@ namespace Latios.Myri
                             BuildChannelGraph(ref profile, commandBlock, listenerMixNode, ref listenerGraphState);
 
                             //Write out entity data
-                            listenerGraphStateCdfe[entity]       = listenerGraphState;
-                            listenerOutputGraphStateCdfe[entity] = listenerOutputGraphState;
+                            listenerGraphStateLookup[entity]       = listenerGraphState;
+                            listenerOutputGraphStateLookup[entity] = listenerOutputGraphState;
                         }
                         existingEntities.Add(entity);
 
@@ -258,7 +258,7 @@ namespace Latios.Myri
                     for (int i = 0; i < existingEntities.Length; i++)
                     {
                         var entity             = existingEntities[i];
-                        var listenerGraphState = listenerGraphStateCdfe[entity];
+                        var listenerGraphState = listenerGraphStateLookup[entity];
                         for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
                         {
                             var ildConnection = listenerGraphState.ildConnections[j];
@@ -269,7 +269,7 @@ namespace Latios.Myri
                                 listenerGraphState.ildConnections[j] = ildConnection;
                             }
                         }
-                        listenerGraphStateCdfe[entity] = listenerGraphState;
+                        listenerGraphStateLookup[entity] = listenerGraphState;
                     }
 
                     var fakePortRealPortHashmap = new NativeParallelHashMap<int, int>(8, Allocator.Temp);
@@ -278,7 +278,7 @@ namespace Latios.Myri
                     for (int i = 0; i < existingEntities.Length; i++)
                     {
                         var entity             = existingEntities[i];
-                        var listenerGraphState = listenerGraphStateCdfe[entity];
+                        var listenerGraphState = listenerGraphStateLookup[entity];
                         fakePortRealPortHashmap.Clear();
                         for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
                         {
@@ -303,7 +303,7 @@ namespace Latios.Myri
                                 commandBlock.SetAttenuation(ildConnection.connection, ildConnection.attenuation);
                             listenerGraphState.ildConnections[j] = ildConnection;
                         }
-                        listenerGraphStateCdfe[entity] = listenerGraphState;
+                        listenerGraphStateLookup[entity] = listenerGraphState;
                     }
                     //Build connections fo new entities
                     for (int i = 0; i < newEntities.Length; i++)

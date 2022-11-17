@@ -1,4 +1,5 @@
-﻿using Unity.Entities;
+﻿using Latios.Authoring;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -39,6 +40,74 @@ namespace Latios.Myri.Authoring
         [Tooltip("The attenuation to apply at the outer angle. A value of 0 makes the source inaudible outside of the outer angle.")]
         [Range(0f, 1f)]
         public float outerAngleVolume = 0f;
+    }
+
+    public struct AudioSourceBakerWorker : ISmartBakeItem<AudioSourceAuthoring>
+    {
+        SmartBlobberHandle<AudioClipBlob> m_handle;
+        bool                              m_looped;
+
+        public bool Bake(AudioSourceAuthoring authoring, IBaker baker)
+        {
+            m_looped = authoring.looping;
+            if (!authoring.looping)
+            {
+                baker.AddComponent(new AudioSourceOneShot
+                {
+                    innerRange      = authoring.innerRange,
+                    outerRange      = authoring.outerRange,
+                    rangeFadeMargin = authoring.rangeFadeMargin,
+                    volume          = authoring.volume
+                });
+                if (authoring.autoDestroyOnFinish)
+                {
+                    baker.AddComponent<AudioSourceDestroyOneShotWhenFinished>();
+                }
+            }
+            else
+            {
+                baker.AddComponent(new AudioSourceLooped
+                {
+                    innerRange           = authoring.innerRange,
+                    outerRange           = authoring.outerRange,
+                    rangeFadeMargin      = authoring.rangeFadeMargin,
+                    volume               = authoring.volume,
+                    offsetIsBasedOnSpawn = authoring.playFromBeginningAtSpawn
+                });
+            }
+            if (authoring.useCone)
+            {
+                baker.AddComponent(new AudioSourceEmitterCone
+                {
+                    cosInnerAngle         = math.cos(math.radians(authoring.innerAngle)),
+                    cosOuterAngle         = math.cos(math.radians(authoring.outerAngle)),
+                    outerAngleAttenuation = authoring.outerAngleVolume
+                });
+            }
+
+            m_handle = baker.RequestCreateBlobAsset(authoring.clip, authoring.voices);
+            return m_handle.IsValid;
+        }
+
+        public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
+        {
+            if (m_looped)
+            {
+                var source    = entityManager.GetComponentData<AudioSourceLooped>(entity);
+                source.m_clip = m_handle.Resolve(entityManager);
+                entityManager.SetComponentData(entity, source);
+            }
+            else
+            {
+                var source    = entityManager.GetComponentData<AudioSourceOneShot>(entity);
+                source.m_clip = m_handle.Resolve(entityManager);
+                entityManager.SetComponentData(entity, source);
+            }
+        }
+    }
+
+    public class AudioSourceBaker : SmartBaker<AudioSourceAuthoring, AudioSourceBakerWorker>
+    {
     }
 }
 

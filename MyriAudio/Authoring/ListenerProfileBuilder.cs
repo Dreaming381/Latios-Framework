@@ -7,20 +7,29 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-using Hash128 = Unity.Entities.Hash128;
-
 namespace Latios.Myri.Authoring
 {
     /// <summary>
+    /// Implement this interface to define a custom audio listener profile
+    /// </summary>
+    public interface IListenerProfileBuilder
+    {
+        void BuildProfile(ref ListenerProfileBuildContext context);
+    }
+
+    /// <summary>
     /// An asset type which is used to define a volume and frequency spatialization profile for an audio listener
     /// </summary>
-    public abstract class ListenerProfileBuilder : ScriptableObject
+    public abstract class ListenerProfileBuilder : ScriptableObject, IListenerProfileBuilder
     {
         /// <summary>
         /// Override this function to make several calls to AddChannel and AddFilterToChannel which defines a profile.
         /// </summary>
-        protected abstract void BuildProfile();
+        public abstract void BuildProfile(ref ListenerProfileBuildContext context);
+    }
 
+    public struct ListenerProfileBuildContext
+    {
         /// <summary>
         /// Adds a channel to the profile. A channel is a 3D radial slice where all audio sources coming from that direction
         /// are subject to the channels filters. Sources between channels will interpolate between the channels.
@@ -36,17 +45,15 @@ namespace Latios.Myri.Authoring
         /// <param name="passthroughVolume">The raw attenuation of amplification to apply to the signal bypassing the filters. Not in decibels.</param>
         /// <param name="isRightEar">If true, this channel uses the right ear. Otherwise, it uses the left ear.</param>
         /// <returns>A handle which can be used to add filters to the channel</returns>
-        protected ChannelHandle AddChannel(float2 minMaxHorizontalAngleInRadiansCounterClockwiseFromRight,
-                                           float2 minMaxVerticalAngleInRadians,
-                                           float passthroughFraction,
-                                           float filterVolume,
-                                           float passthroughVolume,
-                                           bool isRightEar)
+        public ChannelHandle AddChannel(float2 minMaxHorizontalAngleInRadiansCounterClockwiseFromRight,
+                                        float2 minMaxVerticalAngleInRadians,
+                                        float passthroughFraction,
+                                        float filterVolume,
+                                        float passthroughVolume,
+                                        bool isRightEar)
         {
-            CheckAllowedToGenerate("AddChannel()");
-
             if (m_job.anglesPerLeftChannel.Length + m_job.anglesPerRightChannel.Length >= 127)
-                throw new InvalidOperationException("An IldProfile only supports up to 127 channels");
+                throw new InvalidOperationException("An ListenrProfile only supports up to 127 channels");
 
             if (isRightEar)
             {
@@ -71,10 +78,8 @@ namespace Latios.Myri.Authoring
         /// </summary>
         /// <param name="filter">The filter to apply</param>
         /// <param name="channel">The channel handle returned from AddChannel</param>
-        protected void AddFilterToChannel(FrequencyFilter filter, ChannelHandle channel)
+        public void AddFilterToChannel(FrequencyFilter filter, ChannelHandle channel)
         {
-            CheckAllowedToGenerate("AddFilterToChannel()");
-
             if (channel.isRightChannel)
             {
                 m_job.filtersRight.Add(filter);
@@ -98,16 +103,9 @@ namespace Latios.Myri.Authoring
 
         #region Internals
 
-        FinalizeBlobJob m_job           = default;
-        bool            m_allowGenerate = false;
+        FinalizeBlobJob m_job;
 
-        void CheckAllowedToGenerate(string function)
-        {
-            if (!m_allowGenerate)
-                throw new InvalidOperationException($"The context is not valid. Please only call {function} from within BuildProfile() and do not call BuildProfile() yourself.");
-        }
-
-        internal BlobAssetReference<ListenerProfileBlob> ComputeBlob()
+        internal void Initialize()
         {
             m_job = new FinalizeBlobJob
             {
@@ -123,15 +121,14 @@ namespace Latios.Myri.Authoring
                 filterVolumesPerRightChannel        = new NativeList<float>(Allocator.TempJob),
                 passthroughVolumesPerLeftChannel    = new NativeList<float>(Allocator.TempJob),
                 passthroughVolumesPerRightChannel   = new NativeList<float>(Allocator.TempJob),
-                blob                                = new NativeReference<BlobAssetReference<ListenerProfileBlob> >(Allocator.TempJob)
+                blobNativeReference                 = new NativeReference<BlobAssetReference<ListenerProfileBlob> >(Allocator.TempJob)
             };
+        }
 
-            m_allowGenerate = true;
-            BuildProfile();
-            m_allowGenerate = false;
-
+        internal BlobAssetReference<ListenerProfileBlob> ComputeBlobAndDispose()
+        {
             m_job.Run();
-            var blob = m_job.blob.Value;
+            var blob = m_job.blobNativeReference.Value;
 
             m_job.filtersLeft.Dispose();
             m_job.filtersRight.Dispose();
@@ -145,7 +142,7 @@ namespace Latios.Myri.Authoring
             m_job.filterVolumesPerRightChannel.Dispose();
             m_job.passthroughVolumesPerLeftChannel.Dispose();
             m_job.passthroughVolumesPerRightChannel.Dispose();
-            m_job.blob.Dispose();
+            m_job.blobNativeReference.Dispose();
 
             return blob;
         }
@@ -167,27 +164,27 @@ namespace Latios.Myri.Authoring
             public NativeList<float>  passthroughVolumesPerLeftChannel;
             public NativeList<float>  passthroughVolumesPerRightChannel;
 
-            public NativeReference<BlobAssetReference<ListenerProfileBlob> > blob;
+            public NativeReference<BlobAssetReference<ListenerProfileBlob> > blobNativeReference;
 
             public void Execute()
             {
                 var     builder = new BlobBuilder(Allocator.Temp);
                 ref var root    = ref builder.ConstructRoot<ListenerProfileBlob>();
-                builder.ConstructFromNativeArray(ref root.filtersLeft,                         filtersLeft);
-                builder.ConstructFromNativeArray(ref root.channelIndicesLeft,                  channelIndicesLeft);
-                builder.ConstructFromNativeArray(ref root.filtersRight,                        filtersRight);
-                builder.ConstructFromNativeArray(ref root.channelIndicesRight,                 channelIndicesRight);
+                builder.ConstructFromNativeArray(ref root.filtersLeft,                         filtersLeft.AsArray());
+                builder.ConstructFromNativeArray(ref root.channelIndicesLeft,                  channelIndicesLeft.AsArray());
+                builder.ConstructFromNativeArray(ref root.filtersRight,                        filtersRight.AsArray());
+                builder.ConstructFromNativeArray(ref root.channelIndicesRight,                 channelIndicesRight.AsArray());
 
-                builder.ConstructFromNativeArray(ref root.anglesPerLeftChannel,                anglesPerLeftChannel);
-                builder.ConstructFromNativeArray(ref root.anglesPerRightChannel,               anglesPerRightChannel);
-                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerLeftChannel,  passthroughFractionsPerLeftChannel);
-                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerRightChannel, passthroughFractionsPerRightChannel);
-                builder.ConstructFromNativeArray(ref root.filterVolumesPerLeftChannel,         filterVolumesPerLeftChannel);
-                builder.ConstructFromNativeArray(ref root.filterVolumesPerRightChannel,        filterVolumesPerRightChannel);
-                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerLeftChannel,    passthroughVolumesPerLeftChannel);
-                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerRightChannel,   passthroughVolumesPerRightChannel);
+                builder.ConstructFromNativeArray(ref root.anglesPerLeftChannel,                anglesPerLeftChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.anglesPerRightChannel,               anglesPerRightChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerLeftChannel,  passthroughFractionsPerLeftChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerRightChannel, passthroughFractionsPerRightChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.filterVolumesPerLeftChannel,         filterVolumesPerLeftChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.filterVolumesPerRightChannel,        filterVolumesPerRightChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerLeftChannel,    passthroughVolumesPerLeftChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerRightChannel,   passthroughVolumesPerRightChannel.AsArray());
 
-                blob.Value = builder.CreateBlobAssetReference<ListenerProfileBlob>(Allocator.Persistent);
+                blobNativeReference.Value = builder.CreateBlobAssetReference<ListenerProfileBlob>(Allocator.Persistent);
             }
         }
         #endregion

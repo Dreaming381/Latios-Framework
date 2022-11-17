@@ -7,9 +7,9 @@ thread-safe collision detection and event handling.
 ## The Collision Layer Structure
 
 A collision layer does not use any pointers, nor does the broadphase algorithm
-use any `ComponentDataFromEntity<>` to perform its work. Instead, all data is
-copied upon construction. The following pieces of data are stored in a
-CollisionLayer:
+use any `ComponentLookup<>` to perform its work. Instead, all data is copied
+upon construction. The following pieces of data are stored in a
+`CollisionLayer`:
 
 -   Aabb
 -   ColliderBody – a struct which contains the following
@@ -33,14 +33,14 @@ layers are used together.
 
 A `CollisionLayerSettings` contains the following:
 
--   worldAABB – The axis-aligned box which defines the subdivision offsets of
+-   worldAabb – The axis-aligned box which defines the subdivision offsets of
     the multi-box broadphase cells
--   worldSubdivisionsPerAxis – The number of subdivisions of the `worldAABB` by
+-   worldSubdivisionsPerAxis – The number of subdivisions of the `worldAabb` by
     axis
 
-Note: The `worldAABB` does **not** need to fully encapsulate all colliders. The
-outer surface cells within the `worldAABB` are “open” and extend off to
-infinity. The “extents” of the `worldAABB` have no effect for subdivisions of 2
+Note: The `worldAabb` does **not** need to fully encapsulate all colliders. The
+outer surface cells within the `worldAabb` are “open” and extend off to
+infinity. The “extents” of the `worldAabb` have no effect for subdivisions of 2
 or less per corresponding axis.
 
 If no `CollisionLayerSettings` is provided to the builder, the layer will be
@@ -81,6 +81,9 @@ handles:
 
 These handles are obtained immediately during the call.
 
+You may also cache these handles inside of a `BuildCollisionLayerTypeHandles`
+member in `OnCreate()` and use those instead. Just remember to `Update()` them.
+
 `remapSrcIndices` arrays refer to the `entityInQueryIndex` of the `EntityQuery`.
 
 **Warning: This method will call** `EntityQuery.CalculateEntityCount`
@@ -100,10 +103,8 @@ element.
 This overload is similar to the previous overload, except instead of calculating
 the `Aabb`s from the `Collider` and `RigidTransform`, it uses the passed in
 `Aabb`s instead. This allows you to do more custom operations such as accounting
-for projected movements.
-
-You can calculate an `Aabb` from a `Collider` and `RigidTransform` directly
-using `Physics.CalculateAabb()`.
+for projected movements. Use the `Physics.AabbFrom()` methods for common use
+cases
 
 ### Step 2: WithXXX - Choose your settings
 
@@ -155,7 +156,7 @@ the resulting order of elements in the `CollisionLayer`.
 
 The array is not populated until the construction of the `CollisionLayer` is
 complete. However, this overload guarantees the array is allocated to the
-correct size.
+correct size. This method supports custom allocators.
 
 ### Step 3: RunXXX / ScheduleXXX – Choose your scheduler
 
@@ -163,7 +164,7 @@ The final step is to choose how to schedule the construction of the collision
 layer. Construction can be expensive, especially with large input data.
 
 All of these methods specify an `Allocator` which will be used for all native
-containers inside the `CollisionLayer`.
+containers inside the `CollisionLayer`. Custom allocators are supported.
 
 #### RunImmediate(out CollisionLayer layer, Allocator allocator)
 
@@ -190,7 +191,7 @@ For array data, only one job is scheduled.
 #### ScheduleParallel(out CollisionLayer layer, Allocator allocator, JobHandle inputDeps = default)
 
 This mode constructs the `CollisionLayer` using parallel jobs for as many stages
-of the construction as possible. It returns a JobHandle that must be completed
+of the construction as possible. It returns a `JobHandle` that must be completed
 or used as a dependency for any operation that wishes to use the output `layer`
 or `remapSrcArray`.
 
@@ -206,7 +207,8 @@ You may see these stages in the profiler:
 -   Part 5 - `IJobFor` with batch count of 128
 
 With the exception of the job types themselves, there is no algorithmic overhead
-for using parallel jobs.
+for using parallel jobs. All algorithms used in `CollisionLayer` construction
+are O(n).
 
 There is also no memory overhead for using parallel jobs, although this is more
 of a lack of reusing temp memory in the single-threaded use-case.
@@ -263,41 +265,47 @@ an instance of when invoking `FindPairs`. The best way to think of it is it’s
 like a custom job type, except you do not need to add the `[BurstCompile]`
 attribute.
 
-The interface requires that you implement an `Execute(FindPairsResult result)`.
+The interface requires that you implement an `Execute(in FindPairsResult
+result)`.
 
 #### FindPairsResult
 
 `FindPairsResult` is the data the `FindPairs` algorithm provides you whenever it
-finds a pair of overlapping `Aabb`s. It contains the following:
+finds a pair of overlapping `Aabb`s. It contains the following properties:
 
+-   entityA – A key into `PhysicsComponentLookup` which corresponds to
+    `bodyA.entity`
+-   entityB - A key into `PhysicsComponentLookup` which corresponds to
+    `bodyB.entity`
+-   colliderA – The first collider element in the pair
+-   colliderB – The second collider element in the pair
+-   transformA – The first transform element in the pair
+-   transformB – The second transform element in the pair
 -   bodyA – The `ColliderBody` representing the first element in the pair
 -   bodyB – The `ColliderBody` representing the second element in the pair
+-   layerA – The full `CollisionLayer` the first element in the pair comes from
+-   layerB – The full `CollisionLayer` the second element in the pair comes from
 -   bodyAIndex – The index of the first element in the pair as stored in its
     `CollisionLayer`
 -   bodyBIndex – The index of the second element in the pair as stored in its
     `CollisionLayer`
 -   jobIndex – An index for deterministically writing to
     `EntityCommandBuffer.ParallelWriter` and similar API
--   entityA – A key into `PhysicsComponentDataFromEntity` which corresponds to
-    `bodyA.entity`
--   entityB - A key into `PhysicsComponentDataFromEntity` which corresponds to
-    `bodyB.entity`
 
-#### PhysicsComponentDataFromEntity and SafeEntity
+#### PhysicsComponentLookup and SafeEntity
 
 In `FindPairs`, the two entities in the result passed into the
 `IFindPairsProcessor` are guaranteed to be thread-safe writable. In other words,
 you can safely write to any of those entities components without race
-conditions. However, Unity’s default safety system for `ComponentDataFromEntity`
-doesn’t understand this.
+conditions. However, Unity’s default safety system for `ComponentLookup` doesn’t
+understand this.
 
-If you need to do this writing, you can instead use
-`PhysicsComponentDataFromEntity`. You assign this a normal
-`ComponentDataFromEntity` when constructing your `IFindPairsProcessor`.
-`PhysicsComponentDataFromEntity` works just like `ComponentDataFromEntity`
-except instead of being indexed with `Entity`, it is indexed using `SafeEntity`.
-The only way to obtain a `SafeEntity` is from the `entityA` and `entityB`
-properties of a `FindPairsResult`.
+If you need to do this writing, you can instead use `PhysicsComponentLookup`.
+You assign this a normal `ComponentLookup` when constructing your
+`IFindPairsProcessor`. `PhysicsComponentLookup` works just like
+`ComponentLookup` except instead of being indexed with `Entity`, it is indexed
+using `SafeEntity`. The only way to obtain a `SafeEntity` is from the `entityA`
+and `entityB` properties of a `FindPairsResult`.
 
 **Warning: This safety rule using SafeEntity only applies if only one occurrence
 of an Entity exists in the CollisonLayer(s) passed to FindPairs. Do not use
@@ -311,8 +319,7 @@ violated.
 Similar to how the two entities’ components are thread-safe writable when
 processing a `FindPairsResult`, any `NativeArray` element at either `bodyAIndex`
 or `bodyBIndex` is also thread-safe writable. However, unlike
-`PhysicsComponentDataFromEntity`, there is no thread-safe wrapper for
-`NativeArray`s.
+`PhysicsComponentLookup`, there is no thread-safe wrapper for `NativeArray`s.
 
 `jobIndex` is **not** unique per `FindPairsResult`. It is unique to each *cell
 vs cell query* the `FindPairs` algorithm performs.
@@ -355,7 +362,26 @@ using `layerA` and `layerB`. It will find all instances where an `Aabb` in
 element) always comes from `layerA` and the second element (“B” element) always
 comes from `layerB`.
 
-### Step 2: RunXXX / ScheduleXXX – Choose your scheduler
+### Step 2: WithXXX – Choose your options
+
+You can customize the algorithm to improve performance or disable specific
+safety checks like entity aliasing.
+
+#### WithoutEntityAliasingChecks()
+
+Component Safety guarantees on found pairs are invalid if an entity exists
+multiple times in a `CollisionLayer`. If you want to disable the safety check
+for this in parallel jobs, use this method.
+
+#### WithCrossCache()
+
+FindPairs is typically a two-phased algorithm. The second phase is limited in
+the number of threads it can utilize. This method moves some of the computation
+of the second phase to the highly parallel first phase, at the cost of needing
+to store the results of the computation in an intermediate buffer. This
+sacrifices some throughput to reduce latency under heavy loads.
+
+### Step 3: RunXXX / ScheduleXXX – Choose your scheduler
 
 While `FindPairs` is an optimized algorithm, it can still be computationally
 expensive, especially with complex `IFindPairsProcessor`s.
@@ -405,6 +431,12 @@ safe.
 
 This method returns a `JobHandle `which represents the final state of the
 `FindPairs` algorithm.
+
+## FindObjects
+
+If you only need to query a single `Aabb` against a `CollisionLayer`, you can
+use the `FindObjects` API. It works very similarly to `FindPairs`, but with
+fewer options.
 
 ## Debugging Collision Layers
 

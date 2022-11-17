@@ -8,7 +8,7 @@ buffers which expand the available range of performance and features, and by
 providing a dedicated sync point which permits some types of jobs to run on the
 worker threads instead of sitting idle.
 
-Code examples are down here.
+Code examples are down [here](#_Code_Examples).
 
 ## Command Buffers
 
@@ -17,7 +17,8 @@ significantly more limited than `EntityCommandBuffer` in that they each service
 only one type of command. All command buffers provide a deterministic
 `ParallelWriter` instance in which commands require a `sortKey` argument. The
 command buffers provide proper safety checks to prevent misuse. `Add()` is
-always the method for writing a new command.
+always the method for writing a new command. They can be used with custom
+allocators and utilized fully in Burst-compiled unmanaged systems.
 
 ### EnableCommandBuffer
 
@@ -47,19 +48,18 @@ To manually play back a `DestroyCommandBuffer`, you must provide an
 ### InstantiateCommandBuffer
 
 `InstantiateCommandBuffer` can instantiate an entity, add or set up to five
-components on it, and add an additional five components. The group of components
-added or set is identical for all commands in the command buffer.
+components on it, and add an additional fifteen components. The group of
+components added or set is identical for all commands in the command buffer.
 
 The generic arguments represent the components you wish to initialize. If a
 component does not exist on the entity, it will be added. Otherwise, the
-prefab’s default value for that component will be overridden. A non-generic
+prefab’s default value for that component will be overwritten. A non-generic
 variant also exists when no initialization is required.
 
 You can add additional components using the `AddComponentTag()` method. You may
-also use `SetComponentTags()` to add multiple tags at once. This approach allows
-you to legally bypass the five-tag limit (in other words, it works) but may not
-be used in conjunction with `AddComponentTag()`. If the prefab already has one
-of these components, the already existing component will be left untouched.
+also use `SetComponentTags()` to add multiple tags at once. If the prefab
+already has one of these components, the already existing component will be left
+untouched.
 
 *Important: The tag components are container-wide and are applied to all root
 entities instantiated.*
@@ -116,15 +116,23 @@ back the following command buffers:
 -   InstantiateCommandBuffer
 
 It will play back these buffers in the order they are requested from systems.
+The system is an unmanaged system invoked from a managed
+`SyncPoibtPlaybackSystemDispatch` which is responsible for catching exceptions
+and in such situations reissuing updates until all command buffers are
+processed.
 
 ### Creation and Usage
 
 To request a command buffer, call the appropriate `Create*CommandBuffer()`
 method.
 
-If you request a command buffer from somewhere other than a
-[SubSystem](Sub-Systems.md), you must also call `AddJobHandleForProducer()` in
-the same was as an `EntityCommandBufferSystem`.
+If you request a command buffer from somewhere other than a Latios Framework
+dispatched system, you must also call `AddJobHandleForProducer()` or
+`AddMainThreadCompletionForProducer()`.
+
+*Note: The default root system groups as well as any Latios Framework-defined
+ComponentSystemGroup will dispatch systems with automatic dependency
+management.*
 
 Like `EntityCommandBufferSystem`, `SyncPointPlaybackSystem` will capture the
 requesting system for each command buffer and add this to the profiling metadata
@@ -323,7 +331,3 @@ public partial struct SpawnShipsEnableSystem : ISystem
     }
 }
 ```
-
-## Known Issues
-
-The `latiosWorld.syncPoint` is not accessible in an `ISystem`.

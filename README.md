@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.5.8]
+# Latios Framework Packages for DOTS – [0.6.0]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -9,11 +9,13 @@ License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
 packages may contain code borrowed from official Unity packages and therefore
 may be seen as derivative works.
 
-This version targets Entities 0.51.1. If you are still using Entities 0.50.1,
-please use the framework version 0.5.6 instead. If you are still using Entities
-0.17, please use the framework version 0.4.4 instead.
+This version targets Entities 1.0.0 experimental. If you are still using
+Entities 0.51.1, please use the framework version 0.5.8 instead.
 
-*[0.4.x] users, please read the* [*Upgrade
+The 0.6.x series uses Transforms V1. If you are using Transforms V2, please wait
+for a newer version of the Latios Framework.
+
+*[0.5.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
@@ -53,7 +55,7 @@ technical reasons, it is a “framework”, but it acts more like a toolkit and
 stays out of the way. A developer using it should always feel in control. If
 not, there’s likely an issue worth bringing to attention.
 
-0.5 marks the end of Phase II, where focus was placed on enabling technologies
+0.5 marked the end of Phase II, where focus was placed on enabling technologies
 in DOTS such as audio and animation. Phase III will focus on gameplay
 technologies such as spatial and hierarchical queries and AI tools.
 
@@ -200,7 +202,7 @@ last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
 publish patch releases for older versions. (There might be an exception to this
-rule during the transition to DOTS 1.0, but that is TBD.)
+rule during the ongoing transition to DOTS 1.0, but that is TBD.)
 
 ## A Word of Caution
 

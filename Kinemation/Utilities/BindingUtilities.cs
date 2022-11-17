@@ -20,6 +20,16 @@ namespace Latios.Kinemation
         //    public JobHandle Dispose(JobHandle inputDeps) => indices.Dispose(inputDeps);
         //}
 
+        /// <summary>
+        /// Try to find binding indices for the mesh paths relative to the skeleton paths.
+        /// This method is used internally for automatic binding, but you can invoke it yourself
+        /// in custom tools.
+        /// </summary>
+        /// <param name="meshPaths">The bone paths for the mesh</param>
+        /// <param name="skeletonPaths">The bone paths for the skeleton</param>
+        /// <param name="outSolvedBindings">A list of indices that specify the index of the bone in the skeleton for a given bone index in the mesh's skin weights</param>
+        /// <param name="failedMeshIndex">If binding failed, specifies which bone index in the mesh was unable to find a binding</param>
+        /// <returns>True if a successful binding was found</returns>
         public static unsafe bool TrySolveBindings(BlobAssetReference<MeshBindingPathsBlob>     meshPaths,
                                                    BlobAssetReference<SkeletonBindingPathsBlob> skeletonPaths,
                                                    NativeList<short>                            outSolvedBindings,

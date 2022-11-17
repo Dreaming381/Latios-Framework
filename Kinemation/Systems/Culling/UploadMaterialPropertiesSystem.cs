@@ -1,5 +1,6 @@
 using Latios;
 using Unity.Burst;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -8,20 +9,27 @@ using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
 using UnityEngine.Profiling;
+using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     public partial class UploadMaterialPropertiesSystem : SubSystem
     {
         EntityQuery m_metaQuery;
 
-        UnityEngine.ComputeBuffer m_GPUPersistentInstanceData;
-        int                       m_persistentInstanceDataSize = 32 * 1024 * 1024;
+        private UnityEngine.GraphicsBuffer        m_GPUPersistentInstanceData;
+        internal UnityEngine.GraphicsBufferHandle m_GPUPersistentInstanceBufferHandle;
+        private SparseUploader                    m_GPUUploader;
+        private ThreadedSparseUploader            m_ThreadedGPUUploader;
 
-        const int              kGPUUploaderChunkSize = 4 * 1024 * 1024;
-        SparseUploader         m_GPUUploader;
-        ThreadedSparseUploader m_ThreadedGPUUploader;
+        private long m_persistentInstanceDataSize;
+
+        const int  kGPUUploaderChunkSize = 4 * 1024 * 1024;
+        const long kGPUBufferSizeInitial = 32 * 1024 * 1024;
+
+        internal ComponentTypeCache.BurstCompatibleTypeArray m_burstCompatibleTypeArray;
 
 #if DEBUG_LOG_MEMORY_USAGE
         private static ulong PrevUsedSpace = 0;
@@ -29,13 +37,42 @@ namespace Latios.Kinemation.Systems
 
         protected override void OnCreate()
         {
-            m_metaQuery = Fluent.WithAll<HybridChunkInfo>(false).WithAll<ChunkHeader>(true).Build();
+            m_metaQuery = Fluent.WithAll<EntitiesGraphicsChunkInfo>(false).WithAll<ChunkHeader>(true).Build();
 
-            m_GPUPersistentInstanceData = new UnityEngine.ComputeBuffer(
-                m_persistentInstanceDataSize / 4,
-                4,
-                UnityEngine.ComputeBufferType.Raw);
-            m_GPUUploader = new SparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
+            m_persistentInstanceDataSize = kGPUBufferSizeInitial;
+
+            m_GPUPersistentInstanceData = new UnityEngine.GraphicsBuffer(
+                UnityEngine.GraphicsBuffer.Target.Raw,
+                UnityEngine.GraphicsBuffer.UsageFlags.None,
+                (int)m_persistentInstanceDataSize / 4,
+                4);
+            m_GPUPersistentInstanceBufferHandle = m_GPUPersistentInstanceData.bufferHandle;
+            m_GPUUploader                       = new SparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
+        }
+
+        // Todo: Get rid of the hard system dependencies.
+        internal bool SetBufferSize(long requiredPersistentBufferSize, out UnityEngine.GraphicsBufferHandle newHandle)
+        {
+            if (requiredPersistentBufferSize != m_persistentInstanceDataSize)
+            {
+                m_persistentInstanceDataSize = requiredPersistentBufferSize;
+
+                var newBuffer = new UnityEngine.GraphicsBuffer(
+                    UnityEngine.GraphicsBuffer.Target.Raw,
+                    UnityEngine.GraphicsBuffer.UsageFlags.None,
+                    (int)(m_persistentInstanceDataSize / 4),
+                    4);
+                m_GPUUploader.ReplaceBuffer(newBuffer, true);
+                m_GPUPersistentInstanceBufferHandle = newBuffer.bufferHandle;
+                newHandle                           = m_GPUPersistentInstanceBufferHandle;
+
+                if (m_GPUPersistentInstanceData != null)
+                    m_GPUPersistentInstanceData.Dispose();
+                m_GPUPersistentInstanceData = newBuffer;
+                return true;
+            }
+            newHandle = default;
+            return false;
         }
 
         protected override unsafe void OnUpdate()
@@ -57,26 +94,16 @@ namespace Latios.Kinemation.Systems
                 Allocator.TempJob,
                 NativeArrayOptions.ClearMemory);
 
-            Profiler.BeginSample("GetTypeHandles");
-            // Getting the chunk header here ensures that CheckedState() runs before we do anything crazy.
-            var chunkHeader = GetComponentTypeHandle<ChunkHeader>(true);
-
-            //context.componentTypeCache.FetchTypeHandles(this);
-            var worldUnmanaged = World.Unmanaged;
-            ComponentTypeCacheBurstHelpers.FetchTypeHandlesBursted(ref context.componentTypeCache, SystemHandleUntyped, ref worldUnmanaged, out var typeIndicesTemp);
-            //var componentTypes = context.componentTypeCache.ToBurstCompatible(Allocator.TempJob);
-            ComponentTypeCacheBurstHelpers.MakeBurstCompatibleTypeArray(ref context.componentTypeCache, out var componentTypes, Allocator.TempJob, typeIndicesTemp);
-            Profiler.EndSample();
-
+            m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
             Dependency = new ComputeOperationsJob
             {
-                ChunkHeader                     = chunkHeader,
+                ChunkHeader                     = GetComponentTypeHandle<ChunkHeader>(true),
                 ChunkProperties                 = context.chunkProperties,
                 chunkPropertyDirtyMaskHandle    = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
                 chunkPerCameraCullingMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                ComponentTypes                  = componentTypes,
+                ComponentTypes                  = m_burstCompatibleTypeArray,
                 GpuUploadOperations             = gpuUploadOperations,
-                HybridChunkInfo                 = GetComponentTypeHandle<HybridChunkInfo>(true),
+                EntitiesGraphicsChunkInfo       = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                 LocalToWorldType                = TypeManager.GetTypeIndex<LocalToWorld>(),
                 NumGpuUploadOperations          = numGpuUploadOperations,
                 PrevLocalToWorldType            = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
@@ -84,13 +111,12 @@ namespace Latios.Kinemation.Systems
                 WorldToLocalType                = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
             }.ScheduleParallel(m_metaQuery, Dependency);
             CompleteDependency();
-            componentTypes.TypeIndexToArrayIndex.Dispose();
             Dependency = default;
 
             UnityEngine.Debug.Assert(numGpuUploadOperations.Value <= gpuUploadOperations.Length, "Maximum GPU upload operation count exceeded");
 
             ComputeUploadSizeRequirements(
-                numGpuUploadOperations.Value, gpuUploadOperations, context.defaultValueBlits,
+                numGpuUploadOperations.Value, gpuUploadOperations, context.valueBlits,
                 out int numOperations, out int totalUploadBytes, out int biggestUploadBytes);
 
 #if DEBUG_LOG_UPLOADS
@@ -102,20 +128,6 @@ namespace Latios.Kinemation.Systems
 
             // BeginUpdate()
             Profiler.BeginSample("StartUpdate");
-            if (context.requiredPersistentBufferSize != m_persistentInstanceDataSize)
-            {
-                m_persistentInstanceDataSize = context.requiredPersistentBufferSize;
-
-                var newBuffer = new UnityEngine.ComputeBuffer(
-                    m_persistentInstanceDataSize / 4,
-                    4,
-                    UnityEngine.ComputeBufferType.Raw);
-                m_GPUUploader.ReplaceBuffer(newBuffer, true);
-
-                if (m_GPUPersistentInstanceData != null)
-                    m_GPUPersistentInstanceData.Dispose();
-                m_GPUPersistentInstanceData = newBuffer;
-            }
 
             m_ThreadedGPUUploader = m_GPUUploader.Begin(totalUploadBytes, biggestUploadBytes, numOperations);
             Profiler.EndSample();
@@ -129,33 +141,22 @@ namespace Latios.Kinemation.Systems
             gpuUploadOperations.Dispose();
 
             // UploadAllBlits()
+            // Todo: Do only on first culling pass?
             Profiler.BeginSample("UploadAllBlits");
             UploadBlitJob uploadJob = new UploadBlitJob()
             {
-                BlitList               = context.defaultValueBlits,
+                BlitList               = context.valueBlits,
                 ThreadedSparseUploader = m_ThreadedGPUUploader
             };
             Profiler.EndSample();
 
-            uploadJob.Schedule(context.defaultValueBlits.Length, 1).Complete();
-            context.defaultValueBlits.Clear();
+            uploadJob.Schedule(context.valueBlits.Length, 1).Complete();
+            context.valueBlits.Clear();
 
             Profiler.BeginSample("EndUpdate");
             try
             {
-                // EndUpdate()
                 m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader);
-                // Bind compute buffer here globally
-                // TODO: Bind it once to the shader of the batch!
-                UnityEngine.Shader.SetGlobalBuffer("unity_DOTSInstanceData", m_GPUPersistentInstanceData);
-
-#if DEBUG_LOG_MEMORY_USAGE
-                if (m_GPUPersistentAllocator.UsedSpace != PrevUsedSpace)
-                {
-                    Debug.Log($"GPU memory: {m_GPUPersistentAllocator.UsedSpace / 1024.0 / 1024.0:F4} / {m_GPUPersistentAllocator.Size / 1024.0 / 1024.0:F4}");
-                    PrevUsedSpace = m_GPUPersistentAllocator.UsedSpace;
-                }
-#endif
             }
             finally
             {
@@ -168,17 +169,18 @@ namespace Latios.Kinemation.Systems
         {
             m_GPUUploader.Dispose();
             m_GPUPersistentInstanceData.Dispose();
+            m_burstCompatibleTypeArray.Dispose(default);
         }
 
         private void ComputeUploadSizeRequirements(
             int numGpuUploadOperations,
-            NativeArray<GpuUploadOperation>         gpuUploadOperations,
-            NativeArray<DefaultValueBlitDescriptor> defaultValueBlits,
+            NativeArray<GpuUploadOperation> gpuUploadOperations,
+            NativeList<ValueBlitDescriptor> valueBlits,
             out int _numOperations,
             out int _totalUploadBytes,
             out int _biggestUploadBytes)
         {
-            var numOperations      = numGpuUploadOperations + defaultValueBlits.Length;
+            var numOperations      = numGpuUploadOperations + valueBlits.Length;
             var totalUploadBytes   = 0;
             var biggestUploadBytes = 0;
             Job.WithCode(() =>
@@ -190,9 +192,9 @@ namespace Latios.Kinemation.Systems
                     biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
                 }
 
-                for (int i = 0; i < defaultValueBlits.Length; ++i)
+                for (int i = 0; i < valueBlits.Length; ++i)
                 {
-                    var numBytes        = defaultValueBlits[i].BytesRequiredInUploadBuffer;
+                    var numBytes        = valueBlits[i].BytesRequiredInUploadBuffer;
                     totalUploadBytes   += numBytes;
                     biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
                 }
@@ -204,9 +206,9 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        struct ComputeOperationsJob : IJobEntityBatch
+        struct ComputeOperationsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<HybridChunkInfo>           HybridChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
             public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>       chunkPropertyDirtyMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>               ChunkHeader;
@@ -222,11 +224,11 @@ namespace Latios.Kinemation.Systems
 
             public ComponentTypeCache.BurstCompatibleTypeArray ComponentTypes;
 
-            public void Execute(ArchetypeChunk metaChunk, int chunkIndex)
+            public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 // metaChunk is the chunk which contains the meta entities (= entities holding the chunk components) for the actual chunks
 
-                var hybridChunkInfos   = metaChunk.GetNativeArray(HybridChunkInfo);
+                var hybridChunkInfos   = metaChunk.GetNativeArray(EntitiesGraphicsChunkInfo);
                 var chunkHeaders       = metaChunk.GetNativeArray(ChunkHeader);
                 var chunkDirtyMasks    = metaChunk.GetNativeArray(chunkPropertyDirtyMaskHandle);
                 var chunkPerCameraMask = metaChunk.GetNativeArray(chunkPerCameraCullingMaskHandle);
@@ -247,7 +249,7 @@ namespace Latios.Kinemation.Systems
                 }
             }
 
-            unsafe void ProcessChunk(in HybridChunkInfo chunkInfo, ref ChunkMaterialPropertyDirtyMask dirtyMask, ArchetypeChunk chunk)
+            unsafe void ProcessChunk(in EntitiesGraphicsChunkInfo chunkInfo, ref ChunkMaterialPropertyDirtyMask dirtyMask, ArchetypeChunk chunk)
             {
                 if (!chunkInfo.Valid)
                     return;
@@ -309,28 +311,6 @@ namespace Latios.Kinemation.Systems
                                     (chunkProperty.ValueSizeBytesGPU == 4 * 4 * 3) ?
                                     ThreadedSparseUploader.MatrixType.MatrixType3x4 :
                                     ThreadedSparseUploader.MatrixType.MatrixType4x4);
-
-#if USE_PICKING_MATRICES
-                                // If picking support is enabled, also copy the LocalToWorld matrices
-                                // to the traditional instancing matrix array. This should be thread safe
-                                // because the related Burst jobs run during DOTS system execution, and
-                                // are guaranteed to have finished before rendering starts.
-                                if (isLocalToWorld)
-                                {
-#if PROFILE_BURST_JOB_INTERNALS
-                                    ProfilePickingMatrices.Begin();
-#endif
-                                    float4x4* batchPickingMatrices = (float4x4*)BatchPickingMatrices[internalIndex];
-                                    int chunkOffsetInBatch   = chunkInfo.CullingData.BatchOffset;
-                                    UnsafeUtility.MemCpy(
-                                        batchPickingMatrices + chunkOffsetInBatch,
-                                        srcPtr,
-                                        sizeBytes);
-#if PROFILE_BURST_JOB_INTERNALS
-                                    ProfilePickingMatrices.End();
-#endif
-                                }
-#endif
                             }
                             else
                             {
@@ -363,7 +343,6 @@ namespace Latios.Kinemation.Systems
                         DstOffset        = dstOffset,
                         DstOffsetInverse = -1,
                         Size             = sizeBytes,
-                        Stride           = 0,
                     };
                 }
                 else
@@ -394,7 +373,6 @@ namespace Latios.Kinemation.Systems
                         DstOffset        = dstOffset,
                         DstOffsetInverse = dstOffsetInverse,
                         Size             = numMatrices,
-                        Stride           = 0,
                     };
                 }
                 else
@@ -404,16 +382,147 @@ namespace Latios.Kinemation.Systems
             }
         }
     }
+}
 
-    [BurstCompile]
-    internal static class ComponentTypeCacheBurstHelpers
+namespace Latios.Kinemation
+{
+    internal static class BurstCompatibleMaterialComponentTypeCacheExtensions
     {
-        public static unsafe void FetchTypeHandlesBursted(ref ComponentTypeCache cache, in SystemHandleUntyped handle, ref WorldUnmanaged world, out NativeArray<int> typeIndices)
+        public static void Update(ref this ComponentTypeCache.BurstCompatibleTypeArray array, ref SystemState state)
         {
-            var statePtr = world.ResolveSystemState(handle);
+            array.t0.Update(ref state);
+            array.t1.Update(ref state);
+            array.t2.Update(ref state);
+            array.t3.Update(ref state);
+            array.t4.Update(ref state);
+            array.t5.Update(ref state);
+            array.t6.Update(ref state);
+            array.t7.Update(ref state);
+            array.t8.Update(ref state);
+            array.t9.Update(ref state);
+            array.t10.Update(ref state);
+            array.t11.Update(ref state);
+            array.t12.Update(ref state);
+            array.t13.Update(ref state);
+            array.t14.Update(ref state);
+            array.t15.Update(ref state);
+            array.t16.Update(ref state);
+            array.t17.Update(ref state);
+            array.t18.Update(ref state);
+            array.t19.Update(ref state);
+            array.t20.Update(ref state);
+            array.t21.Update(ref state);
+            array.t22.Update(ref state);
+            array.t23.Update(ref state);
+            array.t24.Update(ref state);
+            array.t25.Update(ref state);
+            array.t26.Update(ref state);
+            array.t27.Update(ref state);
+            array.t28.Update(ref state);
+            array.t29.Update(ref state);
+            array.t30.Update(ref state);
+            array.t31.Update(ref state);
+            array.t32.Update(ref state);
+            array.t33.Update(ref state);
+            array.t34.Update(ref state);
+            array.t35.Update(ref state);
+            array.t36.Update(ref state);
+            array.t37.Update(ref state);
+            array.t38.Update(ref state);
+            array.t39.Update(ref state);
+            array.t40.Update(ref state);
+            array.t41.Update(ref state);
+            array.t42.Update(ref state);
+            array.t43.Update(ref state);
+            array.t44.Update(ref state);
+            array.t45.Update(ref state);
+            array.t46.Update(ref state);
+            array.t47.Update(ref state);
+            array.t48.Update(ref state);
+            array.t49.Update(ref state);
+            array.t50.Update(ref state);
+            array.t51.Update(ref state);
+            array.t52.Update(ref state);
+            array.t53.Update(ref state);
+            array.t54.Update(ref state);
+            array.t55.Update(ref state);
+            array.t56.Update(ref state);
+            array.t57.Update(ref state);
+            array.t58.Update(ref state);
+            array.t59.Update(ref state);
+            array.t60.Update(ref state);
+            array.t61.Update(ref state);
+            array.t62.Update(ref state);
+            array.t63.Update(ref state);
+            array.t64.Update(ref state);
+            array.t65.Update(ref state);
+            array.t66.Update(ref state);
+            array.t67.Update(ref state);
+            array.t68.Update(ref state);
+            array.t69.Update(ref state);
+            array.t70.Update(ref state);
+            array.t71.Update(ref state);
+            array.t72.Update(ref state);
+            array.t73.Update(ref state);
+            array.t74.Update(ref state);
+            array.t75.Update(ref state);
+            array.t76.Update(ref state);
+            array.t77.Update(ref state);
+            array.t78.Update(ref state);
+            array.t79.Update(ref state);
+            array.t80.Update(ref state);
+            array.t81.Update(ref state);
+            array.t82.Update(ref state);
+            array.t83.Update(ref state);
+            array.t84.Update(ref state);
+            array.t85.Update(ref state);
+            array.t86.Update(ref state);
+            array.t87.Update(ref state);
+            array.t88.Update(ref state);
+            array.t89.Update(ref state);
+            array.t90.Update(ref state);
+            array.t91.Update(ref state);
+            array.t92.Update(ref state);
+            array.t93.Update(ref state);
+            array.t94.Update(ref state);
+            array.t95.Update(ref state);
+            array.t96.Update(ref state);
+            array.t97.Update(ref state);
+            array.t98.Update(ref state);
+            array.t99.Update(ref state);
+            array.t100.Update(ref state);
+            array.t101.Update(ref state);
+            array.t102.Update(ref state);
+            array.t103.Update(ref state);
+            array.t104.Update(ref state);
+            array.t105.Update(ref state);
+            array.t106.Update(ref state);
+            array.t107.Update(ref state);
+            array.t108.Update(ref state);
+            array.t109.Update(ref state);
+            array.t110.Update(ref state);
+            array.t111.Update(ref state);
+            array.t112.Update(ref state);
+            array.t113.Update(ref state);
+            array.t114.Update(ref state);
+            array.t115.Update(ref state);
+            array.t116.Update(ref state);
+            array.t117.Update(ref state);
+            array.t118.Update(ref state);
+            array.t119.Update(ref state);
+            array.t120.Update(ref state);
+            array.t121.Update(ref state);
+            array.t122.Update(ref state);
+            array.t123.Update(ref state);
+            array.t124.Update(ref state);
+            array.t125.Update(ref state);
+            array.t126.Update(ref state);
+            array.t127.Update(ref state);
+        }
 
-            //var types = cache.UsedTypes.GetKeyValueArrays(Allocator.Temp);
-            var types = UsedTypesGetKeyValueArrays(cache.UsedTypes);
+        public static void FetchTypeHandles(ref this ComponentTypeCache cache, ref SystemState componentSystem)
+        {
+            var types = cache.UsedTypes.GetKeyValueArrays(Allocator.Temp);
 
             if (cache.TypeDynamics == null || cache.TypeDynamics.Length < cache.MaxIndex + 1)
                 // Allocate according to Capacity so we grow with the same geometric formula as NativeList
@@ -424,97 +533,13 @@ namespace Latios.Kinemation.Systems
             int     numTypes = keys.Length;
             for (int i = 0; i < numTypes; ++i)
             {
-                int arrayIndex = keys[i];
-                int typeIndex  = values[i];
-                //cache.TypeDynamics[arrayIndex] = statePtr->GetDynamicComponentTypeHandle(
-                //    ComponentType.ReadOnly(typeIndex));
-                DynamicComponentTypeHandle typeHandle = default;
-                GetDynamicComponentTypeHandle(statePtr, typeIndex, &typeHandle);
-                cache.TypeDynamics[arrayIndex] = typeHandle;
+                int arrayIndex                 = keys[i];
+                int typeIndex                  = values[i];
+                cache.TypeDynamics[arrayIndex] = componentSystem.GetDynamicComponentTypeHandle(
+                    ComponentType.ReadOnly(typeIndex));
             }
 
-            typeIndices = types.Values;
-        }
-
-        public static unsafe void MakeBurstCompatibleTypeArray(ref ComponentTypeCache cache,
-                                                               out ComponentTypeCache.BurstCompatibleTypeArray result,
-                                                               Allocator allocator,
-                                                               NativeArray<int>                                typeIndices)
-        {
-            ComponentTypeCache.BurstCompatibleTypeArray typeArray = default;
-
-            UnityEngine.Debug.Assert(cache.UsedTypeCount > 0,                                                      "No types have been registered");
-            UnityEngine.Debug.Assert(cache.UsedTypeCount <= ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes, "Maximum supported amount of types exceeded");
-
-            typeArray.TypeIndexToArrayIndex = new NativeArray<int>(
-                cache.MaxIndex + 1,
-                allocator,
-                NativeArrayOptions.UninitializedMemory);
-            ref var toArrayIndex = ref typeArray.TypeIndexToArrayIndex;
-
-            // Use an index guaranteed to cause a crash on invalid indices
-            uint GuaranteedCrashOffset = 0x80000000;
-            //for (int i = 0; i < toArrayIndex.Length; ++i)
-            //    toArrayIndex[i] = (int)GuaranteedCrashOffset;
-            UnsafeUtility.MemCpyReplicate(toArrayIndex.GetUnsafePtr(), &GuaranteedCrashOffset, 4, toArrayIndex.Length);
-
-            //var typeIndices = UsedTypes.GetValueArray(Allocator.Temp);
-            int numTypes = math.min(typeIndices.Length, ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes);
-            var fixedT0  = &typeArray.t0;
-
-            for (int i = 0; i < numTypes; ++i)
-            {
-                int typeIndex                                             = typeIndices[i];
-                fixedT0[i]                                                = cache.Type(typeIndex);
-                toArrayIndex[ComponentTypeCache.GetArrayIndex(typeIndex)] = i;
-            }
-
-            // TODO: Is there a way to avoid this?
-            // We need valid type objects in each field.
-            {
-                var someType = cache.Type(typeIndices[0]);
-                for (int i = numTypes; i < ComponentTypeCache.BurstCompatibleTypeArray.kMaxTypes; ++i)
-                    fixedT0[i] = someType;
-            }
-
-            typeIndices.Dispose();
-
-            result = typeArray;
-        }
-
-        private static NativeKeyValueArrays<int, int> UsedTypesGetKeyValueArrays(NativeParallelHashMap<int, int> usedTypes)
-        {
-            var keys                         = new NativeList<int>(Allocator.TempJob);
-            var values                       = new NativeList<int>(Allocator.TempJob);
-            new ExtractKeyValueArrays { keys = keys, values = values, map = usedTypes }.Run();
-            var result                       = new NativeKeyValueArrays<int, int>(keys.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            result.Keys.CopyFrom(keys);
-            result.Values.CopyFrom(values);
-            keys.Dispose();
-            values.Dispose();
-            return result;
-        }
-
-        [BurstCompile]
-        struct ExtractKeyValueArrays : IJob
-        {
-            public NativeList<int> keys;
-            public NativeList<int> values;
-
-            [ReadOnly] public NativeParallelHashMap<int, int> map;
-
-            public void Execute()
-            {
-                var keyValues = map.GetKeyValueArrays(Allocator.Temp);
-                keys.AddRange(keyValues.Keys);
-                values.AddRange(keyValues.Values);
-            }
-        }
-
-        [BurstCompile]
-        public static unsafe void GetDynamicComponentTypeHandle(SystemState* statePtr, int typeIndex, DynamicComponentTypeHandle* handle)
-        {
-            *handle = statePtr->GetDynamicComponentTypeHandle(ComponentType.ReadOnly(typeIndex));
+            types.Dispose();
         }
     }
 }

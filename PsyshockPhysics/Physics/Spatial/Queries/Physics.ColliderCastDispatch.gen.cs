@@ -13,521 +13,509 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-	public static partial class Physics
-	{
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, SphereCollider targetSphere, RigidTransform targetSphereTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetSphere, targetSphereTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+    public static partial class Physics
+    {
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in SphereCollider targetSphere,
+                                        in RigidTransform targetSphereTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(colliderToCast.m_sphere, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(colliderToCast.m_capsule, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(colliderToCast.m_box, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(colliderToCast.m_triangle, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(colliderToCast.m_convex, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(colliderToCast.m_compound, in castStart, castEnd, in targetSphere, in targetSphereTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(SphereCollider sphereToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(sphereToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, CapsuleCollider targetCapsule, RigidTransform targetCapsuleTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCapsule, targetCapsuleTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in SphereCollider sphereToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_capsule, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_box, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_triangle, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_convex, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in sphereToCast, in castStart, castEnd, in targetCollider.m_compound, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in CapsuleCollider targetCapsule,
+                                        in RigidTransform targetCapsuleTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetCapsule, in targetCapsuleTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(CapsuleCollider capsuleToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(capsuleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, BoxCollider targetBox, RigidTransform targetBoxTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetBox, targetBoxTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in CapsuleCollider capsuleToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_capsule, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_box, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_triangle, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_convex, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in capsuleToCast, in castStart, castEnd, in targetCollider.m_compound, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in BoxCollider targetBox,
+                                        in RigidTransform targetBoxTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetBox, in targetBoxTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(BoxCollider boxToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(boxToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, TriangleCollider targetTriangle, RigidTransform targetTriangleTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetTriangle, targetTriangleTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in BoxCollider boxToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in boxToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in boxToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in boxToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in boxToCast, castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in boxToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in boxToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in TriangleCollider targetTriangle,
+                                        in RigidTransform targetTriangleTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetTriangle, in targetTriangleTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(TriangleCollider triangleToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(triangleToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, ConvexCollider targetConvex, RigidTransform targetConvexTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetConvex, targetConvexTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in TriangleCollider triangleToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_capsule, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_box, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_triangle, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_convex, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in triangleToCast, in castStart, castEnd, in targetCollider.m_compound, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in ConvexCollider targetConvex,
+                                        in RigidTransform targetConvexTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetConvex, in targetConvexTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(ConvexCollider convexToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(convexToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, CompoundCollider targetCompound, RigidTransform targetCompoundTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = colliderToCast;
-					return ColliderCast(col, castStart, castEnd, targetCompound, targetCompoundTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in ConvexCollider convexToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_capsule, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_box, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_triangle, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_convex, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in convexToCast, in castStart, castEnd, in targetCollider.m_compound, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in CompoundCollider targetCompound,
+                                        in RigidTransform targetCompoundTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetCompound, in targetCompoundTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(CompoundCollider compoundToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (targetCollider.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider col = targetCollider;
-					return ColliderCast(compoundToCast, castStart, castEnd, col, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
+        public static bool ColliderCast(in CompoundCollider compoundToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (targetCollider.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_sphere, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_capsule, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_box, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_triangle, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_convex, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in compoundToCast, in castStart, castEnd, in targetCollider.m_compound, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
 
-		public static bool ColliderCast(Collider colliderToCast, RigidTransform castStart, float3 castEnd, Collider targetCollider, RigidTransform targetTransform, out ColliderCastResult result)
-		{
-			switch (colliderToCast.type)
-			{
-				case ColliderType.Sphere: 
-				{
-					SphereCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				case ColliderType.Capsule: 
-				{
-					CapsuleCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				case ColliderType.Box: 
-				{
-					BoxCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				case ColliderType.Triangle: 
-				{
-					TriangleCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				case ColliderType.Convex: 
-				{
-					ConvexCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				case ColliderType.Compound: 
-				{
-					CompoundCollider colA = colliderToCast;
-					return ColliderCast(colA, castStart, castEnd, targetCollider, targetTransform, out result);
-				}
-				default:
-					result = default;
-					return false;
-			}
-		}
-	}
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in RigidTransform castStart,
+                                        float3 castEnd,
+                                        in Collider targetCollider,
+                                        in RigidTransform targetTransform,
+                                        out ColliderCastResult result)
+        {
+            switch (colliderToCast.type)
+            {
+                case ColliderType.Sphere:
+                {
+                    return ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                case ColliderType.Capsule:
+                {
+                    return ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                case ColliderType.Box:
+                {
+                    return ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                case ColliderType.Triangle:
+                {
+                    return ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                case ColliderType.Convex:
+                {
+                    return ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                case ColliderType.Compound:
+                {
+                    return ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in targetCollider, in targetTransform, out result);
+                }
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+    }
 }
+

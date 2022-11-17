@@ -1,0 +1,19 @@
+﻿using Unity.Collections;
+using Unity.Entities;
+using Unity.Mathematics;
+using UnityEngine;
+
+#ROOTNAMESPACEBEGIN#
+    public class #SCRIPTNAME# : MonoBehaviour
+    {
+        #NOTRIM#
+    }
+
+    public class #SCRIPTNAME#Baker : Baker<#SCRIPTNAME#>
+    {
+        public override void Bake(#SCRIPTNAME authoring)
+        {
+            #NOTRIM#
+        }
+    }
+#ROOTNAMESPACEEND#

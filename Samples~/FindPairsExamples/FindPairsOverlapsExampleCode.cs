@@ -8,7 +8,7 @@ using Unity.Transforms;
 
 namespace Dragons
 {
-    [AlwaysUpdateSystem, DisableAutoCreation]
+    [DisableAutoCreation]
     public partial class FindPairsOverlapsExampleSystem : SubSystem
     {
         public override bool ShouldUpdateSystem()
@@ -42,7 +42,7 @@ namespace Dragons
             CollisionLayerSettings settings = new CollisionLayerSettings
             {
                 worldSubdivisionsPerAxis = new int3(1, 4, 4),
-                worldAABB                = new Aabb(-1000f, 1000f),
+                worldAabb                = new Aabb(-1000f, 1000f),
             };
             Dependency = Physics.BuildCollisionLayer(m_query, this).WithSettings(settings).ScheduleParallel(out CollisionLayer layer, Allocator.TempJob, Dependency);
             Dependency = PhysicsDebug.DrawFindPairs(layer).ScheduleParallel(Dependency);

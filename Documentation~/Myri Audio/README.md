@@ -2,8 +2,8 @@
 
 Myri Audio is a pure DOTS audio solution designed for handling a myriad of audio
 sources. It leverages the C\# job system, the Burst compiler, and the DSPGraph.
-At the time of its initial release (when this page was written), no official
-Unity Entities-based audio solution existed.
+At the time of its latest release (when this page was last modified), no
+official Unity Entities-based audio solution exists.
 
 Check out the [Getting Started](Getting%20Started.md) page!
 
@@ -12,7 +12,7 @@ Check out the [Getting Started](Getting%20Started.md) page!
 ### Out-of-the-Box
 
 Myri can play audio without requiring a single line of code. Simply add Myri
-Audio Source components to your GameObjects and a Myri Audio Listener Authoring
+Audio Source components to your Game Objects and a Myri Audio Listener Authoring
 to your camera transform and you are good to go. A brickwall limiter is applied
 to the final audio result so your audio can remain distortion-free no matter how
 chaotic your scene is.
@@ -98,11 +98,11 @@ The following issues are issues with Unity’s underlying DSPGraph and cannot be
 resolved in Myri. If you encounter one of these issues, submit a bug report to
 Unity!
 
--   Background subscene conversion may fail to properly convert audio sources as
-    it fails to read the AudioClip files.
+-   Background subscene baking crashes while reading the AudioClip assets on
+    some systems.
 -   Sometimes in the editor, audio may stutter despite a lack of warnings of the
-    DSPGraph being starved. This is because GC spikes stall the audio thread on
-    some versions of Unity. (It is not due to Myri. I checked.)
+    DSPGraph being starved. This is because GC spikes stall the audio thread if
+    Burst Compilation is disabled.
 -   A job which manages listeners and the DSP graph is not Bursted due to
     DSPGraph limitations.
 -   The Unity Editor sometimes emits an exception from a Bursted job. This is a
@@ -111,10 +111,6 @@ Unity!
 -   Exiting play mode while an active listener exists will cause a warning
     regarding DSPGraph nodes not being disposed. This is an execution order
     issue on teardown.
--   Audio causes crashes for MacOS builds using 2020.1.9f1 and possibly other
-    versions. (1 report)
--   DSPGraph does not initialize correctly on 2020.3 using the new build system
-    packages for Windows. (1 report)
 
 ## Near-Term Roadmap
 

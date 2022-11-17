@@ -1,22 +1,26 @@
 ﻿using Color = UnityEngine.Color;
 using Debug = UnityEngine.Debug;
-using Unity.Burst;
-using Unity.Collections;
-using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
     public static partial class PhysicsDebug
     {
-        public static void DrawCollider(SphereCollider sphere, RigidTransform transform, Color color, int segmentsPerPi = 6)
+        /// <summary>
+        /// Draws a wireframe of a sphere using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The sphere to draw</param>
+        /// <param name="transform">The transform of the sphere in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc</param>
+        public static void DrawCollider(in SphereCollider sphere, in RigidTransform transform, Color color, int segmentsPerPi = 6)
         {
             math.sincos(math.PI / segmentsPerPi, out float sin, out float cos);
             float2 turnVector = new float2(cos, sin);
             float2 previous   = new float2(1f, 0f);
 
-            transform.pos += sphere.center;
+            var tf  = transform;
+            tf.pos += sphere.center;
 
             for (int segment = 0; segment < segmentsPerPi; segment++)
             {
@@ -27,8 +31,8 @@ namespace Latios.Psyshock
 
                 for (int i = 0; i < segmentsPerPi; i++)
                 {
-                    var xTransform = transform;
-                    var zTransform = transform;
+                    var xTransform = tf;
+                    var zTransform = tf;
                     xTransform.rot = math.mul(xTransform.rot, quaternion.RotateX(math.PI * i / segmentsPerPi));
                     zTransform.rot = math.mul(zTransform.rot, quaternion.RotateZ(math.PI * i / segmentsPerPi));
 
@@ -53,7 +57,14 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void DrawCollider(CapsuleCollider capsule, RigidTransform transform, Color color, int segmentsPerPi = 6)
+        /// <summary>
+        /// Draws a wireframe of a capsule using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The capsule to draw</param>
+        /// <param name="transform">The transform of the capsule in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc</param>
+        public static void DrawCollider(in CapsuleCollider capsule, in RigidTransform transform, Color color, int segmentsPerPi = 6)
         {
             if (math.distance(capsule.pointA, capsule.pointB) < math.EPSILON)
             {
@@ -131,7 +142,13 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void DrawCollider(BoxCollider box, RigidTransform transform, Color color)
+        /// <summary>
+        /// Draws a wireframe of a box using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The box to draw</param>
+        /// <param name="transform">The transform of the box in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        public static void DrawCollider(in BoxCollider box, in RigidTransform transform, Color color)
         {
             var aabb = new Aabb(box.center - box.halfSize, box.center + box.halfSize);
 
@@ -160,7 +177,13 @@ namespace Latios.Psyshock
             Debug.DrawLine(rightBottomFront, rightBottomBack,  color);
         }
 
-        public static void DrawCollider(TriangleCollider triangle, RigidTransform transform, Color color)
+        /// <summary>
+        /// Draws a wireframe of a triangle using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The triangle to draw</param>
+        /// <param name="transform">The transform of the triangle in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        public static void DrawCollider(in TriangleCollider triangle, in RigidTransform transform, Color color)
         {
             float3 a = math.transform(transform, triangle.pointA);
             float3 b = math.transform(transform, triangle.pointB);
@@ -171,7 +194,13 @@ namespace Latios.Psyshock
             Debug.DrawLine(c, a, color);
         }
 
-        public static void DrawCollider(ConvexCollider convex, RigidTransform transform, Color color)
+        /// <summary>
+        /// Draws a wireframe of a convex mesh using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The convex mesh to draw</param>
+        /// <param name="transform">The transform of the convex mesh in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        public static void DrawCollider(in ConvexCollider convex, in RigidTransform transform, Color color)
         {
             ref var blob = ref convex.convexColliderBlob.Value;
 
@@ -184,46 +213,56 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void DrawCollider(CompoundCollider compound, RigidTransform transform, Color color, int segmentsPerPi = 6)
+        /// <summary>
+        /// Draws a wireframe of all subcolliders in a compound using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The compound to draw</param>
+        /// <param name="transform">The transform of the compound in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc for any subcolliders which have round features</param>
+        public static void DrawCollider(in CompoundCollider compound, in RigidTransform transform, Color color, int segmentsPerPi = 6)
         {
             ref var blob  = ref compound.compoundColliderBlob.Value;
             var     scale = new PhysicsScale(compound.scale);
 
             for (int i = 0; i < blob.blobColliders.Length; i++)
             {
-                var c = Physics.ScaleCollider(blob.colliders[i], scale);
-                var t = math.mul(transform, blob.transforms[i]);
+                var c               = Physics.ScaleCollider(blob.colliders[i], scale);
+                var localTransform  = blob.transforms[i];
+                localTransform.pos *= compound.scale;
+                var t               = math.mul(transform, localTransform);
                 DrawCollider(c, t, color, segmentsPerPi);
             }
         }
 
-        public static void DrawCollider(Collider collider, RigidTransform transform, Color color, int segmentsPerPi = 6)
+        /// <summary>
+        /// Draws a wireframe of a collider using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The collider to draw</param>
+        /// <param name="transform">The transform of the collider in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc if the collider has round features</param>
+        public static void DrawCollider(in Collider collider, in RigidTransform transform, Color color, int segmentsPerPi = 6)
         {
             switch (collider.type)
             {
                 case ColliderType.Sphere:
-                    SphereCollider sphere = collider;
-                    DrawCollider(sphere, transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_sphere,   transform, color, segmentsPerPi);
                     break;
                 case ColliderType.Capsule:
-                    CapsuleCollider capsule = collider;
-                    DrawCollider(capsule, transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_capsule,  transform, color, segmentsPerPi);
                     break;
                 case ColliderType.Box:
-                    BoxCollider box = collider;
-                    DrawCollider(box, transform, color);
+                    DrawCollider(in collider.m_box,      transform, color);
                     break;
                 case ColliderType.Triangle:
-                    TriangleCollider triangle = collider;
-                    DrawCollider(triangle, transform, color);
+                    DrawCollider(in collider.m_triangle, transform, color);
                     break;
                 case ColliderType.Convex:
-                    ConvexCollider convex = collider;
-                    DrawCollider(convex, transform, color);
+                    DrawCollider(in collider.m_convex,   transform, color);
                     break;
                 case ColliderType.Compound:
-                    CompoundCollider compound = collider;
-                    DrawCollider(compound, transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_compound, transform, color, segmentsPerPi);
                     break;
             }
         }

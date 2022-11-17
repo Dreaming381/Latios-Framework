@@ -1,6 +1,6 @@
 # Getting Started with Kinemation – Part 2
 
-In this part, we’ll convert a Skinned Mesh Renderer into an entity and use an
+In this part, we’ll bake a Skinned Mesh Renderer into an entity and use an
 exposed skeleton. No code will be required.
 
 If you haven’t already done so, create a new DOTS project and add the Latios
@@ -8,20 +8,18 @@ Framework as a package. Then, create one of the Standard Bootstraps.
 
 ## Importing a Character
 
-When importing a character, ensure Read/Write Enabled is checked.
-
-![](media/f712ae7489dc88aab00c6f3e3ef61a84.png)
-
-In the rig tab, the most important settings are highlighted in this image:
+When importing a character, in the rig tab, the most important settings are
+highlighted in this image:
 
 ![](media/a16538b197e863a720ff35b6d76010dd.png)
 
 The *Animation Type* can be set to whatever type your animation clips work with.
-The *Avatar Definition* must be set to *Create From This Model*. *Skin Weights*
-is dependent on which skinning algorithm you plan to use. If you use *Linear
-Blend Skinning*, you must set it to *Standard (4 Bones)* as shown above. For
-*Compute Deform*, you can change it to custom with a max weights set up to 128.
-Leave *Optimize Game Objects* unchecked.
+The *Avatar Definition* must be set to *Create From This Model* (for this
+example only). *Skin Weights* is dependent on which skinning algorithm you plan
+to use. If you use *Linear Blend Skinning*, you must set it to *Standard (4
+Bones)* as shown above. For *Compute Deform*, you can change it to custom with a
+max weights set up to 128. Leave *Optimize Game Objects* unchecked (for this
+example only).
 
 Lastly, turn **off** compression of animation clips.
 
@@ -29,15 +27,15 @@ Lastly, turn **off** compression of animation clips.
 
 *Q: Why did we turn animation compression off?*
 
-*A: Kinemation uses its own lossy compression algorithm during conversion. If it
-reads from Unity’s lossy-compressed clips, quality will be significantly reduced
-without any benefit.*
+*A: Kinemation uses its own high-quality lossy compression algorithm during
+baking. If it reads from Unity’s lossy-compressed clips, quality will be
+significantly reduced without any benefit.*
 
 ## Making the Shader Graph and Materials
 
-Kinemation has the same requirements as the Hybrid Renderer in that skinned
-meshes must use a shader that supports one of the two skinning algorithms. You
-can easily create such a shader using *Shader Graph*. Only the *Vertex* block
+Kinemation has the same requirements as Entities Graphics in that skinned meshes
+must use a shader that supports one of the two skinning algorithms. You can
+easily create such a shader using *Shader Graph*. Only the *Vertex* block
 matters for skinning. Here’s what such a graph looks like using *Linear Blend
 Skinning*:
 
@@ -51,14 +49,16 @@ Once you’ve done that, you will need to create materials using your new shader
 
 ![](media/299fe25fca0ebd0661503dc965a4a4d9.png)
 
-## Converting the Entity
+## Baking the Entity
 
-Now, drag your character into the scene. Assign it the new materials, check the
-*Convert To Entity*, and make sure it has an *Animator* component attached. The
-*Animator* doesn’t need to be configured with anything. It just serves as a
-marker so Kinemation converts it to a skeleton.
+Now, drag your character into a subscene. Assign it the new materials, and make
+sure it has an *Animator* component attached. The *Animator* doesn’t need to be
+configured with anything. It just serves as a marker so Kinemation converts it
+to a skeleton.
 
 ![](media/41535c619a4504589e7e373af918383a.png)
+
+*Ignore the “Convert To Entity” in this image.*
 
 Now press Play. If everything went right, the character should still be posed,
 but now using Kinemation. I included some of the components on the skeleton in

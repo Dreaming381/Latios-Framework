@@ -1,74 +1,184 @@
-using Latios;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
+using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class CopySkinWithCullingSystem : SubSystem
+    [BurstCompile]
+    public partial struct CopySkinWithCullingSystem : ISystem
     {
-        EntityQuery m_metaQuery;
+        EntityQuery          m_metaQuery;
+        LatiosWorldUnmanaged latiosWorld;
 
-        protected override void OnCreate()
+        FindChunksNeedingCopyingJob m_findJob;
+        SingleSplitCopySkinJob      m_singleJob;
+        MultiSplitCopySkinJob       m_multiJob;
+
+        public void OnCreate(ref SystemState state)
         {
-            m_metaQuery = Fluent.WithAll<ChunkWorldRenderBounds>(true).WithAll<HybridChunkInfo>(true).WithAll<ChunkHeader>(true).WithAll<ChunkPerFrameCullingMask>(true)
-                          .WithAll<ChunkCopySkinShaderData>(true).WithAll<ChunkPerCameraCullingMask>(false).UseWriteGroups().Build();
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkCopySkinShaderData>(true).WithAll<ChunkPerFrameCullingMask>(true)
+                          .WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
+
+            m_findJob = new FindChunksNeedingCopyingJob
+            {
+                perCameraCullingMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                chunkHeaderHandle          = state.GetComponentTypeHandle<ChunkHeader>(true)
+            };
+
+            m_singleJob = new SingleSplitCopySkinJob
+            {
+                chunkPerFrameMaskHandle        = state.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                referenceHandle                = state.GetComponentTypeHandle<ShareSkinFromEntity>(true),
+                esiLookup                      = state.GetEntityStorageInfoLookup(),
+                chunkPerCameraMaskHandle       = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
+                chunkMaterialPropertyDirtyMask = state.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                computeLookup                  = state.GetComponentLookup<ComputeDeformShaderIndex>(false),
+                linearBlendLookup              = state.GetComponentLookup<LinearBlendSkinningShaderIndex>(false),
+                computeDeformHandle            = state.GetComponentTypeHandle<ComputeDeformShaderIndex>(false),
+                linearBlendHandle              = state.GetComponentTypeHandle<LinearBlendSkinningShaderIndex>(false),
+            };
+
+            m_multiJob = new MultiSplitCopySkinJob
+            {
+                chunkPerFrameMaskHandle        = m_singleJob.chunkPerFrameMaskHandle,
+                referenceHandle                = m_singleJob.referenceHandle,
+                esiLookup                      = m_singleJob.esiLookup,
+                chunkPerCameraMaskHandle       = m_singleJob.chunkPerCameraMaskHandle,
+                chunkPerCameraSplitsMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(false),
+                chunkMaterialPropertyDirtyMask = m_singleJob.chunkMaterialPropertyDirtyMask,
+                computeLookup                  = m_singleJob.computeLookup,
+                linearBlendLookup              = m_singleJob.linearBlendLookup,
+                computeDeformHandle            = m_singleJob.computeDeformHandle,
+                linearBlendHandle              = m_singleJob.linearBlendHandle
+            };
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            int linearBlendIndex = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true).Reinterpret<ComponentType>().AsNativeArray()
+            var chunkList = new NativeList<ArchetypeChunk>(m_metaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
+
+            m_findJob.chunkHeaderHandle.Update(ref state);
+            m_findJob.chunksToProcess = chunkList.AsParallelWriter();
+            m_findJob.perCameraCullingMaskHandle.Update(ref state);
+            state.Dependency = m_findJob.ScheduleParallelByRef(m_metaQuery, state.Dependency);
+
+            int linearBlendIndex = latiosWorld.worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true).Reinterpret<ComponentType>().AsNativeArray()
                                    .IndexOf(ComponentType.ReadOnly<LinearBlendSkinningShaderIndex>());
             ulong linearBlendMaterialMaskLower = (ulong)linearBlendIndex >= 64UL ? 0UL : (1UL << linearBlendIndex);
             ulong linearBlendMaterialMaskUpper = (ulong)linearBlendIndex >= 64UL ? (1UL << (linearBlendIndex - 64)) : 0UL;
 
-            int deformIndex = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true).Reinterpret<ComponentType>().AsNativeArray()
+            int deformIndex = latiosWorld.worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true).Reinterpret<ComponentType>().AsNativeArray()
                               .IndexOf(ComponentType.ReadOnly<ComputeDeformShaderIndex>());
             ulong deformMaterialMaskLower = (ulong)deformIndex >= 64UL ? 0UL : (1UL << deformIndex);
             ulong deformMaterialMaskUpper = (ulong)deformIndex >= 64UL ? (1UL << (deformIndex - 64)) : 0UL;
 
-            Dependency = new CopySkinJob
+            var cullRequestType = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().viewType;
+            if (cullRequestType == BatchCullingViewType.Light)
             {
-                hybridChunkInfoHandle          = GetComponentTypeHandle<HybridChunkInfo>(true),
-                chunkHeaderHandle              = GetComponentTypeHandle<ChunkHeader>(true),
-                chunkPerFrameMaskHandle        = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
-                referenceHandle                = GetComponentTypeHandle<ShareSkinFromEntity>(true),
-                sife                           = GetStorageInfoFromEntity(),
-                chunkPerCameraMaskHandle       = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                chunkMaterialPropertyDirtyMask = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                computeCdfe                    = GetComponentDataFromEntity<ComputeDeformShaderIndex>(false),
-                linearBlendCdfe                = GetComponentDataFromEntity<LinearBlendSkinningShaderIndex>(false),
-                computeDeformHandle            = GetComponentTypeHandle<ComputeDeformShaderIndex>(false),
-                linearBlendHandle              = GetComponentTypeHandle<LinearBlendSkinningShaderIndex>(false),
-                linearBlendMaterialMaskLower   = linearBlendMaterialMaskLower,
-                linearBlendMaterialMaskUpper   = linearBlendMaterialMaskUpper,
-                deformMaterialMaskLower        = deformMaterialMaskLower,
-                deformMaterialMaskUpper        = deformMaterialMaskUpper
-            }.ScheduleParallel(m_metaQuery, Dependency);
+                m_multiJob.chunkPerFrameMaskHandle.Update(ref state);
+                m_multiJob.referenceHandle.Update(ref state);
+                m_multiJob.esiLookup.Update(ref state);
+                m_multiJob.chunkPerCameraMaskHandle.Update(ref state);
+                m_multiJob.chunkPerCameraSplitsMaskHandle.Update(ref state);
+                m_multiJob.chunkMaterialPropertyDirtyMask.Update(ref state);
+                m_multiJob.computeLookup.Update(ref state);
+                m_multiJob.linearBlendLookup.Update(ref state);
+                m_multiJob.computeDeformHandle.Update(ref state);
+                m_multiJob.linearBlendHandle.Update(ref state);
+                m_multiJob.linearBlendMaterialMaskLower = linearBlendMaterialMaskLower;
+                m_multiJob.linearBlendMaterialMaskUpper = linearBlendMaterialMaskUpper;
+                m_multiJob.deformMaterialMaskLower      = deformMaterialMaskLower;
+                m_multiJob.deformMaterialMaskUpper      = deformMaterialMaskUpper;
+                m_multiJob.chunksToProcess              = chunkList.AsDeferredJobArray();
+
+                state.Dependency = m_multiJob.ScheduleByRef(chunkList, 1, state.Dependency);
+            }
+            else
+            {
+                m_singleJob.chunkPerFrameMaskHandle.Update(ref state);
+                m_singleJob.referenceHandle.Update(ref state);
+                m_singleJob.esiLookup.Update(ref state);
+                m_singleJob.chunkPerCameraMaskHandle.Update(ref state);
+                m_singleJob.chunkMaterialPropertyDirtyMask.Update(ref state);
+                m_singleJob.computeLookup.Update(ref state);
+                m_singleJob.linearBlendLookup.Update(ref state);
+                m_singleJob.computeDeformHandle.Update(ref state);
+                m_singleJob.linearBlendHandle.Update(ref state);
+                m_singleJob.linearBlendMaterialMaskLower = linearBlendMaterialMaskLower;
+                m_singleJob.linearBlendMaterialMaskUpper = linearBlendMaterialMaskUpper;
+                m_singleJob.deformMaterialMaskLower      = deformMaterialMaskLower;
+                m_singleJob.deformMaterialMaskUpper      = deformMaterialMaskUpper;
+                m_singleJob.chunksToProcess              = chunkList.AsDeferredJobArray();
+
+                state.Dependency = m_singleJob.ScheduleByRef(chunkList, 1, state.Dependency);
+            }
         }
 
         [BurstCompile]
-        unsafe struct CopySkinJob : IJobEntityBatch
+        public void OnDestroy(ref SystemState state)
         {
-            [ReadOnly] public ComponentTypeHandle<HybridChunkInfo>          hybridChunkInfoHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>              chunkHeaderHandle;
+        }
+
+        [BurstCompile]
+        struct FindChunksNeedingCopyingJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>               chunkHeaderHandle;
+
+            public NativeList<ArchetypeChunk>.ParallelWriter chunksToProcess;
+
+            [Unity.Burst.CompilerServices.SkipLocalsInit]
+            public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var chunksCache = stackalloc ArchetypeChunk[128];
+                int chunksCount = 0;
+                var masks       = metaChunk.GetNativeArray(perCameraCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(chunkHeaderHandle);
+                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                {
+                    var mask = masks[i];
+                    if ((mask.lower.Value | mask.upper.Value) != 0)
+                    {
+                        chunksCache[chunksCount] = headers[i].ArchetypeChunk;
+                        chunksCount++;
+                    }
+                }
+
+                if (chunksCount > 0)
+                {
+                    chunksToProcess.AddRangeNoResize(chunksCache, chunksCount);
+                }
+            }
+        }
+
+        [BurstCompile]
+        unsafe struct SingleSplitCopySkinJob : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
+
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask> chunkPerFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ShareSkinFromEntity>      referenceHandle;
 
-            [ReadOnly] public StorageInfoFromEntity sife;
+            [ReadOnly] public EntityStorageInfoLookup esiLookup;
 
             public ComponentTypeHandle<ChunkPerCameraCullingMask>      chunkPerCameraMaskHandle;
             public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask> chunkMaterialPropertyDirtyMask;
 
-            [NativeDisableParallelForRestriction] public ComponentDataFromEntity<ComputeDeformShaderIndex>       computeCdfe;
-            [NativeDisableParallelForRestriction] public ComponentDataFromEntity<LinearBlendSkinningShaderIndex> linearBlendCdfe;
+            [NativeDisableParallelForRestriction] public ComponentLookup<ComputeDeformShaderIndex>       computeLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<LinearBlendSkinningShaderIndex> linearBlendLookup;
 
             [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<ComputeDeformShaderIndex>       computeDeformHandle;
             [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<LinearBlendSkinningShaderIndex> linearBlendHandle;
@@ -78,91 +188,65 @@ namespace Latios.Kinemation.Systems
             public ulong deformMaterialMaskLower;
             public ulong deformMaterialMaskUpper;
 
-            public void Execute(ArchetypeChunk archetypeChunk, int chunkIndex)
+            public void Execute(int i)
             {
-                var hybridChunkInfos        = archetypeChunk.GetNativeArray(hybridChunkInfoHandle);
-                var chunkHeaders            = archetypeChunk.GetNativeArray(chunkHeaderHandle);
-                var chunkCameraMasks        = archetypeChunk.GetNativeArray(chunkPerCameraMaskHandle);
-                var chunkFrameMasks         = archetypeChunk.GetNativeArray(chunkPerFrameMaskHandle);
-                var chunkMaterialDirtyMasks = archetypeChunk.GetNativeArray(chunkMaterialPropertyDirtyMask);
+                Execute(chunksToProcess[i]);
+            }
 
+            void Execute(in ArchetypeChunk chunk)
+            {
                 var context = new MaterialContext();
-                context.Init(linearBlendCdfe, computeCdfe, linearBlendHandle, computeDeformHandle);
+                context.Begin(in chunk, in linearBlendLookup, in computeLookup, in linearBlendHandle, in computeDeformHandle);
 
-                for (var metaIndex = 0; metaIndex < archetypeChunk.Count; metaIndex++)
+                var references                 = chunk.GetNativeArray(referenceHandle);
+                var invertedFrameMasks         = chunk.GetChunkComponentData(chunkPerFrameMaskHandle);
+                invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
+                invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
+                ref var cameraMask             = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
+
+                var inMask = cameraMask.lower.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    var hybridChunkInfo = hybridChunkInfos[metaIndex];
-                    if (!hybridChunkInfo.Valid)
-                        continue;
+                    bool isIn = IsReferenceVisible(references[i].sourceSkinnedEntity,
+                                                   invertedFrameMasks.lower.IsSet(i),
+                                                   i,
+                                                   ref context);
+                    cameraMask.lower.Value &= ~(math.select(1ul, 0ul, isIn) << i);
+                }
+                inMask = cameraMask.upper.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
+                {
+                    bool isIn = IsReferenceVisible(references[i + 64].sourceSkinnedEntity,
+                                                   invertedFrameMasks.upper.IsSet(i),
+                                                   i + 64,
+                                                   ref context);
+                    cameraMask.upper.Value &= ~(math.select(1ul, 0ul, isIn) << i);
+                }
 
-                    var chunkHeader = chunkHeaders[metaIndex];
-
-                    ref var chunkCullingData = ref hybridChunkInfo.CullingData;
-
-                    var chunkInstanceCount    = chunkHeader.ArchetypeChunk.Count;
-                    var chunkEntityLodEnabled = chunkCullingData.InstanceLodEnableds;
-                    var anyLodEnabled         = (chunkEntityLodEnabled.Enabled[0] | chunkEntityLodEnabled.Enabled[1]) != 0;
-
-                    if (anyLodEnabled)
+                if (context.linearBlendDirty || context.computeDeformDirty)
+                {
+                    ref var dirtyMask = ref chunk.GetChunkComponentRefRW(in chunkMaterialPropertyDirtyMask);
+                    if (context.linearBlendDirty)
                     {
-                        // Todo: Throw error if not per-instance?
-                        //var perInstanceCull = 0 != (chunkCullingData.Flags & HybridChunkCullingData.kFlagInstanceCulling);
-
-                        var chunk = chunkHeader.ArchetypeChunk;
-                        context.ResetChunk(chunk);
-
-                        var references                 = chunk.GetNativeArray(referenceHandle);
-                        var invertedFrameMasks         = chunkFrameMasks[metaIndex];
-                        invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
-                        invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
-
-                        var        lodWord = chunkEntityLodEnabled.Enabled[0];
-                        BitField64 maskWordLower;
-                        maskWordLower.Value = 0;
-                        for (int i = math.tzcnt(lodWord); i < 64; lodWord ^= 1ul << i, i = math.tzcnt(lodWord))
-                        {
-                            bool isIn = IsReferenceVisible(references[i].sourceSkinnedEntity,
-                                                           invertedFrameMasks.lower.IsSet(i),
-                                                           i,
-                                                           ref context);
-                            maskWordLower.Value |= math.select(0ul, 1ul, isIn) << i;
-                        }
-                        lodWord = chunkEntityLodEnabled.Enabled[1];
-                        BitField64 maskWordUpper;
-                        maskWordUpper.Value = 0;
-                        for (int i = math.tzcnt(lodWord); i < 64; lodWord ^= 1ul << i, i = math.tzcnt(lodWord))
-                        {
-                            bool isIn = IsReferenceVisible(references[i + 64].sourceSkinnedEntity,
-                                                           invertedFrameMasks.upper.IsSet(i),
-                                                           i + 64,
-                                                           ref context);
-                            maskWordUpper.Value |= math.select(0ul, 1ul, isIn) << i;
-                        }
-
-                        chunkCameraMasks[metaIndex] = new ChunkPerCameraCullingMask { lower = maskWordLower, upper = maskWordUpper };
-
-                        var dirtyMask = chunkMaterialDirtyMasks[metaIndex];
-                        if (context.linearBlendDirty)
-                        {
-                            dirtyMask.lower.Value |= linearBlendMaterialMaskLower;
-                            dirtyMask.upper.Value |= linearBlendMaterialMaskUpper;
-                        }
-                        if (context.computeDeformDirty)
-                        {
-                            dirtyMask.lower.Value |= deformMaterialMaskLower;
-                            dirtyMask.upper.Value |= deformMaterialMaskUpper;
-                        }
-                        chunkMaterialDirtyMasks[metaIndex] = dirtyMask;
+                        dirtyMask.lower.Value |= linearBlendMaterialMaskLower;
+                        dirtyMask.upper.Value |= linearBlendMaterialMaskUpper;
+                    }
+                    if (context.computeDeformDirty)
+                    {
+                        dirtyMask.lower.Value |= deformMaterialMaskLower;
+                        dirtyMask.upper.Value |= deformMaterialMaskUpper;
                     }
                 }
+
+                context.End(ref linearBlendLookup, ref computeLookup, ref linearBlendHandle, ref computeDeformHandle);
             }
 
             bool IsReferenceVisible(Entity reference, bool needsCopy, int entityIndex, ref MaterialContext context)
             {
-                if (reference == Entity.Null || !sife.Exists(reference))
+                if (reference == Entity.Null || !esiLookup.Exists(reference))
                     return false;
 
-                var  info          = sife[reference];
+                var  info          = esiLookup[reference];
                 var  referenceMask = info.Chunk.GetChunkComponentData(chunkPerCameraMaskHandle);
                 bool result;
                 if (info.IndexInChunk >= 64)
@@ -171,63 +255,180 @@ namespace Latios.Kinemation.Systems
                     result = referenceMask.lower.IsSet(info.IndexInChunk);
                 if (result && needsCopy)
                 {
-                    context.CopySkin(entityIndex,
-                                     reference);
+                    context.CopySkin(entityIndex, reference);
                 }
                 return result;
             }
+        }
 
-            struct MaterialContext
+        [BurstCompile]
+        unsafe struct MultiSplitCopySkinJob : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
+
+            [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask> chunkPerFrameMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ShareSkinFromEntity>      referenceHandle;
+
+            [ReadOnly] public EntityStorageInfoLookup esiLookup;
+
+            public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraMaskHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraSplitsMaskHandle;
+            public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>  chunkMaterialPropertyDirtyMask;
+
+            [NativeDisableParallelForRestriction] public ComponentLookup<ComputeDeformShaderIndex>       computeLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<LinearBlendSkinningShaderIndex> linearBlendLookup;
+
+            [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<ComputeDeformShaderIndex>       computeDeformHandle;
+            [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<LinearBlendSkinningShaderIndex> linearBlendHandle;
+
+            public ulong linearBlendMaterialMaskLower;
+            public ulong linearBlendMaterialMaskUpper;
+            public ulong deformMaterialMaskLower;
+            public ulong deformMaterialMaskUpper;
+
+            public void Execute(int i)
             {
-                bool                                                    newChunk;
-                ArchetypeChunk                                          currentChunk;
-                NativeArray<LinearBlendSkinningShaderIndex>             linearBlendChunkArray;
-                NativeArray<ComputeDeformShaderIndex>                   computeDeformChunkArray;
-                bool                                                    hasLinearBlend;
-                bool                                                    hasComputeDeform;
-                ComponentTypeHandle<LinearBlendSkinningShaderIndex>     copySkinLinearBlendHandle;
-                ComponentDataFromEntity<LinearBlendSkinningShaderIndex> referenceLinearBlendCdfe;
-                ComponentTypeHandle<ComputeDeformShaderIndex>           copySkinComputeDeformHandle;
-                ComponentDataFromEntity<ComputeDeformShaderIndex>       referenceComputeDeformCdfe;
+                Execute(chunksToProcess[i]);
+            }
 
-                public void Init(ComponentDataFromEntity<LinearBlendSkinningShaderIndex> lbsCdfe, ComponentDataFromEntity<ComputeDeformShaderIndex> cdsCdfe,
-                                 ComponentTypeHandle<LinearBlendSkinningShaderIndex> lbsHandle, ComponentTypeHandle<ComputeDeformShaderIndex> cdsHandle)
+            void Execute(in ArchetypeChunk chunk)
+            {
+                var context = new MaterialContext();
+                context.Begin(in chunk, in linearBlendLookup, in computeLookup, in linearBlendHandle, in computeDeformHandle);
+
+                var references                 = chunk.GetNativeArray(referenceHandle);
+                var invertedFrameMasks         = chunk.GetChunkComponentData(chunkPerFrameMaskHandle);
+                invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
+                invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
+                ref var cameraMask             = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
+                ref var cameraSplitsMask       = ref chunk.GetChunkComponentRefRW(in chunkPerCameraSplitsMaskHandle);
+                cameraSplitsMask               = default;
+
+                var inMask = cameraMask.lower.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    copySkinLinearBlendHandle   = lbsHandle;
-                    referenceLinearBlendCdfe    = lbsCdfe;
-                    copySkinComputeDeformHandle = cdsHandle;
-                    referenceComputeDeformCdfe  = cdsCdfe;
+                    bool isIn = IsReferenceVisible(references[i].sourceSkinnedEntity,
+                                                   invertedFrameMasks.lower.IsSet(i),
+                                                   i,
+                                                   ref context,
+                                                   out var splits);
+                    cameraMask.lower.Value         &= ~(math.select(1ul, 0ul, isIn) << i);
+                    cameraSplitsMask.splitMasks[i]  = splits;
+                }
+                inMask = cameraMask.upper.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
+                {
+                    bool isIn = IsReferenceVisible(references[i + 64].sourceSkinnedEntity,
+                                                   invertedFrameMasks.upper.IsSet(i),
+                                                   i + 64,
+                                                   ref context,
+                                                   out var splits);
+                    cameraMask.upper.Value              &= ~(math.select(1ul, 0ul, isIn) << i);
+                    cameraSplitsMask.splitMasks[i + 64]  = splits;
                 }
 
-                public void ResetChunk(ArchetypeChunk chunk)
+                if (context.linearBlendDirty || context.computeDeformDirty)
                 {
-                    newChunk         = true;
-                    hasComputeDeform = false;
-                    hasLinearBlend   = false;
-                    currentChunk     = chunk;
-                }
-
-                public bool linearBlendDirty => hasLinearBlend;
-                public bool computeDeformDirty => hasComputeDeform;
-
-                public void CopySkin(int entityIndex, Entity reference)
-                {
-                    if (Hint.Unlikely(newChunk))
+                    ref var dirtyMask = ref chunk.GetChunkComponentRefRW(in chunkMaterialPropertyDirtyMask);
+                    if (context.linearBlendDirty)
                     {
-                        newChunk         = false;
-                        hasLinearBlend   = currentChunk.Has(copySkinLinearBlendHandle);
-                        hasComputeDeform = currentChunk.Has(copySkinComputeDeformHandle);
-                        if (hasLinearBlend)
-                            linearBlendChunkArray = currentChunk.GetNativeArray(copySkinLinearBlendHandle);
-                        if (hasComputeDeform)
-                            computeDeformChunkArray = currentChunk.GetNativeArray(copySkinComputeDeformHandle);
+                        dirtyMask.lower.Value |= linearBlendMaterialMaskLower;
+                        dirtyMask.upper.Value |= linearBlendMaterialMaskUpper;
                     }
-
-                    if (hasLinearBlend)
-                        linearBlendChunkArray[entityIndex] = referenceLinearBlendCdfe[reference];
-                    if (hasComputeDeform)
-                        computeDeformChunkArray[entityIndex] = referenceComputeDeformCdfe[reference];
+                    if (context.computeDeformDirty)
+                    {
+                        dirtyMask.lower.Value |= deformMaterialMaskLower;
+                        dirtyMask.upper.Value |= deformMaterialMaskUpper;
+                    }
                 }
+
+                context.End(ref linearBlendLookup, ref computeLookup, ref linearBlendHandle, ref computeDeformHandle);
+            }
+
+            bool IsReferenceVisible(Entity reference, bool needsCopy, int entityIndex, ref MaterialContext context, out byte splits)
+            {
+                splits = default;
+                if (reference == Entity.Null || !esiLookup.Exists(reference))
+                    return false;
+
+                var  info          = esiLookup[reference];
+                var  referenceMask = info.Chunk.GetChunkComponentRefRO(in chunkPerCameraMaskHandle);
+                bool result;
+                if (info.IndexInChunk >= 64)
+                    result = referenceMask.ValueRO.upper.IsSet(info.IndexInChunk - 64);
+                else
+                    result = referenceMask.ValueRO.lower.IsSet(info.IndexInChunk);
+
+                if (result)
+                {
+                    var referenceSplits = info.Chunk.GetChunkComponentRefRO(in chunkPerCameraSplitsMaskHandle);
+                    splits              = referenceSplits.ValueRO.splitMasks[info.IndexInChunk];
+                }
+
+                if (result && needsCopy)
+                {
+                    context.CopySkin(entityIndex, reference);
+                }
+                return result;
+            }
+        }
+
+        // A context object used to copy skinning indices while preserving caches as much as possible.
+        struct MaterialContext
+        {
+            bool                                                newChunk;
+            ArchetypeChunk                                      currentChunk;
+            NativeArray<LinearBlendSkinningShaderIndex>         linearBlendChunkArray;
+            NativeArray<ComputeDeformShaderIndex>               computeDeformChunkArray;
+            bool                                                hasLinearBlend;
+            bool                                                hasComputeDeform;
+            ComponentTypeHandle<LinearBlendSkinningShaderIndex> copySkinLinearBlendHandle;
+            ComponentLookup<LinearBlendSkinningShaderIndex>     referenceLinearBlendLookup;
+            ComponentTypeHandle<ComputeDeformShaderIndex>       copySkinComputeDeformHandle;
+            ComponentLookup<ComputeDeformShaderIndex>           referenceComputeDeformLookup;
+
+            public void Begin(in ArchetypeChunk chunk, in ComponentLookup<LinearBlendSkinningShaderIndex> lbsLookup, in ComponentLookup<ComputeDeformShaderIndex> cdsLookup,
+                              in ComponentTypeHandle<LinearBlendSkinningShaderIndex> lbsHandle, in ComponentTypeHandle<ComputeDeformShaderIndex> cdsHandle)
+            {
+                copySkinLinearBlendHandle    = lbsHandle;
+                referenceLinearBlendLookup   = lbsLookup;
+                copySkinComputeDeformHandle  = cdsHandle;
+                referenceComputeDeformLookup = cdsLookup;
+                newChunk                     = true;
+                hasComputeDeform             = false;
+                hasLinearBlend               = false;
+                currentChunk                 = chunk;
+            }
+
+            public void End(ref ComponentLookup<LinearBlendSkinningShaderIndex> lbsLookup, ref ComponentLookup<ComputeDeformShaderIndex> cdsLookup,
+                            ref ComponentTypeHandle<LinearBlendSkinningShaderIndex> lbsHandle, ref ComponentTypeHandle<ComputeDeformShaderIndex> cdsHandle)
+            {
+                lbsHandle = copySkinLinearBlendHandle;
+                lbsLookup = referenceLinearBlendLookup;
+                cdsHandle = copySkinComputeDeformHandle;
+                cdsLookup = referenceComputeDeformLookup;
+            }
+
+            public bool linearBlendDirty => hasLinearBlend;
+            public bool computeDeformDirty => hasComputeDeform;
+
+            public void CopySkin(int entityIndex, Entity reference)
+            {
+                if (Hint.Unlikely(newChunk))
+                {
+                    newChunk         = false;
+                    hasLinearBlend   = currentChunk.Has(copySkinLinearBlendHandle);
+                    hasComputeDeform = currentChunk.Has(copySkinComputeDeformHandle);
+                    if (hasLinearBlend)
+                        linearBlendChunkArray = currentChunk.GetNativeArray(copySkinLinearBlendHandle);
+                    if (hasComputeDeform)
+                        computeDeformChunkArray = currentChunk.GetNativeArray(copySkinComputeDeformHandle);
+                }
+
+                if (hasLinearBlend)
+                    linearBlendChunkArray[entityIndex] = referenceLinearBlendLookup[reference];
+                if (hasComputeDeform)
+                    computeDeformChunkArray[entityIndex] = referenceComputeDeformLookup[reference];
             }
         }
     }

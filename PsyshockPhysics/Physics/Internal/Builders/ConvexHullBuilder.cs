@@ -710,7 +710,7 @@ namespace Latios.Psyshock
             for (int i = 0; i < numVertices; i++)
             {
                 const bool force2D = true;
-                AddPoint(mathex.projectPoint(plane, tempVertices[i]), 0, force2D);
+                AddPoint(mathex.ProjectPoint(plane, tempVertices[i]), 0, force2D);
             }
 
             BuildFaceIndices();
@@ -808,7 +808,7 @@ namespace Latios.Psyshock
                                     continue;
                                 Plane  currentPlane = planes[i];
                                 float3 errors       =
-                                    new float3(mathex.signedDistance(currentPlane, a), mathex.signedDistance(currentPlane, b), mathex.signedDistance(currentPlane, c));
+                                    new float3(mathex.SignedDistance(currentPlane, a), mathex.SignedDistance(currentPlane, b), mathex.SignedDistance(currentPlane, c));
                                 float error = math.cmax(math.abs(errors));
                                 if (error < bestError)
                                 {
@@ -855,7 +855,7 @@ namespace Latios.Psyshock
 
                                 int    apex      = ApexVertex(linkedEdge);
                                 float3 newVertex = vertices[apex].position;
-                                if (math.abs(mathex.signedDistance(plane, newVertex)) > k_planeEps)
+                                if (math.abs(mathex.SignedDistance(plane, newVertex)) > k_planeEps)
                                 {
                                     continue;
                                 }
@@ -866,8 +866,8 @@ namespace Latios.Psyshock
                                     continue;
                                 }
 
-                                float4 p0 = mathex.planeFrom(newVertex, newVertex - vertices[StartVertex(edge)].position, plane.normal);
-                                float4 p1 = mathex.planeFrom(newVertex, vertices[EndVertex(edge)].position - newVertex, plane.normal);
+                                float4 p0 = mathex.PlaneFrom(newVertex, newVertex - vertices[StartVertex(edge)].position, plane.normal);
+                                float4 p1 = mathex.PlaneFrom(newVertex, vertices[EndVertex(edge)].position - newVertex, plane.normal);
 
                                 var accept = true;
                                 for (int j = 1; accept && j < (numBoundaryEdges - 1); ++j)
@@ -1304,7 +1304,7 @@ namespace Latios.Psyshock
                 for (int i = vertices.peakCount - 1, j = 0; j < vertices.peakCount; i = j, j++)
                 {
                     //float4 edgePlane = PlaneFromTwoEdges(Vertices[i].Position, Vertices[j].Position - Vertices[i].Position, ProjectionPlane.Normal);
-                    float4    edgePlane   = mathex.planeFrom(vertices[i].position, vertices[j].position - vertices[i].position, projectionPlane.normal);
+                    float4    edgePlane   = mathex.PlaneFrom(vertices[i].position, vertices[j].position - vertices[i].position, projectionPlane.normal);
                     double4x4 edgeMatrix  = GetPlaneDistSqMatrix(edgePlane);
                     matrices[i]          += edgeMatrix;
                     matrices[j]          += edgeMatrix;
@@ -1552,7 +1552,7 @@ namespace Latios.Psyshock
                 // Flip the plane if it's pointing the wrong way
                 if (math.dot(plane.normal, averageDirection) < 0)
                 {
-                    plane = mathex.flip(plane);
+                    plane = mathex.Flip(plane);
                 }
             }
 
@@ -1690,7 +1690,7 @@ namespace Latios.Psyshock
                 float span = 0.0f;
                 foreach (Vertex vertex in vertices.elements)
                 {
-                    span = math.max(span, -mathex.signedDistance(plane, vertex.position));
+                    span = math.max(span, -mathex.SignedDistance(plane, vertex.position));
                 }
                 minSpan = math.min(span, minSpan);
             }
@@ -2049,7 +2049,7 @@ namespace Latios.Psyshock
                     // Get the line through the two planes and check if it intersects the domain.
                     // If not, then it has no intersections that will be kept and we can skip it in the n^4 loop.
                     float3 tangent0 = math.cross(plane0.normal, cross);
-                    float3 point01  = point0 - tangent0 * mathex.signedDistance(plane1, point0) / math.dot(plane1.normal, tangent0);  //point on both plane0 and plane1
+                    float3 point01  = point0 - tangent0 * mathex.SignedDistance(plane1, point0) / math.dot(plane1.normal, tangent0);  //point on both plane0 and plane1
                     float3 invCross = math.select(math.rcp(cross), math.sqrt(float.MaxValue), cross == float3.zero);
                     float3 tMin     = (m_integerSpaceAabb.min - point01) * invCross;
                     float3 tMax     = (m_integerSpaceAabb.max - point01) * invCross;

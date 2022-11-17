@@ -16,19 +16,19 @@ listed here.
 
 ### Unity.Entities
 
--   `World.ExecutingSystemType()` – Returns the currently executing system for
-    the given world. This should not be used for gameplay, but may be useful for
-    profiling.
--   `World.ExecutingSystemHandle()` – Returns the `SystemHandleUntyped` of the
-    executing system for the given world.
--   `World.AsManagedSystem()` – Resolves a `SystemHandleUntyped` into a
-    `ComponentSystemBase` or `null`.
--   `WorldUnmanaged.GetAllSystemStates()` – Returns an array of all
-    `SystemState` instances stored in the world. The `SystemState` instances can
-    be fetched by ref from the array object.
--   `WorldExposedExtensions.GetMetaIdForType()` – Computes the meta ID for a
-    system type so that an unmanaged type with a resolved `SystemState` can be
-    compared against the meta ID.
+-   `UnityObjectRef<T>.GetInstanceID() – Returns the instance ID of the
+    UnityObjectRef for use in hashmaps`
+-   `ArchetypeChunk.GetChunkComponentRefRW<T>() – Returns the chunk component of
+    a chunk by ref for situations where the chunk component is large`
+-   `ArchetypeChunk.GetChunkComponentRefRO<T>() – Returns the chunk component of
+    a chunk by RefRO for situations where the chunk component is large`
+-   `BlobAssetReference<T>.GetLength()` – Returns the number of bytes associated
+    with the blob asset starting from `GetUnsafePtr()`
+-   `UnsafeUntypedBlobAssetReference.GetLength()` – Returns the number of bytes
+    associated with the blob asset starting from `GetUnsafePtr()`
+-   `BlobAssetReference<T>.GetHash64()` – Returns the internal hash of the blob
+-   `UnsafeUntypedBlobAssetReference.GetHash64()` – Returns the internal hash of
+    the blob
 -   `ComponentSystemGroup.GetSystemGroupEnumerator()` – Returns an enumerator
     which can traverse both managed and unmanaged systems in order.
 -   `SystemSortingTracker` – Struct type which can detect added or removed
@@ -36,8 +36,8 @@ listed here.
 -   `EntityManager.CopySharedComponent()` – Copies the value of a shared
     component from one entity to another given only the `ComponentType`. Will
     add the `ComponentType` to the destination entity if absent.
--   `BlobAssetReference<T>.GetLength()` – Returns the number of bytes associated
-    with the blob asset starting from `GetUnsafePtr()`
+-   `World.AsManagedSystem()` – Resolves a `SystemHandle` into a
+    `ComponentSystemBase` or `null`.
 
 ## Extensions
 

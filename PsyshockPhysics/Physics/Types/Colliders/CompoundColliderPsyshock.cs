@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -6,11 +7,15 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A uniformly scaled collection of colliders and their relative transforms.
+    /// </summary>
     [Serializable]
+    [StructLayout(LayoutKind.Explicit)]
     public struct CompoundCollider
     {
-        public BlobAssetReference<CompoundColliderBlob> compoundColliderBlob;
-        public float                                    scale;
+        [FieldOffset(0)] public BlobAssetReference<CompoundColliderBlob> compoundColliderBlob;
+        [FieldOffset(8)] public float                                    scale;
 
         public CompoundCollider(BlobAssetReference<CompoundColliderBlob> compoundColliderBlob, float scale = 1f)
         {
@@ -27,6 +32,9 @@ namespace Latios.Psyshock
     }
 
     //Todo: Use some acceleration structure in a future version
+    /// <summary>
+    /// A blob asset composed of a collection of colliders and their transforms in a unified coordinate space
+    /// </summary>
     public struct CompoundColliderBlob
     {
         internal BlobArray<BlobCollider> blobColliders;

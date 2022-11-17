@@ -6,6 +6,64 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] – 2022-11-16
+
+Officially supports Entities [1.0.0 experimental]
+
+### Added
+
+-   *New Feature:* The Kinemation renderer can now be used in the Editor World,
+    providing previews of skinned mesh entities
+-   Added `ChunkPerCameraCullingSplitsMask` for shadow map culling
+-   Added `CullingSplitElement` for shadow map culling
+-   Added many new fields to `CullingContext` which come from the new
+    `BatchRendererGroup` API
+-   Added `ChunkPerCameraSkeletonCullingSplitsMask` for shadow map culling of
+    skeletons
+
+### Changed
+
+-   **Breaking:** Authoring has been completely rewritten to use baking workflow
+-   **Breaking:** `KinemationConversionBootstrap.InstallKinemationConversion()`
+    has been replaced with
+    `KinemationBakingBootstrap.InstallKinemationBakersAndSystems()`
+-   **Breaking:** `AnimationClip.ExtractKienamtionClipEvents()` now returns a
+    `NativeArray` and expects an `Allocator` argument
+-   **Breaking:** Renamed `PhysicsComponentDataFromEntity` to
+    `PhysicsComponentLookup` and `PhysicsBufferFromEntity` to
+    `PhysicsBufferLookup`
+-   Exposed skeleton baking will not include a descendent Game Object with an
+    Animator as part of the skeleton
+-   Optimized skeleton baking only considers the first level children without
+    Skinned Mesh Renderers or Animators to be exported bones, meaning exported
+    bones can now have dynamic children
+-   *Skeleton Authoring* has been replaced with *Skeleton Settings Authoring*
+-   The new Culling algorithms work differently, so custom culling code should
+    be re-evaluated as there may be opportunities to leverage more of the system
+
+### Fixed
+
+-   Fixed component conflicts between bound skinned meshes and exported bones
+    during baking
+-   Fixed bug where exposed bone culling arrays were allocated to double the
+    amount of memory they actually required
+
+### Improved
+
+-   Added property inspectors in the editor for `MeshBindingPathsBlob`,
+    `SkeletonBindingPathsBlob`, and `OptimizedSkeletonHierarchyBlob` which can
+    be used to debug binding issues
+-   Many systems are now Burst-compiled `ISystems` using the much-improved
+    Collection Component manager and consequently run much faster on the main
+    thread, especially during culling with improvements as much as 5 times
+    better performance
+-   Material Property Component Type Handles are fully cached
+-   Meshes no longer need to be marked Read/Write enabled
+
+### Removed
+
+-   Removed `BindingMode`, `ImportStatus`, and `BoneTransformData`
+
 ## [0.5.8] – 2022-11-10
 
 Officially supports Entities [0.51.1]

@@ -69,7 +69,7 @@ namespace Latios.Psyshock
 
         public static bool RaycastCapsule(Ray ray, CapsuleCollider capsule, out float fraction, out float3 normal)
         {
-            float          axisLength = mathex.getLengthAndNormal(capsule.pointB - capsule.pointA, out float3 axis);
+            float          axisLength = mathex.GetLengthAndNormal(capsule.pointB - capsule.pointA, out float3 axis);
             SphereCollider sphere1    = new SphereCollider(capsule.pointA, capsule.radius);
 
             // Ray vs infinite cylinder
@@ -104,7 +104,7 @@ namespace Latios.Psyshock
 
         public static bool4 Raycast4Capsules(Ray ray, simdFloat3 capA, simdFloat3 capB, float4 capRadius, out float4 fraction, out simdFloat3 normal)
         {
-            float4 axisLength = mathex.getLengthAndNormal(capB - capA, out simdFloat3 axis);
+            float4 axisLength = mathex.GetLengthAndNormal(capB - capA, out simdFloat3 axis);
             // Ray vs infinite cylinder
             float4     directionDotAxis   = simd.dot(ray.displacement, axis);
             float4     originDotAxis      = simd.dot(ray.start - capA, axis);

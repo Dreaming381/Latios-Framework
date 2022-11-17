@@ -55,7 +55,8 @@ So let’s examine how Unity.Physics stacks up:
     spheres based on an animation curve, but we need this. Currently this means
     we need to allocate, destroy, and reallocate a `BlobAsset` every frame while
     simultaneously making sure that the colliders are not shared. This is not
-    performant.
+    performant. Beginning in Unity Physics 1.0, this now involves explicitly
+    passing scale to queries, which is still really awkward, but a step forward.
 -   Most of our game logic is going to be detecting if two colliders
     intersected. We want to know if our friendly projectiles hit the enemies, if
     the enemy fire hits us, if any projectile hits terrain, if two different
@@ -140,16 +141,16 @@ productivity buff. I don’t know. It’s probably some kind of fairy magic.*
 ### Mutable Colliders
 
 Instead of making the [Collider](Colliders.md) component a pointer to an
-immutable asset, I put the mutable properties directly inside the Collider
-component. Don’t worry. You don’t have to query for every `SphereCollider`,
-`CapsuleCollider`, `BoxCollider`, `TriangleCollider`, ect. I use a union to pack
-the different types together. The primitive colliders fit entirely in the
-component, which makes sense because those are the colliders you are going to
-want to mutate every which way possible anyways. The more complex colliders may
-expose some readily tweakable parameters (like scale) but also rely on Blobs or
-Entity references to an Entity with dynamic buffers and stuff. So per-frame
-animated (or simulated like cloth) mesh colliders are not only more accessible
-but more intuitive in the DOTS ecosystem.
+immutable asset, Psyshock puts the mutable properties directly inside the
+Collider component. Don’t worry. You don’t have to query for every
+`SphereCollider`, `CapsuleCollider`, `BoxCollider`, `TriangleCollider`, ect.
+Psyshock uses a union to pack the different types together. The primitive
+colliders fit entirely in the component, which makes sense because those are the
+colliders you are going to want to mutate every which way possible anyways. The
+more complex colliders may expose some readily tweakable parameters (like scale)
+but also rely on Blobs or Entity references to an Entity with dynamic buffers
+and stuff. So per-frame animated (or simulated like cloth) mesh colliders are
+not only more accessible but more intuitive in the DOTS ecosystem.
 
 One might argue that copying large collider components (it is the same size as
 `LocalToWorld`) is quite a bit more expensive than copying pointers. But given
@@ -171,9 +172,8 @@ The physics algorithms apply a local to world space conversion when capturing
 data from entities. They will also support world to local space conversion on
 simulation write back when simulation is supported.
 
-A `PhysicsScale` component is also present for handling scaled colliders. There
-is an algorithm to update `PhysicsScale` from the transform hierarchy’s scale
-components. (Future release, because it is broken atm)
+In a future release, dynamic scaling will also be fully automatic. Currently,
+you can manually scale a collider with the `PhysicsScale` component.
 
 ### Infinite Layers
 
@@ -204,9 +204,10 @@ layers as arguments. However, there is an additional generic argument requesting
 an `IFindPairsProcessor`. This is the struct that will have your
 NativeContainers and stuff to handle the results.
 
-`Physics.FindPairs` can be scheduled as a parallel job, and when you do, I
-guarantee that both entities passed into the `IFindPairsProcessor.Execute()` are
-**thread-safe writable** to any of their components!
+`Physics.FindPairs` can be scheduled as a parallel job, and when you do, the
+algorithm guarantees that both entities passed into the
+`IFindPairsProcessor.Execute()` are **thread-safe writable** to any of their
+components!
 
 Do you know how many people have asked about how to write in parallel to nearby
 enemies that should be damaged by an attack or some similar problem? Well here
@@ -224,9 +225,8 @@ You can still shoot yourself in the foot by trying to access an entity that
 isn’t one of the pair’s entities. That includes trying to access a parent
 entity, which is a common use case. You’ll have to be smart about how you go
 about that problem, or just avoid it by not using
-`[NativeDisableParallelForRestriction]`. There’s a
-`PhysicsComponentDataFromEntity` type that will help you follow the rules when
-writing to components.
+`[NativeDisableParallelForRestriction]`. There’s a `PhysicsComponentLookup` type
+that will help you follow the rules when writing to components.
 
 But even more importantly, you must ensure that **no entity can appear twice in
 a participating CollisionLayer!** There is a check in place for this when safety
@@ -274,7 +274,7 @@ using Unity.Physics, you will get two different hit points in world space. In
 fact, the distance between those two points is expressed by this formula: *r(√3
 – 1)*
 
-This isn’t the only hack in Unity.Physics. Any CastCollider function will
+This isn’t the only hack in Unity.Physics. Any `CastCollider` function will
 translate the casted collider along the ray and then check if it is “close
 enough”. And if it doesn’t find something after 10 tries, it just gives up and
 calls it a miss.
@@ -286,15 +286,14 @@ code wrong?”
 
 Psyshock is hack-free. Queries generate consistent results with as much
 precision as the 32-bit floating point hardware allows. And yes, this leads to
-some very interesting ColliderCast algorithms.
+some very interesting `ColliderCast` algorithms.
 
 ### Immediate Mode Design
 
 Nearly the entirety of Psyshock is composed of data types, data structures, and
 stateless static methods. There’s no internal state. There’s no
 “StepTheSimulation” method (and if there ever becomes one, it will just be a
-convenience method using public API). There are no systems (other than
-authoring).
+convenience method using public API). There are no systems (other than baking).
 
 Even the debug tools are static!
 
@@ -306,10 +305,6 @@ being designed inside-out. Over time, it will eventually achieve an
 out-of-the-box status, but that is not the focus. The focus is flexibility with
 the luxury of drop-in optimized and accurate algorithms and authoring tools.
 
-While it is a long way off yet, I plan on having a customizable simulation
-graph. I’m not aware of any graph-based physics engine, but I see no reason why
-it wouldn’t work.
-
 ### Invent Your Own Laws
 
 For most physics engines, if you need something extremely custom, you either
@@ -318,19 +313,15 @@ you want, or even worse, modify the code directly. In Psyshock, you own the
 engine. It is up to you whether or not you want to use the physical rules
 provided or make up your own. Do you want every object to experience its own
 rate of time? Such a concept would usually require a custom physics engine. But
-with Psyshock, this can be achieved with much less effort.
+with Psyshock, this can be achieved with little effort.
 
 ## Known Issues
 
--   This release is missing quite a few collider shapes, queries, and FindPairs
-    features. These are coming soon!
+-   This release is missing quite a few collider shapes, queries, and simulation
+    features.
 -   `PhysicsScale` is not added when authoring a scaled collider. Instead, the
     collider’s scale is baked in during conversion.
 -   Composite Transform components are not currently supported.
--   FindPairs is not fully optimized. I’m using a single-axis pruner because of
-    both familiarity and wanting to see how far I can push the algorithm with
-    Burst and easily iterate-able data structures. I haven’t even come close to
-    pushing this algorithm to the limit yet.
 -   Compound Colliders use linear brute force algorithms and lack an underlying
     acceleration structure. Try to keep the count of primitive colliders down to
     a reasonable amount.
@@ -340,10 +331,8 @@ with Psyshock, this can be achieved with much less effort.
 ## Near-Term Roadmap
 
 -   More Character Controller Utilities
--   FindPairs overhaul
-    -   Aabb layers
-    -   Stack optimizations
-    -   Pair caching
+-   FindPairs improvements
+    -   Aabb-only layers
     -   Pair filter caching
     -   Mismatched layers support
     -   CollisionLayers fully deferrable (breaking)
@@ -352,9 +341,6 @@ with Psyshock, this can be achieved with much less effort.
 -   More Collider Shapes
     -   Quad, RoundedBox, Cone, Cylinder
     -   Terrain, Static Mesh, Dynamic Compound, Dynamic Mesh
--   Raycasting CollisionLayers
-    -   Any hit, first hit, and multi-hit with IRaycastLayerProcessor
-    -   Batch structures
 -   Simplified Overlap Queries
 -   Manifold Generation
 -   More Force Equations

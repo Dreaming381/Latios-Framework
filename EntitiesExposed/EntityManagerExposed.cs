@@ -28,7 +28,7 @@ namespace Unity.Entities.Exposed
 
     public static unsafe class EntityManagerExposed
     {
-        [BurstCompatible]
+        [GenerateTestsForBurstCompatibility]
         public static EntityLocationInChunk GetEntityLocationInChunk(this EntityManager entityManager, Entity entity)
         {
             var ecs           = entityManager.GetCheckedEntityDataAccess()->EntityComponentStore;
@@ -41,7 +41,6 @@ namespace Unity.Entities.Exposed
         }
 
         // Todo: Make a Burst-Compatible version.
-        [NotBurstCompatible]
         public static void CopySharedComponent(this EntityManager entityManager, Entity src, Entity dst, ComponentType componentType)
         {
             CheckComponentTypeIsSharedComponent(componentType);

@@ -1,0 +1,26 @@
+{
+    "name": "Latios.Core.Editor",
+    "rootNamespace": "Latios.Editor",
+    "references": [
+        "Latios.Core",
+        "Unity.Entities",
+        "Unity.Platforms.UI.Editor"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.netcode",
+            "expression": "0.49",
+            "define": "NETCODE_PROJECT"
+        }
+    ],
+    "noEngineReferences": false
+}

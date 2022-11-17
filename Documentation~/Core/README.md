@@ -19,11 +19,15 @@ class is here for!
 -   Build a `playerloop` with custom preset loops (like one with classical
     `FixedUpdate` or one with Rendering before Simulation)
 
-Also, there’s an `ICustomConversionBootstrap` interface which allows you to
-customize conversion worlds. Do you want Psyshock to convert colliders, or are
-you using Unity Physics exclusively? Should the Hybrid Renderer convert skinned
-meshes, or should Kinemation? It used to be a pain to implement these decisions.
-But now you have full control!
+Also, there’s an `ICustomBakingBootstrap` interface which allows you to
+customize baking worlds and enable or disable bakers. Do you want Psyshock to
+bake colliders, or are you using Unity Physics exclusively? Should Entities
+Graphics bake skinned meshes, or should Kinemation? It used to be a pain to
+implement these decisions. But now you have full control!
+
+And lastly, there’s `ICustomEditorBootstrap`, so you can customize the Editor
+World too. This is especially useful for custom tooling that requires
+interactive previews.
 
 See more: [Customizing the Bootstraps](Customizing%20the%20Bootstraps.md)
 
@@ -54,12 +58,11 @@ not possible by the public API (Shared Components).
 
 Unity does this thing where it tries to look at your Entity Queries and decide
 if your system should update or not. While it’s certainly cute that Unity cares
-about performance, you as the programmer can make much better decisions. Turn
-off Unity’s logic with the `[AlwaysUpdateSystem]` attribute and turn on your own
-by overriding `ShouldUpdateSystem()` on a `SubSystem` (`SystemBase`) or
-`ISystemShouldUpdate` (for `ISystem`).
+about performance, you as the programmer can make much better decisions. Turn on
+your own logic by overriding `ShouldUpdateSystem()` on a `SubSystem`
+(`SystemBase`) or `ISystemShouldUpdate` (for `ISystem`).
 
-You can also use both mechanisms if Unity’s logic is not interfering but you
+You can also combine this with Unity’s logic if it is not interfering but you
 also want to further constrain the system to a specific scene or something. I do
 this a lot.
 
@@ -105,14 +108,10 @@ onto these entities. The `SceneManagerSystem `and Myri’s `AudioSystem `use the
 heavily for internal communication and for exposing camera culling parameters to
 the custom culling API.
 
-Blackboard entities can be accessed as properties of `LatiosWorld`, `SubSystem`,
-and `SuperSystem`, or via the `SystemState` extension methods.
+Blackboard entities can be accessed as properties of `LatiosWorld`,
+`LatiosWorldUnmanaged`, `SubSystem`, and `SuperSystem`.
 
 See more: [Blackboard Entities](Blackboard%20Entities.md)
-
-*Sidenote: Blackboard entities were previously referred to as “global entities”.
-The new name better represents their function, as they serve as hubs for systems
-to store or expose state.*
 
 ### Scene Management
 
@@ -127,9 +126,10 @@ to *(hopefully)*.
 
 You can request a new scene using the `RequestLoadScene` component, and you can
 get useful scene info from the `CurrentScene` component attached to the
-`worldGlobalEntity`.
+`worldGlobalEntity`. All subscenes loaded are forced to load synchronously,
+ensuring that settings entities are present right away.
 
-If you want an entity to stick around (besides the `worldGlobalEntity` which
+If you want an entity to stick around (besides the `worldBlackboardEntity` which
 always sticks around), you can add the `DontDestroyOnSceneChangeTag`.
 
 Now you can build your Mario Party clone, your multi-track racer, or your fancy
@@ -147,16 +147,19 @@ See more: [Scene Management](Scene%20Management.md)
 
 ### Collection Components
 
-Why in the world does Unity think that collections only belong on systems? Did
-they not watch the Overwatch ECS talks?
+Why in the world does Unity think that collections only belong on systems or
+singletons? Did they not watch the Overwatch ECS talks?
 
-All joking aside, they support them in two different ways:
+All joking aside, they support them in three different ways:
 
 -   Class components implementing `IDisposable`, which works but allocates GC
--   Unsafe collections which you have to be extra careful using
+-   Collections which you have to be extra careful using to avoid memory leaks
+    and don’t provide automatic dependency management
+-   Singletons which only provide dependency management for contained
+    collections (which is really bizarre)
 
-I wasn’t really satisfied with either of these solutions, so I made my own. They
-are structs that implement `ICollectionComponent`.
+I wasn’t really satisfied with these solutions, so I made my own. They are
+structs that implement `ICollectionComponent`.
 
 **Warning: Managed components and collection components are not real components.
 There are some special ways you need to work with them.**
@@ -174,11 +177,11 @@ Entities.WithAll\<{AssociatedComponentType}\>().ForEach((Entity)
 =\>{}).WithoutBurst().Run();
 ```
 
-You can then access the collection component using the `EntityManager`
-extensions.
+You can then access the collection component using the `LatiosWorldUnmanaged`
+methods.
 
 Collection components have this nice feature of automatically updating their
-dependencies if you use them in a `SubSystem`.
+dependencies if you use them in a system.
 
 See more: [Collection and Managed Struct
 Components](Collection%20and%20Managed%20Struct%20Components.md)
@@ -193,10 +196,10 @@ and you know how to reference data on other entities using Entity fields.
 Really, you just want GC-free structs that can store shared references. You
 can’t use them in jobs, but that’s not the concern.
 
-Meet `IManagedComponent`. It is a struct that can hold references. You can get
-and set them using `EntityManager.Get/SetManagedComponent` and friends. They
-work essentially the same as `ICollectionComponent` except without the automatic
-dependency management because there’s no dependencies to manage.
+Meet `IManagedStructComponent`. It is a struct that can hold references. You can
+get and set them using `LatiosWorldUnmanaged.Get/SetManagedComponent` and
+friends. They work essentially the same as `ICollectionComponent` except without
+the automatic dependency management because there’s no dependencies to manage.
 
 See more: [Collection and Managed Struct
 Components](Collection%20and%20Managed%20Struct%20Components.md)
@@ -243,10 +246,10 @@ See more: [Fluent Queries](Fluent%20Queries.md)
 
 `EntityCommandBuffer` is a powerful tool, but it has some limitations.
 
-First, it has no equivalent for `EntityManager.SetEnabled()`. While this can be
-replicated by attaching or detaching the Disabled component directly, one would
-also have to manage the `LinkedEntityGroup`, which could change between command
-recording and playback.
+First, it has no equivalent for `EntityManager.SetEnabled()` in parallel jobs.
+While this can be replicated by attaching or detaching the Disabled component
+directly, one would also have to manage the `LinkedEntityGroup`, which could
+change between command recording and playback.
 
 Enter `EnableCommandBuffer` and `DisableCommandBuffer`. They are quite limited
 in that they can only handle one type of command each, but they do it right!
@@ -257,21 +260,20 @@ initialized. This is done one-by-one in the `EntityCommandBuffer` which can be
 slow.
 
 Enter `InstantiateCommandBuffer`. You can use this command buffer to instantiate
-entities and initialize up to 5 components. You can also add an additional 5
+entities and initialize up to 5 components. You can also add an additional 15
 components on top. It uses batch processing for increased speed.
 
 Lastly, there’s a `DestroyCommandBuffer`. This command buffer may provide a
 speedup in some circumstances.
 
 All of these command buffers can be played back by the `SyncPointPlaybackSystem`
-(which can play back `EntityCommandBuffers` too). If using a `SubSystem`, you
-can fetch this using `latiosWorld.SyncPoint` and skip caching it in
-`OnCreate()`. And you don’t even have to invoke `AddJobHandleForProducer()` when
-you are done. All that boilerplate is gone. As the title says, this sync point
-is smart!
+(which can play back `EntityCommandBuffers` too). You can fetch this using
+`LatiosWorldUnmanaged.SyncPoint.` And you don’t even have to invoke
+`AddJobHandleForProducer()` or touch a singleton. Dependency management is fully
+automatic. All that boilerplate is gone. As the title says, this sync point is
+smart!
 
-You can also manually play back these buffers manually, including in a Burst
-`ISystem`.
+You can also play back these buffers manually.
 
 See more: [Custom Command Buffers and
 SyncPointPlaybackSystem](Custom%20Command%20Buffers%20and%20SyncPointPlaybackSystem.md)
@@ -324,26 +326,23 @@ complex code a little more compact and readable.
 
 ### Smart Blobbers
 
-Blob Asset Conversion is tough to get right, especially if you want to use the
-more scalable `BlobAssetComputationContext` and generate blobs in parallel. In
-addition, what if multiple authoring `MonoBehaviours` want access to these blobs
-to store in custom components? Do they build the blobs themselves and risk doing
-it wrong?
+Blob Asset Baking is tough to get right, especially if you want to cache
+expensive computation and generate blobs in parallel via baking systems. And
+what if multiple bakers want to leverage this caching and parallel baking, but
+do something custom with the results?
 
-Smart Blobbers solve this problem and make blob asset conversion painless, even
-for large projects with complex conversion dependencies. They provide a built-in
-mechanism for other authoring logic to request blobs to be converted. Those
-requests can later be resolved into real `BlobAssetReference<>` values. Smart
-Blobbers are strategically placed in the conversion pipeline to make this
-process easy and intuitive.
+Smart Blobbers solve this problem and make blob asset baking simpler, especially
+for large projects with complex baking dependencies. They provide a built-in
+mechanism for Bakers to request blobs to be built. Those requests can later be
+resolved into real `BlobAssetReference<>` values. Smart Bakers provide a
+mechanism to propagate bake context beyond a Baker’s scope so that blob assets
+can be resolved correctly without having to write custom baking systems.
 
-If you need to define your own Blob Asset Conversion, you can subclass one of
-the two `SmartBlobberConversionSystem` types. The classes explicitly define
-their requirements through abstract functions and interface constraints. And all
-the pieces you are expected to interact with are thoroughly documented via XML
-documentation. You get fully parallel (and Bursted if using runtime conversion)
-blob asset generation without having to worry about Unity’s convoluted blob
-asset conversion APIs.
+The design outlines a pattern you can follow that allows you to extend the Smart
+Blobber mechanisms to your own blob types. The process is thoroughly documented
+and all APIs contain detailed XML documentation. You can obtain fully parallel
+and Bursted blob asset generation without having to worry about Unity’s
+convoluted blob asset conversion APIs.
 
 See more: [Smart Blobbers](Smart%20Blobbers.md)
 
@@ -396,21 +395,18 @@ hierarchies are instantiated.
     Under the hood, I use generic components to modify the Entity archetypes.
     Expect them to not work with a lot of query and archetype sugar. I do try to
     make them blend in where I can though.
--   `SyncPointPlaybackSystem` uses `Allocator.Persistent` instead of
-    `World.UpdateAllocator`. (Fixed in 0.6)
--   Unmanaged systems do not support automatic dependency management features,
-    due to them being unable to receive an external `NativeContainer` while in
-    Burst. (Fixed in 0.6)
--   `ISystemShouldUpdate` and `ISystemNewScene` do not work correctly with
-    `SystemState` lambdas.
 -   Automatic dependency management for `latiosWorld.SyncPoint` and collection
     components do not function correctly when used inside `OnStartRunning()` or
     `OnStopRunning()`. This is due to a bug in `SystemBase` which assumes no
     exceptions occur inside these methods.
--   Custom containers do not yet support custom allocators.
 -   Compile errors are generated when using .Net Framework. Use .Net Standard.
--   IL2CPP only works in builds in Unity 2021 LTS and requires the IL2CPP Code
-    Generation to use the “Faster (smaller) builds” option.
+-   IL2CPP requires the IL2CPP Code Generation to use the “Faster (smaller)
+    builds” option.
+-   Fluent Queries do not work in Burst, though you can use them in an `ISystem`
+    which Burst-compiles the `OnUpdate()` method.
+-   Blackboard Entities do not retain blob asset reference counts.
+-   Scene Management does not have an updated `CurrentScene` component when
+    `OnNewScene()` callbacks are invoked.
 
 ## Near-Term Roadmap
 
@@ -436,5 +432,3 @@ hierarchies are instantiated.
     -   Port and cleanup from Lsss
 -   Reflection-free improvements
 -   Job-friendly safe blob management
--   Custom Lambda Code-gen
-    -   If I am feeling really, really brave…

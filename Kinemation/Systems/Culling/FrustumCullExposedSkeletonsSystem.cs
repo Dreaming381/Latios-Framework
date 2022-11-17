@@ -1,189 +1,402 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using Unity.Rendering;
 using Unity.Transforms;
+using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public class FrustumCullExposedSkeletonsSystem : SubSystem
+    [BurstCompile]
+    public partial struct FrustumCullExposedSkeletonsSystem : ISystem
     {
+        LatiosWorldUnmanaged latiosWorld;
+
         EntityQuery m_query;
 
-        protected override void OnCreate()
+        SingleSplitCullingJobPart2 m_singleJob2;
+        MultiSplitCullingJobPart2  m_multiJob2;
+
+        public void OnCreate(ref SystemState state)
         {
-            m_query = Fluent.WithAll<DependentSkinnedMesh>(true).WithAll<ExposedSkeletonCullingIndex>(true)
-                      .WithAll<ChunkPerCameraSkeletonCullingMask>(false, true).Build();
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_query = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<ExposedSkeletonCullingIndex>(true)
+                      .WithAll<ChunkPerCameraSkeletonCullingMask>(false, true).WithAll<ChunkPerCameraSkeletonCullingSplitsMask>(false, true).Build();
+
+            m_singleJob2 = new SingleSplitCullingJobPart2
+            {
+                perCameraCullingMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(false),
+                cullingIndexHandle         = state.GetComponentTypeHandle<ExposedSkeletonCullingIndex>(true)
+            };
+
+            m_multiJob2 = new MultiSplitCullingJobPart2
+            {
+                perCameraCullingMaskHandle       = m_singleJob2.perCameraCullingMaskHandle,
+                perCameraCullingSplitsMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraSkeletonCullingSplitsMask>(false),
+                cullingIndexHandle               = m_singleJob2.cullingIndexHandle
+            };
         }
 
-        protected override void OnUpdate()
-        {
-            // Todo: We only need the max index, so we may want to store that in an ICD instead.
-            var exposedCullingIndexManager = worldBlackboardEntity.GetCollectionComponent<ExposedCullingIndexManager>(true, out var cullingIndexJH);
-            var boundsArrays               = worldBlackboardEntity.GetCollectionComponent<ExposedSkeletonBoundsArrays>(true);
-            cullingIndexJH.Complete();
-
-            var planesBuffer = worldBlackboardEntity.GetBuffer<CullingPlane>(true);
-            var unmanaged    = World.Unmanaged;
-            var planes       = CullingUtilities.BuildSOAPlanePackets(planesBuffer.Reinterpret<UnityEngine.Plane>().AsNativeArray(), ref unmanaged);
-
-            var perThreadBitArrays = unmanaged.UpdateAllocator.AllocateNativeArray<UnsafeBitArray>(JobsUtility.MaxJobThreadCount);
-            for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
-                perThreadBitArrays[i] = default;
-
-            Dependency = new CullExposedBoundsJob
-            {
-                aabbs              = boundsArrays.allAabbs.AsDeferredJobArray(),
-                batchAabbs         = boundsArrays.batchedAabbs.AsDeferredJobArray(),
-                planePackets       = planes,
-                maxBitIndex        = exposedCullingIndexManager.maxIndex,
-                perThreadBitArrays = perThreadBitArrays,
-                allocator          = unmanaged.UpdateAllocator.ToAllocator
-            }.ScheduleBatch(exposedCullingIndexManager.maxIndex.Value + 1, 32, Dependency);
-
-            Dependency = new CollapseBitsJob
-            {
-                perThreadBitArrays = perThreadBitArrays,
-            }.Schedule(Dependency);
-
-            Dependency = new SkeletonCullingJob
-            {
-                chunkMaskHandle    = GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(false),
-                cullingIndexHandle = GetComponentTypeHandle<ExposedSkeletonCullingIndex>(true),
-                perThreadBitArrays = perThreadBitArrays
-            }.ScheduleParallel(m_query, Dependency);
-        }
-
-        // Todo: Is it worth iterating over meta chunks?
         [BurstCompile]
-        struct CullExposedBoundsJob : IJobParallelForBatch
+        public void OnUpdate(ref SystemState state)
         {
-            [ReadOnly] public NativeArray<AABB>                                      aabbs;
-            [ReadOnly] public NativeArray<AABB>                                      batchAabbs;
-            [ReadOnly] public NativeArray<FrustumPlanes.PlanePacket4>                planePackets;
-            [ReadOnly] public NativeReference<int>                                   maxBitIndex;
-            [NativeDisableParallelForRestriction] public NativeArray<UnsafeBitArray> perThreadBitArrays;
-            public Allocator                                                         allocator;
+            var splits       = latiosWorld.worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(true);
+            var boundsArrays = latiosWorld.worldBlackboardEntity.GetCollectionComponent<ExposedSkeletonBoundsArrays>(true);
 
-            [NativeSetThreadIndex] int m_NativeThreadIndex;
-
-            public void Execute(int startIndex, int count)
+            var cullRequestType = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().viewType;
+            if (cullRequestType == BatchCullingViewType.Light)
             {
-                var cullType = FrustumPlanes.Intersect2(planePackets, batchAabbs[startIndex / 32]);
-                if (cullType == FrustumPlanes.IntersectResult.Out)
+                var bitArray     = new NativeList<BitField32>(state.WorldUpdateAllocator);
+                var splitsArray  = new NativeList<byte>(state.WorldUpdateAllocator);
+                state.Dependency = new AllocateMultiSplitJob
                 {
-                    return;
-                }
+                    aabbs       = boundsArrays.allAabbs,
+                    bitArray    = bitArray,
+                    splitsArray = splitsArray
+                }.Schedule(state.Dependency);
 
-                var perThreadBitArray = perThreadBitArrays[m_NativeThreadIndex];
-                if (!perThreadBitArray.IsCreated)
+                state.Dependency = new MultiSplitCullingJobPart1
                 {
-                    perThreadBitArray = new UnsafeBitArray(CollectionHelper.Align(maxBitIndex.Value + 1, 64),
-                                                           allocator,
-                                                           NativeArrayOptions.ClearMemory);
-                    perThreadBitArrays[m_NativeThreadIndex] = perThreadBitArray;
-                }
+                    aabbs         = boundsArrays.allAabbs.AsDeferredJobArray(),
+                    batchAabbs    = boundsArrays.batchedAabbs.AsDeferredJobArray(),
+                    bitArray      = bitArray.AsDeferredJobArray(),
+                    cullingSplits = splits.packedSplits,
+                    splitsArray   = splitsArray.AsDeferredJobArray()
+                }.Schedule(boundsArrays.batchedAabbs, 1, state.Dependency);
 
-                if (cullType == FrustumPlanes.IntersectResult.In)
+                m_multiJob2.perCameraCullingMaskHandle.Update(ref state);
+                m_multiJob2.perCameraCullingSplitsMaskHandle.Update(ref state);
+                m_multiJob2.cullingIndexHandle.Update(ref state);
+                m_multiJob2.bitArray    = bitArray.AsDeferredJobArray();
+                m_multiJob2.splitsArray = splitsArray.AsDeferredJobArray();
+                state.Dependency        = m_multiJob2.ScheduleParallelByRef(m_query, state.Dependency);
+            }
+            else
+            {
+                var bitArray     = new NativeList<BitField32>(state.WorldUpdateAllocator);
+                state.Dependency = new AllocateSingleSplitJob
                 {
-                    for (int i = 0; i < count; i++)
-                    {
-                        perThreadBitArray.Set(startIndex + i, true);
-                    }
-                }
-                else
+                    batchAabbs = boundsArrays.batchedAabbs,
+                    bitArray   = bitArray,
+                }.Schedule(state.Dependency);
+
+                state.Dependency = new SingleSplitCullingJobPart1
                 {
-                    for (int i = 0; i < count; i++)
-                    {
-                        bool bit  = perThreadBitArray.IsSet(startIndex + i);
-                        bit      |= FrustumPlanes.Intersect2NoPartial(planePackets, aabbs[startIndex + i]) == FrustumPlanes.IntersectResult.In;
-                        perThreadBitArray.Set(startIndex + i, bit);
-                    }
-                }
+                    aabbs         = boundsArrays.allAabbs.AsDeferredJobArray(),
+                    batchAabbs    = boundsArrays.batchedAabbs.AsDeferredJobArray(),
+                    bitArray      = bitArray.AsDeferredJobArray(),
+                    cullingSplits = splits.packedSplits,
+                }.Schedule(boundsArrays.batchedAabbs, 1, state.Dependency);
+
+                m_singleJob2.perCameraCullingMaskHandle.Update(ref state);
+                m_singleJob2.cullingIndexHandle.Update(ref state);
+                m_singleJob2.bitArray = bitArray.AsDeferredJobArray();
+                state.Dependency      = m_singleJob2.ScheduleParallelByRef(m_query, state.Dependency);
             }
         }
 
         [BurstCompile]
-        unsafe struct CollapseBitsJob : IJob
+        public void OnDestroy(ref SystemState state)
         {
-            public NativeArray<UnsafeBitArray> perThreadBitArrays;
+        }
+
+        [BurstCompile]
+        struct AllocateSingleSplitJob : IJob
+        {
+            public NativeList<BitField32>      bitArray;
+            [ReadOnly] public NativeList<AABB> batchAabbs;
+
+            public void Execute() => bitArray.ResizeUninitialized(batchAabbs.Length);
+        }
+
+        [BurstCompile]
+        struct AllocateMultiSplitJob : IJob
+        {
+            public NativeList<BitField32>      bitArray;
+            public NativeList<byte>            splitsArray;
+            [ReadOnly] public NativeList<AABB> aabbs;
 
             public void Execute()
             {
-                int startFrom = -1;
-                for (int i = 0; i < perThreadBitArrays.Length; i++)
-                {
-                    if (perThreadBitArrays[i].IsCreated)
-                    {
-                        startFrom             = i + 1;
-                        perThreadBitArrays[0] = perThreadBitArrays[i];
-                        perThreadBitArrays[i] = default;
-                        break;
-                    }
-                }
-
-                if (startFrom == -1)
-                {
-                    // This happens if chunk culling removes all bones. Unlikely but possible.
-                    // In this case, we will need to check for this in future jobs.
-                    return;
-                }
-
-                for (int arrayIndex = startFrom; arrayIndex < perThreadBitArrays.Length; arrayIndex++)
-                {
-                    if (!perThreadBitArrays[arrayIndex].IsCreated)
-                        continue;
-                    var dstArray    = perThreadBitArrays[0];
-                    var dstArrayPtr = dstArray.Ptr;
-                    var srcArrayPtr = perThreadBitArrays[arrayIndex].Ptr;
-
-                    for (int i = 0, bitCount = 0; bitCount < dstArray.Length; i++, bitCount += 64)
-                    {
-                        dstArrayPtr[i] |= srcArrayPtr[i];
-                    }
-                }
+                splitsArray.ResizeUninitialized(aabbs.Length);
+                int count = aabbs.Length / 32;
+                if ((aabbs.Length % 32) != 0)
+                    count++;
+                bitArray.ResizeUninitialized(count);
             }
         }
 
         [BurstCompile]
-        unsafe struct SkeletonCullingJob : IJobEntityBatch
+        unsafe struct SingleSplitCullingJobPart1 : IJobParallelForDefer
         {
-            [ReadOnly] public ComponentTypeHandle<ExposedSkeletonCullingIndex> cullingIndexHandle;
-            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>      chunkMaskHandle;
+            [ReadOnly] public NativeReference<CullingSplits> cullingSplits;
+            [ReadOnly] public NativeArray<AABB>              aabbs;
+            [ReadOnly] public NativeArray<AABB>              batchAabbs;
+            public NativeArray<BitField32>                   bitArray;
 
-            [ReadOnly] public NativeArray<UnsafeBitArray> perThreadBitArrays;
-
-            public void Execute(ArchetypeChunk chunk, int chunkIndex)
+            public void Execute(int i)
             {
-                if (!perThreadBitArrays[0].IsCreated)
+                var start = i << 5;
+                var count = math.min(32, aabbs.Length - start);
+                Execute(start, count);
+            }
+
+            public void Execute(int startIndex, int count)
+            {
+                BitField32 mask = default;
+
+                ref var splits        = ref UnsafeUtility.AsRef<CullingSplits>(cullingSplits.GetUnsafeReadOnlyPtr());
+                var     cullingPlanes = splits.SplitPlanePackets.AsNativeArray();
+                var     chunkIn       = FrustumPlanes.Intersect2(cullingPlanes, batchAabbs[startIndex >> 5]);
+
+                if (chunkIn == FrustumPlanes.IntersectResult.Out)
                 {
-                    chunk.SetChunkComponentData(chunkMaskHandle, default);
+                    bitArray[startIndex >> 5] = mask;
+                    return;
+                }
+                if (chunkIn == FrustumPlanes.IntersectResult.In)
+                {
+                    mask.SetBits(0, true, count);
+                    bitArray[startIndex >> 5] = mask;
                     return;
                 }
 
+                for (int i = 0; i < count; i++)
+                {
+                    bool bit = FrustumPlanes.Intersect2NoPartial(cullingPlanes, aabbs[startIndex + i]) != FrustumPlanes.IntersectResult.Out;
+                    mask.SetBits(i, bit);
+                }
+
+                bitArray[startIndex >> 5] = mask;
+            }
+        }
+
+        [BurstCompile]
+        unsafe struct MultiSplitCullingJobPart1 : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeReference<CullingSplits>               cullingSplits;
+            [ReadOnly] public NativeArray<AABB>                            aabbs;
+            [ReadOnly] public NativeArray<AABB>                            batchAabbs;
+            public NativeArray<BitField32>                                 bitArray;
+            [NativeDisableParallelForRestriction] public NativeArray<byte> splitsArray;
+
+            public void Execute(int i)
+            {
+                var start = i << 5;
+                var count = math.min(32, aabbs.Length - start);
+                Execute(start, count);
+            }
+
+            public void Execute(int startIndex, int count)
+            {
+                Hint.Assume(count > 0 && count <= 32);
+
+                BitField32 mask = default;
+
+                ref var splits      = ref UnsafeUtility.AsRef<CullingSplits>(cullingSplits.GetUnsafeReadOnlyPtr());
+                var     batchBounds = batchAabbs[startIndex >> 5];
+                if (!splits.ReceiverPlanePackets.IsEmpty)
+                {
+                    if (FrustumPlanes.Intersect2NoPartial(splits.ReceiverPlanePackets.AsNativeArray(), batchBounds) ==
+                        FrustumPlanes.IntersectResult.Out)
+                    {
+                        bitArray[startIndex >> 5] = mask;
+                        return;
+                    }
+                }
+
+                // Unlike Entities Graphics, we initialize the visibility mask as 1s and clear bits that are hidden.
+                // However, for splits, it makes more sense to follow Entities Graphics approach.
+                // Therefore the actual strategy is to clear splits, enable them as we progress,
+                // and then mask the splits against our visibility mask.
+                var splitMasks = splitsArray.GetSubArray(startIndex, count);
+                UnsafeUtility.MemClear(splitMasks.GetUnsafePtr(), count);
+
+                var worldBounds = aabbs.GetSubArray(startIndex, count);
+
+                // First, perform frustum and receiver plane culling for all splits
+                for (int splitIndex = 0; splitIndex < splits.Splits.Length; ++splitIndex)
+                {
+                    var s = splits.Splits[splitIndex];
+
+                    byte splitMask = (byte)(1 << splitIndex);
+
+                    var splitPlanes = splits.SplitPlanePackets.GetSubNativeArray(
+                        s.PlanePacketOffset,
+                        s.PlanePacketCount);
+                    var combinedSplitPlanes = splits.CombinedSplitAndReceiverPlanePackets.GetSubNativeArray(
+                        s.CombinedPlanePacketOffset,
+                        s.CombinedPlanePacketCount);
+
+                    float2 receiverSphereLightSpace = splits.TransformToLightSpaceXY(s.CullingSphereCenter);
+
+                    // If the entire chunk fails the sphere test, no need to consider further
+                    if (splits.SphereTestEnabled && SphereTest(ref splits, s, batchBounds, receiverSphereLightSpace) == SphereTestResult.CannotCastShadow)
+                        continue;
+
+                    // See note above about per-instance culling
+                    var chunkIn = FrustumPlanes.Intersect2(splitPlanes, batchBounds);
+
+                    if (chunkIn == FrustumPlanes.IntersectResult.Partial)
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            bool isIn      = FrustumPlanes.Intersect2NoPartial(combinedSplitPlanes, worldBounds[i]) != FrustumPlanes.IntersectResult.Out;
+                            splitMasks[i] |= (byte)math.select(0u, splitMask, isIn);
+                        }
+                    }
+                    else if (chunkIn == FrustumPlanes.IntersectResult.In)
+                    {
+                        for (int i = 0; i < count; ++i)
+                            splitMasks[i] |= splitMask;
+                    }
+                    else if (chunkIn == FrustumPlanes.IntersectResult.Out)
+                    {
+                        // No need to do anything. Split mask bits for this split should already
+                        // be cleared since they were initialized to zero.
+                    }
+                }
+
+                // Todo: Do we need to help Burst vectorize this?
+                for (int i = 0; i < count; i++)
+                    mask.SetBits(i, splitMasks[i] != 0);
+
+                // If anything survived the culling, perform sphere testing for each split
+                if (splits.SphereTestEnabled && mask.Value != 0)
+                {
+                    for (int i = 0; i < count; i++)
+                    {
+                        var  sphereMask = splits.SplitSOASphereTest.SOASphereTestSplitMask(ref splits, worldBounds[i]);
+                        uint oldMask    = splitMasks[i];
+                        splitMasks[i]   = (byte)(math.asuint(sphereMask) & oldMask);
+                    }
+
+                    // Todo: Do we need to help Burst vectorize this?
+                    for (int i = 0; i < count; i++)
+                        mask.SetBits(i, splitMasks[i] != 0);
+                }
+
+                bitArray[startIndex >> 5] = mask;
+            }
+
+            private enum SphereTestResult
+            {
+                // The caster is guaranteed to not cast a visible shadow in the tested cascade
+                CannotCastShadow,
+                // The caster might cast a shadow in the tested cascade, and has to be rendered in the shadow map
+                MightCastShadow,
+            }
+
+            private SphereTestResult SphereTest(ref CullingSplits cullingSplits, CullingSplitData split, AABB aabb, float2 receiverSphereLightSpace)
+            {
+                // This test has been ported from the corresponding test done by Unity's
+                // built in shadow culling.
+
+                float  casterRadius             = math.length(aabb.Extents);
+                float2 casterCenterLightSpaceXY = cullingSplits.TransformToLightSpaceXY(aabb.Center);
+
+                // A spherical caster casts a cylindrical shadow volume. In XY in light space this ends up being a circle/circle intersection test.
+                // Thus we first check if the caster bounding circle is at least partially inside the cascade circle.
+                float sqrDistBetweenCasterAndCascadeCenter = math.lengthsq(casterCenterLightSpaceXY - receiverSphereLightSpace);
+                float combinedRadius                       = casterRadius + split.CullingSphereRadius;
+                float sqrCombinedRadius                    = combinedRadius * combinedRadius;
+
+                // If the 2D circles intersect, then the caster is potentially visible in the cascade.
+                // If they don't intersect, then there is no way for the caster to cast a shadow that is
+                // visible inside the circle.
+                // Casters that intersect the circle but are behind the receiver sphere also don't cast shadows.
+                // We don't consider that here, since those casters should be culled out by the receiver
+                // plane culling.
+                if (sqrDistBetweenCasterAndCascadeCenter <= sqrCombinedRadius)
+                    return SphereTestResult.MightCastShadow;
+                else
+                    return SphereTestResult.CannotCastShadow;
+            }
+        }
+
+        [BurstCompile]
+        unsafe struct SingleSplitCullingJobPart2 : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<ExposedSkeletonCullingIndex> cullingIndexHandle;
+            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>      perCameraCullingMaskHandle;
+
+            [ReadOnly] public NativeArray<BitField32> bitArray;
+
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                ref var mask = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
+                mask         = default;
+
                 var cullingIndices = chunk.GetNativeArray(cullingIndexHandle);
-
-                BitField64 maskWordLower;
-                maskWordLower.Value = 0;
-                for (int i = 0; i < math.min(64, chunk.Count); i++)
+                for (int i = 0; i < math.min(chunk.ChunkEntityCount, 64); i++)
                 {
-                    bool isIn            = perThreadBitArrays[0].IsSet(cullingIndices[i].cullingIndex);
-                    maskWordLower.Value |= math.select(0ul, 1ul, isIn) << i;
+                    bool isIn         = IsBitSet(cullingIndices[i].cullingIndex);
+                    mask.lower.Value |= math.select(0ul, 1ul, isIn) << i;
                 }
-                BitField64 maskWordUpper;
-                maskWordUpper.Value = 0;
-                for (int i = 0; i < math.max(0, chunk.Count - 64); i++)
+                for (int i = 0; i < chunk.ChunkEntityCount - 64; i++)
                 {
-                    bool isIn            = perThreadBitArrays[0].IsSet(cullingIndices[i + 64].cullingIndex);
-                    maskWordUpper.Value |= math.select(0ul, 1ul, isIn) << i;
+                    bool isIn         = IsBitSet(cullingIndices[i + 64].cullingIndex);
+                    mask.upper.Value |= math.select(0ul, 1ul, isIn) << i;
                 }
+            }
 
-                chunk.SetChunkComponentData(chunkMaskHandle, new ChunkPerCameraSkeletonCullingMask { lower = maskWordLower, upper = maskWordUpper });
+            bool IsBitSet(int index)
+            {
+                var arrayIndex = index >> 5;
+                var bitIndex   = index & 0x1f;
+                return bitArray[arrayIndex].IsSet(bitIndex);
+            }
+        }
+
+        [BurstCompile]
+        unsafe struct MultiSplitCullingJobPart2 : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<ExposedSkeletonCullingIndex>  cullingIndexHandle;
+            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>       perCameraCullingMaskHandle;
+            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingSplitsMask> perCameraCullingSplitsMaskHandle;
+
+            [ReadOnly] public NativeArray<BitField32> bitArray;
+            [ReadOnly] public NativeArray<byte>       splitsArray;
+
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                ref var mask       = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
+                ref var splitMasks = ref chunk.GetChunkComponentRefRW(in perCameraCullingSplitsMaskHandle);
+                mask               = default;
+                splitMasks         = default;
+
+                var cullingIndices = chunk.GetNativeArray(cullingIndexHandle);
+                for (int i = 0; i < math.min(chunk.ChunkEntityCount, 64); i++)
+                {
+                    bool isIn                 = IsBitSet(cullingIndices[i].cullingIndex, out byte splits);
+                    mask.lower.Value         |= math.select(0ul, 1ul, isIn) << i;
+                    splitMasks.splitMasks[i]  = splits;
+                }
+                for (int i = 0; i < chunk.ChunkEntityCount - 64; i++)
+                {
+                    bool isIn                      = IsBitSet(cullingIndices[i + 64].cullingIndex, out byte splits);
+                    mask.upper.Value              |= math.select(0ul, 1ul, isIn) << i;
+                    splitMasks.splitMasks[i + 64]  = splits;
+                }
+            }
+
+            bool IsBitSet(int index, out byte splits)
+            {
+                var arrayIndex = index >> 5;
+                var bitIndex   = index & 0x1f;
+                var result     = bitArray[arrayIndex].IsSet(bitIndex);
+                splits         = result ? splitsArray[index] : default;
+                return result;
             }
         }
     }

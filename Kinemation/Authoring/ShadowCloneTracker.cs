@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring
 {
     [DisallowMultipleComponent]
-    class HideThis
+    partial class HideThis
     {
         public class ShadowCloneTracker : MonoBehaviour
         {
