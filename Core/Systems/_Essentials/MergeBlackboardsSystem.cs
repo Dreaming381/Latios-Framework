@@ -10,6 +10,7 @@ namespace Latios.Systems
     /// A system which combines entities with the BlackboardEntityData components into the worldBlackboardEntity and sceneBlackboardEntity.
     /// The entities with BlackboardEntityData are destroyed.
     /// </summary>
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderFirst = true)]
     //[UpdateBefore(typeof(ManagedComponentsReactiveSystemGroup))] // Constrained in ManagedComponentsReactiveSystemGroup.
@@ -40,10 +41,10 @@ namespace Latios.Systems
 
         protected override void OnUpdate()
         {
-            Entities.WithStoreEntityQueryInField(ref m_query).WithStructuralChanges().ForEach((Entity entity, ref BlackboardEntityData globalEntityData) =>
+            Entities.WithStoreEntityQueryInField(ref m_query).WithStructuralChanges().ForEach((Entity entity, ref BlackboardEntityData blackboardEntityData) =>
             {
                 var types        = EntityManager.GetComponentTypes(entity, Unity.Collections.Allocator.TempJob);
-                var targetEntity = globalEntityData.blackboardScope == BlackboardScope.World ? worldBlackboardEntity : sceneBlackboardEntity;
+                var targetEntity = blackboardEntityData.blackboardScope == BlackboardScope.World ? worldBlackboardEntity : sceneBlackboardEntity;
                 var sceneTypes   = m_sceneTypes;
 
                 ComponentType errorType = default;
@@ -64,9 +65,9 @@ namespace Latios.Systems
                     if (skip)
                         continue;
 
-                    if (globalEntityData.mergeMethod == MergeMethod.Overwrite || !targetEntity.HasComponent(type))
+                    if (blackboardEntityData.mergeMethod == MergeMethod.Overwrite || !targetEntity.HasComponent(type))
                         m_copyKit.CopyData(entity, targetEntity, type);
-                    else if (globalEntityData.mergeMethod == MergeMethod.ErrorOnConflict)
+                    else if (blackboardEntityData.mergeMethod == MergeMethod.ErrorOnConflict)
                     {
                         errorType = type;
                         error     = true;
@@ -76,7 +77,7 @@ namespace Latios.Systems
                 if (error)
                 {
                     throw new InvalidOperationException(
-                        $"Entity {entity} could not copy component {errorType.GetManagedType()} onto {(globalEntityData.blackboardScope == BlackboardScope.World ? "world" : "scene")} entity because the component already exists and the MergeMethod was set to ErrorOnConflict.");
+                        $"Entity {entity} could not copy component {errorType.GetManagedType()} onto {(blackboardEntityData.blackboardScope == BlackboardScope.World ? "world" : "scene")} entity because the component already exists and the MergeMethod was set to ErrorOnConflict.");
                 }
             }).Run();
             EntityManager.DestroyEntity(m_query);

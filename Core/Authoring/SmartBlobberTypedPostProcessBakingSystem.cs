@@ -97,11 +97,11 @@ namespace Latios.Authoring.Systems
 
         public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
         {
-            var resultArray       = chunk.GetNativeArray(resultHandle);
-            var trackingDataArray = chunk.GetNativeArray(trackingDataHandle);
+            var resultArray       = chunk.GetNativeArray(ref resultHandle);
+            var trackingDataArray = chunk.GetNativeArray(ref trackingDataHandle);
             var entityArray       = chunk.GetNativeArray(entityHandle);
 
-            for (int i = 0; i < chunk.ChunkEntityCount; i++)
+            for (int i = 0; i < chunk.Count; i++)
             {
                 var blob = resultArray[i].blob;
                 if (blob.Reinterpret<int>() == BlobAssetReference<int>.Null)
@@ -145,8 +145,8 @@ namespace Latios.Authoring
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var array = chunk.GetNativeArray(trackingDataHandle);
-                for (int i = 0; i < chunk.ChunkEntityCount; i++)
+                var array = chunk.GetNativeArray(ref trackingDataHandle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var td = array[i];
                     if (td.isNull)
@@ -188,9 +188,9 @@ namespace Latios.Authoring
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var trackingDataArray = chunk.GetNativeArray(trackingDataHandle);
-                var resultArray       = chunk.GetNativeArray(resultHandle);
-                for (int i = 0; i < chunk.ChunkEntityCount; i++)
+                var trackingDataArray = chunk.GetNativeArray(ref trackingDataHandle);
+                var resultArray       = chunk.GetNativeArray(ref resultHandle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var td = trackingDataArray[i];
                     if (td.isNull)

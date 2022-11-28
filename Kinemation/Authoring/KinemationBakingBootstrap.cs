@@ -20,6 +20,9 @@ namespace Latios.Kinemation.Authoring
             context.filteredBakerTypes.Add(typeof(SkinnedMeshBaker));
             context.filteredBakerTypes.Remove(typeof(Unity.Rendering.SkinnedMeshRendererBaker));
 
+            context.filteredBakerTypes.Add(typeof(DefaultMeshRendererBaker));
+            context.filteredBakerTypes.Remove(typeof(Unity.Rendering.MeshRendererBaker));
+
             context.systemTypesToInject.Add(typeof(KinemationSmartBlobberBakingGroup));
             context.systemTypesToInject.Add(typeof(KinemationSmartBlobberResolverBakingGroup));
             context.systemTypesToInject.Add(typeof(AddMasksBakingSystem));

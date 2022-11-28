@@ -82,15 +82,17 @@ namespace Latios.Kinemation.Systems
     public unsafe partial class LatiosEntitiesGraphicsSystem : SubSystem
     {
         #region Variables
-        static private bool s_EntitiesGraphicsEnabled = true;
-
         /// <summary>
         /// Toggles the activation of EntitiesGraphicsSystem.
         /// </summary>
         /// <remarks>
         /// To disable this system, use the HYBRID_RENDERER_DISABLED define.
         /// </remarks>
-        public static bool EntitiesGraphicsEnabled => s_EntitiesGraphicsEnabled;
+#if HYBRID_RENDERER_DISABLED
+        public static bool EntitiesGraphicsEnabled => false;
+#else
+        public static bool EntitiesGraphicsEnabled => EntitiesGraphicsUtils.IsEntitiesGraphicsSupportedOnSystem();
+#endif
 
 #if !DISABLE_HYBRID_RENDERER_ERROR_LOADING_SHADER
         private static bool ErrorShaderEnabled => true;
@@ -213,15 +215,11 @@ namespace Latios.Kinemation.Systems
         {
             var entitiesGraphicsSystem     = World.GetExistingSystemManaged<EntitiesGraphicsSystem>();
             entitiesGraphicsSystem.Enabled = false;
-            // If all graphics rendering has been disabled, early out from all HR functionality
-#if HYBRID_RENDERER_DISABLED
-            s_EntitiesGraphicsEnabled = false;
-#else
+
             // If -nographics is enabled, or if there is no compute shader support, disable HR.
-            s_EntitiesGraphicsEnabled = EntitiesGraphicsUtils.IsEntitiesGraphicsSupportedOnSystem();
-#endif
-            if (!s_EntitiesGraphicsEnabled)
+            if (!EntitiesGraphicsEnabled)
             {
+                Enabled = false;
                 Debug.Log("No SRP present, no compute shader support, or running with -nographics. Entities Graphics package disabled");
                 return;
             }
@@ -417,7 +415,7 @@ namespace Latios.Kinemation.Systems
         /// <inheritdoc/>
         protected override void OnDestroy()
         {
-            if (!s_EntitiesGraphicsEnabled)
+            if (!EntitiesGraphicsEnabled)
                 return;
             CompleteJobs(true);
             Dispose();
@@ -427,9 +425,6 @@ namespace Latios.Kinemation.Systems
         /// <inheritdoc/>
         protected override void OnUpdate()
         {
-            if (!s_EntitiesGraphicsEnabled)
-                return;
-
             JobHandle inputDeps = Dependency;
 
             // Make sure any release culling jobs that have stored pointers in temp allocated
@@ -1216,8 +1211,28 @@ namespace Latios.Kinemation.Systems
             }
         }
 
-        private int NumInstancesInChunk(ArchetypeChunk chunk) => chunk.Capacity;
+        static int NumInstancesInChunk(ArchetypeChunk chunk) => chunk.Capacity;
 
+        [BurstCompile]
+        static void CreateBatchCreateInfo(
+            ref BatchCreateInfoFactory batchCreateInfoFactory,
+            ref NativeArray<ArchetypeChunk>  newChunks,
+            ref NativeArray<BatchCreateInfo> sortedNewChunks,
+            out MaterialPropertyType failureProperty
+            )
+        {
+            failureProperty           = default;
+            failureProperty.TypeIndex = -1;
+            for (int i = 0; i < newChunks.Length; ++i)
+            {
+                sortedNewChunks[i] = batchCreateInfoFactory.Create(newChunks[i], ref failureProperty);
+                if (failureProperty.TypeIndex >= 0)
+                {
+                    return;
+                }
+            }
+            sortedNewChunks.Sort();
+        }
         private int AddNewChunks(NativeArray<ArchetypeChunk> newChunks)
         {
             int numValidNewChunks = 0;
@@ -1236,10 +1251,12 @@ namespace Latios.Kinemation.Systems
 
             var sortedNewChunks = new NativeArray<BatchCreateInfo>(newChunks.Length, Allocator.Temp);
 
-            for (int i = 0; i < newChunks.Length; ++i)
-                sortedNewChunks[i] = batchCreateInfoFactory.Create(newChunks[i]);
-
-            sortedNewChunks.Sort();
+            CreateBatchCreateInfo(ref batchCreateInfoFactory, ref newChunks, ref sortedNewChunks, out var failureProperty);
+            if (failureProperty.TypeIndex >= 0)
+            {
+                Debug.Assert(false,
+                             $"TypeIndex mismatch between key and stored property, Type: {failureProperty.TypeName} ({failureProperty.TypeIndex:x8}), Property: {failureProperty.PropertyName} ({failureProperty.NameID:x8})");
+            }
 
             int batchBegin          = 0;
             int numInstances        = NumInstancesInChunk(sortedNewChunks[0].Chunk);
@@ -1411,26 +1428,64 @@ namespace Latios.Kinemation.Systems
             m_BatchInfos[batchIndex] = batchInfo;
 
             // Configure chunk components for each chunk
-            int chunkMetadataBegin = (int)batchInfo.ChunkMetadataAllocation.begin;
-            int chunkOffsetInBatch = 0;
+            var args = new SetBatchChunkDataArgs
+            {
+                BatchChunks         = batchChunks,
+                BatchIndex          = batchIndex,
+                ChunkProperties     = m_ChunkProperties,
+                EntityManager       = EntityManager,
+                NumProperties       = numProperties,
+                TypeHandles         = typeHandles,
+                ChunkMetadataBegin  = (int)batchInfo.ChunkMetadataAllocation.begin,
+                ChunkOffsetInBatch  = 0,
+                OverrideStreamBegin = overrideStreamBegin
+            };
+            SetBatchChunkData(ref args, ref overrides);
+
+            Debug.Assert(args.ChunkOffsetInBatch == numInstances, "Batch instance count mismatch");
+
+            return true;
+        }
+
+        struct SetBatchChunkDataArgs
+        {
+            public int                          ChunkMetadataBegin;
+            public int                          ChunkOffsetInBatch;
+            public NativeArray<BatchCreateInfo> BatchChunks;
+            public int                          BatchIndex;
+            public int                          NumProperties;
+            public BatchCreationTypeHandles     TypeHandles;
+            public EntityManager                EntityManager;
+            public NativeArray<ChunkProperty>   ChunkProperties;
+            public NativeArray<int>             OverrideStreamBegin;
+        }
+
+        [BurstCompile]
+        static void SetBatchChunkData(ref SetBatchChunkDataArgs args, ref UnsafeList<ArchetypePropertyOverride> overrides)
+        {
+            var batchChunks         = args.BatchChunks;
+            int numProperties       = args.NumProperties;
+            var overrideStreamBegin = args.OverrideStreamBegin;
+            int chunkOffsetInBatch  = args.ChunkOffsetInBatch;
+            int chunkMetadataBegin  = args.ChunkMetadataBegin;
             for (int i = 0; i < batchChunks.Length; ++i)
             {
                 var chunk                     = batchChunks[i].Chunk;
                 var entitiesGraphicsChunkInfo = new EntitiesGraphicsChunkInfo
                 {
                     Valid           = true,
-                    BatchIndex      = batchIndex,
+                    BatchIndex      = args.BatchIndex,
                     ChunkTypesBegin = chunkMetadataBegin,
                     ChunkTypesEnd   = chunkMetadataBegin + numProperties,
                     CullingData     = new EntitiesGraphicsChunkCullingData
                     {
-                        Flags               = ComputeCullingFlags(chunk, typeHandles),
+                        Flags               = ComputeCullingFlags(chunk, args.TypeHandles),
                         InstanceLodEnableds = default,
                         ChunkOffsetInBatch  = chunkOffsetInBatch,
                     },
                 };
 
-                EntityManager.SetChunkComponentData(chunk, entitiesGraphicsChunkInfo);
+                args.EntityManager.SetChunkComponentData(chunk, entitiesGraphicsChunkInfo);
 
                 for (int j = 0; j < numProperties; ++j)
                 {
@@ -1443,27 +1498,26 @@ namespace Latios.Kinemation.Systems
                         ValueSizeBytesGPU  = propertyOverride.SizeBytesGPU,
                     };
 
-                    m_ChunkProperties[chunkMetadataBegin + j] = chunkProperty;
+                    args.ChunkProperties[chunkMetadataBegin + j] = chunkProperty;
                 }
 
                 chunkOffsetInBatch += NumInstancesInChunk(chunk);
                 chunkMetadataBegin += numProperties;
             }
 
-            Debug.Assert(chunkOffsetInBatch == numInstances, "Batch instance count mismatch");
-
-            return true;
+            args.ChunkOffsetInBatch = chunkOffsetInBatch;
+            args.ChunkMetadataBegin = chunkMetadataBegin;
         }
 
-        private byte ComputeCullingFlags(ArchetypeChunk chunk, BatchCreationTypeHandles typeHandles)
+        static byte ComputeCullingFlags(ArchetypeChunk chunk, BatchCreationTypeHandles typeHandles)
         {
-            bool hasLodData = chunk.Has(typeHandles.RootLODRange) &&
-                              chunk.Has(typeHandles.LODRange);
+            bool hasLodData = chunk.Has(ref typeHandles.RootLODRange) &&
+                              chunk.Has(ref typeHandles.LODRange);
 
             // TODO: Do we need non-per-instance culling anymore? It seems to always be added
             // for converted objects, and doesn't seem to be removed ever, so the only way to
             // not have it is to manually remove it or create entities from scratch.
-            bool hasPerInstanceCulling = !hasLodData || chunk.Has(typeHandles.PerInstanceCulling);
+            bool hasPerInstanceCulling = !hasLodData || chunk.Has(ref typeHandles.PerInstanceCulling);
 
             byte flags = 0;
 
@@ -1551,7 +1605,7 @@ namespace Latios.Kinemation.Systems
 
         internal void UpdateSpecCubeHDRDecode(Vector4 specCubeHDRDecode)
         {
-            if (!s_EntitiesGraphicsEnabled)
+            if (!Enabled)
                 return;
 
             bool hdrDecodeDirty = specCubeHDRDecode != m_GlobalValues.SpecCube0_HDR;
@@ -1565,7 +1619,7 @@ namespace Latios.Kinemation.Systems
 
         internal void UpdateGlobalAmbientProbe(SHCoefficients globalAmbientProbe)
         {
-            if (!s_EntitiesGraphicsEnabled)
+            if (!Enabled)
                 return;
 
             bool globalAmbientProbeDirty = globalAmbientProbe != m_GlobalValues.SHCoefficients;
@@ -1741,7 +1795,7 @@ namespace Latios.Kinemation.Systems
 
                         var skipComponent = (isWorldToLocal || isPrevWorldToLocal);
 
-                        bool componentChanged  = chunk.DidChange(type, LastSystemVersion);
+                        bool componentChanged  = chunk.DidChange(ref type, LastSystemVersion);
                         bool copyComponentData = (isNewChunk || structuralChanges || componentChanged) && !skipComponent;
 
                         if (copyComponentData)
@@ -1781,8 +1835,8 @@ namespace Latios.Kinemation.Systems
                 // This job is not written to support queries with enableable component types.
                 Assert.IsFalse(useEnabledMask);
 
-                var chunkHeaders               = metaChunk.GetNativeArray(ChunkHeader);
-                var entitiesGraphicsChunkInfos = metaChunk.GetNativeArray(EntitiesGraphicsChunkInfo);
+                var chunkHeaders               = metaChunk.GetNativeArray(ref ChunkHeader);
+                var entitiesGraphicsChunkInfos = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
 
                 for (int i = 0, chunkEntityCount = metaChunk.Count; i < chunkEntityCount; i++)
                 {
@@ -1831,9 +1885,9 @@ namespace Latios.Kinemation.Systems
 
                 // metaChunk is the chunk which contains the meta entities (= entities holding the chunk components) for the actual chunks
 
-                var entitiesGraphicsChunkInfos = metaChunk.GetNativeArray(EntitiesGraphicsChunkInfo);
-                var chunkHeaders               = metaChunk.GetNativeArray(ChunkHeader);
-                var chunkBoundsArray           = metaChunk.GetNativeArray(ChunkWorldRenderBounds);
+                var entitiesGraphicsChunkInfos = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
+                var chunkHeaders               = metaChunk.GetNativeArray(ref ChunkHeader);
+                var chunkBoundsArray           = metaChunk.GetNativeArray(ref ChunkWorldRenderBounds);
 
                 for (int i = 0, chunkEntityCount = metaChunk.Count; i < chunkEntityCount; i++)
                 {
@@ -1845,8 +1899,8 @@ namespace Latios.Kinemation.Systems
                     // other required components. This should normally not happen, but can happen
                     // if the user manually deletes some components after the fact.
                     bool hasRenderMeshArray  = chunk.Has(RenderMeshArray);
-                    bool hasMaterialMeshInfo = chunk.Has(MaterialMeshInfo);
-                    bool hasLocalToWorld     = chunk.Has(LocalToWorld);
+                    bool hasMaterialMeshInfo = chunk.Has(ref MaterialMeshInfo);
+                    bool hasLocalToWorld     = chunk.Has(ref LocalToWorld);
 
                     if (!math.all(new bool3(hasRenderMeshArray, hasMaterialMeshInfo, hasLocalToWorld)))
                         continue;
@@ -1856,8 +1910,8 @@ namespace Latios.Kinemation.Systems
                     // When LOD ranges change, we must reset the movement grace to avoid using stale data
                     bool lodRangeChange =
                         chunkHeader.ArchetypeChunk.DidOrderChange(EntitiesGraphicsChunkUpdater.LastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(LodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(RootLodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion);
+                        chunkHeader.ArchetypeChunk.DidChange(ref LodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion) |
+                        chunkHeader.ArchetypeChunk.DidChange(ref RootLodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion);
 
                     if (lodRangeChange)
                     {
@@ -1882,9 +1936,9 @@ namespace Latios.Kinemation.Systems
             public void Execute(int index)
             {
                 var chunk     = NewChunks[index];
-                var chunkInfo = chunk.GetChunkComponentData(EntitiesGraphicsChunkInfo);
+                var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
 
-                ChunkWorldRenderBounds chunkBounds = chunk.GetChunkComponentData(ChunkWorldRenderBounds);
+                ChunkWorldRenderBounds chunkBounds = chunk.GetChunkComponentData(ref ChunkWorldRenderBounds);
 
                 Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
                 EntitiesGraphicsChunkUpdater.ProcessValidChunk(chunkInfo, chunk, chunkBounds.Value, true);

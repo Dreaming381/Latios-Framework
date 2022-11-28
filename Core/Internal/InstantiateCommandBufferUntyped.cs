@@ -510,7 +510,7 @@ namespace Latios
             {
                 var   entities = chunk.GetNativeArray(entityHandle);
                 var   t0Size   = icb.m_state->typesSizes[0];
-                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t0, t0Size);
+                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t0, t0Size);
                 byte* t0Ptr    = (byte*)t0Array.GetUnsafePtr();
                 for (int i = 0; i < indices.Length; i++)
                 {
@@ -525,8 +525,8 @@ namespace Latios
                 var   entities = chunk.GetNativeArray(entityHandle);
                 var   t0Size   = icb.m_state->typesSizes[0];
                 var   t1Size   = icb.m_state->typesSizes[1];
-                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t0, t0Size);
-                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t1, t1Size);
+                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t0, t0Size);
+                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t1, t1Size);
                 byte* t0Ptr    = (byte*)t0Array.GetUnsafePtr();
                 byte* t1Ptr    = (byte*)t1Array.GetUnsafePtr();
                 for (int i = 0; i < indices.Length; i++)
@@ -545,9 +545,9 @@ namespace Latios
                 var   t0Size   = icb.m_state->typesSizes[0];
                 var   t1Size   = icb.m_state->typesSizes[1];
                 var   t2Size   = icb.m_state->typesSizes[2];
-                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t0, t0Size);
-                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t1, t1Size);
-                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t2, t2Size);
+                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t0, t0Size);
+                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t1, t1Size);
+                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t2, t2Size);
                 byte* t0Ptr    = (byte*)t0Array.GetUnsafePtr();
                 byte* t1Ptr    = (byte*)t1Array.GetUnsafePtr();
                 byte* t2Ptr    = (byte*)t2Array.GetUnsafePtr();
@@ -571,10 +571,10 @@ namespace Latios
                 var   t1Size   = icb.m_state->typesSizes[1];
                 var   t2Size   = icb.m_state->typesSizes[2];
                 var   t3Size   = icb.m_state->typesSizes[3];
-                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t0, t0Size);
-                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t1, t1Size);
-                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t2, t2Size);
-                var   t3Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t3, t3Size);
+                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t0, t0Size);
+                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t1, t1Size);
+                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t2, t2Size);
+                var   t3Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t3, t3Size);
                 byte* t0Ptr    = (byte*)t0Array.GetUnsafePtr();
                 byte* t1Ptr    = (byte*)t1Array.GetUnsafePtr();
                 byte* t2Ptr    = (byte*)t2Array.GetUnsafePtr();
@@ -601,11 +601,11 @@ namespace Latios
                 var   t2Size   = icb.m_state->typesSizes[2];
                 var   t3Size   = icb.m_state->typesSizes[3];
                 var   t4Size   = icb.m_state->typesSizes[4];
-                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t0, t0Size);
-                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t1, t1Size);
-                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t2, t2Size);
-                var   t3Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t3, t3Size);
-                var   t4Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(t4, t4Size);
+                var   t0Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t0, t0Size);
+                var   t1Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t1, t1Size);
+                var   t2Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t2, t2Size);
+                var   t3Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t3, t3Size);
+                var   t4Array  = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref t4, t4Size);
                 byte* t0Ptr    = (byte*)t0Array.GetUnsafePtr();
                 byte* t1Ptr    = (byte*)t1Array.GetUnsafePtr();
                 byte* t2Ptr    = (byte*)t2Array.GetUnsafePtr();

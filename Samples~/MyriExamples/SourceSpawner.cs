@@ -10,18 +10,16 @@ namespace Dragons
         public Entity prefab;
     }
 
-    public class SourceSpawner : MonoBehaviour, IDeclareReferencedPrefabs, IConvertGameObjectToEntity
+    public class SourceSpawner : MonoBehaviour
     {
         public GameObject prefab;
-
-        public void DeclareReferencedPrefabs(List<GameObject> referencedPrefabs)
+    }
+    
+    public class SourceSpawnerBaker : Baker<SourceSpawner
+    {
+        public override void Bake(SourceSpawner)
         {
-            referencedPrefabs.Add(prefab);
-        }
-
-        public void Convert(Entity entity, EntityManager dstManager, GameObjectConversionSystem conversionSystem)
-        {
-            dstManager.AddComponentData(entity, new AudioSourcePrefab { prefab = conversionSystem.GetPrimaryEntity(prefab) });
+            AddComponent(entity, new AudioSourcePrefab { prefab = GetEntity(prefab) });
         }
     }
 }

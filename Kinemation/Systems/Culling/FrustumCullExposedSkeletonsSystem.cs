@@ -337,13 +337,13 @@ namespace Latios.Kinemation.Systems
                 ref var mask = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
                 mask         = default;
 
-                var cullingIndices = chunk.GetNativeArray(cullingIndexHandle);
-                for (int i = 0; i < math.min(chunk.ChunkEntityCount, 64); i++)
+                var cullingIndices = chunk.GetNativeArray(ref cullingIndexHandle);
+                for (int i = 0; i < math.min(chunk.Count, 64); i++)
                 {
                     bool isIn         = IsBitSet(cullingIndices[i].cullingIndex);
                     mask.lower.Value |= math.select(0ul, 1ul, isIn) << i;
                 }
-                for (int i = 0; i < chunk.ChunkEntityCount - 64; i++)
+                for (int i = 0; i < chunk.Count - 64; i++)
                 {
                     bool isIn         = IsBitSet(cullingIndices[i + 64].cullingIndex);
                     mask.upper.Value |= math.select(0ul, 1ul, isIn) << i;
@@ -375,14 +375,14 @@ namespace Latios.Kinemation.Systems
                 mask               = default;
                 splitMasks         = default;
 
-                var cullingIndices = chunk.GetNativeArray(cullingIndexHandle);
-                for (int i = 0; i < math.min(chunk.ChunkEntityCount, 64); i++)
+                var cullingIndices = chunk.GetNativeArray(ref cullingIndexHandle);
+                for (int i = 0; i < math.min(chunk.Count, 64); i++)
                 {
                     bool isIn                 = IsBitSet(cullingIndices[i].cullingIndex, out byte splits);
                     mask.lower.Value         |= math.select(0ul, 1ul, isIn) << i;
                     splitMasks.splitMasks[i]  = splits;
                 }
-                for (int i = 0; i < chunk.ChunkEntityCount - 64; i++)
+                for (int i = 0; i < chunk.Count - 64; i++)
                 {
                     bool isIn                      = IsBitSet(cullingIndices[i + 64].cullingIndex, out byte splits);
                     mask.upper.Value              |= math.select(0ul, 1ul, isIn) << i;

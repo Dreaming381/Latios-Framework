@@ -97,15 +97,15 @@ namespace Latios.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.DidChange(parentHandle, lastSystemVersion))
+                if (!chunk.DidChange(ref parentHandle, lastSystemVersion))
                     return;
 
-                var parents = chunk.GetNativeArray(parentHandle);
+                var parents = chunk.GetNativeArray(ref parentHandle);
 
                 BufferAccessor<Child> childAccess         = default;
-                bool                  hasChildrenToUpdate = chunk.Has(childHandle);
+                bool                  hasChildrenToUpdate = chunk.Has(ref childHandle);
                 if (hasChildrenToUpdate)
-                    childAccess           = chunk.GetBufferAccessor(childHandle);
+                    childAccess           = chunk.GetBufferAccessor(ref childHandle);
                 NativeArray<Depth> depths = default;
 
                 for (int i = 0; i < chunk.Count; i++)
@@ -113,7 +113,7 @@ namespace Latios.Systems
                     if (IsDepthChangeRoot(parents[i].Value, out var depth))
                     {
                         if (!depths.IsCreated)
-                            depths = chunk.GetNativeArray(depthHandle);
+                            depths = chunk.GetNativeArray(ref depthHandle);
 
                         var startDepth = new Depth { depth = depth };
                         depths[i]                          = startDepth;
@@ -169,17 +169,17 @@ namespace Latios.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (chunk.DidChange(depthHandle, lastSystemVersion) || chunk.DidOrderChange(lastSystemVersion))
+                if (chunk.DidChange(ref depthHandle, lastSystemVersion) || chunk.DidOrderChange(lastSystemVersion))
                 {
                     BitField32 depthMask = default;
-                    var        depths    = chunk.GetNativeArray(depthHandle);
+                    var        depths    = chunk.GetNativeArray(ref depthHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         if (depths[i].depth < kMaxDepthIterations)
                             depthMask.SetBits(depths[i].depth, true);
                     }
 
-                    chunk.SetChunkComponentData(chunkDepthMaskHandle, new ChunkDepthMask { chunkDepthMask = depthMask });
+                    chunk.SetChunkComponentData(ref chunkDepthMaskHandle, new ChunkDepthMask { chunkDepthMask = depthMask });
                 }
             }
         }

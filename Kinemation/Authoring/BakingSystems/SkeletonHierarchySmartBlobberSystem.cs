@@ -84,7 +84,7 @@ namespace Latios.Kinemation.Authoring.Systems
             new Job().ScheduleParallel();
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct Job : IJobEntity
         {

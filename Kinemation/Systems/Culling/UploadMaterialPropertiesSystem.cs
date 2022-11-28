@@ -37,7 +37,7 @@ namespace Latios.Kinemation.Systems
 
         protected override void OnCreate()
         {
-            m_metaQuery = Fluent.WithAll<EntitiesGraphicsChunkInfo>(false).WithAll<ChunkHeader>(true).Build();
+            m_metaQuery = Fluent.WithAll<EntitiesGraphicsChunkInfo>(false).WithAll<ChunkHeader>(true).WithAll<ChunkPerCameraCullingMask>(true).Build();
 
             m_persistentInstanceDataSize = kGPUBufferSizeInitial;
 
@@ -228,10 +228,10 @@ namespace Latios.Kinemation.Systems
             {
                 // metaChunk is the chunk which contains the meta entities (= entities holding the chunk components) for the actual chunks
 
-                var hybridChunkInfos   = metaChunk.GetNativeArray(EntitiesGraphicsChunkInfo);
-                var chunkHeaders       = metaChunk.GetNativeArray(ChunkHeader);
-                var chunkDirtyMasks    = metaChunk.GetNativeArray(chunkPropertyDirtyMaskHandle);
-                var chunkPerCameraMask = metaChunk.GetNativeArray(chunkPerCameraCullingMaskHandle);
+                var hybridChunkInfos   = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
+                var chunkHeaders       = metaChunk.GetNativeArray(ref ChunkHeader);
+                var chunkDirtyMasks    = metaChunk.GetNativeArray(ref chunkPropertyDirtyMaskHandle);
+                var chunkPerCameraMask = metaChunk.GetNativeArray(ref chunkPerCameraCullingMaskHandle);
 
                 for (int i = 0; i < metaChunk.Count; ++i)
                 {
@@ -287,7 +287,7 @@ namespace Latios.Kinemation.Systems
                             Debug.Log($"UpdateChunkProperty(internalBatchIndex: {chunkInfo.InternalIndex}, property: {i}, elementSize: {chunkProperty.ValueSizeBytesCPU})");
 #endif
 
-                            var src = chunk.GetDynamicComponentDataArrayReinterpret<int>(type,
+                            var src = chunk.GetDynamicComponentDataArrayReinterpret<int>(ref type,
                                                                                          chunkProperty.ValueSizeBytesCPU);
 
 #if PROFILE_BURST_JOB_INTERNALS

@@ -36,11 +36,11 @@ namespace Latios.Psyshock
             {
                 var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
 
-                bool ltw = chunk.Has(typeGroup.localToWorld);
-                bool p   = chunk.Has(typeGroup.parent);
-                bool t   = chunk.Has(typeGroup.translation);
-                bool r   = chunk.Has(typeGroup.rotation);
-                bool s   = chunk.Has(typeGroup.scale);
+                bool ltw = chunk.Has(ref typeGroup.localToWorld);
+                bool p   = chunk.Has(ref typeGroup.parent);
+                bool t   = chunk.Has(ref typeGroup.translation);
+                bool r   = chunk.Has(ref typeGroup.rotation);
+                bool s   = chunk.Has(ref typeGroup.scale);
 
                 int mask  = math.select(0, 0x10, ltw);
                 mask     += math.select(0, 0x8, p);
@@ -99,7 +99,7 @@ namespace Latios.Psyshock
             private void ProcessNoTransform(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(typeGroup.collider);
+                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
                 var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -110,8 +110,8 @@ namespace Latios.Psyshock
             private void ProcessScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(typeGroup.collider);
-                var chunkScales    = chunk.GetNativeArray(typeGroup.scale);
+                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkScales    = chunk.GetNativeArray(ref typeGroup.scale);
                 var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -123,8 +123,8 @@ namespace Latios.Psyshock
             private void ProcessRotation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(typeGroup.collider);
-                var chunkRotations = chunk.GetNativeArray(typeGroup.rotation);
+                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkRotations = chunk.GetNativeArray(ref typeGroup.rotation);
                 var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -136,9 +136,9 @@ namespace Latios.Psyshock
             private void ProcessRotationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(typeGroup.collider);
-                var chunkRotations = chunk.GetNativeArray(typeGroup.rotation);
-                var chunkScales    = chunk.GetNativeArray(typeGroup.scale);
+                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkRotations = chunk.GetNativeArray(ref typeGroup.rotation);
+                var chunkScales    = chunk.GetNativeArray(ref typeGroup.scale);
                 var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -151,8 +151,8 @@ namespace Latios.Psyshock
             private void ProcessTranslation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(typeGroup.translation);
+                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
                 var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -164,9 +164,9 @@ namespace Latios.Psyshock
             private void ProcessTranslationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(typeGroup.translation);
-                var chunkScales       = chunk.GetNativeArray(typeGroup.scale);
+                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
+                var chunkScales       = chunk.GetNativeArray(ref typeGroup.scale);
                 var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -179,9 +179,9 @@ namespace Latios.Psyshock
             private void ProcessTranslationRotation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(typeGroup.translation);
-                var chunkRotations    = chunk.GetNativeArray(typeGroup.rotation);
+                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
+                var chunkRotations    = chunk.GetNativeArray(ref typeGroup.rotation);
                 var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -193,10 +193,10 @@ namespace Latios.Psyshock
             private void ProcessTranslationRotationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(typeGroup.translation);
-                var chunkRotations    = chunk.GetNativeArray(typeGroup.rotation);
-                var chunkScales       = chunk.GetNativeArray(typeGroup.scale);
+                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
+                var chunkRotations    = chunk.GetNativeArray(ref typeGroup.rotation);
+                var chunkScales       = chunk.GetNativeArray(ref typeGroup.scale);
                 var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -209,8 +209,8 @@ namespace Latios.Psyshock
             private void ProcessLocalToWorld(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(typeGroup.localToWorld);
+                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
                 var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -225,8 +225,8 @@ namespace Latios.Psyshock
             private void ProcessParent(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(typeGroup.localToWorld);
+                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
                 var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {
@@ -241,9 +241,9 @@ namespace Latios.Psyshock
             private void ProcessParentScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
             {
                 var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(typeGroup.localToWorld);
-                var chunkScales        = chunk.GetNativeArray(typeGroup.scale);
+                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
+                var chunkScales        = chunk.GetNativeArray(ref typeGroup.scale);
                 var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
                 {

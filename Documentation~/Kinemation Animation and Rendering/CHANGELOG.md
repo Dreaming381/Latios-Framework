@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] – 2022-11-28
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Added
+
+-   Added `OverrideMeshRendererBase` which if present on a `GameObject` will
+    disable default `MeshRenderer` baking for that `GameObject`
+-   Added `OverrideMeshRendererBakerBase<T>` which allows baking a `Renderer`
+    using a custom mesh and materials that might be generated at bake time
+
+### Fixed
+
+-   Fixed issue where the runtime mechanism for ensuring Kinemation culling
+    components were present queried `RenderMesh` instead of `MaterialMeshInfo`
+-   Fixed issue where `SkinnedMeshRenderers` might be excluded from
+    `RenderMeshArray` post-processing during baking
+
+### Improved
+
+-   Kinemation renderer was updated with the latest material error handling
+    improvements of Entities Graphics
+
 ## [0.6.0] – 2022-11-16
 
 Officially supports Entities [1.0.0 experimental]

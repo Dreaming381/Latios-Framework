@@ -111,9 +111,9 @@ namespace Latios.Kinemation.Systems
             {
                 var chunksCache = stackalloc ArchetypeChunk[128];
                 int chunksCount = 0;
-                var masks       = metaChunk.GetNativeArray(perCameraCullingMaskHandle);
-                var headers     = metaChunk.GetNativeArray(chunkHeaderHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                var masks       = metaChunk.GetNativeArray(ref perCameraCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(ref chunkHeaderHandle);
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     var mask = masks[i];
                     if ((mask.lower.Value | mask.upper.Value) != 0)
@@ -150,13 +150,13 @@ namespace Latios.Kinemation.Systems
             void Execute(in ArchetypeChunk chunk)
             {
                 ref var cameraMask = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
-                if (!chunk.Has(dependentHandle))
+                if (!chunk.Has(ref dependentHandle))
                 {
                     cameraMask = default;
                     return;
                 }
 
-                var rootRefs = chunk.GetNativeArray(dependentHandle);
+                var rootRefs = chunk.GetNativeArray(ref dependentHandle);
 
                 var inMask = cameraMask.lower.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
@@ -178,7 +178,7 @@ namespace Latios.Kinemation.Systems
                     return false;
 
                 var info         = esiLookup[root];
-                var skeletonMask = info.Chunk.GetChunkComponentData(chunkSkeletonMaskHandle);
+                var skeletonMask = info.Chunk.GetChunkComponentData(ref chunkSkeletonMaskHandle);
                 if (info.IndexInChunk >= 64)
                     return skeletonMask.upper.IsSet(info.IndexInChunk - 64);
                 else
@@ -211,8 +211,8 @@ namespace Latios.Kinemation.Systems
                 ref var cameraSplitsMask = ref chunk.GetChunkComponentRefRW(in chunkPerCameraSplitsMaskHandle);
                 cameraSplitsMask         = default;
 
-                var rootRefs = chunk.GetNativeArray(dependentHandle);
-                if (!chunk.Has(dependentHandle))
+                var rootRefs = chunk.GetNativeArray(ref dependentHandle);
+                if (!chunk.Has(ref dependentHandle))
                 {
                     cameraMask = default;
                     return;
@@ -241,7 +241,7 @@ namespace Latios.Kinemation.Systems
                     return false;
 
                 var  info         = esiLookup[root];
-                var  skeletonMask = info.Chunk.GetChunkComponentData(chunkSkeletonMaskHandle);
+                var  skeletonMask = info.Chunk.GetChunkComponentData(ref chunkSkeletonMaskHandle);
                 bool result;
                 if (info.IndexInChunk >= 64)
                     result = skeletonMask.upper.IsSet(info.IndexInChunk - 64);

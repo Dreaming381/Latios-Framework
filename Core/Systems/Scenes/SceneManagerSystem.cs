@@ -90,6 +90,7 @@ namespace Latios.Systems
             {
                 currentScene.currentScene      = SceneManager.GetActiveScene().name;
                 currentScene.isSceneFirstFrame = true;
+                worldBlackboardEntity.SetComponentData(currentScene);
                 latiosWorld.CreateNewSceneBlackboardEntity();
             }
             else if (m_paused)

@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.6.0]
+# Latios Framework Packages for DOTS – [0.6.1]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -12,8 +12,9 @@ may be seen as derivative works.
 This version targets Entities 1.0.0 experimental. If you are still using
 Entities 0.51.1, please use the framework version 0.5.8 instead.
 
-The 0.6.x series uses Transforms V1. If you are using Transforms V2, please wait
-for a newer version of the Latios Framework.
+The 0.6.x series uses Transforms V1, which can be enabled in your project via
+the Scripting Define Symbol ENABLE_TRANSFORM_V1. If you are using Transforms V2,
+please wait for a newer version of the Latios Framework.
 
 *[0.5.x] users, please read the* [*Upgrade
 Guide*](Documentation~/Upgrade%20Guide.md)*!*
@@ -197,7 +198,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.5.X) will always preserve backwards compatibility back to the
+Patch releases (0.6.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not

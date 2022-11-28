@@ -115,6 +115,61 @@ public class RandomizeTransformsSystem : SubSystem
 }
 ```
 
+## Using SystemRng
+
+When aiming for maximum performance using Burst-compiled `ISystem` and
+`IJobEntity`, the `entityInQueryIndex` can cause a significant overhead when
+nothing else uses it, as it must compute and base offset cache before running
+the actual job.
+
+For this reason, it is instead desired to use a sequence index per chunk rather
+than per entity. `SystemRng` helps facilitate this behavior.
+
+`SystemRng` is an `IComponentData` type designed to be added to the system
+`Entity` in `OnCreate()` or `OnNewScene()` like so:
+
+```csharp
+public void OnNewScene(ref SystemState state) => state.EntityManager.AddComponentData(state.SystemHandle, new SystemRng("AiSearchAndDestroyInitializePersonalitySystem"));
+```
+
+Next, your `IJobEntity` will also need to implement `IJobEntityChunkBeginEnd`,
+and in the `OnChunkBegin()` method, you will need to invoke
+`SystemRng.BeginChunk()`. After that, you invoke your random calls directly on
+the `SystemRng` instance.
+
+```csharp
+[BurstCompile]
+partial struct Job : IJobEntity, IJobEntityChunkBeginEnd
+{
+    public SystemRng rng;
+
+    public bool OnChunkBegin(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+    {
+        rng.BeginChunk(unfilteredChunkIndex);
+        return true;
+    }
+
+    public void Execute(ref AiSearchAndDestroyPersonality personality, in AiSearchAndDestroyPersonalityInitializerValues initalizer)
+    {
+        personality.targetLeadDistance = rng.NextFloat(initalizer.targetLeadDistanceMinMax.x, initalizer.targetLeadDistanceMinMax.y);
+    }
+
+    public void OnChunkEnd(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask, bool chunkWasExecuted)
+    {
+    }
+}
+```
+
+Finally, during scheduling, you can shuffle and assign the job `SystemRng` like
+this:
+
+```csharp
+new Job
+{
+    rng = GetComponentRW<SystemRng>(state.SystemHandle).ValueRW.Shuffle(),
+}.ScheduleParallel(m_query);
+```
+
 ## Rng Randomness
 
 You might be wondering if this new random number generator is prone to repeating

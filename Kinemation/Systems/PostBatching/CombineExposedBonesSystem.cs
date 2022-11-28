@@ -112,7 +112,7 @@ namespace Latios.Kinemation
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (chunk.DidChange(boundsHandle, lastSystemVersion) || chunk.DidChange(indexHandle, lastSystemVersion))
+                if (chunk.DidChange(ref boundsHandle, lastSystemVersion) || chunk.DidChange(ref indexHandle, lastSystemVersion))
                 {
                     var perThreadBitArray = perThreadBitArrays[m_NativeThreadIndex];
                     if (!perThreadBitArray.IsCreated)
@@ -123,7 +123,7 @@ namespace Latios.Kinemation
                         perThreadBitArrays[m_NativeThreadIndex] = perThreadBitArray;
                     }
 
-                    var indices = chunk.GetNativeArray(indexHandle);
+                    var indices = chunk.GetNativeArray(ref indexHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         perThreadBitArray.Set(indices[i].cullingIndex, true);
@@ -206,8 +206,8 @@ namespace Latios.Kinemation
                     }
                 }
 
-                var indices = chunk.GetNativeArray(indexHandle);
-                var bounds  = chunk.GetNativeArray(boundsHandle);
+                var indices = chunk.GetNativeArray(ref indexHandle);
+                var bounds  = chunk.GetNativeArray(ref boundsHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var index = indices[i].cullingIndex;

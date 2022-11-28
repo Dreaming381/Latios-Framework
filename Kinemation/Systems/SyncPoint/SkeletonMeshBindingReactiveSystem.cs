@@ -550,7 +550,7 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var buffers = chunk.GetBufferAccessor(dependentsHandle);
+                var buffers = chunk.GetBufferAccessor(ref dependentsHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -579,7 +579,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var entities = chunk.GetNativeArray(entityHandle);
-                var deps     = chunk.GetNativeArray(depsHandle);
+                var deps     = chunk.GetNativeArray(ref depsHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -626,9 +626,9 @@ namespace Latios.Kinemation.Systems
             {
                 var lower = new BitField64(~0UL);
                 var upper = new BitField64(~0UL);
-                if (chunk.Has(needsBindingHandle))
+                if (chunk.Has(ref needsBindingHandle))
                 {
-                    var needs = chunk.GetNativeArray(needsBindingHandle);
+                    var needs = chunk.GetNativeArray(ref needsBindingHandle);
                     for (int i = 0; i < math.min(chunk.Count, 64); i++)
                     {
                         lower.SetBits(i, needs[i].needsBinding);
@@ -644,15 +644,15 @@ namespace Latios.Kinemation.Systems
                 }
 
                 var entities      = chunk.GetNativeArray(entityHandle);
-                var rootRefs      = chunk.GetNativeArray(rootRefHandle);
-                var skinningBlobs = chunk.GetNativeArray(skinningBlobRefHandle);
+                var rootRefs      = chunk.GetNativeArray(ref rootRefHandle);
+                var skinningBlobs = chunk.GetNativeArray(ref skinningBlobRefHandle);
 
-                var hasPathBindings  = chunk.Has(pathBindingsBlobRefHandle);
-                var hasOverrideBones = chunk.Has(overrideBonesHandle);
-                var hasRadialBounds  = chunk.Has(radialBoundsHandle);
-                var pathBindings     = hasPathBindings ? chunk.GetNativeArray(pathBindingsBlobRefHandle) : default;
-                var overrideBones    = hasOverrideBones ? chunk.GetBufferAccessor(overrideBonesHandle) : default;
-                var radialBounds     = hasRadialBounds ? chunk.GetNativeArray(radialBoundsHandle) : default;
+                var hasPathBindings  = chunk.Has(ref pathBindingsBlobRefHandle);
+                var hasOverrideBones = chunk.Has(ref overrideBonesHandle);
+                var hasRadialBounds  = chunk.Has(ref radialBoundsHandle);
+                var pathBindings     = hasPathBindings ? chunk.GetNativeArray(ref pathBindingsBlobRefHandle) : default;
+                var overrideBones    = hasOverrideBones ? chunk.GetBufferAccessor(ref overrideBonesHandle) : default;
+                var radialBounds     = hasRadialBounds ? chunk.GetNativeArray(ref radialBoundsHandle) : default;
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -792,14 +792,14 @@ namespace Latios.Kinemation.Systems
             {
                 // The general strategy here is to unbind anything requesting a rebind
                 // and then to treat it like a new mesh using that job's struct.
-                if (!chunk.DidChange(newMeshesJob.needsBindingHandle, lastSystemVersion))
+                if (!chunk.DidChange(ref newMeshesJob.needsBindingHandle, lastSystemVersion))
                     return;
 
                 {
                     // New scope so that the compiler doesn't keep these variables on the stack when running the NewMesh job.
                     var entities = chunk.GetNativeArray(newMeshesJob.entityHandle);
-                    var deps     = chunk.GetNativeArray(depsHandle);
-                    var needs    = chunk.GetNativeArray(newMeshesJob.needsBindingHandle);
+                    var deps     = chunk.GetNativeArray(ref depsHandle);
+                    var needs    = chunk.GetNativeArray(ref newMeshesJob.needsBindingHandle);
 
                     for (int i = 0; i < chunk.Count; i++)
                     {
@@ -1675,7 +1675,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var entities   = chunk.GetNativeArray(entityHandle);
-                var dirtyFlags = chunk.GetNativeArray(dirtyFlagHandle);
+                var dirtyFlags = chunk.GetNativeArray(ref dirtyFlagHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -1699,7 +1699,7 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var indices = chunk.GetNativeArray(indexHandle).Reinterpret<int>();
+                var indices = chunk.GetNativeArray(ref indexHandle).Reinterpret<int>();
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     bool needsClearing = indices[i] < indicesToClear.Value.Length ? indicesToClear.Value.IsSet(indices[i]) : false;

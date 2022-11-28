@@ -63,7 +63,7 @@ namespace Latios.Authoring.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.Has(trackingDataHandle))
+                if (!chunk.Has(ref trackingDataHandle))
                 {
                     UnityEngine.Debug.LogError(
                         "A SmartBlobberResult was detected without a tracking handle. Do not add SmartBlobberResult manually. Instead, use the RequestCreateBlobAsset API to have it added.");
@@ -75,7 +75,7 @@ namespace Latios.Authoring.Systems
                     UnityEngine.Debug.LogError("Where did the SmartBlobberBlobTypeHash go?");
                 }
 
-                var trackingDataArray = chunk.GetNativeArray(trackingDataHandle);
+                var trackingDataArray = chunk.GetNativeArray(ref trackingDataHandle);
                 if (trackingDataArray[0].isFinalized)
                     return;
 
@@ -84,8 +84,8 @@ namespace Latios.Authoring.Systems
                 UnityEngine.Debug.LogError(
                     $"A SmartBlobberResult was detected that was not post-processed. Please ensure to register the Smart Blobber blob type with SmartBlobberTools.Register(). If you are seeing this error but did not create a custom SmartBlobber, check your ICustomBakingBootstrap to ensure the features you are attempting to use are correctly installed. The offending blobs will be disposed. Blob type hash: BurstRuntime.GetHashCode64() = {hash}.");
 
-                var resultArray = chunk.GetNativeArray(resultHandle);
-                for (int i = 0; i < chunk.ChunkEntityCount; i++)
+                var resultArray = chunk.GetNativeArray(ref resultHandle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     if (trackingDataArray[i].isNull)
                         continue;

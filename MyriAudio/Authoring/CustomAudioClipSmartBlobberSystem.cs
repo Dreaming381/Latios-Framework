@@ -194,7 +194,7 @@ namespace Latios.Myri.Authoring.Systems
         public void OnDestroy(ref SystemState state) {
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct MonoJob : IJobEntity
         {
@@ -223,7 +223,7 @@ namespace Latios.Myri.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct StereoJob : IJobEntity
         {

@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] – 2022-11-28
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Added
+
+-   Added `SystemRng` which provides a new workflow for `Rng` inside of
+    `IJobEntity`
+-   Added `Rng` constructor overload which accepts a `FixedString128Bytes`
+-   Added `float3x4.TRS()` extension method
+
+### Changed
+
+-   `CurrentScene` is now updated before `OnNewScene()` callbacks
+
+### Fixed
+
+-   Fixed script templates which attempted to load from an invalid path due to a
+    directory restructuring
+-   Fixed profile markers for `SyncPointPlaybackSystem` so that system names are
+    displayed correctly
+-   Fixed `Child` buffer being left behind on changed parents
+
+### Improved
+
+-   Fluent Queries now only generates GC when using shared component filters,
+    whose support will be removed in 0.7 to provide full Burst-compatibility
+-   `MergeBlackboardsSystem` only runs when queries are matched, improving main
+    thread performance
+
 ## [0.6.0] – 2022-11-16
 
 Officially supports Entities [1.0.0 experimental]

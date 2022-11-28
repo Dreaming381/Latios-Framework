@@ -195,8 +195,6 @@ that version.*
     LODs are used in different culling passes.
 -   GPU uploads are done in a way that prevent the processors from going into an
     idle state.
--   `AddMissingMaskSystem` queries for the wrong component types. This will be
-    fixed in a patch release.
 
 ## Near-Term Roadmap
 

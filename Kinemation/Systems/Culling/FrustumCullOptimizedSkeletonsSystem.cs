@@ -102,9 +102,9 @@ namespace Latios.Kinemation.Systems
 
                 if (chunkIn == FrustumPlanes.IntersectResult.In)
                 {
-                    mask.lower.SetBits(0, true, math.min(64, chunk.ChunkEntityCount));
-                    if (chunk.ChunkEntityCount > 64)
-                        mask.upper.SetBits(0, true, chunk.ChunkEntityCount - 64);
+                    mask.lower.SetBits(0, true, math.min(64, chunk.Count));
+                    if (chunk.Count > 64)
+                        mask.upper.SetBits(0, true, chunk.Count - 64);
                     return;
                 }
                 if (chunkIn == FrustumPlanes.IntersectResult.Out)
@@ -113,13 +113,13 @@ namespace Latios.Kinemation.Systems
                     return;
                 }
 
-                var worldBounds = chunk.GetNativeArray(worldRenderBoundsHandle);
-                for (int i = 0; i < math.min(chunk.ChunkEntityCount, 64); i++)
+                var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
+                for (int i = 0; i < math.min(chunk.Count, 64); i++)
                 {
                     bool isIn         = FrustumPlanes.Intersect2NoPartial(cullingPlanes, worldBounds[i].bounds) != FrustumPlanes.IntersectResult.Out;
                     mask.lower.Value |= math.select(0ul, 1ul, isIn) << i;
                 }
-                for (int i = 0; i < chunk.ChunkEntityCount - 64; i++)
+                for (int i = 0; i < chunk.Count - 64; i++)
                 {
                     bool isIn         = FrustumPlanes.Intersect2NoPartial(cullingPlanes, worldBounds[i + 64].bounds) != FrustumPlanes.IntersectResult.Out;
                     mask.upper.Value |= math.select(0ul, 1ul, isIn) << i;
@@ -167,9 +167,9 @@ namespace Latios.Kinemation.Systems
                 ref var splitMasks = ref chunk.GetChunkComponentRefRW(in perCameraCullingSplitsMaskHandle);
                 splitMasks         = default;
 
-                var worldBounds = chunk.GetNativeArray(worldRenderBoundsHandle);
+                var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
 
-                var numEntities = chunk.ChunkEntityCount;
+                var numEntities = chunk.Count;
 
                 // First, perform frustum and receiver plane culling for all splits
                 for (int splitIndex = 0; splitIndex < splits.Splits.Length; ++splitIndex)

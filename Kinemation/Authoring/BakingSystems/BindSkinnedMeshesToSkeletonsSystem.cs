@@ -47,7 +47,7 @@ namespace Latios.Kinemation.Authoring.Systems
             ecbRemove.Dispose();
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct ClearJob : IJobEntity
         {
@@ -57,7 +57,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct BindJob : IJobEntity
         {
@@ -80,7 +80,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct UnbindJob : IJobEntity
         {

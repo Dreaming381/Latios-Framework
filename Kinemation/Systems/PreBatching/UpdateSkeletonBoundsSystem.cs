@@ -116,24 +116,24 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsUpdate  = chunk.DidChange(boneBoundsHandle, lastSystemVersion);
-                needsUpdate      |= chunk.DidChange(ltwHandle, lastSystemVersion);
+                bool needsUpdate  = chunk.DidChange(ref boneBoundsHandle, lastSystemVersion);
+                needsUpdate      |= chunk.DidChange(ref ltwHandle, lastSystemVersion);
                 if (!needsUpdate && chunk.DidOrderChange(lastSystemVersion))
                 {
                     //A structural change happened but no component of concern changed, meaning we need to recalculate the chunk component but nothing else (rare).
-                    var worldBoundsRO = chunk.GetNativeArray(boneWorldBoundsReadOnlyHandle);
+                    var worldBoundsRO = chunk.GetNativeArray(ref boneWorldBoundsReadOnlyHandle);
                     var aabb          = worldBoundsRO[0].bounds;
                     for (int i = 1; i < chunk.Count; i++)
                         aabb =
                             Physics.CombineAabb(aabb, worldBoundsRO[i].bounds);
-                    chunk.SetChunkComponentData(chunkBoneWorldBoundsHandle, new ChunkBoneWorldBounds { chunkBounds = FromAabb(aabb) });
+                    chunk.SetChunkComponentData(ref chunkBoneWorldBoundsHandle, new ChunkBoneWorldBounds { chunkBounds = FromAabb(aabb) });
                     return;
                 }
                 if (!needsUpdate)
                     return;
-                var boneBounds  = chunk.GetNativeArray(boneBoundsHandle);
-                var ltws        = chunk.GetNativeArray(ltwHandle);
-                var worldBounds = chunk.GetNativeArray(boneWorldBoundsHandle);
+                var boneBounds  = chunk.GetNativeArray(ref boneBoundsHandle);
+                var ltws        = chunk.GetNativeArray(ref ltwHandle);
+                var worldBounds = chunk.GetNativeArray(ref boneWorldBoundsHandle);
 
                 Aabb chunkBounds = ComputeBounds(boneBounds[0].radialOffsetInBoneSpace, ltws[0].Value);
                 worldBounds[0]   = new BoneWorldBounds { bounds = chunkBounds };
@@ -146,7 +146,7 @@ namespace Latios.Kinemation.Systems
                     chunkBounds     = Physics.CombineAabb(chunkBounds, newBounds);
                 }
 
-                chunk.SetChunkComponentData(chunkBoneWorldBoundsHandle, new ChunkBoneWorldBounds { chunkBounds = FromAabb(chunkBounds) });
+                chunk.SetChunkComponentData(ref chunkBoneWorldBoundsHandle, new ChunkBoneWorldBounds { chunkBounds = FromAabb(chunkBounds) });
             }
 
             Aabb ComputeBounds(float radius, float4x4 ltw)
@@ -171,28 +171,28 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsUpdate  = chunk.DidChange(boneBoundsHandle, lastSystemVersion);
-                needsUpdate      |= chunk.DidChange(boneToRootHandle, lastSystemVersion);
-                needsUpdate      |= chunk.DidChange(ltwHandle, lastSystemVersion);
+                bool needsUpdate  = chunk.DidChange(ref boneBoundsHandle, lastSystemVersion);
+                needsUpdate      |= chunk.DidChange(ref boneToRootHandle, lastSystemVersion);
+                needsUpdate      |= chunk.DidChange(ref ltwHandle, lastSystemVersion);
                 if (!needsUpdate && chunk.DidOrderChange(lastSystemVersion))
                 {
                     //A structural change happened but no component of concern changed, meaning we need to recalculate the chunk component but nothing else (rare).
-                    var worldBoundsRO = chunk.GetNativeArray(skeletonWorldBoundsReadOnlyHandle);
+                    var worldBoundsRO = chunk.GetNativeArray(ref skeletonWorldBoundsReadOnlyHandle);
                     var aabb          = new Aabb( worldBoundsRO[0].bounds.Min, worldBoundsRO[0].bounds.Max);
                     for (int i = 1; i < chunk.Count; i++)
                         aabb =
                             Physics.CombineAabb(aabb, new Aabb(worldBoundsRO[i].bounds.Min, worldBoundsRO[i].bounds.Max));
-                    chunk.SetChunkComponentData(chunkSkeletonWorldBoundsHandle, new ChunkSkeletonWorldBounds { chunkBounds = FromAabb(aabb) });
+                    chunk.SetChunkComponentData(ref chunkSkeletonWorldBoundsHandle, new ChunkSkeletonWorldBounds { chunkBounds = FromAabb(aabb) });
                     return;
                 }
                 if (!needsUpdate)
                     return;
 
-                var boneBounds   = chunk.GetBufferAccessor(boneBoundsHandle);
-                var boneToRoots  = chunk.GetBufferAccessor(boneToRootHandle);
-                var ltws         = chunk.GetNativeArray(ltwHandle);
-                var shaderBounds = chunk.GetNativeArray(shaderBoundsHandle);
-                var worldBounds  = chunk.GetNativeArray(skeletonWorldBoundsHandle);
+                var boneBounds   = chunk.GetBufferAccessor(ref boneBoundsHandle);
+                var boneToRoots  = chunk.GetBufferAccessor(ref boneToRootHandle);
+                var ltws         = chunk.GetNativeArray(ref ltwHandle);
+                var shaderBounds = chunk.GetNativeArray(ref shaderBoundsHandle);
+                var worldBounds  = chunk.GetNativeArray(ref skeletonWorldBoundsHandle);
 
                 Aabb chunkBounds = ComputeBounds(boneBounds[0], boneToRoots[0], ltws[0].Value);
                 worldBounds[0]   = new SkeletonWorldBounds { bounds = FromAabb(chunkBounds) };
@@ -205,7 +205,7 @@ namespace Latios.Kinemation.Systems
                     chunkBounds     = Physics.CombineAabb(chunkBounds, newBounds);
                 }
 
-                chunk.SetChunkComponentData(chunkSkeletonWorldBoundsHandle, new ChunkSkeletonWorldBounds { chunkBounds = FromAabb(chunkBounds) });
+                chunk.SetChunkComponentData(ref chunkSkeletonWorldBoundsHandle, new ChunkSkeletonWorldBounds { chunkBounds = FromAabb(chunkBounds) });
             }
 
             Aabb ComputeBounds(DynamicBuffer<OptimizedBoneBounds> bounds, DynamicBuffer<OptimizedBoneToRoot> boneToRoots, float4x4 ltw)

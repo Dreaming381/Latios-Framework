@@ -264,7 +264,7 @@ namespace Latios
         }
 
         /// <summary>
-        /// Adds a shared component value as a filter to the query
+        /// Adds a shared component value as a filter to the query.
         /// </summary>
         /// <param name="value">The ISharedComponentData value that entities in the query are required to match</param>
         public FluentQuery WithSharedComponent<T>(T value) where T : unmanaged, ISharedComponentData
@@ -462,27 +462,32 @@ namespace Latios
             //desc.Options(m_options);
             //desc.FinalizeQuery();
 
-            var desc = new EntityQueryDesc()
-            {
-                All     = m_all.ToArrayNBC(),
-                Any     = m_any.ToArrayNBC(),
-                None    = m_none.ToArrayNBC(),
-                Options = m_options
-            };
+            var builder = new EntityQueryBuilder(Allocator.Temp).WithAll(ref m_all).WithAny(ref m_any).WithNone(ref m_none).WithOptions(m_options);
+
+            //var desc = new EntityQueryDesc()
+            //{
+            //    All     = m_all.ToArrayNBC(),
+            //    Any     = m_any.ToArrayNBC(),
+            //    None    = m_none.ToArrayNBC(),
+            //    Options = m_options
+            //};
 
             DisposeArrays();
             EntityQuery query;
             if (m_targetSystem != null)
             {
-                query = m_targetSystem.GetEntityQuery(desc);
+                //query = m_targetSystem.GetEntityQuery(desc);
+                query = builder.Build(m_targetSystem as SystemBase);
             }
             else if (m_targetState != null)
             {
-                query = m_targetState->GetEntityQuery(desc);
+                //query = m_targetState->GetEntityQuery(desc);
+                query = builder.Build(ref *m_targetState);
             }
             else if (m_targetManager != default)
             {
-                query = m_targetManager.CreateEntityQuery(desc);
+                //query = m_targetManager.CreateEntityQuery(desc);
+                query = builder.Build(m_targetManager);
             }
             else
                 throw new System.InvalidOperationException("Missing a system or entity manager reference to build an EntityQuery.");

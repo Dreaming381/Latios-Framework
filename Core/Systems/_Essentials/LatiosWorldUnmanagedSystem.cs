@@ -109,7 +109,6 @@ namespace Latios.Systems
         // so Burst can't be used here.
         public void OnDestroy(ref SystemState state)
         {
-            // Todo
             m_impl->m_worldUnmanaged.EntityManager.CompleteAllTrackedJobs();
 
             (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).Dispose();

@@ -107,13 +107,13 @@ namespace Latios.Kinemation.Systems
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var ptr = metaChunk.GetComponentDataPtrRW(ref maskHandle);
-                UnsafeUtility.MemClear(ptr, sizeof(ChunkPerCameraCullingMask) * metaChunk.ChunkEntityCount);
+                UnsafeUtility.MemClear(ptr, sizeof(ChunkPerCameraCullingMask) * metaChunk.Count);
 
                 var chunkPerCameraMasks = (ChunkPerCameraCullingMask*)ptr;
 
                 var chunkHeaders = (ChunkHeader*)metaChunk.GetComponentDataPtrRO(ref headerHandle);
                 var chunkInfos   = (EntitiesGraphicsChunkInfo*)metaChunk.GetComponentDataPtrRO(ref chunkInfoHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     if (!chunkInfos[i].Valid)
                         continue;
@@ -132,8 +132,8 @@ namespace Latios.Kinemation.Systems
 
                     // sceneCullingMask gets handled in a separate Editor-only job
 
-                    int lowBitCount  = math.min(64, chunk.ChunkEntityCount);
-                    int highBitCount = chunk.ChunkEntityCount - 64;
+                    int lowBitCount  = math.min(64, chunk.Count);
+                    int highBitCount = chunk.Count - 64;
                     chunkPerCameraMasks[i].lower.SetBits(0, true, lowBitCount);
                     if (highBitCount > 0)
                         chunkPerCameraMasks[i].upper.SetBits(0, true, highBitCount);
@@ -161,13 +161,13 @@ namespace Latios.Kinemation.Systems
             {
                 var chunkPerCameraMasks = (ChunkPerCameraCullingMask*)metaChunk.GetComponentDataPtrRW(ref maskHandle);
                 var chunkHeaders        = (ChunkHeader*)metaChunk.GetComponentDataPtrRO(ref headerHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     if (chunkPerCameraMasks[i].lower.Value == 0)
                         continue;
 
                     ref var chunk                 = ref chunkHeaders[i].ArchetypeChunk;
-                    int editorRenderDataIndex = chunk.GetSharedComponentIndex(editorDataComponentHandle);  // Safe to call even if chunk doesn't have component
+                    int editorRenderDataIndex = chunk.GetSharedComponentIndex(ref editorDataComponentHandle);  // Safe to call even if chunk doesn't have component
 
                     // If we can't find a culling mask, use the default
                     ulong chunkSceneCullingMask = EditorSceneManager.DefaultSceneCullingMask;
@@ -190,11 +190,11 @@ namespace Latios.Kinemation.Systems
                         var entities = chunk.GetNativeArray(entityHandle);
                         ulong lower    = 0;
                         ulong upper    = 0;
-                        for (int j = 0; j < math.min(chunk.ChunkEntityCount, 64); j++)
+                        for (int j = 0; j < math.min(chunk.Count, 64); j++)
                         {
                             lower |= math.select(0ul, 1ul, includeExcludeFilter.EntityPassesFilter(entities[j].Index)) << j;
                         }
-                        for (int j = 64; j < chunk.ChunkEntityCount; j++)
+                        for (int j = 64; j < chunk.Count; j++)
                         {
                             upper |= math.select(0ul, 1ul, includeExcludeFilter.EntityPassesFilter(entities[j].Index)) << (j - 64);
                         }

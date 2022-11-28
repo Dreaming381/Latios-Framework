@@ -4,8 +4,8 @@ using UnityEditor;
 
 internal class ScriptTemplateMenus
 {
-    public const string TemplatesRootSolo      = "Packages/com.latios.core/Core.Editor/ScriptTemplates";
-    public const string TemplatesRootFramework = "Packages/com.latios.latiosframework/Core/Core.Editor/ScriptTemplates";
+    public const string TemplatesRootSolo      = "Packages/com.latios.core/Editor/ScriptTemplates";
+    public const string TemplatesRootFramework = "Packages/com.latios.latiosframework/Core/Editor/ScriptTemplates";
     public const string TemplatesRootAssets    = "Assets/_Code/Core.Editor/ScriptTemplates";
 
     [MenuItem("Assets/Create/Latios/Bootstrap/Minimal - Injection Workflow")]

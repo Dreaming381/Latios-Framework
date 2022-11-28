@@ -65,9 +65,9 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var skeletons = chunk.GetNativeArray(skeletonHandle);
+                var skeletons = chunk.GetNativeArray(ref skeletonHandle);
 
-                if (!chunk.DidChange(fromBoneHandle, lastSystemVersion) && !chunk.DidChange(skeletonHandle, lastSystemVersion))
+                if (!chunk.DidChange(ref fromBoneHandle, lastSystemVersion) && !chunk.DidChange(ref skeletonHandle, lastSystemVersion))
                 {
                     bool needsCopy = false;
                     for (int i = 0; i < chunk.Count; i++)
@@ -83,8 +83,8 @@ namespace Latios.Kinemation.Systems
                         return;
                 }
 
-                var bones = chunk.GetNativeArray(fromBoneHandle);
-                var ltps  = chunk.GetNativeArray(ltpHandle).Reinterpret<float4x4>();
+                var bones = chunk.GetNativeArray(ref fromBoneHandle);
+                var ltps  = chunk.GetNativeArray(ref ltpHandle).Reinterpret<float4x4>();
 
                 for (int i = 0; i < chunk.Count; i++)
                 {

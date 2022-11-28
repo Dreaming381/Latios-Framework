@@ -5,8 +5,8 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.Exposed;
+using Unity.Entities.UI;
 using Unity.Mathematics;
-using Unity.Platforms.UI;
 using UnityEngine;
 using UnityEngine.UIElements;
 

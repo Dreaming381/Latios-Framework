@@ -66,7 +66,7 @@ namespace Latios.Kinemation.Authoring.Systems
             ecbRemove.Dispose();
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [WithAll(typeof(CopyLocalToParentFromBone))]
         [BurstCompile]
         partial struct ClearJob : IJobEntity
@@ -77,7 +77,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct ApplySkeletonsToBonesJob : IJobEntity
         {
@@ -118,7 +118,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [WithAll(typeof(CopyLocalToParentFromBone))]
         [BurstCompile]
         partial struct RemoveDisconnectedBonesJob : IJobEntity

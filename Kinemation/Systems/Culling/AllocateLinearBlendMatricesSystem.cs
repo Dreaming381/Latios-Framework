@@ -116,21 +116,21 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var cameraMask = chunk.GetChunkComponentData(perCameraMaskHandle);
-                var frameMask  = chunk.GetChunkComponentData(perFrameMaskHandle);
+                var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
+                var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
                 var upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
                 if ((upper | lower) == 0)
                     return; // The masks get re-checked in ChunkPrefixSumJob so we can quit now.
 
-                var meshArray  = chunk.GetNativeArray(meshHandle);
+                var meshArray  = chunk.GetNativeArray(ref meshHandle);
                 int count      = 0;
-                var enumerator = new ChunkEntityEnumerator(true, new v128(lower, upper), chunk.ChunkEntityCount);
+                var enumerator = new ChunkEntityEnumerator(true, new v128(lower, upper), chunk.Count);
                 while (enumerator.NextEntityIndex(out int i))
                 {
                     count += meshArray[i].blob.Value.bindPoses.Length;
                 }
-                chunk.SetChunkComponentData(metaHandle, new ChunkLinearBlendSkinningMemoryMetadata { bonesStartPrefixSum = count });
+                chunk.SetChunkComponentData(ref metaHandle, new ChunkLinearBlendSkinningMemoryMetadata { bonesStartPrefixSum = count });
             }
         }
 
@@ -153,11 +153,11 @@ namespace Latios.Kinemation.Systems
             {
                 var prefixSum = maxRequiredLinearBlendMatricesLookup[worldBlackboardEntity].matricesCount;
 
-                var cameraMaskArray   = chunk.GetNativeArray(perCameraMaskHandle);
-                var frameMaskArray    = chunk.GetNativeArray(perFrameMaskHandle);
-                var headerArray       = chunk.GetNativeArray(chunkHeaderHandle);
-                var metaArray         = chunk.GetNativeArray(metaHandle);
-                var materialMaskArray = chunk.GetNativeArray(materialMaskHandle);
+                var cameraMaskArray   = chunk.GetNativeArray(ref perCameraMaskHandle);
+                var frameMaskArray    = chunk.GetNativeArray(ref perFrameMaskHandle);
+                var headerArray       = chunk.GetNativeArray(ref chunkHeaderHandle);
+                var metaArray         = chunk.GetNativeArray(ref metaHandle);
+                var materialMaskArray = chunk.GetNativeArray(ref materialMaskHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -199,14 +199,14 @@ namespace Latios.Kinemation.Systems
             {
                 var chunk = changedChunks[index];
 
-                var metadata   = chunk.GetChunkComponentData(metaHandle);
-                var cameraMask = chunk.GetChunkComponentData(perCameraMaskHandle);
-                var frameMask  = chunk.GetChunkComponentData(perFrameMaskHandle);
+                var metadata   = chunk.GetChunkComponentData(ref metaHandle);
+                var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
+                var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var lower      = new BitField64(cameraMask.lower.Value & (~frameMask.lower.Value));
                 var upper      = new BitField64(cameraMask.upper.Value & (~frameMask.upper.Value));
 
-                var meshArray = chunk.GetNativeArray(meshHandle);
-                var indices   = chunk.GetNativeArray(indicesHandle).Reinterpret<uint>();
+                var meshArray = chunk.GetNativeArray(ref meshHandle);
+                var indices   = chunk.GetNativeArray(ref indicesHandle).Reinterpret<uint>();
                 int prefixSum = metadata.bonesStartPrefixSum;
 
                 for (int i = lower.CountTrailingZeros(); i < 64; lower.SetBits(i, false), i = lower.CountTrailingZeros())

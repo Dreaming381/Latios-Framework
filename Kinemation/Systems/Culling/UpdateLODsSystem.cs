@@ -137,8 +137,8 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var entitiesGraphicsChunkInfoArray = metaChunk.GetNativeArray(EntitiesGraphicsChunkInfo);
-                var chunkHeaderArray               = metaChunk.GetNativeArray(ChunkHeader);
+                var entitiesGraphicsChunkInfoArray = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
+                var chunkHeaderArray               = metaChunk.GetNativeArray(ref ChunkHeader);
 
                 for (var entityIndex = 0; entityIndex < metaChunk.Count; entityIndex++)
                 {
@@ -180,10 +180,10 @@ namespace Latios.Kinemation.Systems
                             chunkEntityLodEnabled.Enabled[0] = 0;
                             chunkEntityLodEnabled.Enabled[1] = 0;
 
-                            var rootLODRanges          = chunk.GetNativeArray(RootLODRanges);
-                            var rootLODReferencePoints = chunk.GetNativeArray(RootLODReferencePoints);
-                            var lodRanges              = chunk.GetNativeArray(LODRanges);
-                            var lodReferencePoints     = chunk.GetNativeArray(LODReferencePoints);
+                            var rootLODRanges          = chunk.GetNativeArray(ref RootLODRanges);
+                            var rootLODReferencePoints = chunk.GetNativeArray(ref RootLODReferencePoints);
+                            var lodRanges              = chunk.GetNativeArray(ref LODRanges);
+                            var lodReferencePoints     = chunk.GetNativeArray(ref LODReferencePoints);
 
                             float graceDistance = float.MaxValue;
 
@@ -258,10 +258,10 @@ namespace Latios.Kinemation.Systems
 
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var chunkInfoArray = metaChunk.GetNativeArray(chunkInfoHandle);
-                var maskArray      = metaChunk.GetNativeArray(perCameraMaskHandle);
+                var chunkInfoArray = metaChunk.GetNativeArray(ref chunkInfoHandle);
+                var maskArray      = metaChunk.GetNativeArray(ref perCameraMaskHandle);
 
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     if (maskArray[i].lower.Value == 0)
                         continue;

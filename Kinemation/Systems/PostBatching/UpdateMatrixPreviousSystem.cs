@@ -81,19 +81,19 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.DidChange(ltwHandle, secondLastSystemVersion))
+                if (!chunk.DidChange(ref ltwHandle, secondLastSystemVersion))
                     return;
 
-                var mask          = chunk.GetChunkComponentData(maskHandle);
+                var mask          = chunk.GetChunkComponentData(ref maskHandle);
                 mask.lower.Value |= matrixPrevMaterialMaskLower;
                 mask.upper.Value |= matrixPrevMaterialMaskUpper;
-                chunk.SetChunkComponentData(maskHandle, mask);
+                chunk.SetChunkComponentData(ref maskHandle, mask);
 
-                var ltws   = chunk.GetNativeArray(ltwHandle).Reinterpret<float4x4>();
-                var caches = chunk.GetNativeArray(cacheHandle).Reinterpret<float2x4>();
+                var ltws   = chunk.GetNativeArray(ref ltwHandle).Reinterpret<float4x4>();
+                var caches = chunk.GetNativeArray(ref cacheHandle).Reinterpret<float2x4>();
                 // Even if this is the first frame that LTW moves, we still dirty prev.
                 // Todo: Is there an efficient way to fix this, and is it even worth it?
-                var prevs = chunk.GetNativeArray(prevHandle).Reinterpret<float4x4>();
+                var prevs = chunk.GetNativeArray(ref prevHandle).Reinterpret<float4x4>();
 
                 for (int i = 0; i < chunk.Count; i++)
                 {

@@ -40,7 +40,7 @@ namespace Latios.Kinemation.Authoring.Systems
             ecb.Dispose();
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct SkeletonBindingPathsJob : IJobEntity
         {
@@ -58,7 +58,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct OptimizedSkeletonHierarchyJob : IJobEntity
         {
@@ -78,7 +78,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct MeshBindingPathsJob : IJobEntity
         {
@@ -95,7 +95,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct MeshSkinningJob : IJobEntity
         {

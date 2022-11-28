@@ -105,9 +105,9 @@ namespace Latios.Kinemation.Systems
             {
                 var chunksCache = stackalloc ArchetypeChunk[128];
                 int chunksCount = 0;
-                var masks       = metaChunk.GetNativeArray(perCameraCullingMaskHandle);
-                var headers     = metaChunk.GetNativeArray(chunkHeaderHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                var masks       = metaChunk.GetNativeArray(ref perCameraCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(ref chunkHeaderHandle);
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     var mask = masks[i];
                     if ((mask.lower.Value | mask.upper.Value) != 0)
@@ -165,7 +165,7 @@ namespace Latios.Kinemation.Systems
                     return;
                 }
 
-                var worldBounds = chunk.GetNativeArray(worldRenderBoundsHandle);
+                var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
                 var inMask      = mask.lower.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
@@ -227,9 +227,9 @@ namespace Latios.Kinemation.Systems
                 ref var splitMasks = ref chunk.GetChunkComponentRefRW(in perCameraCullingSplitsMaskHandle);
                 splitMasks         = default;
 
-                var worldBounds = chunk.GetNativeArray(worldRenderBoundsHandle);
+                var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
 
-                var numEntities = chunk.ChunkEntityCount;
+                var numEntities = chunk.Count;
 
                 // First, perform frustum and receiver plane culling for all splits
                 for (int splitIndex = 0; splitIndex < splits.Splits.Length; ++splitIndex)

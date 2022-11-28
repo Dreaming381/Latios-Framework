@@ -241,8 +241,8 @@ namespace Latios.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var headers    = chunk.GetNativeArray(headerHandle);
-                var depthMasks = chunk.GetNativeArray(depthMaskHandle);
+                var headers    = chunk.GetNativeArray(ref headerHandle);
+                var depthMasks = chunk.GetNativeArray(ref depthMaskHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -302,10 +302,10 @@ namespace Latios.Systems
                     return;
                 }
 
-                var parents = chunk.GetNativeArray(parentHandle);
-                var depths  = chunk.GetNativeArray(depthHandle);
+                var parents = chunk.GetNativeArray(ref parentHandle);
+                var depths  = chunk.GetNativeArray(ref depthHandle);
 
-                if (chunk.DidChange(parentHandle, lastSystemVersion) || chunk.DidChange(ltpHandle, lastSystemVersion))
+                if (chunk.DidChange(ref parentHandle, lastSystemVersion) || chunk.DidChange(ref ltpHandle, lastSystemVersion))
                 {
                     // Fast path. No need to check for changes on parent.
                     SetNeedsUpdate(chunk);
@@ -329,9 +329,9 @@ namespace Latios.Systems
 
             void SetNeedsUpdate(ArchetypeChunk chunk)
             {
-                var depthMask = chunk.GetChunkComponentData(depthMaskHandle);
+                var depthMask = chunk.GetChunkComponentData(ref depthMaskHandle);
                 depthMask.chunkDepthMask.SetBits(depth + kMaxDepthIterations, true);
-                chunk.SetChunkComponentData(depthMaskHandle, depthMask);
+                chunk.SetChunkComponentData(ref depthMaskHandle, depthMask);
             }
         }
 
@@ -353,13 +353,13 @@ namespace Latios.Systems
             public void Execute(int index)
             {
                 var chunk = chunkList[index];
-                if (!chunk.GetChunkComponentData(depthMaskHandle).chunkDepthMask.IsSet(depth + kMaxDepthIterations))
+                if (!chunk.GetChunkComponentData(ref depthMaskHandle).chunkDepthMask.IsSet(depth + kMaxDepthIterations))
                     return;
 
-                var parents = chunk.GetNativeArray(parentHandle);
-                var depths  = chunk.GetNativeArray(depthHandle);
-                var ltps    = chunk.GetNativeArray(ltpHandle);
-                var ltws    = chunk.GetNativeArray(ltwHandle);
+                var parents = chunk.GetNativeArray(ref parentHandle);
+                var depths  = chunk.GetNativeArray(ref depthHandle);
+                var ltps    = chunk.GetNativeArray(ref ltpHandle);
+                var ltws    = chunk.GetNativeArray(ref ltwHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -431,20 +431,20 @@ namespace Latios.Systems
 
             public void Execute(int index)
             {
-                var batchInChunk = chunkList[index];
+                var chunk = chunkList[index];
 
-                if (!batchInChunk.Has(childHandle))
+                if (!chunk.Has(ref childHandle))
                     return;
 
                 bool updateChildrenTransform =
-                    batchInChunk.DidChange(ltwHandle, lastSystemVersion) ||
-                    batchInChunk.DidChange(childHandle, lastSystemVersion);
+                    chunk.DidChange(ref ltwHandle, lastSystemVersion) ||
+                    chunk.DidChange(ref childHandle, lastSystemVersion);
 
-                var  chunkLocalToWorld = batchInChunk.GetNativeArray(ltwHandle);
-                var  depths            = batchInChunk.GetNativeArray(depthHandle);
-                var  chunkChildren     = batchInChunk.GetBufferAccessor(childHandle);
+                var  chunkLocalToWorld = chunk.GetNativeArray(ref ltwHandle);
+                var  depths            = chunk.GetNativeArray(ref depthHandle);
+                var  chunkChildren     = chunk.GetBufferAccessor(ref childHandle);
                 bool ltwIsValid        = true;
-                for (int i = 0; i < batchInChunk.Count; i++)
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     if (depths[i].depth == depthLevel)
                     {
@@ -453,7 +453,7 @@ namespace Latios.Systems
                         for (int j = 0; j < children.Length; j++)
                         {
                             ChildLocalToWorld(ref localToWorldMatrix, children[j].Value, updateChildrenTransform, Entity.Null, ref ltwIsValid,
-                                              batchInChunk.DidChange(childHandle, lastSystemVersion));
+                                              chunk.DidChange(ref childHandle, lastSystemVersion));
                         }
                     }
                 }

@@ -295,11 +295,11 @@ namespace Latios.Kinemation.Systems
 
                 int stride                 = bufferId + 1;
                 var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * unfilteredChunkIndex, stride);
-                if (chunk.Has(boneReferenceBufferHandle))
+                if (chunk.Has(ref boneReferenceBufferHandle))
                 {
                     ProcessExposed(chunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
                 }
-                else if (chunk.Has(optimizedBoneBufferHandle))
+                else if (chunk.Has(ref optimizedBoneBufferHandle))
                 {
                     ProcessOptimized(chunk, ref boneCount, ref skeletonCount, ref meshCount, skeletonCountsByBuffer);
                 }
@@ -313,15 +313,15 @@ namespace Latios.Kinemation.Systems
                 meshDataStream.EndForEachIndex();
             }
 
-            void ProcessExposed(ArchetypeChunk batchInChunk, ref int batchBoneCount, ref int skeletonCount, ref int meshCount, NativeArray<int> skeletonCountsByBuffer)
+            void ProcessExposed(ArchetypeChunk chunk, ref int batchBoneCount, ref int skeletonCount, ref int meshCount, NativeArray<int> skeletonCountsByBuffer)
             {
-                var entityArray           = batchInChunk.GetNativeArray(entityHandle);
-                var skinnedMeshesAccessor = batchInChunk.GetBufferAccessor(skinnedMeshesBufferHandle);
-                var boneBufferAccessor    = batchInChunk.GetBufferAccessor(boneReferenceBufferHandle);
-                var perFrameMetadataArray = batchInChunk.GetNativeArray(perFrameMetadataHandle);
-                var skeletonCullingMask   = batchInChunk.GetChunkComponentData(skeletonCullingMaskHandle);
+                var entityArray           = chunk.GetNativeArray(entityHandle);
+                var skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
+                var boneBufferAccessor    = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
+                var perFrameMetadataArray = chunk.GetNativeArray(ref perFrameMetadataHandle);
+                var skeletonCullingMask   = chunk.GetChunkComponentData(ref skeletonCullingMaskHandle);
 
-                for (int i = 0; i < batchInChunk.Count; i++)
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var mask = i >= 64 ? skeletonCullingMask.upper : skeletonCullingMask.lower;
                     if (mask.IsSet(i % 64))
@@ -343,15 +343,15 @@ namespace Latios.Kinemation.Systems
                 }
             }
 
-            void ProcessOptimized(ArchetypeChunk batchInChunk, ref int batchBoneCount, ref int skeletonCount, ref int meshCount, NativeArray<int> skeletonCountsByBuffer)
+            void ProcessOptimized(ArchetypeChunk chunk, ref int batchBoneCount, ref int skeletonCount, ref int meshCount, NativeArray<int> skeletonCountsByBuffer)
             {
-                var entityArray           = batchInChunk.GetNativeArray(entityHandle);
-                var skinnedMeshesAccessor = batchInChunk.GetBufferAccessor(skinnedMeshesBufferHandle);
-                var boneBufferAccessor    = batchInChunk.GetBufferAccessor(optimizedBoneBufferHandle);
-                var perFrameMetadataArray = batchInChunk.GetNativeArray(perFrameMetadataHandle);
-                var skeletonCullingMask   = batchInChunk.GetChunkComponentData(skeletonCullingMaskHandle);
+                var entityArray           = chunk.GetNativeArray(entityHandle);
+                var skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
+                var boneBufferAccessor    = chunk.GetBufferAccessor(ref optimizedBoneBufferHandle);
+                var perFrameMetadataArray = chunk.GetNativeArray(ref perFrameMetadataHandle);
+                var skeletonCullingMask   = chunk.GetChunkComponentData(ref skeletonCullingMaskHandle);
 
-                for (int i = 0; i < batchInChunk.Count; i++)
+                for (int i = 0; i < chunk.Count; i++)
                 {
                     var mask = i >= 64 ? skeletonCullingMask.upper : skeletonCullingMask.lower;
                     if (mask.IsSet(i % 64))
@@ -391,8 +391,8 @@ namespace Latios.Kinemation.Systems
                     }
 
                     var  storageInfo = esiLookup[meshEntity];
-                    var  cameraMask  = storageInfo.Chunk.GetChunkComponentData(meshPerCameraCullingMaskHandle);
-                    var  frameMask   = storageInfo.Chunk.GetChunkComponentData(meshPerFrameCullingMaskHandle);
+                    var  cameraMask  = storageInfo.Chunk.GetChunkComponentData(ref meshPerCameraCullingMaskHandle);
+                    var  frameMask   = storageInfo.Chunk.GetChunkComponentData(ref meshPerFrameCullingMaskHandle);
                     bool isNewMesh   = false;
                     if (storageInfo.IndexInChunk >= 64)
                     {
@@ -525,11 +525,11 @@ namespace Latios.Kinemation.Systems
                 int stride                 = bufferId + 1;
                 var skeletonCountsByBuffer = skeletonCountsByBufferByBatch.GetSubArray(stride * unfilteredChunkIndex, stride);
 
-                if (chunk.Has(boneReferenceBufferHandle))
+                if (chunk.Has(ref boneReferenceBufferHandle))
                 {
                     ProcessExposed(chunk, countsElement, count, skeletonCountsByBuffer);
                 }
-                else if (chunk.Has(optimizedBoneBufferHandle))
+                else if (chunk.Has(ref optimizedBoneBufferHandle))
                 {
                     ProcessOptimized(chunk, countsElement, count, skeletonCountsByBuffer);
                 }
@@ -537,16 +537,16 @@ namespace Latios.Kinemation.Systems
                 meshDataStream.EndForEachIndex();
             }
 
-            void ProcessExposed(ArchetypeChunk batchInChunk, CountsElement countsElement, int streamWriteCount, NativeArray<int> skeletonCountsByBuffer)
+            void ProcessExposed(ArchetypeChunk chunk, CountsElement countsElement, int streamWriteCount, NativeArray<int> skeletonCountsByBuffer)
             {
                 int boneOffset = countsElement.boneCount;
                 int meshOffset = countsElement.meshCount * 2 + skeletonCount;
 
-                var perFrameMetaArray = batchInChunk.GetNativeArray(perFrameMetadataHandle);
-                var meshesAccessor    = batchInChunk.GetBufferAccessor(skinnedMeshesBufferHandle);
+                var perFrameMetaArray = chunk.GetNativeArray(ref perFrameMetadataHandle);
+                var meshesAccessor    = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
 
-                var bonesAccessor = batchInChunk.GetBufferAccessor(boneReferenceBufferHandle);
-                var skeletonLtws  = batchInChunk.GetNativeArray(ltwHandle);
+                var bonesAccessor = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
+                var skeletonLtws  = chunk.GetNativeArray(ref ltwHandle);
 
                 for (int streamWrites = 0; streamWrites < streamWriteCount;)
                 {
@@ -586,15 +586,15 @@ namespace Latios.Kinemation.Systems
                 }
             }
 
-            void ProcessOptimized(ArchetypeChunk batchInChunk, CountsElement countsElement, int streamWriteCount, NativeArray<int> skeletonCountsByBuffer)
+            void ProcessOptimized(ArchetypeChunk chunk, CountsElement countsElement, int streamWriteCount, NativeArray<int> skeletonCountsByBuffer)
             {
                 int boneOffset = countsElement.boneCount;
                 int meshOffset = countsElement.meshCount * 2 + skeletonCount;
 
-                var perFrameMetaArray = batchInChunk.GetNativeArray(perFrameMetadataHandle);
-                var meshesAccessor    = batchInChunk.GetBufferAccessor(skinnedMeshesBufferHandle);
+                var perFrameMetaArray = chunk.GetNativeArray(ref perFrameMetadataHandle);
+                var meshesAccessor    = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
 
-                var bonesAccessor = batchInChunk.GetBufferAccessor(optimizedBoneBufferHandle);
+                var bonesAccessor = chunk.GetBufferAccessor(ref optimizedBoneBufferHandle);
 
                 for (int streamWrites = 0; streamWrites < streamWriteCount;)
                 {

@@ -64,5 +64,17 @@ namespace Unity.Mathematics
             return a ^ ((a ^ b) & c);
         }
     }
+
+    public partial struct float3x4
+    {
+        public static float3x4 TRS(float3 translation, quaternion rotation, float3 scale)
+        {
+            float3x3 r = new float3x3(rotation);
+            return new float3x4((r.c0 * scale.x),
+                                (r.c1 * scale.y),
+                                (r.c2 * scale.z),
+                                (translation   ));
+        }
+    }
 }
 

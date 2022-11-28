@@ -8,8 +8,6 @@ using Unity.Mathematics;
 
 namespace Latios
 {
-    //Todo: Combine Read and Write handles into single struct with single dictionary.
-    //Todo: Explore idea of using NativeHashmap for JobHandles.
     internal unsafe struct CollectionComponentStorage : IDisposable
     {
         struct Key : IEquatable<Key>

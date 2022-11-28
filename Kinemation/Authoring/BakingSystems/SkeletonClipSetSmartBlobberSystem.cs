@@ -341,7 +341,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
         [BurstCompile]
         partial struct CompressClipsAndBuildBlobJob : IJobEntity
         {

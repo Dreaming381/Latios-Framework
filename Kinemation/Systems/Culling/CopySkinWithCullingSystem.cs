@@ -145,9 +145,9 @@ namespace Latios.Kinemation.Systems
             {
                 var chunksCache = stackalloc ArchetypeChunk[128];
                 int chunksCount = 0;
-                var masks       = metaChunk.GetNativeArray(perCameraCullingMaskHandle);
-                var headers     = metaChunk.GetNativeArray(chunkHeaderHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                var masks       = metaChunk.GetNativeArray(ref perCameraCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(ref chunkHeaderHandle);
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     var mask = masks[i];
                     if ((mask.lower.Value | mask.upper.Value) != 0)
@@ -198,8 +198,8 @@ namespace Latios.Kinemation.Systems
                 var context = new MaterialContext();
                 context.Begin(in chunk, in linearBlendLookup, in computeLookup, in linearBlendHandle, in computeDeformHandle);
 
-                var references                 = chunk.GetNativeArray(referenceHandle);
-                var invertedFrameMasks         = chunk.GetChunkComponentData(chunkPerFrameMaskHandle);
+                var references                 = chunk.GetNativeArray(ref referenceHandle);
+                var invertedFrameMasks         = chunk.GetChunkComponentData(ref chunkPerFrameMaskHandle);
                 invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
                 invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
                 ref var cameraMask             = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
@@ -247,7 +247,7 @@ namespace Latios.Kinemation.Systems
                     return false;
 
                 var  info          = esiLookup[reference];
-                var  referenceMask = info.Chunk.GetChunkComponentData(chunkPerCameraMaskHandle);
+                var  referenceMask = info.Chunk.GetChunkComponentData(ref chunkPerCameraMaskHandle);
                 bool result;
                 if (info.IndexInChunk >= 64)
                     result = referenceMask.upper.IsSet(info.IndexInChunk - 64);
@@ -296,8 +296,8 @@ namespace Latios.Kinemation.Systems
                 var context = new MaterialContext();
                 context.Begin(in chunk, in linearBlendLookup, in computeLookup, in linearBlendHandle, in computeDeformHandle);
 
-                var references                 = chunk.GetNativeArray(referenceHandle);
-                var invertedFrameMasks         = chunk.GetChunkComponentData(chunkPerFrameMaskHandle);
+                var references                 = chunk.GetNativeArray(ref referenceHandle);
+                var invertedFrameMasks         = chunk.GetChunkComponentData(ref chunkPerFrameMaskHandle);
                 invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
                 invertedFrameMasks.upper.Value = ~invertedFrameMasks.upper.Value;
                 ref var cameraMask             = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
@@ -417,12 +417,12 @@ namespace Latios.Kinemation.Systems
                 if (Hint.Unlikely(newChunk))
                 {
                     newChunk         = false;
-                    hasLinearBlend   = currentChunk.Has(copySkinLinearBlendHandle);
-                    hasComputeDeform = currentChunk.Has(copySkinComputeDeformHandle);
+                    hasLinearBlend   = currentChunk.Has(ref copySkinLinearBlendHandle);
+                    hasComputeDeform = currentChunk.Has(ref copySkinComputeDeformHandle);
                     if (hasLinearBlend)
-                        linearBlendChunkArray = currentChunk.GetNativeArray(copySkinLinearBlendHandle);
+                        linearBlendChunkArray = currentChunk.GetNativeArray(ref copySkinLinearBlendHandle);
                     if (hasComputeDeform)
-                        computeDeformChunkArray = currentChunk.GetNativeArray(copySkinComputeDeformHandle);
+                        computeDeformChunkArray = currentChunk.GetNativeArray(ref copySkinComputeDeformHandle);
                 }
 
                 if (hasLinearBlend)

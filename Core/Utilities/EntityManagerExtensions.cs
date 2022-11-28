@@ -33,9 +33,9 @@ namespace Latios
             var handleRO           = entityManager.GetDynamicComponentTypeHandle(typeRO);
             var srcChunk           = entityManager.GetStorageInfo(src);
             var dstChunk           = entityManager.GetStorageInfo(dst);
-            var dstPtr             = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(handleRW, size).GetUnsafePtr();
+            var dstPtr             = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRW, size).GetUnsafePtr();
             dstPtr                += dstChunk.IndexInChunk * size;
-            var srcPtr             = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(handleRO, size).GetUnsafeReadOnlyPtr();
+            var srcPtr             = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRO, size).GetUnsafeReadOnlyPtr();
             srcPtr                += srcChunk.IndexInChunk * size;
             UnsafeUtility.MemCpy(dstPtr, srcPtr, size);
         }

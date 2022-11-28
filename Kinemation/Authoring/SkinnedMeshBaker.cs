@@ -19,6 +19,9 @@ namespace Latios.Kinemation.Authoring
 
         public override void Bake(SkinnedMeshRenderer authoring)
         {
+            if (GetComponent<OverrideMeshRendererBase>() != null)
+                return;
+
             if (authoring.sharedMesh == null)
             {
                 Debug.LogError($"Kinemation failed to bake Skinned Mesh Renderer {authoring.gameObject.name} because no mesh was assigned.");
@@ -206,12 +209,6 @@ namespace Latios.Kinemation.Authoring
 #pragma warning disable CS0162
         private static void AddRendererComponents<T>(Entity entity, Baker<T> baker, in RenderMeshDescription renderMeshDescription, RenderMesh renderMesh) where T : Component
         {
-#if UNITY_EDITOR
-            // Skip the validation check in the player to minimize overhead.
-            if (!RenderMeshUtility.ValidateMesh(renderMesh))
-                return;
-#endif
-
             // Entities with Static are never rendered with motion vectors
             bool inMotionPass = RenderMeshUtility.kUseHybridMotionPass &&
                                 renderMeshDescription.FilterSettings.IsInMotionPass &&
@@ -326,6 +323,9 @@ namespace Latios.Kinemation.Authoring
                 Debug.LogWarning(
                     $"Singular mesh for Skinned Mesh Renderer {renderer.gameObject.name} uses shader {material.shader.name} which does not support skinning. Please see documentation for Linear Blend Skinning Node and Compute Deformation Node in Shader Graph.");
             }
+
+            // This serves no other purpose than to ensure post-processing occurs.
+            baker.AddComponent(entity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = renderer as SkinnedMeshRenderer });
         }
 
         internal static void ConvertToMultipleEntities<T>(
@@ -444,6 +444,9 @@ namespace Latios.Kinemation.Authoring
                 baker.AddComponent(referenceEntity, linearBlendComponents);
             if (referenceComputeDeform || referenceNeedsComputeDeform)
                 baker.AddComponent(referenceEntity, computeDeformComponents);
+
+            // This serves no other purpose than to ensure post-processing occurs.
+            baker.AddComponent(referenceEntity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = renderer as SkinnedMeshRenderer });
         }
     }
 }

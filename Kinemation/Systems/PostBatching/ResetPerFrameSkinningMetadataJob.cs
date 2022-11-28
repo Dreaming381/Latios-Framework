@@ -59,9 +59,9 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (chunk.DidChange(handle, lastSystemVersion))
+                if (chunk.DidChange(ref handle, lastSystemVersion))
                 {
-                    var metadata = chunk.GetNativeArray(handle);
+                    var metadata = chunk.GetNativeArray(ref handle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         metadata[i] = new PerFrameSkeletonBufferMetadata { bufferId = -1, startIndexInBuffer = -1 };

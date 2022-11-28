@@ -83,11 +83,11 @@ namespace Latios.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 bool updateChildrenTransform =
-                    chunk.DidChange<LocalToWorld>(LocalToWorldTypeHandle, LastSystemVersion) ||
-                    chunk.DidChange<Child>(ChildTypeHandle, LastSystemVersion);
+                    chunk.DidChange<LocalToWorld>(ref LocalToWorldTypeHandle, LastSystemVersion) ||
+                    chunk.DidChange<Child>(ref ChildTypeHandle, LastSystemVersion);
 
-                var  chunkLocalToWorld = chunk.GetNativeArray(LocalToWorldTypeHandle);
-                var  chunkChildren     = chunk.GetBufferAccessor(ChildTypeHandle);
+                var  chunkLocalToWorld = chunk.GetNativeArray(ref LocalToWorldTypeHandle);
+                var  chunkChildren     = chunk.GetBufferAccessor(ref ChildTypeHandle);
                 bool ltwIsValid        = true;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -96,7 +96,7 @@ namespace Latios.Systems
                     for (int j = 0; j < children.Length; j++)
                     {
                         ChildLocalToWorld(ref localToWorldMatrix, children[j].Value, updateChildrenTransform, Entity.Null, ref ltwIsValid,
-                                          chunk.DidChange(ChildTypeHandle, LastSystemVersion));
+                                          chunk.DidChange(ref ChildTypeHandle, LastSystemVersion));
                     }
                 }
             }

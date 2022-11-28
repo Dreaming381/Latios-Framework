@@ -181,7 +181,8 @@ namespace Latios.Systems
                 else
                     m_requestSystemNameForCurrentBuffer = m_externalSourceText.AsReadOnly();
 #if ENABLE_PROFILER
-                m_currentMarker = new Unity.Profiling.ProfilerMarker($"{m_currentBufferTypeName}::{m_requestSystemNameForCurrentBuffer}");
+                var fixedBuffer = new FixedString4096Bytes(m_requestSystemNameForCurrentBuffer);
+                m_currentMarker = new Unity.Profiling.ProfilerMarker($"{m_currentBufferTypeName}::{fixedBuffer}");
                 m_currentMarker.Begin();
                 m_needsMarkerResolve = true;
 #endif

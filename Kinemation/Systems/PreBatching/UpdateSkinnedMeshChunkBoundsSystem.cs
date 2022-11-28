@@ -78,7 +78,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 Aabb aabb   = new Aabb(float.MaxValue, float.MinValue);
-                var  bounds = chunk.GetNativeArray(handle);
+                var  bounds = chunk.GetNativeArray(ref handle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var b = bounds[i].chunkBounds;
@@ -97,7 +97,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 Aabb aabb   = new Aabb(float.MaxValue, float.MinValue);
-                var  bounds = chunk.GetNativeArray(handle);
+                var  bounds = chunk.GetNativeArray(ref handle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var b = bounds[i].chunkBounds;
@@ -116,7 +116,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var aabb   = new ChunkWorldRenderBounds { Value = FromAabb(combinedBounds.Value) };
-                var bounds                                      = chunk.GetNativeArray(handle);
+                var bounds                                      = chunk.GetNativeArray(ref handle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     bounds[i] = aabb;

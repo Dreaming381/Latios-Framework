@@ -16,15 +16,16 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_computeQuery = state.Fluent().WithAll<RenderMesh>(true).WithAll<ComputeDeformShaderIndex>().Without<ShareSkinFromEntity>()
+            m_computeQuery = state.Fluent().WithAll<MaterialMeshInfo>(true).WithAll<ComputeDeformShaderIndex>().Without<ShareSkinFromEntity>()
                              .Without<ChunkComputeDeformMemoryMetadata>(      true).IncludePrefabs().IncludeDisabled().Build();
 
-            m_linearBlendQuery = state.Fluent().WithAll<RenderMesh>(true).WithAll<LinearBlendSkinningShaderIndex>().Without<ShareSkinFromEntity>()
+            m_linearBlendQuery = state.Fluent().WithAll<MaterialMeshInfo>(true).WithAll<LinearBlendSkinningShaderIndex>().Without<ShareSkinFromEntity>()
                                  .Without<ChunkLinearBlendSkinningMemoryMetadata>(true).IncludePrefabs().IncludeDisabled().Build();
 
-            m_copyQuery = state.Fluent().WithAll<ShareSkinFromEntity>(true).Without<ChunkCopySkinShaderData>(true).IncludePrefabs().IncludeDisabled().Build();
+            m_copyQuery = state.Fluent().WithAll<MaterialMeshInfo>(true).WithAll<ShareSkinFromEntity>(true).Without<ChunkCopySkinShaderData>(true)
+                          .IncludePrefabs().IncludeDisabled().Build();
 
-            m_baseQuery = state.Fluent().WithAll<RenderMesh>(true).Without<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabled().Build();
+            m_baseQuery = state.Fluent().WithAll<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabled().Build();
         }
 
         [BurstCompile]

@@ -62,12 +62,12 @@ using Unity.Mathematics;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsUpdate  = chunk.DidChange(blobHandle, lastSystemVersion);
+                bool needsUpdate  = chunk.DidChange(ref blobHandle, lastSystemVersion);
                 needsUpdate      |= chunk.DidOrderChange(lastSystemVersion);
                 if (!needsUpdate)
                     return;
 
-                var blobs       = chunk.GetNativeArray(blobHandle);
+                var blobs       = chunk.GetNativeArray(ref blobHandle);
                 int minVertices = int.MaxValue;
                 int maxVertices = int.MinValue;
 
@@ -80,12 +80,12 @@ using Unity.Mathematics;
 
                 //CheckVertexCountMismatch(minVertices, maxVertices);
 
-                var metadata = chunk.GetChunkComponentData(metaHandle);
+                var metadata = chunk.GetChunkComponentData(ref metaHandle);
                 if (metadata.verticesPerMesh != maxVertices || metadata.entitiesInChunk != chunk.Count)
                 {
                     metadata.verticesPerMesh = maxVertices;
                     metadata.entitiesInChunk = chunk.Count;
-                    chunk.SetChunkComponentData(metaHandle, metadata);
+                    chunk.SetChunkComponentData(ref metaHandle, metadata);
                 }
             }
 

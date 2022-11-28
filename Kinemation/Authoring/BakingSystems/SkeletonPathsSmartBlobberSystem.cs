@@ -131,7 +131,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
         }
 
-        [WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct Job : IJobEntity
         {

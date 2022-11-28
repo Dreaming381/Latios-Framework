@@ -45,7 +45,7 @@ namespace Latios.Kinemation.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (chunk.DidChange(handle, lastSystemVersion))
+                if (chunk.DidChange(ref handle, lastSystemVersion))
                 {
                     var ptr = chunk.GetComponentDataPtrRW(ref handle);
                     UnsafeUtility.MemClear(ptr, sizeof(ChunkPerFrameCullingMask) * chunk.Count);

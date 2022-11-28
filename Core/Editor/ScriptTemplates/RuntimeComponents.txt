@@ -3,5 +3,5 @@ using Unity.Entities;
 using Unity.Mathematics;
 
 #ROOTNAMESPACEBEGIN#
-    #NOTRIM
+    #NOTRIM#
 #ROOTNAMESPACEEND#

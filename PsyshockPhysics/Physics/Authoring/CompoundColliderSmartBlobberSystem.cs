@@ -164,7 +164,7 @@ namespace Latios.Psyshock.Authoring.Systems
         }
 
         [BurstCompile]
-        [WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         partial struct Job : IJobEntity
         {
             public void Execute(ref SmartBlobberResult result, in CompoundColliderBakingRootTransform rootTransform, in DynamicBuffer<CompoundColliderBakingSubCollider> buffer)

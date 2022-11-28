@@ -27,7 +27,7 @@ namespace Latios.Myri
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var oneshots = chunk.GetNativeArray(oneshotHandle);
+                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
                 var entities = chunk.GetNativeArray(entityHandle);
                 for (int i = 0; i < oneshots.Length; i++)
                 {
@@ -59,10 +59,10 @@ namespace Latios.Myri
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var listeners = chunk.GetNativeArray(listenerHandle);
-                if (chunk.Has(ltwHandle))
+                var listeners = chunk.GetNativeArray(ref listenerHandle);
+                if (chunk.Has(ref ltwHandle))
                 {
-                    var ltws = chunk.GetNativeArray(ltwHandle);
+                    var ltws = chunk.GetNativeArray(ref ltwHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         var l = listeners[i];
@@ -79,14 +79,14 @@ namespace Latios.Myri
                 }
                 else
                 {
-                    bool                     hasTranslation = chunk.Has(translationHandle);
-                    bool                     hasRotation    = chunk.Has(rotationHandle);
+                    bool                     hasTranslation = chunk.Has(ref translationHandle);
+                    bool                     hasRotation    = chunk.Has(ref rotationHandle);
                     NativeArray<Translation> translations   = default;
                     NativeArray<Rotation>    rotations      = default;
                     if (hasTranslation)
-                        translations = chunk.GetNativeArray(translationHandle);
+                        translations = chunk.GetNativeArray(ref translationHandle);
                     if (hasRotation)
-                        rotations = chunk.GetNativeArray(rotationHandle);
+                        rotations = chunk.GetNativeArray(ref rotationHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         var l = listeners[i];
@@ -131,7 +131,7 @@ namespace Latios.Myri
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
-                var oneshots         = chunk.GetNativeArray(oneshotHandle);
+                var oneshots         = chunk.GetNativeArray(ref oneshotHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var oneshot = oneshots[i];
@@ -147,11 +147,11 @@ namespace Latios.Myri
                     }
                 }
 
-                bool ltw = chunk.Has(ltwHandle);
-                bool p   = chunk.Has(parentHandle);
-                bool t   = chunk.Has(translationHandle);
-                bool r   = chunk.Has(rotationHandle);
-                bool c   = chunk.Has(coneHandle);
+                bool ltw = chunk.Has(ref ltwHandle);
+                bool p   = chunk.Has(ref parentHandle);
+                bool t   = chunk.Has(ref translationHandle);
+                bool r   = chunk.Has(ref rotationHandle);
+                bool c   = chunk.Has(ref coneHandle);
 
                 int mask  = math.select(0, 0x10, ltw);
                 mask     += math.select(0, 0x8, p);
@@ -204,7 +204,7 @@ namespace Latios.Myri
 
             void ProcessNoTransform(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    oneshots = chunk.GetNativeArray(oneshotHandle);
+                var                    oneshots = chunk.GetNativeArray(ref oneshotHandle);
                 AudioSourceEmitterCone cone     = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -220,8 +220,8 @@ namespace Latios.Myri
 
             void ProcessCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var oneshots = chunk.GetNativeArray(oneshotHandle);
-                var cones    = chunk.GetNativeArray(coneHandle);
+                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
+                var cones    = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new OneshotEmitter
@@ -236,9 +236,9 @@ namespace Latios.Myri
 
             void ProcessRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var oneshots  = chunk.GetNativeArray(oneshotHandle);
-                var rotations = chunk.GetNativeArray(rotationHandle);
-                var cones     = chunk.GetNativeArray(coneHandle);
+                var oneshots  = chunk.GetNativeArray(ref oneshotHandle);
+                var rotations = chunk.GetNativeArray(ref rotationHandle);
+                var cones     = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new OneshotEmitter
@@ -253,8 +253,8 @@ namespace Latios.Myri
 
             void ProcessTranslation(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    oneshots     = chunk.GetNativeArray(oneshotHandle);
-                var                    translations = chunk.GetNativeArray(translationHandle);
+                var                    oneshots     = chunk.GetNativeArray(ref oneshotHandle);
+                var                    translations = chunk.GetNativeArray(ref translationHandle);
                 AudioSourceEmitterCone cone         = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -270,9 +270,9 @@ namespace Latios.Myri
 
             void ProcessTranslationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var oneshots     = chunk.GetNativeArray(oneshotHandle);
-                var translations = chunk.GetNativeArray(translationHandle);
-                var cones        = chunk.GetNativeArray(coneHandle);
+                var oneshots     = chunk.GetNativeArray(ref oneshotHandle);
+                var translations = chunk.GetNativeArray(ref translationHandle);
+                var cones        = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new OneshotEmitter
@@ -287,10 +287,10 @@ namespace Latios.Myri
 
             void ProcessTranslationRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var oneshots     = chunk.GetNativeArray(oneshotHandle);
-                var translations = chunk.GetNativeArray(translationHandle);
-                var rotations    = chunk.GetNativeArray(rotationHandle);
-                var cones        = chunk.GetNativeArray(coneHandle);
+                var oneshots     = chunk.GetNativeArray(ref oneshotHandle);
+                var translations = chunk.GetNativeArray(ref translationHandle);
+                var rotations    = chunk.GetNativeArray(ref rotationHandle);
+                var cones        = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new OneshotEmitter
@@ -305,8 +305,8 @@ namespace Latios.Myri
 
             void ProcessLtw(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    oneshots = chunk.GetNativeArray(oneshotHandle);
-                var                    ltws     = chunk.GetNativeArray(ltwHandle);
+                var                    oneshots = chunk.GetNativeArray(ref oneshotHandle);
+                var                    ltws     = chunk.GetNativeArray(ref ltwHandle);
                 AudioSourceEmitterCone cone     = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -323,9 +323,9 @@ namespace Latios.Myri
 
             void ProcessLtwCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var oneshots = chunk.GetNativeArray(oneshotHandle);
-                var ltws     = chunk.GetNativeArray(ltwHandle);
-                var cones    = chunk.GetNativeArray(coneHandle);
+                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
+                var ltws     = chunk.GetNativeArray(ref ltwHandle);
+                var cones    = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var ltw                        = ltws[i];
@@ -370,7 +370,7 @@ namespace Latios.Myri
             {
                 var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
                 var rng              = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
-                var looped           = chunk.GetNativeArray(loopedHandle);
+                var looped           = chunk.GetNativeArray(ref loopedHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var l = looped[i];
@@ -430,11 +430,11 @@ namespace Latios.Myri
                     }
                 }
 
-                bool ltw = chunk.Has(ltwHandle);
-                bool p   = chunk.Has(parentHandle);
-                bool t   = chunk.Has(translationHandle);
-                bool r   = chunk.Has(rotationHandle);
-                bool c   = chunk.Has(coneHandle);
+                bool ltw = chunk.Has(ref ltwHandle);
+                bool p   = chunk.Has(ref parentHandle);
+                bool t   = chunk.Has(ref translationHandle);
+                bool r   = chunk.Has(ref rotationHandle);
+                bool c   = chunk.Has(ref coneHandle);
 
                 int mask  = math.select(0, 0x10, ltw);
                 mask     += math.select(0, 0x8, p);
@@ -487,7 +487,7 @@ namespace Latios.Myri
 
             void ProcessNoTransform(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    loopeds = chunk.GetNativeArray(loopedHandle);
+                var                    loopeds = chunk.GetNativeArray(ref loopedHandle);
                 AudioSourceEmitterCone cone    = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -503,8 +503,8 @@ namespace Latios.Myri
 
             void ProcessCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var loopeds = chunk.GetNativeArray(loopedHandle);
-                var cones   = chunk.GetNativeArray(coneHandle);
+                var loopeds = chunk.GetNativeArray(ref loopedHandle);
+                var cones   = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new LoopedEmitter
@@ -519,9 +519,9 @@ namespace Latios.Myri
 
             void ProcessRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var loopeds   = chunk.GetNativeArray(loopedHandle);
-                var rotations = chunk.GetNativeArray(rotationHandle);
-                var cones     = chunk.GetNativeArray(coneHandle);
+                var loopeds   = chunk.GetNativeArray(ref loopedHandle);
+                var rotations = chunk.GetNativeArray(ref rotationHandle);
+                var cones     = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new LoopedEmitter
@@ -536,8 +536,8 @@ namespace Latios.Myri
 
             void ProcessTranslation(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    loopeds      = chunk.GetNativeArray(loopedHandle);
-                var                    translations = chunk.GetNativeArray(translationHandle);
+                var                    loopeds      = chunk.GetNativeArray(ref loopedHandle);
+                var                    translations = chunk.GetNativeArray(ref translationHandle);
                 AudioSourceEmitterCone cone         = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -553,9 +553,9 @@ namespace Latios.Myri
 
             void ProcessTranslationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var loopeds      = chunk.GetNativeArray(loopedHandle);
-                var translations = chunk.GetNativeArray(translationHandle);
-                var cones        = chunk.GetNativeArray(coneHandle);
+                var loopeds      = chunk.GetNativeArray(ref loopedHandle);
+                var translations = chunk.GetNativeArray(ref translationHandle);
+                var cones        = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new LoopedEmitter
@@ -570,10 +570,10 @@ namespace Latios.Myri
 
             void ProcessTranslationRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var loopeds      = chunk.GetNativeArray(loopedHandle);
-                var translations = chunk.GetNativeArray(translationHandle);
-                var rotations    = chunk.GetNativeArray(rotationHandle);
-                var cones        = chunk.GetNativeArray(coneHandle);
+                var loopeds      = chunk.GetNativeArray(ref loopedHandle);
+                var translations = chunk.GetNativeArray(ref translationHandle);
+                var rotations    = chunk.GetNativeArray(ref rotationHandle);
+                var cones        = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     emitters[firstEntityIndex + i] = new LoopedEmitter
@@ -588,8 +588,8 @@ namespace Latios.Myri
 
             void ProcessLtw(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var                    loopeds = chunk.GetNativeArray(loopedHandle);
-                var                    ltws    = chunk.GetNativeArray(ltwHandle);
+                var                    loopeds = chunk.GetNativeArray(ref loopedHandle);
+                var                    ltws    = chunk.GetNativeArray(ref ltwHandle);
                 AudioSourceEmitterCone cone    = default;
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -606,9 +606,9 @@ namespace Latios.Myri
 
             void ProcessLtwCone(ArchetypeChunk chunk, int firstEntityIndex)
             {
-                var loopeds = chunk.GetNativeArray(loopedHandle);
-                var ltws    = chunk.GetNativeArray(ltwHandle);
-                var cones   = chunk.GetNativeArray(coneHandle);
+                var loopeds = chunk.GetNativeArray(ref loopedHandle);
+                var ltws    = chunk.GetNativeArray(ref ltwHandle);
+                var cones   = chunk.GetNativeArray(ref coneHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var ltw                        = ltws[i];

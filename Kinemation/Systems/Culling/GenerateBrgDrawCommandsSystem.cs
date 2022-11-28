@@ -205,10 +205,10 @@ namespace Latios.Kinemation.Systems
             {
                 var chunksCache = stackalloc ArchetypeChunk[128];
                 int chunksCount = 0;
-                var masks       = metaChunk.GetNativeArray(perCameraCullingMaskHandle);
-                var headers     = metaChunk.GetNativeArray(chunkHeaderHandle);
+                var masks       = metaChunk.GetNativeArray(ref perCameraCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(ref chunkHeaderHandle);
                 var frameMask   = (ChunkPerFrameCullingMask*)metaChunk.GetComponentDataPtrRW(ref perFrameCullingMaskHandle);
-                for (int i = 0; i < metaChunk.ChunkEntityCount; i++)
+                for (int i = 0; i < metaChunk.Count; i++)
                 {
                     var mask = masks[i];
                     if ((mask.lower.Value | mask.upper.Value) != 0)
@@ -274,7 +274,7 @@ namespace Latios.Kinemation.Systems
                 DrawCommandOutput.InitializeForEmitThread();
 
                 {
-                    var entitiesGraphicsChunkInfo = chunk.GetChunkComponentData(EntitiesGraphicsChunkInfo);
+                    var entitiesGraphicsChunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
 
                     if (!entitiesGraphicsChunkInfo.Valid)
                         return;
@@ -283,9 +283,9 @@ namespace Latios.Kinemation.Systems
 
                     int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
 
-                    var  materialMeshInfos = chunk.GetNativeArray(MaterialMeshInfo);
-                    var  localToWorlds     = chunk.GetNativeArray(LocalToWorld);
-                    bool isDepthSorted     = chunk.Has(DepthSorted);
+                    var  materialMeshInfos = chunk.GetNativeArray(ref MaterialMeshInfo);
+                    var  localToWorlds     = chunk.GetNativeArray(ref LocalToWorld);
+                    bool isDepthSorted     = chunk.Has(ref DepthSorted);
                     bool isLightMapped     = chunk.GetSharedComponentIndex(LightMaps) >= 0;
 
                     // Check if the chunk has statically disabled motion (i.e. never in motion pass)
@@ -297,9 +297,9 @@ namespace Latios.Kinemation.Systems
                     if (hasMotion)
                     {
                         bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
-                        bool transformChanged = chunk.DidChange(LocalToWorld, LastSystemVersion);
+                        bool transformChanged = chunk.DidChange(ref LocalToWorld, LastSystemVersion);
 #if ENABLE_DOTS_DEFORMATION_MOTION_VECTORS
-                        bool isDeformed = chunk.Has(DeformedMeshIndex);
+                        bool isDeformed = chunk.Has(ref DeformedMeshIndex);
 #else
                         bool isDeformed = false;
 #endif

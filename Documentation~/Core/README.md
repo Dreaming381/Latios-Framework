@@ -387,10 +387,11 @@ hierarchies are instantiated.
 ## Known Issues
 
 -   There’s a limit to how many generic components you can add at runtime before
-    everything explodes. If you want to expand that limit, write a T4 script to
-    generate hundreds of non-generic `IComponentData` types. Your compiler will
-    hate you, but Unity might stop exploding. I’ll take dealing with one enemy
-    over death any day. This will be fixed in the future.
+    everything explodes (you’ll rarely hit it in practice). If you want to
+    expand that limit, write a T4 script to generate hundreds of non-generic
+    `IComponentData` types. Your compiler will hate you, but Unity might stop
+    exploding. I’ll take dealing with one enemy over death any day. This will be
+    fixed in the future.
 -   `IManagedComponent` and `ICollectionComponent` are not true components.
     Under the hood, I use generic components to modify the Entity archetypes.
     Expect them to not work with a lot of query and archetype sugar. I do try to
@@ -405,8 +406,6 @@ hierarchies are instantiated.
 -   Fluent Queries do not work in Burst, though you can use them in an `ISystem`
     which Burst-compiles the `OnUpdate()` method.
 -   Blackboard Entities do not retain blob asset reference counts.
--   Scene Management does not have an updated `CurrentScene` component when
-    `OnNewScene()` callbacks are invoked.
 
 ## Near-Term Roadmap
 
