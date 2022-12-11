@@ -2,8 +2,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
 
-// Todo: Need an RngForIJobEntity that avoids EntityInQueryIndex.
-
 namespace Latios
 {
     /// <summary>

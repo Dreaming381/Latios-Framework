@@ -999,7 +999,7 @@ namespace Latios.Psyshock
             result = default;
             return false;
         }
-        // Todo: Capsule
+
         public static bool ColliderCast(in ConvexCollider convexToCast,
                                         in RigidTransform castStart,
                                         float3 castEnd,

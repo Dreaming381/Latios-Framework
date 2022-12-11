@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] – 2022-12-10
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Improved
+
+-   Kinemation renderer now uses a fixed frame count when recycling rendering
+    buffers instead of an async readback, which prevented devices from going
+    into a sleep state
+
 ## [0.6.1] – 2022-11-28
 
 Officially supports Entities [1.0.0 prerelease 15]

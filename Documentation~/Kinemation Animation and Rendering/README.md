@@ -193,8 +193,6 @@ that version.*
     for this in a future release which will be more extensible and customizable.
 -   Skeletons are uploaded to the GPU multiple times in a frame if different
     LODs are used in different culling passes.
--   GPU uploads are done in a way that prevent the processors from going into an
-    idle state.
 
 ## Near-Term Roadmap
 

@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.6.1]
+# Latios Framework Packages for DOTS – [0.6.2]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -32,6 +32,8 @@ survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLX
     spatialized sounds and music streaming
 -   [Kinemation](Documentation~/Kinemation%20Animation%20and%20Rendering/README.md)
     – Authored animation, simulated animation, and everything in between
+-   Latios Transforms – A novel QVVS transform system designed to be fast,
+    intuitive, and flexible (Coming in 0.7)
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
     throughput (No public release)
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public

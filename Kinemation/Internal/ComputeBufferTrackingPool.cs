@@ -326,72 +326,28 @@ namespace Latios.Kinemation
 
         struct FencePool : IDisposable
         {
-            struct TrackedFence
-            {
-                public ComputeBuffer           buffer;
-                public uint                    frameId;
-                public AsyncGPUReadbackRequest request;
-            }
-
             uint m_currentFrameId;
             uint m_recoveredFrameId;
-
-            List<TrackedFence> m_fencesInFlight;
-            List<TrackedFence> m_fencesInPool;
+            int  m_numberOfFramesToWait;
 
             public uint CurrentFrameId => m_currentFrameId;
             public uint RecoveredFrameId => m_recoveredFrameId;
 
             public FencePool(bool dummy)
             {
-                m_fencesInFlight   = new List<TrackedFence>();
-                m_fencesInPool     = new List<TrackedFence>();
-                m_currentFrameId   = 1;
-                m_recoveredFrameId = 0;
+                m_numberOfFramesToWait = Unity.Rendering.SparseUploader.NumFramesInFlight;
+                m_currentFrameId       = (uint)m_numberOfFramesToWait;
+                m_recoveredFrameId     = 0;
             }
 
             public void Update()
             {
-                for (int i = 0; i < m_fencesInFlight.Count; i++)
-                {
-                    var fence = m_fencesInFlight[i];
-                    if (fence.request.done)
-                    {
-                        if (IsEqualOrNewer(fence.frameId, m_recoveredFrameId))
-                            m_recoveredFrameId = fence.frameId;
-                        m_fencesInPool.Add(fence);
-                        m_fencesInFlight.RemoveAtSwapBack(i);
-                        i--;
-                    }
-                }
-
-                TrackedFence newFence;
-                if (m_fencesInPool.Count > 0)
-                {
-                    newFence = m_fencesInPool[0];
-                    m_fencesInPool.RemoveAtSwapBack(0);
-                }
-                else
-                {
-                    newFence = new TrackedFence
-                    {
-                        buffer = new ComputeBuffer(1, 4, ComputeBufferType.Default, ComputeBufferMode.Immutable),
-                    };
-                }
-
-                newFence.frameId = m_currentFrameId;
-                newFence.request = AsyncGPUReadback.Request(newFence.buffer);
-                m_fencesInFlight.Add(newFence);
-
+                m_recoveredFrameId++;
                 m_currentFrameId++;
             }
 
             public void Dispose()
             {
-                foreach (var buffer in m_fencesInPool)
-                    buffer.buffer.Dispose();
-                foreach (var buffer in m_fencesInFlight)
-                    buffer.buffer.Dispose();
             }
         }
 
