@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.6.2]
+# Latios Framework Packages for DOTS – [0.6.3]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are

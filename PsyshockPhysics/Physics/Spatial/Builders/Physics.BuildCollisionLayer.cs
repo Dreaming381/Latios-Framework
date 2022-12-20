@@ -381,14 +381,15 @@ namespace Latios.Psyshock
                 NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
                                                                                                                              Allocator.TempJob,
                                                                                                                              NativeArrayOptions.UninitializedMemory);
-
+                var part1Indices = config.query.CalculateBaseEntityIndexArray(Allocator.TempJob);
                 new BuildCollisionLayerInternal.Part1FromQueryJob
                 {
-                    typeGroup    = config.typeGroup,
-                    layer        = layer,
-                    layerIndices = layerIndices,
-                    colliderAoS  = aos,
-                    xMinMaxs     = xMinMaxs
+                    typeGroup                 = config.typeGroup,
+                    layer                     = layer,
+                    layerIndices              = layerIndices,
+                    colliderAoS               = aos,
+                    xMinMaxs                  = xMinMaxs,
+                    firstEntityInChunkIndices = part1Indices
                 }.Run(config.query);
 
                 new BuildCollisionLayerInternal.Part2Job
@@ -496,14 +497,15 @@ namespace Latios.Psyshock
                 NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
                                                                                                                              Allocator.TempJob,
                                                                                                                              NativeArrayOptions.UninitializedMemory);
-
-                jh = new BuildCollisionLayerInternal.Part1FromQueryJob
+                var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
+                jh               = new BuildCollisionLayerInternal.Part1FromQueryJob
                 {
-                    typeGroup    = config.typeGroup,
-                    layer        = layer,
-                    layerIndices = layerIndices,
-                    colliderAoS  = aos,
-                    xMinMaxs     = xMinMaxs
+                    typeGroup                 = config.typeGroup,
+                    layer                     = layer,
+                    layerIndices              = layerIndices,
+                    colliderAoS               = aos,
+                    xMinMaxs                  = xMinMaxs,
+                    firstEntityInChunkIndices = part1Indices
                 }.Schedule(config.query, jh);
 
                 jh = new BuildCollisionLayerInternal.Part2Job
