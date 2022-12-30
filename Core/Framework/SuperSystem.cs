@@ -93,7 +93,8 @@ namespace Latios
             }
             CreateSystems();
 
-            EnableSystemSorting &= !latiosWorld.useExplicitSystemOrdering;
+            if (!m_overrideSystemSortingPreference)
+                base.EnableSystemSorting = !latiosWorld.useExplicitSystemOrdering;
         }
 
         [EditorBrowsable(EditorBrowsableState.Never)]
@@ -179,9 +180,21 @@ namespace Latios
             return ref World.Unmanaged.GetUnsafeSystemRef<T>(system);
         }
 
+        private bool m_overrideSystemSortingPreference = false;
+
+        public new bool EnableSystemSorting
+        {
+            get { return base.EnableSystemSorting; }
+            set
+            {
+                m_overrideSystemSortingPreference = true;
+                base.EnableSystemSorting          = value;
+            }
+        }
+
         public void SortSystemsUsingAttributes(bool enableSortingAlways = true)
         {
-            EnableSystemSorting = true;
+            base.EnableSystemSorting = true;
             SortSystems();
             EnableSystemSorting = enableSortingAlways;
         }

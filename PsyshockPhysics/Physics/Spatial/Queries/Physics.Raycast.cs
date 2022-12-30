@@ -96,15 +96,17 @@ namespace Latios.Psyshock
 
         public static bool Raycast(Ray ray, in CompoundCollider compound, in RigidTransform compoundTransform, out RaycastResult result)
         {
-            result                     = default;
-            result.distance            = float.MaxValue;
-            bool    hit                = false;
-            var     rayInCompoundSpace = Ray.TransformRay(math.inverse(compoundTransform), ray);
-            var     scaledRay          = new Ray(rayInCompoundSpace.start / compound.scale, rayInCompoundSpace.end / compound.scale);
-            ref var blob               = ref compound.compoundColliderBlob.Value;
+            // Note: Each collider in the compound may evaluate the ray in its local space,
+            // so it is better to keep the ray in world-space relative to the blob so that the result is in the right space.
+            // Todo: Is the cost of transforming each collider to world space worth it?
+            result          = default;
+            result.distance = float.MaxValue;
+            bool    hit     = false;
+            ref var blob    = ref compound.compoundColliderBlob.Value;
+            var     scale   = new PhysicsScale { scale = compound.scale, state = PhysicsScale.State.Uniform };
             for (int i = 0; i < blob.colliders.Length; i++)
             {
-                var newHit                  = Raycast(scaledRay, blob.colliders[i], blob.transforms[i], out var newResult);
+                var newHit                  = Raycast(ray, ScaleCollider(blob.colliders[i], scale), math.mul(compoundTransform, blob.transforms[i]), out var newResult);
                 newResult.subColliderIndex  = i;
                 newHit                     &= newResult.distance < result.distance;
                 hit                        |= newHit;

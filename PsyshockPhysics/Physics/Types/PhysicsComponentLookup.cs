@@ -21,7 +21,7 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         public static implicit operator Entity(SafeEntity e) => new Entity
         {
-            Index = math.abs(e.entity.Index), Version = e.entity.Version
+            Index = math.select(e.entity.Index, math.abs(e.entity.Index + 1), e.entity.Index < 0), Version = e.entity.Version
         };
 #else
         public static implicit operator Entity(SafeEntity e) => e.entity;

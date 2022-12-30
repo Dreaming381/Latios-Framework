@@ -13,7 +13,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>(true).Without<MatrixPreviousCache>().IncludeDisabled().IncludePrefabs().Build();
+            m_query = state.Fluent().WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>(true).Without<MatrixPreviousCache>().IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         [BurstCompile]

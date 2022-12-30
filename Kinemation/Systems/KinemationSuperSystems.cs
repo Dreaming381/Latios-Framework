@@ -36,6 +36,8 @@ namespace Latios.Kinemation.Systems
     {
         protected override void CreateSystems()
         {
+            EnableSystemSorting = false;
+
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkinnedMeshChunkBoundsSystem>();
             GetOrCreateAndAddManagedSystem<BeginPerFrameMeshSkinningBuffersUploadSystem>();
@@ -49,6 +51,8 @@ namespace Latios.Kinemation.Systems
     {
         protected override void CreateSystems()
         {
+            EnableSystemSorting = false;
+
             GetOrCreateAndAddManagedSystem<EndPerFrameMeshSkinningBuffersUploadSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateMatrixPreviousSystem>();
             GetOrCreateAndAddUnmanagedSystem<CombineExposedBonesSystem>();
@@ -65,6 +69,8 @@ namespace Latios.Kinemation.Systems
     {
         protected override void CreateSystems()
         {
+            EnableSystemSorting = false;
+
             GetOrCreateAndAddUnmanagedSystem<AddMissingMatrixCacheSystem>();
             GetOrCreateAndAddUnmanagedSystem<AddMissingMasksSystem>();
             GetOrCreateAndAddUnmanagedSystem<SkeletonMeshBindingReactiveSystem>();
@@ -77,6 +83,8 @@ namespace Latios.Kinemation.Systems
     {
         protected override void CreateSystems()
         {
+            EnableSystemSorting = false;
+
             GetOrCreateAndAddUnmanagedSystem<AddMissingMatrixCacheSystem>();
             GetOrCreateAndAddUnmanagedSystem<AddMissingMasksSystem>();
             GetOrCreateAndAddUnmanagedSystem<SkeletonMeshBindingReactiveSystem>();

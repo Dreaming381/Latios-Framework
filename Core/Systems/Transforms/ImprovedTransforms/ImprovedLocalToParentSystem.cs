@@ -8,6 +8,8 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
 
+using static Unity.Entities.SystemAPI;
+
 // This system uses PreviousParent in all cases because it is guaranteed to be updated
 // (ParentSystem just ran) and it is updated when the entity is enabled so change filters
 // work correctly.
@@ -145,12 +147,12 @@ namespace Latios.Systems
 #endif
         public void OnUpdate(ref SystemState state)
         {
-            var localToWorldType        = state.GetComponentTypeHandle<LocalToWorld>(true);
-            var childType               = state.GetBufferTypeHandle<Child>(true);
-            var childFromEntity         = state.GetBufferLookup<Child>(true);
-            var parentFromEntity        = state.GetComponentLookup<PreviousParent>(true);
-            var localToParentFromEntity = state.GetComponentLookup<LocalToParent>(true);
-            var localToWorldFromEntity  = state.GetComponentLookup<LocalToWorld>();
+            var localToWorldType        = GetComponentTypeHandle<LocalToWorld>(true);
+            var childType               = GetBufferTypeHandle<Child>(true);
+            var childFromEntity         = GetBufferLookup<Child>(true);
+            var parentFromEntity        = GetComponentLookup<PreviousParent>(true);
+            var localToParentFromEntity = GetComponentLookup<LocalToParent>(true);
+            var localToWorldFromEntity  = GetComponentLookup<LocalToWorld>();
 
             var updateHierarchyJob = new UpdateHierarchy
             {

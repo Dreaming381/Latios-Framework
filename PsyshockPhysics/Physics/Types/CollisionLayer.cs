@@ -61,6 +61,7 @@ namespace Latios.Psyshock
         internal float3                                                              worldMin;
         internal float3                                                              worldAxisStride;
         internal int3                                                                worldSubdivisionsPerAxis;
+        AllocatorManager.AllocatorHandle                                             allocator;
 
         internal CollisionLayer(int bodyCount, CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
@@ -72,11 +73,12 @@ namespace Latios.Psyshock
                 settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 2,
                 allocator,
                 NativeArrayOptions.UninitializedMemory);
-            xmins         = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            xmaxs         = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            yzminmaxs     = CollectionHelper.CreateNativeArray<float4>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            intervalTrees = CollectionHelper.CreateNativeArray<IntervalTreeNode>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            bodies        = CollectionHelper.CreateNativeArray<ColliderBody>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            xmins          = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            xmaxs          = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            yzminmaxs      = CollectionHelper.CreateNativeArray<float4>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            intervalTrees  = CollectionHelper.CreateNativeArray<IntervalTreeNode>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            bodies         = CollectionHelper.CreateNativeArray<ColliderBody>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
+            this.allocator = allocator;
         }
 
         /// <summary>
@@ -96,6 +98,7 @@ namespace Latios.Psyshock
             yzminmaxs             = CollectionHelper.CreateNativeArray(sourceLayer.yzminmaxs, allocator);
             intervalTrees         = CollectionHelper.CreateNativeArray(sourceLayer.intervalTrees, allocator);
             bodies                = CollectionHelper.CreateNativeArray(sourceLayer.bodies, allocator);
+            this.allocator        = allocator;
         }
 
         /// <summary>
@@ -104,12 +107,12 @@ namespace Latios.Psyshock
         public void Dispose()
         {
             worldSubdivisionsPerAxis = 0;
-            bucketStartsAndCounts.Dispose();
-            xmins.Dispose();
-            xmaxs.Dispose();
-            yzminmaxs.Dispose();
-            intervalTrees.Dispose();
-            bodies.Dispose();
+            CollectionHelper.DisposeNativeArray(bucketStartsAndCounts, allocator);
+            CollectionHelper.DisposeNativeArray(xmins,                 allocator);
+            CollectionHelper.DisposeNativeArray(xmaxs,                 allocator);
+            CollectionHelper.DisposeNativeArray(yzminmaxs,             allocator);
+            CollectionHelper.DisposeNativeArray(intervalTrees,         allocator);
+            CollectionHelper.DisposeNativeArray(bodies,                allocator);
         }
 
         /// <summary>
@@ -120,7 +123,14 @@ namespace Latios.Psyshock
         public unsafe JobHandle Dispose(JobHandle inputDeps)
         {
             worldSubdivisionsPerAxis = 0;
-            JobHandle* deps          = stackalloc JobHandle[6]
+            if (allocator.IsCustomAllocator)
+            {
+                // Todo: No DisposeJob for NativeArray from CollectionHelper
+                inputDeps.Complete();
+                Dispose();
+                return default;
+            }
+            JobHandle* deps = stackalloc JobHandle[6]
             {
                 bucketStartsAndCounts.Dispose(inputDeps),
                 xmins.Dispose(inputDeps),

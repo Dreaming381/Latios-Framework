@@ -39,7 +39,7 @@ namespace Latios.Systems
             latiosWorld.autoGenerateSceneBlackboardEntity = false;
 
             m_unitySubsceneLoadQuery        = Fluent.WithAll<Unity.Entities.RequestSceneLoaded>().Build();
-            m_dontDestroyOnSceneChangeQuery = Fluent.WithAll<Unity.Entities.SceneTag>().WithAll<DontDestroyOnSceneChangeTag>().IncludeDisabled().IncludePrefabs().Build();
+            m_dontDestroyOnSceneChangeQuery = Fluent.WithAll<Unity.Entities.SceneTag>().WithAll<DontDestroyOnSceneChangeTag>().IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         protected override void OnUpdate()

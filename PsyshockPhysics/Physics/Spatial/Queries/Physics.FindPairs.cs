@@ -46,7 +46,7 @@ namespace Latios.Psyshock
         {
             entity = new Entity
             {
-                Index   = math.select(-bodyA.entity.Index, bodyA.entity.Index, m_isThreadSafe),
+                Index   = math.select(-bodyA.entity.Index - 1, bodyA.entity.Index, m_isThreadSafe),
                 Version = bodyA.entity.Version
             }
         };
@@ -54,7 +54,7 @@ namespace Latios.Psyshock
         {
             entity = new Entity
             {
-                Index   = math.select(-bodyB.entity.Index, bodyB.entity.Index, m_isThreadSafe),
+                Index   = math.select(-bodyB.entity.Index - 1, bodyB.entity.Index, m_isThreadSafe),
                 Version = bodyB.entity.Version
             }
         };

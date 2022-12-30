@@ -299,10 +299,16 @@ namespace Latios
         /// Allows disabled entities to be included in the query
         /// </summary>
         /// <returns></returns>
-        public FluentQuery IncludeDisabled()
+        public FluentQuery IncludeDisabledEntities()
         {
             m_options |= EntityQueryOptions.IncludeDisabledEntities;
             return this;
+        }
+
+        [System.Obsolete("(UnityUpgradable) -> IncludeDisabledEntities")]
+        public FluentQuery IncludeDisabled()
+        {
+            return IncludeDisabledEntities();
         }
 
         /// <summary>
@@ -322,6 +328,17 @@ namespace Latios
         public FluentQuery UseWriteGroups()
         {
             m_options |= EntityQueryOptions.FilterWriteGroup;
+            return this;
+        }
+
+        /// <summary>
+        /// Causes the EntityQuery to only check for the presence of components in the archetype
+        /// and assumes that disabled components are included.
+        /// </summary>
+        /// <returns></returns>
+        public FluentQuery IgnoreEnableableBits()
+        {
+            m_options |= EntityQueryOptions.IgnoreComponentEnabledState;
             return this;
         }
 

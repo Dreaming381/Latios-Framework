@@ -20,7 +20,7 @@ namespace Latios.Systems
         protected override void OnCreate()
         {
             m_destroyQuery = Fluent.WithAll<LatiosSceneChangeDummyTag>().Without<WorldBlackboardTag>().Without<DontDestroyOnSceneChangeTag>().Without<RequestSceneLoaded>()
-                             .IncludePrefabs().IncludeDisabled().Build();
+                             .IncludePrefabs().IncludeDisabledEntities().Build();
             SceneManager.activeSceneChanged += RealUpdateOnSceneChange;
         }
 

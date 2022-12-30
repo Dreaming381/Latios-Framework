@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] – 2022-12-29
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Fixed
+
+-   Fixed raycasting a compound collider generating a result in the compound’s
+    local space rather than world space
+-   Fixed raycasting a compound collider not respecting the compound’s scale
+    value
+-   Fixed `CollisionLayer.Dispose()` when allocated with a custom allocator
+
+### Improved
+
+-   `SafeEntity` now remaps an `Entity` with `Index` 0 correctly when safety
+    checks are enabled
+
 ## [0.6.3] – 2022-12-19
 
 Officially supports Entities [1.0.0 prerelease 15]

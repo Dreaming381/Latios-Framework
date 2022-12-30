@@ -86,15 +86,7 @@ namespace Latios.Authoring
 
             ICustomBakingBootstrap bootstrap = System.Activator.CreateInstance(selectedType) as ICustomBakingBootstrap;
 
-            var candidateBakers = new List<System.Type>();
-
-            foreach (var type in UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(Baker<>)))
-            {
-                if (!type.IsAbstract && !type.IsDefined(typeof(DisableAutoCreationAttribute)))
-                {
-                    candidateBakers.Add(type);
-                }
-            }
+            var candidateBakers = OverrideBakers.GetDefaultBakerTypes();
 
             var context = new CustomBakingBootstrapContext
             {

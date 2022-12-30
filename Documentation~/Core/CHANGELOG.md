@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] – 2022-12-29
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Added
+
+-   Added `FluentQuery.IgnoreEnableableBits()` which adds
+    `EntityQueryOptions.IgnoreComponentEnabledState` to the query
+-   Added `IBakerExposedExtensions.GetDefaultBakerTypes()` to investigate all
+    types of bakers that will be created by default by Unity
+-   Added `math.InverseRotateFast()` methods which assume the passed in
+    quaternions are normalized and because of this perform faster inverse
+    operations
+
+### Changed
+
+-   Renamed `FluentQuery.IncludeDisabled()` to`
+    FluentQuery.IncludeDisabledEntities()`
+
+### Fixed
+
+-   Fixed `ICustomBakingBootstrap` ignoring `GameObjectBaker` types and not
+    respecting derived type sorting
+-   Fixed Smart Blobbers pre-maturely disposing shared blob assets
+-   Fixed `SuperSystem` overwriting an override `EnableSystemSorting = true`
+    inside of `CreateSystems()`
+-   Fixed Improved Transforms warnings about caching type handles
+
 ## [0.6.1] – 2022-11-28
 
 Officially supports Entities [1.0.0 prerelease 15]
@@ -27,7 +55,8 @@ Officially supports Entities [1.0.0 prerelease 15]
     directory restructuring
 -   Fixed profile markers for `SyncPointPlaybackSystem` so that system names are
     displayed correctly
--   Fixed `Child` buffer being left behind on changed parents
+-   Fixed `Child` buffer being left behind on changed parents when using
+    Improved or Extreme Transforms
 
 ### Improved
 

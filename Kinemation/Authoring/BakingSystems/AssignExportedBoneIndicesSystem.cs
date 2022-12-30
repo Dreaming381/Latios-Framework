@@ -42,6 +42,7 @@ namespace Latios.Kinemation.Authoring.Systems
                                 break;
                             }
                         }
+                        i++;
                     }
                     currentIndex++;
 

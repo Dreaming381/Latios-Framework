@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.6.3]
+# Latios Framework Packages for DOTS – [0.6.4]
 
 The packages contained in this repository are packages built upon Unity DOTS
 which I use for my own personal hobbyist game development. All packages are
@@ -38,9 +38,6 @@ survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLX
     throughput (No public release)
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public
     release)
--   Ethereal – An NPR renderer authored in reality (No public release)
--   Networking (Name TBD) – Snapshots + input sim = unified, testable,
-    inexpensive, and hardware-friendly networking (No public release)
 
 ## Why Use the Latios Framework?
 
@@ -59,8 +56,9 @@ stays out of the way. A developer using it should always feel in control. If
 not, there’s likely an issue worth bringing to attention.
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
-in DOTS such as audio and animation. Phase III will focus on gameplay
-technologies such as spatial and hierarchical queries and AI tools.
+in DOTS such as audio and animation. Current Phase III development focuses on
+gameplay technologies such as spatial and hierarchical queries, simulation, and
+AI tools.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.

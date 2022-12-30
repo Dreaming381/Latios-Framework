@@ -1,5 +1,7 @@
 
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 
 namespace Unity.Entities.Exposed
 {
@@ -27,11 +29,42 @@ namespace Unity.Entities.Exposed
         public OverrideBakers(bool replaceExistingBakers, params Type[] bakerTypes)
         {
             m_override = new BakerDataUtility.OverrideBakers(replaceExistingBakers, bakerTypes);
+            // Sort the bakers so that the bakers for base authoring components are evaluated before bakers for derived types.
+            // This guarantees that the type hierarchy chain authoring components is respected, regardless of the order in which
+            // the bakers are defined in code.
+            var fieldInfo = typeof(BakerDataUtility).GetField("_IndexToBakerInstances", BindingFlags.Static | BindingFlags.NonPublic);
+            var dict      = fieldInfo.GetValue(null) as Dictionary<TypeIndex, BakerDataUtility.BakerData[]>;
+            foreach (var bakers in dict.Values)
+            {
+                Array.Sort(bakers, (a, b) => b.CompatibleComponentCount.CompareTo(a.CompatibleComponentCount));
+            }
         }
 
         public void Dispose()
         {
             m_override.Dispose();
+        }
+
+        public static List<Type> GetDefaultBakerTypes()
+        {
+            var candidateBakers = new List<System.Type>();
+
+            foreach (var type in UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(Baker<>)))
+            {
+                if (!type.IsAbstract && !type.IsDefined(typeof(DisableAutoCreationAttribute)))
+                {
+                    candidateBakers.Add(type);
+                }
+            }
+            foreach (var type in UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(GameObjectBaker)))
+            {
+                if (!type.IsAbstract && !type.IsDefined(typeof(DisableAutoCreationAttribute)))
+                {
+                    candidateBakers.Add(type);
+                }
+            }
+
+            return candidateBakers;
         }
     }
 }

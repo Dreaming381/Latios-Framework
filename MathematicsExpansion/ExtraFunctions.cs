@@ -63,6 +63,28 @@ namespace Unity.Mathematics
         {
             return a ^ ((a ^ b) & c);
         }
+
+        /// <summary>
+        /// Returns the vector (or point) transformed by the inverse of the rotation. The rotation quaternion is assumed to be normalized.
+        /// </summary>
+        /// <param name="normalizedRotation">The rotaiton to inversely rotate the point by</param>
+        /// <param name="vector">The vector or point to be inversely rotated</param>
+        /// <returns>The resulting vector or point</returns>
+        public static float3 InverseRotateFast(quaternion normalizedRotation, float3 vector)
+        {
+            return rotate(conjugate(normalizedRotation), vector);
+        }
+
+        /// <summary>
+        /// Return the second quaternion rotated by the inverse of the assumed normalized first quaternion.
+        /// </summary>
+        /// <param name="normalizedRotation">The first quaternion which is assumed to be normalized (left side of mul)</param>
+        /// <param name="rotationToBeRotated">The second quaternion (right side of mul)</param>
+        /// <returns>The resulting quaternion that is rotated</returns>
+        public static quaternion InverseRotateFast(quaternion normalizedRotation, quaternion rotationToBeRotated)
+        {
+            return mul(conjugate(normalizedRotation), rotationToBeRotated);
+        }
     }
 
     public partial struct float3x4
@@ -75,6 +97,8 @@ namespace Unity.Mathematics
                                 (r.c2 * scale.z),
                                 (translation   ));
         }
+
+        public static readonly float3x4 identity = new float3x4(new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), float3.zero);
     }
 }
 

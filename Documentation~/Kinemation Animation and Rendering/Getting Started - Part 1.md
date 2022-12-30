@@ -149,6 +149,14 @@ The *exposed skeleton* entity is typically also an *exposed bone* entity.
 
 ### Exposed Bone
 
+**Note: What Unity’s Rig tab in the model importer refers to as “exposed bones”
+are consequently referred to as “exported bones” in Kinemation. This name better
+suits the behavior of such bones as their transform data SHOULD NOT be modified
+by user code. “Exposed bones” in Kinemation refer to bones whose transforms CAN
+be modified by user code, and such modifications will be reflected in attached
+Skinned Meshes. When discussing Kinemation issues, try to stick to the
+Kinemation nomenclature.**
+
 An *exposed bone* is an entity whose transform components dictate its state of
 animation. It has the following components:
 
@@ -250,10 +258,11 @@ In addition, an *exported bone* must **not have** any of these components:
 -   Any other component that has `[WriteGroup(typeof(LocalToParent))]` besides
     `CopyLocalToParentFromBone`
 
-Kinemation will generate an exported bone for immediate child of the Animator
-(excluding children with Skinned Mesh Renderers or Animators) at baking time.
-However, you can also freely create these at runtime by meeting the above
-component requirements and specifying the bone to track in the
+Kinemation will generate an exported bone for immediate children of the Animator
+at baking time. Children which have a `SkinnedMeshRenderer` or an `Animator` or
+do not map to a bone in the shadow hierarchy will not be baked into an *exported
+bone*. You can also freely create *exported bones* at runtime by meeting the
+above component requirements and specifying the bone to track in the
 `CopyLocalToParentFromBone` component. The *optimized skeleton* does not know
 about nor care about *exported bones*, which means you can have multiple
 *exported bones* track the same optimized bone. Be careful though, because

@@ -23,8 +23,8 @@ namespace Latios.Kinemation.Authoring.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_addQuery    = state.Fluent().WithAll<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabled().Build();
-            m_removeQuery = state.Fluent().Without<MaterialMeshInfo>(true).WithAll<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabled().Build();
+            m_addQuery    = state.Fluent().WithAll<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabledEntities().Build();
+            m_removeQuery = state.Fluent().Without<MaterialMeshInfo>(true).WithAll<ChunkPerFrameCullingMask>(true).IncludePrefabs().IncludeDisabledEntities().Build();
         }
 
         [BurstCompile]
