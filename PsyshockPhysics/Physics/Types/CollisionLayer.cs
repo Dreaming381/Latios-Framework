@@ -63,6 +63,8 @@ namespace Latios.Psyshock
         internal int3                                                                worldSubdivisionsPerAxis;
         AllocatorManager.AllocatorHandle                                             allocator;
 
+        public NativeArray<ColliderBody> Bodies => bodies;
+
         internal CollisionLayer(int bodyCount, CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
             worldMin                 = settings.worldAabb.min;
