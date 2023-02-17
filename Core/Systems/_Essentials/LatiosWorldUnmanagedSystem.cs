@@ -111,7 +111,10 @@ namespace Latios.Systems
         {
             m_impl->m_worldUnmanaged.EntityManager.CompleteAllTrackedJobs();
 
-            (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).Dispose();
+            if (m_impl->m_managedStructStorage.IsAllocated)
+            {
+                (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage)?.Dispose();
+            }
             m_impl->m_collectionComponentStorage.Dispose();
             m_impl->m_collectionDependencies.Dispose();
             m_impl->m_executingSystemStack.Dispose();
