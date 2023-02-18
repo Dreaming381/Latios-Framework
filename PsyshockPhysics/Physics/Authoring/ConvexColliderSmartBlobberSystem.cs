@@ -137,7 +137,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 }
             }).Schedule();
 
-            Entities.ForEach((ref SmartBlobberResult result, in ConvexColliderBlobBakeData data) =>
+            Entities.WithReadOnly(hashmap).ForEach((ref SmartBlobberResult result, in ConvexColliderBlobBakeData data) =>
             {
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetInstanceID()].blob);
             }).ScheduleParallel();
