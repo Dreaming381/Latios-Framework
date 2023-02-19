@@ -63,8 +63,6 @@ namespace Latios.Psyshock
         internal int3                                                                worldSubdivisionsPerAxis;
         AllocatorManager.AllocatorHandle                                             allocator;
 
-        public NativeArray<ColliderBody> Bodies => bodies;
-
         internal CollisionLayer(int bodyCount, CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
             worldMin                 = settings.worldAabb.min;
@@ -156,6 +154,10 @@ namespace Latios.Psyshock
         /// True if the CollisionLayer has been created
         /// </summary>
         public bool IsCreated => worldSubdivisionsPerAxis.x > 0;
+        /// <summary>
+        /// Read-Only access to the collider bodies stored in the CollisionLayer ordered by bodyIndex
+        /// </summary>
+        public NativeArray<ColliderBody>.ReadOnly colliderBodies => bodies.AsReadOnly();
 
         internal BucketSlices GetBucketSlices(int bucketIndex)
         {

@@ -7,11 +7,17 @@ namespace Latios.Psyshock
     public static partial class Physics
     {
         #region Rays
+        /// <summary>
+        /// Returns an Aabb that encompasses the ray
+        /// </summary>
         public static Aabb AabbFrom(in Ray ray)
         {
             return new Aabb(math.min(ray.start, ray.end), math.max(ray.start, ray.end));
         }
 
+        /// <summary>
+        /// Returns an Aabb that encompasses a ray with the provided endpoints
+        /// </summary>
         public static Aabb AabbFrom(float3 rayStart, float3 rayEnd)
         {
             return new Aabb(math.min(rayStart, rayEnd), math.max(rayStart, rayEnd));

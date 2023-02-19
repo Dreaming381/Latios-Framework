@@ -31,6 +31,16 @@ namespace Unity.Entities.Exposed
             return new RefRO<T>(ptr);
 #endif
         }
+
+        public static unsafe Entity GetMetaEntity(in this ArchetypeChunk chunk)
+        {
+            return chunk.m_Chunk->metaChunkEntity;
+        }
+
+        public static unsafe ulong GetChunkPtrAsUlong(in this ArchetypeChunk chunk)
+        {
+            return (ulong)chunk.m_Chunk;
+        }
     }
 }
 

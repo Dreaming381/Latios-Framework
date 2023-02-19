@@ -66,7 +66,7 @@ namespace Unity.Entities.Exposed
             bool hasSystemsToRemove = group.m_managedSystemsToRemove.Count > 0 || !group.m_UnmanagedSystemsToRemove.IsEmpty;
             bool sortingTurnedOn    = lastEnableSortingSetting == false && enableSorting == true;
 
-            if (systemCount != lastSystemCount || sortingTurnedOn || hasSystemsToRemove)
+            if ((systemCount != lastSystemCount && enableSorting) || sortingTurnedOn || hasSystemsToRemove)
                 group.SortSystems();
 
             lastSystemCount          = systemCount;

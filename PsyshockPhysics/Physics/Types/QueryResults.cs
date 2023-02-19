@@ -3,6 +3,10 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A struct which contains a result of calling Physics.DistanceBetween and passing in a point.
+    /// It contains information about the closest surface point on the collider.
+    /// </summary>
     public struct PointDistanceResult
     {
         /// <summary>
@@ -18,11 +22,15 @@ namespace Latios.Psyshock
         /// </summary>
         public float3 normal;
         /// <summary>
-        /// If the collider is composed of multiple primitives, this is the index of the primitive that generated the result
+        /// If the collider is composed of multiple primitives such as a compound collider, this is the index of the primitive that generated the result
         /// </summary>
         public int subColliderIndex;
     }
 
+    /// <summary>
+    /// A struct which contains a result of calling Physics.DistanceBetween between two colliders.
+    /// It contains information about the closest surface points on each of the colliders.
+    /// </summary>
     public struct ColliderDistanceResult
     {
         /// <summary>
@@ -46,15 +54,19 @@ namespace Latios.Psyshock
         /// </summary>
         public float distance;
         /// <summary>
-        /// If colliderA is composed of multiple primitives, this is the index of the primitive that generated the result
+        /// If colliderA is composed of multiple primitives such as a compound collider, this is the index of the primitive that generated the result
         /// </summary>
         public int subColliderIndexA;
         /// <summary>
-        /// If colliderB is composed of multiple primitives, this is the index of the primitive that generated the result
+        /// If colliderB is composed of multiple primitives such as a compound collider, this is the index of the primitive that generated the result
         /// </summary>
         public int subColliderIndexB;
     }
 
+    /// <summary>
+    /// A struct which contains the result of calling Physics.Raycast.
+    /// It contains information about the hit surface of the collider and the distance the ray traveled.
+    /// </summary>
     public struct RaycastResult
     {
         /// <summary>
@@ -75,6 +87,10 @@ namespace Latios.Psyshock
         public int subColliderIndex;
     }
 
+    /// <summary>
+    /// A struct which contains the result of calling Physics.ColliderCast.
+    /// It contains information about the hit surfaces between the colliders and the distance the casted collider traveled.
+    /// </summary>
     public struct ColliderCastResult
     {
         /// <summary>
@@ -107,6 +123,10 @@ namespace Latios.Psyshock
         public int subColliderIndexOnTarget;
     }
 
+    /// <summary>
+    /// A struct which contains which collider in a CollisionLayer was used when generating a result from query.
+    /// It is generated when calling a Physics.DistanceBetween, Physics.Raycast, or Physics.ColliderCast with a CollisionLayer.
+    /// </summary>
     public struct LayerBodyInfo
     {
         /// <summary>

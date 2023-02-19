@@ -9,7 +9,6 @@ using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Kinemation.Authoring
 {

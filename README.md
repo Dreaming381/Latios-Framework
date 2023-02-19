@@ -1,16 +1,41 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework Packages for DOTS – [0.6.4]
+# Latios Framework for Unity ECS – [0.6.5]
 
-The packages contained in this repository are packages built upon Unity DOTS
-which I use for my own personal hobbyist game development. All packages are
+The Latios Framework is a powerful suite of high-performance low-level APIs and
+feature-sets for Unity’s ECS which aims to give you back control over your
+gameplay. If you like the general paradigms, syntax, and workflows of Unity’s
+ECS, but find Unity’s offerings to be incomplete or frustratingly full of quirky
+unintuitive details, then this framework may be exactly what you need to achieve
+your vision.
+
+The Latios Framework does not replace Unity’s ECS, but rather complements it
+with additional APIs and tools. In some cases, the Latios Framework may override
+Unity ECS’s underlying mechanisms to provide more features. Desktop platforms
+are supported out-of-the-box. Other platforms may require additional effort to
+achieve functionality and performance benefits.
+
+Originally, this framework was for my own personal hobbyist game development,
+and in a sense, still is. However, after several years of development, it has
+proven a valuable resource to the Unity ECS community. It is provided here free
+to use for personal or commercial usage and modification. All modules are
 licensed under the [Unity Companion
 License](https://unity3d.com/legal/licenses/Unity_Companion_License). The
-packages may contain code borrowed from official Unity packages and therefore
-may be seen as derivative works.
+modules may contain code borrowed from official Unity packages and therefore may
+be seen as derivative works. Despite this, the Latios Framework contains many
+adaptations of top-class solutions in the industry (see [Third Party
+Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
+towards Unity’s ECS.
 
-This version targets Entities 1.0.0 experimental. If you are still using
+The Latios Framework is best-known in the community for Kinemation, a module
+which provides extremely high-performance CPU animation and GPU skinned mesh
+rendering features.
+
+This version targets Entities 1.0.0 prerelease 15. If you are still using
 Entities 0.51.1, please use the framework version 0.5.8 instead.
+
+**Note: This release is not compatible with Prerelease 44 due to instability
+issues with that release.**
 
 The 0.6.x series uses Transforms V1, which can be enabled in your project via
 the Scripting Define Symbol ENABLE_TRANSFORM_V1. If you are using Transforms V2,
@@ -22,20 +47,23 @@ Guide*](Documentation~/Upgrade%20Guide.md)*!*
 **If you have any experience with DOTS, please take** [**this
 survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLXyV7BeCdCOsqfPWeWY_Ww/viewform?usp=sf_link)**!**
 
-## Packages
+## Modules
 
 -   [Core](Documentation~/Core/README.md) – General-purpose utilities and
     bootstrap
 -   [Psyshock Physics](Documentation~/Psyshock%20Physics/README.md) – Collision
-    and Physics building blocks using an alternate runtime representation
+    and Physics building blocks controlled by user-defined EntityQueries
 -   [Myri Audio](Documentation~/Myri%20Audio/README.md) – Simple, scalable,
     spatialized sounds and music streaming
 -   [Kinemation](Documentation~/Kinemation%20Animation%20and%20Rendering/README.md)
-    – Authored animation, simulated animation, and everything in between
+    – Authored animation, simulated animation, and everything in between, plus
+    an overhauled Entities Graphics render engine
 -   Latios Transforms – A novel QVVS transform system designed to be fast,
     intuitive, and flexible (Coming in 0.7)
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
     throughput (No public release)
+-   Unika – A high-performance scripting solution including support for
+    interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds (No public
     release)
 
@@ -50,10 +78,10 @@ the engine level. Many of its tools and solutions are inspired by GDC
 presentations, technical blogs, and research papers. A key focus of the
 framework is to make these advanced technologies usable within a DOTS-based
 production environment. But another common theme is fixing or providing
-alternatives for fundamental design issues in the official DOTS packages. For
-technical reasons, it is a “framework”, but it acts more like a toolkit and
-stays out of the way. A developer using it should always feel in control. If
-not, there’s likely an issue worth bringing to attention.
+alternatives for fundamental design issues in the official ECS packages. For
+technical reasons, it is a “framework”, but the individual APIs act more like a
+toolkit and stay out of the way. A developer using it should always feel in
+control. If not, there’s likely an issue worth bringing to attention.
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
 in DOTS such as audio and animation. Current Phase III development focuses on
@@ -68,9 +96,10 @@ development effort required to make highly artistic 3D games and short films.
 There are three methods to install the framework package (contains all publicly
 released packages).
 
+-   Clone or submodule this repository into your project’s Packages folder
+    (recommended for contributors or those wanting faster bugfixes and updates)
 -   Add package via Package Manager -\> Add package from git URL
 -   Add via [OpenUPM](https://openupm.com/packages/com.latios.latiosframework/)
--   Clone or submodule this repository into your project’s Packages folder
 
 After installing the framework package, follow the instructions in the first
 section [here](Documentation~/Core/Getting%20Started.md). You may also want to
@@ -175,16 +204,11 @@ things I can try and squeeze in.
 
 ### Derivatives, Collaboration, and Contribution
 
-I develop this framework separately from this repository. I will provide the
-current snapshot of that code upon request. I promise the code may be terrible.
-This may be useful to you if you desire to contribute in an area I am actively
-developing. See [Contributing](Documentation~/Contributing.md) for more
-information.
-
-Because I often validate changes manually, I usually won’t merge pull requests.
-I’m working on a new workflow that will preserve contributor commits in the
-history. But if I run into issues, I will always prioritize getting changes into
-releases.
+I develop this framework separately from this repository scattered across
+various projects. I will provide the current snapshot from any of those projects
+upon request. I promise the code may be terrible. This may be useful to you if
+you desire to contribute in an area I am actively developing. See
+[Contributing](Documentation~/Contributing.md) for more information.
 
 If you are developing your own packages on top of this framework, commercial or
 open source, feel free to reach out to me for suggestions, guidance, or to
@@ -202,12 +226,21 @@ Patch releases (0.6.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
-publish patch releases for older versions. (There might be an exception to this
-rule during the ongoing transition to DOTS 1.0, but that is TBD.)
+publish patch releases for older versions.
+
+## Special Thanks To These Awesome Contributors
+
+If you would like to be added to this list, see
+[Contributing](Documentation~/Contributing.md) for how to get started.
+
+-   Dechichi01 – various fixes and improvements for Core, Psyshock, and
+    Kinemation
+-   Anthiese – Mac OS support
+-   canmom – build fixes
 
 ## A Word of Caution
 
-If you choose to modify any of the packages here licensed under the Unity
+If you choose to modify any of the contents here licensed under the Unity
 Companion License, my understanding is that any modifications, including new
 inventions inserted, will belong to Unity as per the terms described by the
 license.

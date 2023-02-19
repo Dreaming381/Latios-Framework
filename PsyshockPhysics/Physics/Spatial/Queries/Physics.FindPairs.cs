@@ -10,26 +10,67 @@ using Unity.Mathematics;
 namespace Latios.Psyshock
 {
     /// <summary>
-    /// An interface whose Execute method is invoked for each pair found in a FindPairs operations.
+    /// An interface whose Execute method is invoked for each pair found in a FindPairs operation.
     /// </summary>
     public interface IFindPairsProcessor
     {
         void Execute(in FindPairsResult result);
     }
 
+    /// <summary>
+    /// A result struct passed into the Execute method of an IFindPairsProcessor providing info
+    /// about the pair of colliders whose Aabbs overlapped.
+    /// </summary>
     [NativeContainer]
     public struct FindPairsResult
     {
+        /// <summary>
+        /// The CollisionLayer the first collider in pair belongs to. Can be used for additional
+        /// immediate queries inside the processor.
+        /// </summary>
         public CollisionLayer layerA => m_layerA;
+        /// <summary>
+        /// The CollisionLayer the second collider in the pair belongs to. Can be used for additional
+        /// immediate queries inside the processor. If the FindPairs operation only uses a single
+        /// CollisionLayer, this value is the same as layerA.
+        /// </summary>
         public CollisionLayer layerB => m_layerB;
+        /// <summary>
+        /// The full ColliderBody of the first collider in the pair
+        /// </summary>
         public ColliderBody bodyA => m_layerA.bodies[indexA];
+        /// <summary>
+        /// The full ColliderBody of the second collider in the pair
+        /// </summary>
         public ColliderBody bodyB => m_layerB.bodies[indexB];
+        /// <summary>
+        /// The first collider in the pair
+        /// </summary>
         public Collider colliderA => bodyA.collider;
+        /// <summary>
+        /// The second collider in the pair
+        /// </summary>
         public Collider colliderB => bodyB.collider;
+        /// <summary>
+        /// The transform of the first collider in the pair
+        /// </summary>
         public RigidTransform transformA => bodyA.transform;
+        /// <summary>
+        /// The transform of the second collider in the pair
+        /// </summary>
         public RigidTransform transformB => bodyB.transform;
+        /// <summary>
+        /// The index of the first collider in the pair within its CollisionLayer
+        /// </summary>
         public int indexA => m_bodyAIndex;
+        /// <summary>
+        /// The index of the second collider in the pair within its CollisionLayer
+        /// </summary>
         public int indexB => m_bodyBIndex;
+        /// <summary>
+        /// An index that is guaranteed to be deterministic and unique between threads for a given FindPairs operation,
+        /// and can be used as the sortKey for command buffers
+        /// </summary>
         public int jobIndex => m_jobIndex;
 
         private CollisionLayer m_layerA;
@@ -42,6 +83,10 @@ namespace Latios.Psyshock
         private bool           m_isThreadSafe;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
+        /// <summary>
+        /// A safe entity handle that can be used inside of PhysicsComponentLookup or PhysicsBufferLookup and corresponds to the
+        /// owning entity of the first collider in the pair. It can also be implicitly casted and used as a normal entity reference.
+        /// </summary>
         public SafeEntity entityA => new SafeEntity
         {
             entity = new Entity
@@ -50,6 +95,10 @@ namespace Latios.Psyshock
                 Version = bodyA.entity.Version
             }
         };
+        /// <summary>
+        /// A safe entity handle that can be used inside of PhysicsComponentLookup or PhysicsBufferLookup and corresponds to the
+        /// owning entity of the second collider in the pair. It can also be implicitly casted and used as a normal entity reference.
+        /// </summary>
         public SafeEntity entityB => new SafeEntity
         {
             entity = new Entity
@@ -63,6 +112,9 @@ namespace Latios.Psyshock
         public SafeEntity entityB => new SafeEntity { entity = bodyB.entity };
 #endif
 
+        /// <summary>
+        /// The Aabb of the first collider in the pair
+        /// </summary>
         public Aabb aabbA
         {
             get {
@@ -73,6 +125,9 @@ namespace Latios.Psyshock
             }
         }
 
+        /// <summary>
+        /// The Aabb of the second collider in the pair
+        /// </summary>
         public Aabb aabbB
         {
             get
@@ -231,6 +286,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Enables usage of a cache for pairs involving the cross bucket.
         /// This increases processing time and memory usage, but may decrease latency.
+        /// This may only be used with ScheduleParallel().
         /// </summary>
         /// <param name="cacheAllocator">The type of allocator to use for the cache</param>
         public FindPairsLayerSelfWithCrossCacheConfig<T> WithCrossCache(Allocator cacheAllocator = Allocator.TempJob)
@@ -426,6 +482,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Enables usage of a cache for pairs involving the cross bucket.
         /// This increases processing time and memory usage, but may decrease latency.
+        /// This may only be used with ScheduleParallel().
         /// </summary>
         /// <param name="cacheAllocator">The type of allocator to use for the cache</param>
         public FindPairsLayerLayerWithCrossCacheConfig<T> WithCrossCache(Allocator cacheAllocator = Allocator.TempJob)

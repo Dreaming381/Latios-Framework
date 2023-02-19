@@ -70,7 +70,7 @@ namespace Latios
                             types.Add(t);
                     }
                 }
-                catch (ReflectionTypeLoadException e)
+                catch (System.Reflection.ReflectionTypeLoadException e)
                 {
                     foreach (var t in e.Types)
                     {

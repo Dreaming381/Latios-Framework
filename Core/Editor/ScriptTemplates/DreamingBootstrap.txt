@@ -35,7 +35,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
 [UnityEngine.Scripting.Preserve]
 public class LatiosBootstrap : ICustomBootstrap
 {
-    public unsafe bool Initialize(string defaultWorldName)
+    public bool Initialize(string defaultWorldName)
     {
         var world                             = new LatiosWorld(defaultWorldName);
         World.DefaultGameObjectInjectionWorld = world;

@@ -16,6 +16,9 @@ namespace Latios.Psyshock.Authoring
 {
     public static class ConvexColliderSmartBlobberAPIExtensions
     {
+        /// <summary>
+        /// Requests the creation of a BlobAssetReference<ConvexColliderBlob> that is a convex hull of the passed in mesh
+        /// </summary>
         public static SmartBlobberHandle<ConvexColliderBlob> RequestCreateBlobAsset(this IBaker baker, Mesh mesh)
         {
             return baker.RequestCreateBlobAsset<ConvexColliderBlob, ConvexColliderBakeData>(new ConvexColliderBakeData { sharedMesh = mesh });
@@ -78,7 +81,7 @@ namespace Latios.Psyshock.Authoring.Systems
 
             Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in ConvexColliderBlobBakeData data) =>
             {
-                mapWriter.TryAdd(data.mesh.GetInstanceID(), new UniqueItem { bakeData = data });
+                mapWriter.TryAdd(data.mesh.GetHashCode(), new UniqueItem { bakeData = data });
             }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
 
             var meshes   = new NativeList<UnityObjectRef<Mesh> >(Allocator.TempJob);
@@ -131,15 +134,15 @@ namespace Latios.Psyshock.Authoring.Systems
             {
                 for (int i = 0; i < meshes.Length; i++)
                 {
-                    var element                        = hashmap[meshes[i].GetInstanceID()];
-                    element.blob                       = builders[i].result;
-                    hashmap[meshes[i].GetInstanceID()] = element;
+                    var element                      = hashmap[meshes[i].GetHashCode()];
+                    element.blob                     = builders[i].result;
+                    hashmap[meshes[i].GetHashCode()] = element;
                 }
             }).Schedule();
 
             Entities.WithReadOnly(hashmap).ForEach((ref SmartBlobberResult result, in ConvexColliderBlobBakeData data) =>
             {
-                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetInstanceID()].blob);
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
             }).ScheduleParallel();
 
             Dependency = hashmap.Dispose(Dependency);
@@ -211,7 +214,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 var edgeIndicesInFaces                = new NativeList<int>(convexHullBuilder.numFaceVertices, Allocator.Temp);
                 var edgeIndicesInFacesStartsAndCounts = new NativeList<int2>(convexHullBuilder.numFaces, Allocator.Temp);
                 var vertexIndicesInEdges              = new NativeList<int2>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
-                var edgeHashMap                       = new NativeParallelHashMap<int2, int>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
+                var edgeHashMap                       = new NativeHashMap<int2, int>(convexHullBuilder.vertices.peakCount, Allocator.Temp);
                 var edgeFlippedInFaces                = new NativeList<bool>(convexHullBuilder.numFaceVertices, Allocator.Temp);
 
                 var tempVerticesInFace = new NativeList<int>(Allocator.Temp);

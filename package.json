@@ -1,9 +1,9 @@
 {
   "name": "com.latios.latiosframework",
-  "displayName": "Latios Framework for DOTS",
-  "version": "0.6.4",
+  "displayName": "Latios Framework for ECS",
+  "version": "0.6.5",
   "unity": "2022.2",
-  "description": "Latios Framework for DOTS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following packages:\n\u25aa Core\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\u25aa Kinemation Animation and Rendering\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip/tree/v0.4.5\n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos",
+  "description": "Latios Framework for ECS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following modules:\n\u25aa Core\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\u25aa Kinemation Animation and Rendering\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip\n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos",
   "dependencies": {
     "com.unity.entities": "1.0.0-pre.15",
     "com.unity.audio.dspgraph": "0.1.0-preview.22",

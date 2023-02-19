@@ -98,6 +98,14 @@ namespace Unity.Mathematics
                                 (translation   ));
         }
 
+        public static float3x4 Scale(float3 scale)
+        {
+            return new float3x4(new float3(scale.x, 0f, 0f),
+                                new float3(0f, scale.y, 0f),
+                                new float3(0f, 0f, scale.z),
+                                float3.zero);
+        }
+
         public static readonly float3x4 identity = new float3x4(new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), float3.zero);
     }
 }

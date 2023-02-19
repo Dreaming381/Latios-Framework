@@ -9,6 +9,17 @@ Versioning](http://semver.org/spec/v2.0.0.html).
 You can find changelogs for the individual modules inside the Documentation\~
 directory.
 
+## [0.6.5] – 2023-2-18
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Changed
+
+-   Updated Core to v0.6.5
+-   Updated Psyshock to v0.6.5
+-   Updated Myri to v0.6.5
+-   Updated Kinemation to v0.6.5
+
 ## [0.6.4] – 2022-12-29
 
 Officially supports Entities [1.0.0 prerelease 15]

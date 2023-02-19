@@ -35,12 +35,12 @@ namespace Latios.Kinemation.Authoring
 
         public bool Equals(ShadowHierarchyRequest other)
         {
-            return animatorToBuildShadowFor.GetInstanceID().Equals(other.animatorToBuildShadowFor.GetInstanceID());
+            return animatorToBuildShadowFor.Equals(other.animatorToBuildShadowFor);
         }
 
         public override int GetHashCode()
         {
-            return animatorToBuildShadowFor.GetInstanceID();
+            return animatorToBuildShadowFor.GetHashCode();
         }
     }
 

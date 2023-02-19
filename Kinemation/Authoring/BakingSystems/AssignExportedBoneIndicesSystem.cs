@@ -36,7 +36,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         int i = 0;
                         foreach (var go in gameObjectRefs)
                         {
-                            if (go.authoringGameObjectForBone.GetInstanceID() == id)
+                            if (go.authoringGameObjectForBone.GetHashCode() == id)
                             {
                                 exportedBones.ElementAt(i).boneIndex = currentIndex;
                                 break;

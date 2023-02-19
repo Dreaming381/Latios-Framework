@@ -70,6 +70,8 @@ namespace Latios.Systems
             //World.DestroySystem(World.CreateSystem<CollectionComponentCreateSystem<CollectionDefeatStripComponent> >());
             //World.DestroySystem(World.CreateSystem<CollectionComponentDestroySystem<CollectionDefeatStripComponent> >());
 
+            EnableSystemSorting = false;
+
             var managedCreateType         = typeof(ManagedComponentCreateSystem<>);
             var managedDestroyType        = typeof(ManagedComponentDestroySystem<>);
             var collectionCreateType      = typeof(CollectionComponentCreateSystem<>);

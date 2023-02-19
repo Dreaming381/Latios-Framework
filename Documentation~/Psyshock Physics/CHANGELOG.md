@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] – 2023-2-18
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Added
+
+-   Added `CollisionLayer.colliderBodies `which provides access to a read-only
+    array of` ColliderBody` stored in the `CollisionLayer`
+-   Added `Update()` methods to `PhysicsComponentLookup` and
+    `PhysicsBufferLookup`
+
+### Fixed
+
+-   Fixed `ConvexColliderSmartBlobberSystem` safety exceptions
+
+### Improved
+
+-   Backported XML documentation for various APIs from the experimental 0.7
+    development project
+
 ## [0.6.4] – 2022-12-29
 
 Officially supports Entities [1.0.0 prerelease 15]

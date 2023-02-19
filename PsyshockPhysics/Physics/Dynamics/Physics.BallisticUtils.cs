@@ -113,8 +113,16 @@ namespace Latios.Psyshock
 
         public static partial class Constants
         {
+            /// <summary>
+            /// Approximate real-world fluid viscosity of air.
+            /// Units: Pa / s
+            /// </summary>
             public const float fluidViscosityOfAir = 0.000018f;  // Pa / s
-            public const float densityOfAir        = 1.225f;  // kg / m^3
+            /// <summary>
+            /// Approximate real-world density of air.
+            /// Units: kg / m^3
+            /// </summary>
+            public const float densityOfAir = 1.225f;  // kg / m^3
         }
     }
 }

@@ -49,6 +49,7 @@ namespace Unity.Entities.Exposed
         {
             var candidateBakers = new List<System.Type>();
 
+#if UNITY_EDITOR
             foreach (var type in UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(Baker<>)))
             {
                 if (!type.IsAbstract && !type.IsDefined(typeof(DisableAutoCreationAttribute)))
@@ -63,6 +64,7 @@ namespace Unity.Entities.Exposed
                     candidateBakers.Add(type);
                 }
             }
+#endif
 
             return candidateBakers;
         }

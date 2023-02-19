@@ -5,6 +5,7 @@ namespace Latios.Kinemation.Authoring.Systems
 {
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
+    [DisableAutoCreation]
     public class KinemationSmartBlobberBakingGroup : ComponentSystemGroup
     {
         void GetOrCreateAndAddSystem<T>() where T : unmanaged, ISystem

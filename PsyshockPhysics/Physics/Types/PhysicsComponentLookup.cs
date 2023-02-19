@@ -176,6 +176,18 @@ namespace Latios.Psyshock
             return new PhysicsBufferLookup<T> { lookup = bufferFromEntity };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update(ref SystemState state)
+        {
+            lookup.Update(ref state);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update(SystemBase system)
+        {
+            lookup.Update(system);
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
         {

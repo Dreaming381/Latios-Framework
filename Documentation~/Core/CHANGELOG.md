@@ -6,6 +6,34 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.5] – 2023-2-18
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Added
+
+-   Added `ArchetypeChunk` exposed extensions `GetMetaEntity()` and`
+    GetChunkPtrAsUlong()`
+-   Added `float3x4.Scale()`
+
+### Changed
+
+-   Bootstrap Templates no longer require unsafe code enabled
+
+### Fixed
+
+-   Fixed `PreSyncPointGroup` sorting warnings
+-   Fixed various code compilation issues when creating builds
+-   Fixed exception thrown while destroying a `LatiosWorldUnamanged` if the
+    project does not have any managed structs
+
+### Improved
+
+-   System sorting has been disabled for disabled for
+    `ManagedComponentsReactiveSystemGroup`, reducing startup performance
+-   Removed unnecessary system sorting calls when `enableSorting` is false and
+    systems were added but not removed
+
 ## [0.6.4] – 2022-12-29
 
 Officially supports Entities [1.0.0 prerelease 15]

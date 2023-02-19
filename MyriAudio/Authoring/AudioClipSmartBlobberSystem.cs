@@ -92,7 +92,7 @@ namespace Latios.Myri.Authoring.Systems
 
             Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in AudioClipBlobBakeData data) =>
             {
-                mapWriter.TryAdd(data.clip.GetInstanceID(), new UniqueItem { bakeData = data });
+                mapWriter.TryAdd(data.clip.GetHashCode(), new UniqueItem { bakeData = data });
             }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
 
             var clips    = new NativeList<UnityObjectRef<AudioClip> >(Allocator.TempJob);
@@ -137,15 +137,15 @@ namespace Latios.Myri.Authoring.Systems
             {
                 for (int i = 0; i < clips.Length; i++)
                 {
-                    var element                       = hashmap[clips[i].GetInstanceID()];
-                    element.blob                      = builders[i].result;
-                    hashmap[clips[i].GetInstanceID()] = element;
+                    var element                     = hashmap[clips[i].GetHashCode()];
+                    element.blob                    = builders[i].result;
+                    hashmap[clips[i].GetHashCode()] = element;
                 }
             }).Schedule();
 
             Entities.ForEach((ref SmartBlobberResult result, in AudioClipBlobBakeData data) =>
             {
-                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.clip.GetInstanceID()].blob);
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.clip.GetHashCode()].blob);
             }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
 
             Dependency = hashmap.Dispose(Dependency);

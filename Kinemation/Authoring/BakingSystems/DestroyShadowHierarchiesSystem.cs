@@ -22,7 +22,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             Entities.ForEach((in ShadowHierarchyReference reference) =>
             {
-                if (hashset.Add(reference.shadowHierarchyRoot.GetInstanceID()))
+                if (hashset.Add(reference.shadowHierarchyRoot.GetHashCode()))
                     list.Add(in reference);
             }).WithStoreEntityQueryInField(ref m_query).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
 

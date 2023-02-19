@@ -4,63 +4,29 @@ Oh hi! Awesome of you to stop by!
 
 No. I don’t want your money. And no, I don’t drink coffee.
 
-But if you want to write code (or commission someone I suppose), that might be
-code I don’t have to write. That means more time for me to invent stuff. I like
-this plan!
+Writing code is where it’s at! Whether you want to, your boss is telling you to,
+or you are paying someone to, your contributions will not go unnoticed!
 
-Here’s how to contribute new features.
+Here’s how to contribute.
 
 ## Picking a Feature
 
-The first step is to pick a feature. Here’s a list of features to choose from
-that I have deprioritized for myself. If you don’t see the feature you want to
-explore listed here or have questions regarding one of these features, please
-reach out to me.
+If you are just looking to contribute some bug fixes, skip this step.
 
-### Core
+If you already have a feature in mind, be sure to run it by me via various
+channels. The Discord server is usually the best (public or DMs) if you want
+fast responses. But forum PMs, GitHub discussions, and email all work as well.
 
--   Easy
-    -   GetComponent/Buffer(s)InRoot/Hierarchy/Children
-    -   FindEntity/EntitiesWithTypeInHierarchy/Children
-    -   RemoveComponentCommandBuffer
--   Advanced
-    -   AddComponentCommandBuffer
-    -   AddSharedComponentCommandBuffer
-    -   InstantiateCommandBufferWithRemap
-    -   InstantiateCommandBuffer – dynamic buffer variants
-    -   InstantiateCommandBuffer – children initialization variants
-    -   Blackboard Entity runtime editor
+If you don’t have a feature in mind, worry not. There are plenty of open
+challenges to solve. Not all of them require the brainpower of a super-genius
+either. Convenience utilities, Editor tooling with UI Toolkit, and dev-ops are
+all areas that could really use your help. And someone needs to make the example
+projects.
 
-### Psyshock
+If you a looking for an optimization challenge, there’s plenty around too, many
+of which will have real impacts for lots of users.
 
--   Easy
-    -   Spring Force Utility
-    -   PID Controller
--   Advanced
-    -   Character Controller Support Plane Solver
-    -   AreOverlapping(Sphere/Capsule/Box)
-    -   FitToMesh(Sphere/Capsule/Box)
-
-### Myri
-
--   Easy
-    -   Audio Source Gizmos and Handles
-    -   Audio Source Streamlined Inspector
-    -   Audio Layers
--   Advanced
-    -   Audio Clip Compression and Decompression Library
-    -   Multiband EQ Kernel
-    -   Multiband Limiter Kernel
-    -   Vertical Spatialization Profile
-
-### Kinemation
-
--   Easy
-    -   Platform support (requires modifying ACLUnity CMake)
-        -   iOS
-    -   Blending and IK utilities
--   Advanced
-    -   Cage mesh deformation
+Always ask for the latest open challenges via Discord, forums, GitHub, or email.
 
 ## Developing Using a Public GitHub Account
 
@@ -81,8 +47,9 @@ If you would like to use git to develop a new feature, follow these steps:
     are nice, but not necessary. Unity Tests are also optional.
 8.  Push your changes to your fork.
 9.  Make a pull request.
-10. If your PR is closed, that means a version of the feature you implemented
-    has landed in an internal repo and will arrive in a future release.
+10. PRs will land in a staging branch. Pay attention to reviews. Some may have
+    suggested improvements. However, if such suggestions are trivial, they might
+    be made in the next release commit on top of your commits’ changes.
 
 ## Developing Without GitHub
 
@@ -100,7 +67,14 @@ these steps:
     are nice, but not necessary. Unity Tests are also optional.
 6.  Save a copy of your changes to a zipped folder.
 7.  Send your zipped folder (and the zipped folder from step 3 if you have one)
-    via Unity forums PM, email, or any other contact channel you are aware of.
+    via Discord, Unity forums PM, email, or any other contact channel you are
+    aware of. The zipped folder should typically be under 2 MB in size (exclude
+    documentation in your zip).
+
+Your changes will be cherry-picked into a local development project and included
+in the release. You will not be included in git metadata associated with the
+changes. I use tools like Meld for merging such changes, in case you were
+wondering.
 
 ## Naming
 
@@ -115,13 +89,38 @@ release.
 -   Internal fields and properties may also have an “m_” prefix if they are
     accompanied by public members.
 -   ECS tag components have a “Tag” suffix.
+-   Zero-size enableable components have a “Flag” suffix.
 -   ECS systems have a “System” suffix.
 
 If you have a tendency to be overly bland or generic with your type, variable,
 and function names, please use comments to provide details so that I can better
 understand your code.
 
-## My Workflow
+## Formatting
+
+In general, do not worry about formatting. Instead, format the files you intend
+to modify first, and then make your changes such that I can see the diff of just
+the changes and not your formatting.
+
+I have my own tool for formatting which I use for personal development called
+“Alina”. It is not perfect, so if you are interested in helping it be better and
+usable by more people, let me know!
+
+## Tests
+
+If you want them, write them. But in general, my philosophy has always been to
+test things with real projects. That way, I not only test the code itself, but
+also the practicality of such APIs. If you don’t like testing things, don’t
+worry about it.
+
+## The Final Step
+
+Let me know what name you would like to be referred to in the Contributors
+section of the README. If you don’t have a preference, I will typically default
+to your Unity forums username. If you have a webpage you would like to be linked
+to your name, let me know that as well.
+
+## My Own Workflow
 
 I manually synchronize development of the Latios Framework across several
 projects. This means I often have multiple versions of the framework with
@@ -144,11 +143,6 @@ files or send me a public link to the demo.
 If you are an artist or designer, you can create assets and send them to me to
 be featured in demos, examples, and tutorials.
 
-## My Single Rule Regarding Examples
-
-Please do not commit anything with LFS. GitHub LFS is expensive and I have not
-set up an AWS LFS server or alternative yet. (Any suggestions to make this cheap
-will be greatly appreciated!)
-
-If you want LFS, make your own repo and send me the link. I will add it to the
-README.
+Also, a huge help for future users is writing devlogs about your adventures with
+the Latios Framework. You can even showcase your progress in the Discord! We
+love it!

@@ -9,7 +9,6 @@ using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
 using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems

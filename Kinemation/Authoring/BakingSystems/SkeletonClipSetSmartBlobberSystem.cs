@@ -10,7 +10,6 @@ using Unity.Entities.Exposed;
 using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.Jobs;
 
@@ -141,7 +140,7 @@ namespace Latios.Kinemation.Authoring
             int i = 0;
             foreach (var clip in clips)
             {
-                if (clip.clip.GetInstanceID() == 0)
+                if (clip.clip.GetHashCode() == 0)
                 {
                     Debug.LogError($"Kinemation failed to bake clip set on animator {animator.gameObject.name}. Clip at index {i} was null.");
                 }
