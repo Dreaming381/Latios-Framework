@@ -430,8 +430,8 @@ namespace Latios.Psyshock
 
             public void Execute(in FindPairsResult result)
             {
-                hitArray.Set(result.indexA, true);
-                hitArray.Set(result.indexB, true);
+                hitArray.Set(result.bodyIndexA, true);
+                hitArray.Set(result.bodyIndexB, true);
             }
         }
 
@@ -442,8 +442,8 @@ namespace Latios.Psyshock
 
             public void Execute(in FindPairsResult result)
             {
-                hitArrayA.Set(result.indexA, true);
-                hitArrayB.Set(result.indexB, true);
+                hitArrayA.Set(result.bodyIndexA, true);
+                hitArrayB.Set(result.bodyIndexB, true);
             }
         }
 

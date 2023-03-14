@@ -12,12 +12,42 @@ namespace AclUnity
     {
         public struct AclCompressedClipResult : IDisposable
         {
-            public NativeArray<byte>.ReadOnly compressedDataToCopyFrom => compressedData.AsReadOnly();
+            internal ClipHeader        header;
             internal NativeArray<byte> compressedData;
+            internal NativeArray<byte> extraCompressedData;
+
+            public int sizeInBytes => compressedData.Length != 0 ? 16 + compressedData.Length + extraCompressedData.Length : 0;
+
+            public void CopyTo(NativeArray<byte> arrayToCopyTo)
+            {
+                CheckArraySufficient(arrayToCopyTo);
+                CopyTo((byte*)arrayToCopyTo.GetUnsafePtr());
+            }
+
+            public unsafe void CopyTo(byte* ptr)
+            {
+                var headerPtr = (ClipHeader*)ptr;
+                *headerPtr    = header;
+                var firstPtr  = (byte*)(headerPtr + 1);
+                UnsafeUtility.MemCpy(firstPtr, compressedData.GetUnsafeReadOnlyPtr(), compressedData.Length);
+                if (extraCompressedData.Length != 0)
+                {
+                    UnsafeUtility.MemCpy(firstPtr + header.offsetToUniformScalesStartInBytes, extraCompressedData.GetUnsafeReadOnlyPtr(), extraCompressedData.Length);
+                }
+            }
 
             public void Dispose()
             {
                 DisposeCompressedTrack(this);
+            }
+
+            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+            void CheckArraySufficient(NativeArray<byte> array)
+            {
+                if (!array.IsCreated)
+                    throw new ArgumentException("The NativeArray is not valid");
+                if (array.Length < sizeInBytes)
+                    throw new ArgumentException("The NativeArray does not contain enough elements for the compressed clip");
             }
         }
 
@@ -26,21 +56,19 @@ namespace AclUnity
             public short compressionLevel;
             public float maxDistanceError;
             public float sampledErrorDistanceFromBone;
-            public float maxNegligibleTranslationDrift;
-            public float maxNegligibleScaleDrift;
+            public float maxUniformScaleError;
         }
 
         public static readonly SkeletonCompressionSettings kDefaultSettings = new SkeletonCompressionSettings
         {
-            compressionLevel              = 2,
-            maxDistanceError              = 0.0001f,
-            sampledErrorDistanceFromBone  = 0.03f,
-            maxNegligibleScaleDrift       = 0.00001f,
-            maxNegligibleTranslationDrift = 0.00001f
+            compressionLevel             = 2,
+            maxDistanceError             = 0.0001f,
+            sampledErrorDistanceFromBone = 0.03f,
+            maxUniformScaleError         = 0.00001f
         };
 
         public static AclCompressedClipResult CompressSkeletonClip(NativeArray<short>          parentIndices,
-                                                                   NativeArray<Qvv>            aosClipData,
+                                                                   NativeArray<Qvvs>           aosClipData,
                                                                    float sampleRate,
                                                                    SkeletonCompressionSettings settings
                                                                    )
@@ -53,12 +81,44 @@ namespace AclUnity
             var alignedClipData = (float*)aosClipData.GetUnsafeReadOnlyPtr();
             if (!CollectionHelper.IsAligned(alignedClipData, 16))
             {
-                alignedClipData = (float*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<Qvv>() * aosClipData.Length, math.max(UnsafeUtility.AlignOf<Qvv>(), 16), Allocator.TempJob);
-                UnsafeUtility.MemCpy(alignedClipData, aosClipData.GetUnsafeReadOnlyPtr(), UnsafeUtility.SizeOf<Qvv>() * aosClipData.Length);
+                alignedClipData = (float*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<Qvvs>() * aosClipData.Length, math.max(UnsafeUtility.AlignOf<Qvvs>(), 16), Allocator.TempJob);
+                UnsafeUtility.MemCpy(alignedClipData, aosClipData.GetUnsafeReadOnlyPtr(), UnsafeUtility.SizeOf<Qvvs>() * aosClipData.Length);
             }
 
-            int   outCompressedSizeInBytes = 0;
-            void* compressedClipPtr;
+            int               outCompressedSizeInBytes = 0;
+            void*             compressedClipPtr;
+            NativeArray<byte> compressedScales = default;
+            float*            sampledScales    = null;
+
+            // Todo: Maybe do this in AclUnity so that all heavy algorithms run native without the need for Burst?
+            bool needsScales = false;
+            foreach (var data in aosClipData)
+            {
+                needsScales |= data.stretchScale.w != 1f;
+            }
+
+            if (needsScales)
+            {
+                // Todo: This can be pretty heavy for Allocator.Temp. Use Malloc and Convert instead?
+                var alignedScaleData = new NativeArray<float>(aosClipData.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                // Todo: Convert these loops into UnsafeUtility calls once the needsScales loop is native.
+                for (int i = 0; i < aosClipData.Length; i++)
+                    alignedScaleData[i] = aosClipData[i].stretchScale.w;
+                var errors              = new NativeArray<float>(parentIndices.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                for (int i = 0; i < parentIndices.Length; i++)
+                    errors[i]    = settings.maxUniformScaleError;
+                var scalesResult = CompressScalarsClip(alignedScaleData, errors, sampleRate, settings.compressionLevel);
+                compressedScales = scalesResult.compressedData;
+                float timeStep   = math.rcp(sampleRate);
+                float sampleTime = 0f;
+                for (int i = 0; i < alignedScaleData.Length; i += parentIndices.Length)
+                {
+                    var scaleSampleSubArray = alignedScaleData.GetSubArray(i, parentIndices.Length);
+                    Decompression.SampleFloats(compressedScales.GetUnsafeReadOnlyPtr(), scaleSampleSubArray, sampleTime, Decompression.KeyframeInterpolationMode.Nearest);
+                    sampleTime += timeStep;
+                }
+                sampledScales = (float*)alignedScaleData.GetUnsafeReadOnlyPtr();
+            }
 
             if (X86.Avx2.IsAvx2Supported)
             {
@@ -70,9 +130,8 @@ namespace AclUnity
                                                              sampleRate,
                                                              settings.maxDistanceError,
                                                              settings.sampledErrorDistanceFromBone,
-                                                             settings.maxNegligibleTranslationDrift,
-                                                             settings.maxNegligibleScaleDrift,
-                                                             &outCompressedSizeInBytes
+                                                             &outCompressedSizeInBytes,
+                                                             sampledScales
                                                              );
             }
             else
@@ -85,9 +144,8 @@ namespace AclUnity
                                                                       sampleRate,
                                                                       settings.maxDistanceError,
                                                                       settings.sampledErrorDistanceFromBone,
-                                                                      settings.maxNegligibleTranslationDrift,
-                                                                      settings.maxNegligibleScaleDrift,
-                                                                      &outCompressedSizeInBytes
+                                                                      &outCompressedSizeInBytes,
+                                                                      sampledScales
                                                                       );
             }
 
@@ -96,15 +154,24 @@ namespace AclUnity
                 UnsafeUtility.Free(alignedClipData, Allocator.TempJob);
             }
 
-            var resultArray = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None);
+            var resultArray = CollectionHelper.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            var safety = AtomicSafetyHandle.Create();
+            var safety = CollectionHelper.CreateSafetyHandle(Allocator.Persistent);
             NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref resultArray, safety);
 #endif
 
             return new AclCompressedClipResult
             {
-                compressedData = resultArray
+                header = new ClipHeader
+                {
+                    clipType                          = needsScales ? ClipHeader.ClipType.SkeletonWithUniformScales : ClipHeader.ClipType.Skeleton,
+                    duration                          = sampleRate * ((aosClipData.Length / parentIndices.Length) - 1),
+                    sampleRate                        = sampleRate,
+                    trackCount                        = (short)parentIndices.Length,
+                    offsetToUniformScalesStartInBytes = (uint)(needsScales ? CollectionHelper.Align(resultArray.Length, 16) : 0)
+                },
+                compressedData      = resultArray,
+                extraCompressedData = compressedScales
             };
         }
 
@@ -143,31 +210,57 @@ namespace AclUnity
                                                                      &outCompressedSizeInBytes);
             }
 
-            var resultArray = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None);
+            var resultArray = CollectionHelper.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            var safety = AtomicSafetyHandle.Create();
+            var safety = CollectionHelper.CreateSafetyHandle(Allocator.Persistent);
             NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref resultArray, safety);
 #endif
 
             return new AclCompressedClipResult
             {
-                compressedData = resultArray
+                header = new ClipHeader
+                {
+                    clipType                          = ClipHeader.ClipType.Scalars,
+                    duration                          = sampleRate * ((clipData.Length / maxErrorsByTrack.Length) - 1),
+                    sampleRate                        = sampleRate,
+                    trackCount                        = (short)maxErrorsByTrack.Length,
+                    offsetToUniformScalesStartInBytes = 0
+                },
+                compressedData      = resultArray,
+                extraCompressedData = default
             };
         }
 
         // Note: It shouldn't matter which DLL actually does the disposal since
         // this is a movable serializable type. So we don't have to worry about
-        // Burst races in the Editor.
+        // Burst races in the Editor. As long as the DLLs link to the same allocator
+        // it is fine.
         internal static void DisposeCompressedTrack(AclCompressedClipResult clip)
         {
-            if (X86.Avx2.IsAvx2Supported)
-                AVX.disposeCompressedTracksBuffer(clip.compressedData.GetUnsafePtr());
-            else
-                NoExtensions.disposeCompressedTracksBuffer(clip.compressedData.GetUnsafePtr());
+            if (clip.compressedData.IsCreated)
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                    AVX.disposeCompressedTracksBuffer(clip.compressedData.GetUnsafePtr());
+                else
+                    NoExtensions.disposeCompressedTracksBuffer(clip.compressedData.GetUnsafePtr());
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            AtomicSafetyHandle.Release(NativeArrayUnsafeUtility.GetAtomicSafetyHandle(clip.compressedData));
+                var handle = NativeArrayUnsafeUtility.GetAtomicSafetyHandle(clip.compressedData);
+                CollectionHelper.DisposeSafetyHandle(ref handle);
 #endif
+            }
+            if (clip.extraCompressedData.IsCreated)
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                    AVX.disposeCompressedTracksBuffer(clip.extraCompressedData.GetUnsafePtr());
+                else
+                    NoExtensions.disposeCompressedTracksBuffer(clip.extraCompressedData.GetUnsafePtr());
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                var handle = NativeArrayUnsafeUtility.GetAtomicSafetyHandle(clip.extraCompressedData);
+                CollectionHelper.DisposeSafetyHandle(ref handle);
+#endif
+            }
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
@@ -175,6 +268,9 @@ namespace AclUnity
         {
             if (!parentIndices.IsCreated || parentIndices.Length == 0)
                 throw new ArgumentException("parentIndices is invalid");
+
+            if (parentIndices.Length > short.MaxValue)
+                throw new ArgumentException("parentIndices is too big");
 
             if (parentIndices[0] != 0)
                 throw new ArgumentException("parentIndices has invalid root index");
@@ -187,7 +283,7 @@ namespace AclUnity
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckClipDataIsValid(NativeArray<Qvv> aosClipData, int boneCount)
+        static void CheckClipDataIsValid(NativeArray<Qvvs> aosClipData, int boneCount)
         {
             if (!aosClipData.IsCreated || aosClipData.Length == 0)
                 throw new ArgumentException("aosClipData is invalid");
@@ -233,10 +329,6 @@ namespace AclUnity
 
             if (settings.maxDistanceError <= math.EPSILON)
                 throw new ArgumentOutOfRangeException("maxDistanceError is negative or too small");
-            if (settings.maxNegligibleScaleDrift <= math.EPSILON)
-                throw new ArgumentOutOfRangeException("maxNegligivelScaleDrift is negative or too small");
-            if (settings.maxNegligibleTranslationDrift <= math.EPSILON)
-                throw new ArgumentOutOfRangeException("maxNegligibleTranslationDrift is negative or too small");
             if (settings.sampledErrorDistanceFromBone <= math.EPSILON)
                 throw new ArgumentOutOfRangeException("sampledErrorDistanceFromBone is negative or too small");
         }
@@ -254,9 +346,8 @@ namespace AclUnity
                                                             float sampleRate,
                                                             float maxDistanceError,
                                                             float sampledErrorDistanceFromBone,
-                                                            float maxNegligibleTranslationDrift,
-                                                            float maxNegligibleScaleDrift,
-                                                            int*   outCompressedSizeInBytes);
+                                                            int*   outCompressedSizeInBytes,
+                                                            float* sampledScales);
 
             [DllImport(dllName)]
             public static extern void* compressScalarsClip(short numTracks,
@@ -284,9 +375,8 @@ namespace AclUnity
                                                             float sampleRate,
                                                             float maxDistanceError,
                                                             float sampledErrorDistanceFromBone,
-                                                            float maxNegligibleTranslationDrift,
-                                                            float maxNegligibleScaleDrift,
-                                                            int*   outCompressedSizeInBytes);
+                                                            int*   outCompressedSizeInBytes,
+                                                            float* sampledScales);
 
             [DllImport(dllName)]
             public static extern void* compressScalarsClip(short numTracks,

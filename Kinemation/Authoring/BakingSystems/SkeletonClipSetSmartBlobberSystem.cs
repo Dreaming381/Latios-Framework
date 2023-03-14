@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
+using Latios.Transforms;
 using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
@@ -49,23 +50,23 @@ namespace Latios.Kinemation.Authoring
         /// The maximum distance a point sampled some distance away from the bone can
         /// deviate from the original authored animation due to lossy compression.
         /// Typical default is one ten-thousandth of a Unity unit.
+        /// Warning! This is measured when the character root is animated with initial
+        /// local scale of 1f!
         /// </summary>
         public float maxDistanceError;
         /// <summary>
         /// How far away from the bone points are sampled when evaluating distance error.
         /// Defaults to 3% of a Unity unit.
+        /// Warning! This is measured when the character root is animated with initial
+        /// local scale of 1f!
         /// </summary>
         public float sampledErrorDistanceFromBone;
         /// <summary>
-        /// The noise threshold for scale animation to be considered constant for a brief time range.
+        /// The max uniform scale value error. The underlying compression library requires
+        /// the uniform scale values to be compressed first independently currently.
         /// Defaults to 1 / 100_000.
         /// </summary>
-        public float maxNegligibleTranslationDrift;
-        /// <summary>
-        /// The noise threshold for translation animation to be considered constant for a brief time range.
-        /// Defaults to 1 / 100_000.
-        /// </summary>
-        public float maxNegligibleScaleDrift;
+        public float maxUniformScaleError;
 
         /// <summary>
         /// Looping clips must have matching start and end poses.
@@ -80,12 +81,11 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public static readonly SkeletonClipCompressionSettings kDefaultSettings = new SkeletonClipCompressionSettings
         {
-            compressionLevel              = 2,
-            maxDistanceError              = 0.0001f,
-            sampledErrorDistanceFromBone  = 0.03f,
-            maxNegligibleScaleDrift       = 0.00001f,
-            maxNegligibleTranslationDrift = 0.00001f,
-            copyFirstKeyAtEnd             = false
+            compressionLevel             = 2,
+            maxDistanceError             = 0.0001f,
+            sampledErrorDistanceFromBone = 0.03f,
+            maxUniformScaleError         = 0.00001f,
+            copyFirstKeyAtEnd            = false
         };
     }
 
@@ -186,7 +186,7 @@ namespace Latios.Kinemation.Authoring
     [TemporaryBakingType]
     internal struct SampledBoneTransform : IBufferElementData
     {
-        public BoneTransform boneTransform;
+        public TransformQvvs boneTransform;
     }
 
     [TemporaryBakingType]
@@ -290,7 +290,7 @@ namespace Latios.Kinemation.Authoring.Systems
             int startIndex         = appendNewSamplesToThis.Length;
             appendNewSamplesToThis.ResizeUninitialized(requiredTransforms + appendNewSamplesToThis.Length);
 
-            var boneTransforms = appendNewSamplesToThis.Reinterpret<BoneTransform>().AsNativeArray().GetSubArray(startIndex, requiredTransforms);
+            var boneTransforms = appendNewSamplesToThis.Reinterpret<TransformQvvs>().AsNativeArray().GetSubArray(startIndex, requiredTransforms);
 
             var oldWrapMode = clip.wrapMode;
             clip.wrapMode   = WrapMode.Clamp;
@@ -329,14 +329,14 @@ namespace Latios.Kinemation.Authoring.Systems
         partial struct CaptureBoneSamplesJob : IJobParallelForTransform
         {
             [NativeDisableParallelForRestriction]  // Why is this necessary when we are using RunReadOnly()?
-            public NativeArray<BoneTransform> boneTransforms;
+            public NativeArray<TransformQvvs> boneTransforms;
             public int                        samplesPerBone;
             public int                        currentSample;
 
             public void Execute(int index, TransformAccess transform)
             {
                 int target             = index * samplesPerBone + currentSample;
-                boneTransforms[target] = new BoneTransform(transform.localRotation, transform.localPosition, transform.localScale);
+                boneTransforms[target] = new TransformQvvs(transform.localPosition, transform.localRotation, 1f, transform.localScale);
             }
         }
 
@@ -375,32 +375,26 @@ namespace Latios.Kinemation.Authoring.Systems
                     // Step 2: Convert settings
                     var aclSettings = new AclUnity.Compression.SkeletonCompressionSettings
                     {
-                        compressionLevel              = srcClip.settings.compressionLevel,
-                        maxDistanceError              = srcClip.settings.maxDistanceError,
-                        maxNegligibleScaleDrift       = srcClip.settings.maxNegligibleScaleDrift,
-                        maxNegligibleTranslationDrift = srcClip.settings.maxNegligibleTranslationDrift,
-                        sampledErrorDistanceFromBone  = srcClip.settings.sampledErrorDistanceFromBone
+                        compressionLevel             = srcClip.settings.compressionLevel,
+                        maxDistanceError             = srcClip.settings.maxDistanceError,
+                        maxUniformScaleError         = srcClip.settings.maxUniformScaleError,
+                        sampledErrorDistanceFromBone = srcClip.settings.sampledErrorDistanceFromBone
                     };
 
                     // Step 3: Encode bone samples into QVV array
-                    var qvvArray = boneSamplesBuffer.Reinterpret<AclUnity.Qvv>().AsNativeArray().GetSubArray(srcClip.boneTransformStart, srcClip.boneTransformCount);
+                    var qvvArray = boneSamplesBuffer.Reinterpret<AclUnity.Qvvs>().AsNativeArray().GetSubArray(srcClip.boneTransformStart, srcClip.boneTransformCount);
 
                     // Step 4: Compress
                     var compressedClip = AclUnity.Compression.CompressSkeletonClip(parentIndices, qvvArray, srcClip.sampleRate, aclSettings);
 
                     // Step 5: Build blob clip
-                    blobClips[clipIndex]            = default;
-                    blobClips[clipIndex].name       = srcClip.clipName;
-                    blobClips[clipIndex].duration   = math.rcp(srcClip.sampleRate) * ((qvvArray.Length / parents.Length) - 1);
-                    blobClips[clipIndex].boneCount  = root.boneCount;
-                    blobClips[clipIndex].sampleRate = srcClip.sampleRate;
-                    var events                      = clipEventsBuffer.Reinterpret<ClipEvent>().AsNativeArray().GetSubArray(srcClip.eventsStart, srcClip.eventsCount);
+                    blobClips[clipIndex]      = default;
+                    blobClips[clipIndex].name = srcClip.clipName;
+                    var events                = clipEventsBuffer.Reinterpret<ClipEvent>().AsNativeArray().GetSubArray(srcClip.eventsStart, srcClip.eventsCount);
                     ClipEventsBlobHelpers.Convert(ref blobClips[clipIndex].events, ref builder, events);
 
-                    var compressedData = builder.Allocate(ref blobClips[clipIndex].compressedClipDataAligned16, compressedClip.compressedDataToCopyFrom.Length, 16);
-                    UnsafeUtility.MemCpy(compressedData.GetUnsafePtr(),
-                                         compressedClip.compressedDataToCopyFrom.GetUnsafeReadOnlyPtr(),
-                                         compressedClip.compressedDataToCopyFrom.Length);
+                    var compressedData = builder.Allocate(ref blobClips[clipIndex].compressedClipDataAligned16, compressedClip.sizeInBytes, 16);
+                    compressedClip.CopyTo((byte*)compressedData.GetUnsafePtr());
 
                     // Step 6: Dispose ACL memory and safety
                     compressedClip.Dispose();

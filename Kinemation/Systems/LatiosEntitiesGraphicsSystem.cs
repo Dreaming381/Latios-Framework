@@ -46,6 +46,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Latios.Transforms;
 using Unity.Assertions;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -57,7 +58,6 @@ using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 using Unity.Profiling;
-using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
@@ -114,7 +114,6 @@ namespace Latios.Kinemation.Systems
         private uint m_LastSystemVersionAtLastUpdate;
 
         private EntityQuery m_EntitiesGraphicsRenderedQuery;
-        private EntityQuery m_EntitiesGraphicsRenderedQueryRO;
         private EntityQuery m_LodSelectGroup;
         private EntityQuery m_ChangedTransformQuery;
         private EntityQuery m_MetaEntitiesForHybridRenderableChunksQuery;
@@ -238,8 +237,17 @@ namespace Latios.Kinemation.Systems
 
             m_PersistentInstanceDataSize = kGPUBufferSizeInitial;
 
-            m_EntitiesGraphicsRenderedQuery   = GetEntityQuery(EntitiesGraphicsUtils.GetEntitiesGraphicsRenderedQueryDesc());
-            m_EntitiesGraphicsRenderedQueryRO = GetEntityQuery(EntitiesGraphicsUtils.GetEntitiesGraphicsRenderedQueryDescReadOnly());
+            m_EntitiesGraphicsRenderedQuery = GetEntityQuery(new EntityQueryDesc
+            {
+                All = new[]
+                {
+                    ComponentType.ChunkComponentReadOnly<ChunkWorldRenderBounds>(),
+                    ComponentType.ReadOnly<WorldRenderBounds>(),
+                    ComponentType.ReadOnly<WorldTransform>(),
+                    ComponentType.ReadOnly<MaterialMeshInfo>(),
+                    ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>(),
+                },
+            });
 
             m_LodSelectGroup = GetEntityQuery(new EntityQueryDesc
             {
@@ -250,16 +258,15 @@ namespace Latios.Kinemation.Systems
                 },
             });
 
+            // We check for changes in the job itself rather than via filters, because we need to check for optional PostProcessMatrix changes
             m_ChangedTransformQuery = GetEntityQuery(new EntityQueryDesc
             {
                 All = new[]
                 {
-                    ComponentType.ReadOnly<LocalToWorld>(),
+                    ComponentType.ReadOnly<WorldTransform>(),
                     ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>(),
                 },
             });
-            m_ChangedTransformQuery.AddChangedVersionFilter(ComponentType.ReadOnly<LocalToWorld>());
-            m_ChangedTransformQuery.AddOrderVersionFilter();
 
             // We steal the BRG to avoid duplicating the Mesh and Material registration system.
             // Ideally, we want to remain compatible with plugins that register custom meshes and materials.
@@ -327,13 +334,14 @@ namespace Latios.Kinemation.Systems
             m_BatchEditorDatas = new NativeParallelHashMap<int, BatchEditorRenderData>(256, Allocator.Persistent);
 #endif
 
-            // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS
+            // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS (*cough Latios Transforms)
 #if SRP_10_0_0_OR_NEWER
-            RegisterMaterialPropertyType<LocalToWorld>(    "unity_ObjectToWorld", 4 * 4 * 3);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>("unity_WorldToObject", overrideTypeSizeGPU: 4 * 4 * 3);
+            RegisterMaterialPropertyType<WorldTransform>(       "unity_ObjectToWorld",   4 * 4 * 3);
+            RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
+            RegisterMaterialPropertyType<TickStartingTransform>("unity_MatrixPreviousM", 4 * 4 * 3);
 #else
-            RegisterMaterialPropertyType<LocalToWorld>(    "unity_ObjectToWorld", 4 * 4 * 4);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>("unity_WorldToObject", 4 * 4 * 4);
+            RegisterMaterialPropertyType<LocalToWorld>(         "unity_ObjectToWorld",   4 * 4 * 4);
+            RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   4 * 4 * 4);
 #endif
 
 #if ENABLE_PICKING
@@ -425,6 +433,13 @@ namespace Latios.Kinemation.Systems
         /// <inheritdoc/>
         protected override void OnUpdate()
         {
+            var unitySystem = World.GetExistingSystemManaged<EntitiesGraphicsSystem>();
+            if (unitySystem != null && unitySystem.Enabled == true)
+            {
+                UnityEngine.Debug.Log("Entities Graphics was enabled!");
+                unitySystem.Enabled = false;
+            }
+
             JobHandle inputDeps = Dependency;
 
             // Make sure any release culling jobs that have stored pointers in temp allocated
@@ -925,21 +940,10 @@ namespace Latios.Kinemation.Systems
         {
             Profiler.BeginSample("GetComponentTypes");
 
-            var threadLocalAABBs = new NativeArray<ThreadLocalAABB>(
-                JobsUtility.MaxJobThreadCount,
-                Allocator.TempJob,
-                NativeArrayOptions.UninitializedMemory);
-            var zeroAABBJob = new ZeroThreadLocalAABBJob
-            {
-                ThreadLocalAABBs = threadLocalAABBs,
-            }.Schedule(threadLocalAABBs.Length, 16);
-            ThreadLocalAABB.AssertCacheLineSize();
-
             var entitiesGraphicsRenderedChunkType   = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(false);
             var entitiesGraphicsRenderedChunkTypeRO = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true);
             var chunkHeadersRO                      = GetComponentTypeHandle<ChunkHeader>(true);
-            var chunkWorldRenderBoundsRO            = GetComponentTypeHandle<ChunkWorldRenderBounds>(true);
-            var localToWorldsRO                     = GetComponentTypeHandle<LocalToWorld>(true);
+            var worldTransformsRO                   = GetComponentTypeHandle<WorldTransform>(true);
             var lodRangesRO                         = GetComponentTypeHandle<LODRange>(true);
             var rootLodRangesRO                     = GetComponentTypeHandle<RootLODRange>(true);
             var materialMeshInfosRO                 = GetComponentTypeHandle<MaterialMeshInfo>(true);
@@ -951,7 +955,7 @@ namespace Latios.Kinemation.Systems
             totalChunks           = m_EntitiesGraphicsRenderedQuery.CalculateChunkCount();
             var newChunks         = new NativeArray<ArchetypeChunk>(totalChunks, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
-            var classifyNewChunksJob = new ClassifyNewChunksJob
+            var classifyNewChunksJob = new ClassifyNewChunksJobLatiosVersion
             {
                 EntitiesGraphicsChunkInfo = entitiesGraphicsRenderedChunkTypeRO,
                 ChunkHeader               = chunkHeadersRO,
@@ -974,7 +978,7 @@ namespace Latios.Kinemation.Systems
             }.Schedule(existingKeys.Length, kNumScatteredIndicesPerThread);
             existingKeys.Dispose(initializedUnreferenced);
 
-            inputDependencies = JobHandle.CombineDependencies(inputDependencies, initializedUnreferenced, zeroAABBJob);
+            inputDependencies = JobHandle.CombineDependencies(inputDependencies, initializedUnreferenced);
 
             uint lastSystemVersion = LastSystemVersion;
 
@@ -1004,9 +1008,6 @@ namespace Latios.Kinemation.Systems
                 WorldToLocalType     = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
                 PrevWorldToLocalType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
 
-                ThreadLocalAABBs = threadLocalAABBs,
-                ThreadIndex      = 0,  // set by the job system
-
 #if PROFILE_BURST_JOB_INTERNALS
                 ProfileAddUpload = new ProfilerMarker("AddUpload"),
 #endif
@@ -1015,9 +1016,8 @@ namespace Latios.Kinemation.Systems
             var updateOldJob = new UpdateOldEntitiesGraphicsChunksJob
             {
                 EntitiesGraphicsChunkInfo    = entitiesGraphicsRenderedChunkType,
-                ChunkWorldRenderBounds       = chunkWorldRenderBoundsRO,
                 ChunkHeader                  = chunkHeadersRO,
-                LocalToWorld                 = localToWorldsRO,
+                WorldTransform               = worldTransformsRO,
                 LodRange                     = lodRangesRO,
                 RootLodRange                 = rootLodRangesRO,
                 RenderMeshArray              = renderMeshArrays,
@@ -1045,7 +1045,6 @@ namespace Latios.Kinemation.Systems
                 {
                     NewChunks                    = newChunks,
                     EntitiesGraphicsChunkInfo    = entitiesGraphicsRenderedChunkTypeRO,
-                    ChunkWorldRenderBounds       = chunkWorldRenderBoundsRO,
                     EntitiesGraphicsChunkUpdater = entitiesGraphicsChunkUpdater,
                 };
 
@@ -1062,11 +1061,13 @@ namespace Latios.Kinemation.Systems
 
             var drawCommandFlagsUpdated = new UpdateDrawCommandFlagsJob
             {
-                LocalToWorld              = GetComponentTypeHandle<LocalToWorld>(true),
+                WorldTransform            = GetComponentTypeHandle<WorldTransform>(true),
+                PostProcessMatrix         = GetComponentTypeHandle<PostProcessMatrix>(true),
                 RenderFilterSettings      = GetSharedComponentTypeHandle<RenderFilterSettings>(),
                 EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(),
                 FilterSettings            = m_FilterSettings,
                 DefaultFilterSettings     = MakeFilterSettings(RenderFilterSettings.Default),
+                lastSystemVersion         = LastSystemVersion
             }.ScheduleParallel(m_ChangedTransformQuery, entitiesGraphicsCompleted);
             DidScheduleUpdateJob(drawCommandFlagsUpdated);
 
@@ -1088,7 +1089,7 @@ namespace Latios.Kinemation.Systems
 #endif
 
             Profiler.BeginSample("UpdateGlobalAABB");
-            UpdateGlobalAABB(threadLocalAABBs);
+            UpdateGlobalAABB();
             Profiler.EndSample();
 
             unreferencedBatchIndices.Dispose();
@@ -1110,23 +1111,10 @@ namespace Latios.Kinemation.Systems
             }
         }
 
-        private void UpdateGlobalAABB(NativeArray<ThreadLocalAABB> threadLocalAABBs)
+        private void UpdateGlobalAABB()
         {
-            MinMaxAABB aabb = MinMaxAABB.Empty;
-
-            Job.WithCode(() =>
-            {
-                for (int i = 0; i < threadLocalAABBs.Length; ++i)
-                    aabb.Encapsulate(threadLocalAABBs[i].AABB);
-            }).Run();
-#if DEBUG_LOG_GLOBAL_AABB
-            Debug.Log($"Global AABB min: {aabb.Min} max: {aabb.Max}");
-#endif
-
-            var centerExtentsAABB = (AABB)aabb;
-            m_BatchRendererGroup.SetGlobalBounds(new Bounds(centerExtentsAABB.Center, centerExtentsAABB.Extents));
-
-            threadLocalAABBs.Dispose();
+            Psyshock.Physics.GetCenterExtents(worldBlackboardEntity.GetComponentData<BrgAabb>().aabb, out var center, out var extents);
+            m_BatchRendererGroup.SetGlobalBounds(new Bounds(center, extents));
         }
 
         private void ComputeUploadSizeRequirements(
@@ -1728,14 +1716,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly]
             public NativeArray<ChunkProperty> ChunkProperties;
 
-            [NativeDisableParallelForRestriction]
-            public NativeArray<ThreadLocalAABB> ThreadLocalAABBs;
-
             public uint LastSystemVersion;
-
-#pragma warning disable 649
-            [NativeSetThreadIndex] public int ThreadIndex;
-#pragma warning restore 649
 
             public int WorldToLocalType;
             public int PrevWorldToLocalType;
@@ -1754,7 +1735,7 @@ namespace Latios.Kinemation.Systems
                     ~mask);
             }
 
-            public void ProcessChunk(in EntitiesGraphicsChunkInfo chunkInfo, ArchetypeChunk chunk, ChunkWorldRenderBounds chunkBounds)
+            public void ProcessChunk(in EntitiesGraphicsChunkInfo chunkInfo, in ArchetypeChunk chunk)
             {
 #if DEBUG_LOG_CHUNKS
                 Debug.Log(
@@ -1762,18 +1743,17 @@ namespace Latios.Kinemation.Systems
 #endif
 
                 if (chunkInfo.Valid)
-                    ProcessValidChunk(chunkInfo, chunk, chunkBounds.Value, false);
+                    ProcessValidChunk(in chunkInfo, chunk, false);
             }
 
-            public unsafe void ProcessValidChunk(in EntitiesGraphicsChunkInfo chunkInfo, ArchetypeChunk chunk,
-                                                 MinMaxAABB chunkAABB, bool isNewChunk)
+            public unsafe void ProcessValidChunk(in EntitiesGraphicsChunkInfo chunkInfo, in ArchetypeChunk chunk, bool isNewChunk)
             {
                 if (!isNewChunk)
                     MarkBatchAsReferenced(chunkInfo.BatchIndex);
 
                 bool structuralChanges = chunk.DidOrderChange(LastSystemVersion);
 
-                ref var mask = ref chunk.GetChunkComponentRefRW(in chunkMaterialPropertyDirtyMask);
+                ref var mask = ref chunk.GetChunkComponentRefRW(ref chunkMaterialPropertyDirtyMask);
 
                 fixed (DynamicComponentTypeHandle* fixedT0 = &ComponentTypes.t0)
                 {
@@ -1807,20 +1787,11 @@ namespace Latios.Kinemation.Systems
                         }
                     }
                 }
-
-                UpdateAABB(chunkAABB);
-            }
-
-            private unsafe void UpdateAABB(MinMaxAABB chunkAABB)
-            {
-                var     threadLocalAABB = ((ThreadLocalAABB*)ThreadLocalAABBs.GetUnsafePtr()) + ThreadIndex;
-                ref var aabb            = ref threadLocalAABB->AABB;
-                aabb.Encapsulate(chunkAABB);
             }
         }
 
         [BurstCompile]
-        internal struct ClassifyNewChunksJob : IJobChunk
+        internal struct ClassifyNewChunksJobLatiosVersion : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>               ChunkHeader;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
@@ -1868,15 +1839,14 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         internal struct UpdateOldEntitiesGraphicsChunksJob : IJobChunk
         {
-            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>         EntitiesGraphicsChunkInfo;
-            [ReadOnly] public ComponentTypeHandle<ChunkWorldRenderBounds> ChunkWorldRenderBounds;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>            ChunkHeader;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>           LocalToWorld;
-            [ReadOnly] public ComponentTypeHandle<LODRange>               LodRange;
-            [ReadOnly] public ComponentTypeHandle<RootLODRange>           RootLodRange;
-            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>       MaterialMeshInfo;
-            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>  RenderMeshArray;
-            public EntitiesGraphicsChunkUpdater                           EntitiesGraphicsChunkUpdater;
+            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>        EntitiesGraphicsChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>           ChunkHeader;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>        WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<LODRange>              LodRange;
+            [ReadOnly] public ComponentTypeHandle<RootLODRange>          RootLodRange;
+            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>      MaterialMeshInfo;
+            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray> RenderMeshArray;
+            public EntitiesGraphicsChunkUpdater                          EntitiesGraphicsChunkUpdater;
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -1887,7 +1857,6 @@ namespace Latios.Kinemation.Systems
 
                 var entitiesGraphicsChunkInfos = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
                 var chunkHeaders               = metaChunk.GetNativeArray(ref ChunkHeader);
-                var chunkBoundsArray           = metaChunk.GetNativeArray(ref ChunkWorldRenderBounds);
 
                 for (int i = 0, chunkEntityCount = metaChunk.Count; i < chunkEntityCount; i++)
                 {
@@ -1900,12 +1869,10 @@ namespace Latios.Kinemation.Systems
                     // if the user manually deletes some components after the fact.
                     bool hasRenderMeshArray  = chunk.Has(RenderMeshArray);
                     bool hasMaterialMeshInfo = chunk.Has(ref MaterialMeshInfo);
-                    bool hasLocalToWorld     = chunk.Has(ref LocalToWorld);
+                    bool hasWorldTransform   = chunk.Has(ref WorldTransform);
 
-                    if (!math.all(new bool3(hasRenderMeshArray, hasMaterialMeshInfo, hasLocalToWorld)))
+                    if (!math.all(new bool3(hasRenderMeshArray, hasMaterialMeshInfo, hasWorldTransform)))
                         continue;
-
-                    ChunkWorldRenderBounds chunkBounds = chunkBoundsArray[i];
 
                     // When LOD ranges change, we must reset the movement grace to avoid using stale data
                     bool lodRangeChange =
@@ -1919,7 +1886,7 @@ namespace Latios.Kinemation.Systems
                         entitiesGraphicsChunkInfos[i]              = chunkInfo;
                     }
 
-                    EntitiesGraphicsChunkUpdater.ProcessChunk(chunkInfo, chunk, chunkBounds);
+                    EntitiesGraphicsChunkUpdater.ProcessChunk(in chunkInfo, in chunk);
                 }
             }
         }
@@ -1928,7 +1895,6 @@ namespace Latios.Kinemation.Systems
         internal struct UpdateNewEntitiesGraphicsChunksJob : IJobParallelFor
         {
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
-            [ReadOnly] public ComponentTypeHandle<ChunkWorldRenderBounds>    ChunkWorldRenderBounds;
 
             public NativeArray<ArchetypeChunk>  NewChunks;
             public EntitiesGraphicsChunkUpdater EntitiesGraphicsChunkUpdater;
@@ -1938,13 +1904,109 @@ namespace Latios.Kinemation.Systems
                 var chunk     = NewChunks[index];
                 var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
 
-                ChunkWorldRenderBounds chunkBounds = chunk.GetChunkComponentData(ref ChunkWorldRenderBounds);
-
                 Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
-                EntitiesGraphicsChunkUpdater.ProcessValidChunk(chunkInfo, chunk, chunkBounds.Value, true);
+                EntitiesGraphicsChunkUpdater.ProcessValidChunk(in chunkInfo, in chunk, true);
             }
         }
         #endregion
+
+        [BurstCompile]
+        internal unsafe struct UpdateDrawCommandFlagsJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>             WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
+            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>             EntitiesGraphicsChunkInfo;
+
+            [ReadOnly] public NativeParallelHashMap<int, BatchFilterSettings> FilterSettings;
+            public BatchFilterSettings                                        DefaultFilterSettings;
+
+            public uint lastSystemVersion;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                bool hasPostProcess  = chunk.Has(ref PostProcessMatrix);
+                var  changed         = chunk.DidChange(ref WorldTransform, lastSystemVersion);
+                changed             |= chunk.DidOrderChange(lastSystemVersion);
+                changed             |= hasPostProcess && chunk.DidChange(ref PostProcessMatrix, lastSystemVersion);
+                if (!changed)
+                    return;
+
+                // This job is not written to support queries with enableable component types.
+                Assert.IsFalse(useEnabledMask);
+
+                var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
+                Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
+
+                // This job runs for all chunks that have structural changes, so if different
+                // RenderFilterSettings get set on entities, they should be picked up by
+                // the order change filter.
+                int filterIndex = chunk.GetSharedComponentIndex(RenderFilterSettings);
+                if (!FilterSettings.TryGetValue(filterIndex, out var filterSettings))
+                    filterSettings = DefaultFilterSettings;
+
+                bool hasPerObjectMotion = filterSettings.motionMode != MotionVectorGenerationMode.Camera;
+                if (hasPerObjectMotion)
+                    chunkInfo.CullingData.Flags |= EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion;
+                else
+                    chunkInfo.CullingData.Flags &= unchecked ((byte)~EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion);
+
+                var worldTransforms = chunk.GetNativeArray(ref WorldTransform);
+
+                if (hasPostProcess)
+                {
+                    var postProcessTransforms = chunk.GetNativeArray(ref PostProcessMatrix);
+                    for (int i = 0, chunkEntityCount = chunk.Count; i < chunkEntityCount; i++)
+                    {
+                        bool flippedWinding = RequiresFlippedWinding(worldTransforms[i], postProcessTransforms[i]);
+
+                        int   qwordIndex = i / 64;
+                        int   bitIndex   = i % 64;
+                        ulong mask       = 1ul << bitIndex;
+
+                        if (flippedWinding)
+                            chunkInfo.CullingData.FlippedWinding[qwordIndex] |= mask;
+                        else
+                            chunkInfo.CullingData.FlippedWinding[qwordIndex] &= ~mask;
+                    }
+                }
+                else
+                {
+                    for (int i = 0, chunkEntityCount = chunk.Count; i < chunkEntityCount; i++)
+                    {
+                        bool flippedWinding = RequiresFlippedWinding(worldTransforms[i]);
+
+                        int   qwordIndex = i / 64;
+                        int   bitIndex   = i % 64;
+                        ulong mask       = 1ul << bitIndex;
+
+                        if (flippedWinding)
+                            chunkInfo.CullingData.FlippedWinding[qwordIndex] |= mask;
+                        else
+                            chunkInfo.CullingData.FlippedWinding[qwordIndex] &= ~mask;
+                    }
+                }
+
+                chunk.SetChunkComponentData(ref EntitiesGraphicsChunkInfo, chunkInfo);
+            }
+
+            private bool RequiresFlippedWinding(in WorldTransform worldTransform)
+            {
+                var isNegative = worldTransform.nonUniformScale < 0f;
+                return (math.countbits(math.bitmask(new bool4(isNegative, false))) & 1) == 1;
+            }
+
+            private bool RequiresFlippedWinding(in WorldTransform worldTransform, in PostProcessMatrix postProcessMatrix)
+            {
+                var wt4x4  = worldTransform.worldTransform.ToMatrix4x4();
+                var ppm4x4 = new float4x4(new float4(postProcessMatrix.postProcessMatrix.c0, 0f),
+                                          new float4(postProcessMatrix.postProcessMatrix.c1, 0f),
+                                          new float4(postProcessMatrix.postProcessMatrix.c2, 0f),
+                                          new float4(postProcessMatrix.postProcessMatrix.c3, 1f));
+                var product = math.mul(ppm4x4, wt4x4);
+                return math.determinant(product) < 0f;
+            }
+        }
     }
 }
 

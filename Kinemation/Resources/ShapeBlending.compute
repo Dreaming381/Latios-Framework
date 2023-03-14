@@ -1,0 +1,95 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel ShapeBlending
+
+// Individual shapes tend to only affect a small amount of vertices.
+#define THREAD_GROUP_SIZE 64
+
+struct BlendShapeVertexDelta
+{
+    uint index;
+    float3 position;
+    float3 normal;
+    float3 tangent;
+};
+
+struct Vertex
+{
+    float3 position;
+    float3 normal;
+    float3 tangent;
+};
+
+uniform StructuredBuffer<Vertex>                _srcVertices;
+uniform StructuredBuffer<BlendShapeVertexDelta> _blendShapeDeltas;
+
+// Stride of uint4
+uniform ByteAddressBuffer _metaBuffer;
+
+uniform RWStructuredBuffer<Vertex> _dstVertices : register(u1);
+
+uint _startOffset;
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void ShapeBlending (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+{
+    const uint groupId = groupIds.x;
+    const uint4 meshHeaderA = _metaBuffer.Load4((groupId * 2 + _startOffset) * 16);
+    const uint4 meshHeaderB = _metaBuffer.Load4((groupId * 2 + 1 + _startOffset) * 16);
+
+    const uint shapeMetaCount = meshHeaderA.x;
+    const uint shapeMetaStart = meshHeaderA.y;
+    //const uint baseWeights = meshHeaderA.z; // We currently compute absolute offsets CPU-side
+    const uint dstStart = meshHeaderA.w;
+    const bool copySrc = meshHeaderB.x != 0;
+    const uint srcStart = meshHeaderB.y;
+    const uint verticesCount = meshHeaderB.z;
+    // meshHeaderB.w unused
+
+    if (copySrc)
+    {
+        for (uint i = threadId; i < verticesCount; i += THREAD_GROUP_SIZE)
+        {
+            _dstVertices[dstStart + i] = _srcVertices[srcStart + i];
+        }
+    }
+
+    for (uint meshShapeIter = 0; meshShapeIter < shapeMetaCount; )
+    {
+        const uint4 firstShapeInfo = _metaBuffer.Load4((shapeMetaStart + meshShapeIter) * 16);
+        const uint shapeRunLength = firstShapeInfo.x;
+        const uint shapeDeltaCount = firstShapeInfo.y;
+        const uint firstShapeDeltaStart = firstShapeInfo.z;
+        const float firstShapeWeight = abs(asfloat(firstShapeInfo.w));
+
+        if (meshShapeIter != 0 || copySrc)
+            DeviceMemoryBarrierWithGroupSync();
+
+        for (uint i = threadId; i < shapeDeltaCount; i += THREAD_GROUP_SIZE)
+        {
+            BlendShapeVertexDelta delta = _blendShapeDeltas[firstShapeDeltaStart + i];
+            const uint targetIndex = delta.index;
+            
+            Vertex vertex = _dstVertices[dstStart + targetIndex];
+
+            vertex.position += firstShapeWeight * delta.position;
+            vertex.normal += firstShapeWeight * delta.normal;
+            vertex.tangent += firstShapeWeight * delta.tangent;
+
+            for (uint shapeRunIter = 1; shapeRunIter < shapeRunLength; shapeRunIter++)
+            {
+                const uint4 runShapeInfo = _metaBuffer.Load4((shapeMetaStart + meshShapeIter + shapeRunIter) * 16);
+                const uint runShapeDeltaStart = runShapeInfo.z;
+                const uint runShapeWeight = asfloat(runShapeInfo.w);
+
+                delta = _blendShapeDeltas[runShapeDeltaStart + i];
+                vertex.position += runShapeWeight * delta.position;
+                vertex.normal += runShapeWeight * delta.normal;
+                vertex.tangent += runShapeWeight * delta.tangent;
+            }
+
+            _dstVertices[dstStart + targetIndex] = vertex;
+        }
+
+        meshShapeIter += shapeRunLength;
+    }
+}

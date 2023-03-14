@@ -19,91 +19,132 @@ namespace AclUnity
         }
 
         // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
-        public static void SamplePoseAos(void* compressedTransformsClip, NativeArray<Qvv> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
+        public static void SamplePose(void* compressedTransformsClip, NativeArray<Qvvs> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
-            CheckOutputArrayIsCreated(outputBuffer);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
 
             if (X86.Avx2.IsAvx2Supported)
             {
-                AVX.samplePoseAOS(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+                AVX.samplePose(compressedTransformsClip, compressedScalesClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
             }
             else
             {
-                NoExtensions.samplePoseAOS(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+                NoExtensions.samplePose(compressedTransformsClip, compressedScalesClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
             }
         }
 
         // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
-        public static void SamplePoseAosBlendedFirst(void*                     compressedTransformsClip,
-                                                     NativeArray<Qvv>          outputBuffer,
-                                                     float blendFactor,
-                                                     float time,
-                                                     KeyframeInterpolationMode keyframeInterpolationMode)
+        public static void SamplePoseBlendedFirst(void*                     compressedTransformsClip,
+                                                  NativeArray<Qvvs>         outputBuffer,
+                                                  float blendFactor,
+                                                  float time,
+                                                  KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
-            CheckOutputArrayIsCreated(outputBuffer);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
 
             if (X86.Avx2.IsAvx2Supported)
             {
-                AVX.samplePoseAOSBlendedFirst(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+                AVX.samplePoseBlendedFirst(compressedTransformsClip, compressedScalesClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
             }
             else
             {
-                NoExtensions.samplePoseAOSBlendedFirst(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+                NoExtensions.samplePoseBlendedFirst(compressedTransformsClip,
+                                                    compressedScalesClip,
+                                                    (float*)outputBuffer.GetUnsafePtr(),
+                                                    blendFactor,
+                                                    time,
+                                                    (byte)keyframeInterpolationMode);
             }
         }
 
-        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
-        public static void SamplePoseAosBlendedAdd(void*                     compressedTransformsClip,
-                                                   NativeArray<Qvv>          outputBuffer,
-                                                   float blendFactor,
-                                                   float time,
-                                                   KeyframeInterpolationMode keyframeInterpolationMode)
+        public static void SamplePoseBlendedAdd(void*                     compressedTransformsClip,
+                                                NativeArray<Qvvs>         outputBuffer,
+                                                float blendFactor,
+                                                float time,
+                                                KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
-            CheckOutputArrayIsCreated(outputBuffer);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
 
             if (X86.Avx2.IsAvx2Supported)
             {
-                AVX.samplePoseAOSBlendedAdd(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+                AVX.samplePoseBlendedAdd(compressedTransformsClip, compressedScalesClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
             }
             else
             {
-                NoExtensions.samplePoseAOSBlendedAdd(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), blendFactor, time, (byte)keyframeInterpolationMode);
+                NoExtensions.samplePoseBlendedAdd(compressedTransformsClip,
+                                                  compressedScalesClip,
+                                                  (float*)outputBuffer.GetUnsafePtr(),
+                                                  blendFactor,
+                                                  time,
+                                                  (byte)keyframeInterpolationMode);
             }
         }
 
-        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
-        public static void SamplePoseSoa(void* compressedTransformsClip, NativeArray<float> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
+        public static Qvvs SampleBone(void* compressedTransformsClip, int boneIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
-            CheckOutputArrayIsCreated(outputBuffer);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckIndexIsValid(boneIndex, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
+
+            Qvvs qvv;
 
             if (X86.Avx2.IsAvx2Supported)
             {
-                AVX.samplePoseSOA(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+                AVX.sampleBone(compressedTransformsClip, compressedScalesClip, (float*)(&qvv), boneIndex, time, (byte)keyframeInterpolationMode);
             }
             else
             {
-                NoExtensions.samplePoseSOA(compressedTransformsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
-            }
-        }
-
-        public static Qvv SampleBone(void* compressedTransformsClip, int boneIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode)
-        {
-            CheckCompressedClipIsValid(compressedTransformsClip);
-            CheckIndexIsValid(boneIndex);
-
-            Qvv qvv;
-
-            if (X86.Avx2.IsAvx2Supported)
-            {
-                AVX.sampleBone(compressedTransformsClip, (float*)(&qvv), boneIndex, time, (byte)keyframeInterpolationMode);
-            }
-            else
-            {
-                NoExtensions.sampleBone(compressedTransformsClip, (float*)(&qvv), boneIndex, time, (byte)keyframeInterpolationMode);
+                NoExtensions.sampleBone(compressedTransformsClip, compressedScalesClip, (float*)(&qvv), boneIndex, time, (byte)keyframeInterpolationMode);
             }
 
             return qvv;
@@ -113,7 +154,17 @@ namespace AclUnity
         public static void SampleFloats(void* compressedFloatsClip, NativeArray<float> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedFloatsClip);
-            CheckOutputArrayIsCreated(outputBuffer);
+
+            var header = ClipHeader.Read(compressedFloatsClip);
+
+            if (header.clipType != ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+
+            compressedFloatsClip = (byte*)compressedFloatsClip + 16;
 
             if (X86.Avx2.IsAvx2Supported)
             {
@@ -128,7 +179,17 @@ namespace AclUnity
         public static float SampleFloat(void* compressedFloatsClip, int trackIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedFloatsClip);
-            CheckIndexIsValid(trackIndex);
+
+            var header = ClipHeader.Read(compressedFloatsClip);
+
+            if (header.clipType != ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckIndexIsValid(trackIndex, header.trackCount);
+
+            compressedFloatsClip = (byte*)compressedFloatsClip + 16;
 
             if (X86.Avx2.IsAvx2Supported)
             {
@@ -141,7 +202,7 @@ namespace AclUnity
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckCompressedClipIsValid(void* compressedClip)
+        internal static void CheckCompressedClipIsValid(void* compressedClip)
         {
             if (compressedClip == null)
                 throw new ArgumentNullException("compressedClip is null");
@@ -150,24 +211,36 @@ namespace AclUnity
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckOutputArrayIsCreated(NativeArray<Qvv> outputBuffer)
+        static void ThrowIfWrongType()
         {
-            if (!outputBuffer.IsCreated || outputBuffer.Length == 0)
-                throw new ArgumentException("outputBuffer is invalid");
+            throw new ArgumentException("compressedClip is of the wrong type (skeleton vs scalar)");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckOutputArrayIsCreated(NativeArray<float> outputBuffer)
+        static void CheckOutputArrayIsSufficient(NativeArray<Qvvs> outputBuffer, short trackCount)
         {
             if (!outputBuffer.IsCreated || outputBuffer.Length == 0)
                 throw new ArgumentException("outputBuffer is invalid");
+            if (outputBuffer.Length < trackCount)
+                throw new ArgumentException("outputBuffer does not contain enough elements");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void CheckIndexIsValid(int index)
+        static void CheckOutputArrayIsSufficient(NativeArray<float> outputBuffer, short trackCount)
+        {
+            if (!outputBuffer.IsCreated || outputBuffer.Length == 0)
+                throw new ArgumentException("outputBuffer is invalid");
+            if (outputBuffer.Length < trackCount)
+                throw new ArgumentException("outputBuffer does not contain enough elements");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void CheckIndexIsValid(int index, short trackCount)
         {
             if (index < 0)
                 throw new ArgumentOutOfRangeException("Bone or track index is negative");
+            if (index >= trackCount)
+                throw new ArgumentOutOfRangeException("Bone or track index exceeds bone or track count in clip");
         }
 
         static class NoExtensions
@@ -175,24 +248,28 @@ namespace AclUnity
             const string dllName = AclUnityCommon.dllName;
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOS(void* compressedTransformTracks, float* aosOutputBuffer, float time, byte keyframeInterpolationMode);
+            public static extern void samplePose(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float time,
+                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOSBlendedFirst(void*  compressedTransformTracks,
-                                                                float* aosOutputBuffer,
-                                                                float blendFactor,
-                                                                float time,
-                                                                byte keyframeInterpolationMode);
+            public static extern void samplePoseBlendedFirst(void*  compressedTransformTracks,
+                                                             void*  compressedScaleTracks,
+                                                             float* aosOutputBuffer,
+                                                             float blendFactor,
+                                                             float time,
+                                                             byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOSBlendedAdd(void* compressedTransformTracks, float* aosOutputBuffer, float blendFactor, float time,
-                                                              byte keyframeInterpolationMode);
+            public static extern void samplePoseBlendedAdd(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float blendFactor, float time,
+                                                           byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseSOA(void* compressedTransformTracks, float* soaOutputBuffer, float time, byte keyframeInterpolationMode);
-
-            [DllImport(dllName)]
-            public static extern void sampleBone(void* compressedTransformTracks, float* boneQVV, int boneIndex, float time, byte keyframeInterpolationMode);
+            public static extern void sampleBone(void*  compressedTransformTracks,
+                                                 void*  compressedScaleTracks,
+                                                 float* boneQVV,
+                                                 int boneIndex,
+                                                 float time,
+                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
             public static extern void sampleFloats(void* compressedFloatTracks, float* floatOutputBuffer, float time, byte keyframeInterpolationMode);
@@ -206,24 +283,28 @@ namespace AclUnity
             const string dllName = AclUnityCommon.dllNameAVX;
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOS(void* compressedTransformTracks, float* aosOutputBuffer, float time, byte keyframeInterpolationMode);
+            public static extern void samplePose(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float time,
+                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOSBlendedFirst(void*  compressedTransformTracks,
-                                                                float* aosOutputBuffer,
-                                                                float blendFactor,
-                                                                float time,
-                                                                byte keyframeInterpolationMode);
+            public static extern void samplePoseBlendedFirst(void*  compressedTransformTracks,
+                                                             void*  compressedScaleTracks,
+                                                             float* aosOutputBuffer,
+                                                             float blendFactor,
+                                                             float time,
+                                                             byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseAOSBlendedAdd(void* compressedTransformTracks, float* aosOutputBuffer, float blendFactor, float time,
-                                                              byte keyframeInterpolationMode);
+            public static extern void samplePoseBlendedAdd(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float blendFactor, float time,
+                                                           byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseSOA(void* compressedTransformTracks, float* soaOutputBuffer, float time, byte keyframeInterpolationMode);
-
-            [DllImport(dllName)]
-            public static extern void sampleBone(void* compressedTransformTracks, float* boneQVV, int boneIndex, float time, byte keyframeInterpolationMode);
+            public static extern void sampleBone(void*  compressedTransformTracks,
+                                                 void*  compressedScaleTracks,
+                                                 float* boneQVV,
+                                                 int boneIndex,
+                                                 float time,
+                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
             public static extern void sampleFloats(void* compressedFloatTracks, float* floatOutputBuffer, float time, byte keyframeInterpolationMode);

@@ -27,14 +27,14 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_query = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<ChunkSkeletonWorldBounds>(true, true).WithAll<SkeletonWorldBounds>(true)
+            m_query = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<ChunkOptimizedSkeletonWorldBounds>(true, true).WithAll<OptimizedSkeletonWorldBounds>(true)
                       .WithAll<ChunkPerCameraSkeletonCullingMask>(false, true).WithAll<ChunkPerCameraSkeletonCullingSplitsMask>(false, true).Build();
 
             m_singleJob = new SingleSplitCullingJob
             {
-                chunkWorldRenderBoundsHandle = state.GetComponentTypeHandle<ChunkSkeletonWorldBounds>(true),
+                chunkWorldRenderBoundsHandle = state.GetComponentTypeHandle<ChunkOptimizedSkeletonWorldBounds>(true),
                 perCameraCullingMaskHandle   = state.GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(false),
-                worldRenderBoundsHandle      = state.GetComponentTypeHandle<SkeletonWorldBounds>(true)
+                worldRenderBoundsHandle      = state.GetComponentTypeHandle<OptimizedSkeletonWorldBounds>(true)
             };
 
             m_multiJob = new MultiSplitCullingJob
@@ -80,15 +80,15 @@ namespace Latios.Kinemation.Systems
         unsafe struct SingleSplitCullingJob : IJobChunk
         {
             [ReadOnly] public NativeReference<CullingSplits>                cullingSplits;
-            [ReadOnly] public ComponentTypeHandle<SkeletonWorldBounds>      worldRenderBoundsHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonWorldBounds>      worldRenderBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkOptimizedSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
 
             public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask> perCameraCullingMaskHandle;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                ref var mask        = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
-                var     chunkBounds = chunk.GetChunkComponentRefRO(in chunkWorldRenderBoundsHandle);
+                ref var mask        = ref chunk.GetChunkComponentRefRW(ref perCameraCullingMaskHandle);
+                var     chunkBounds = chunk.GetChunkComponentRefRO(ref chunkWorldRenderBoundsHandle);
                 mask                = default;
 
                 // Note: Unlike Entities Graphics, we always assume per-instance culling.
@@ -131,16 +131,16 @@ namespace Latios.Kinemation.Systems
         unsafe struct MultiSplitCullingJob : IJobChunk
         {
             [ReadOnly] public NativeReference<CullingSplits>                cullingSplits;
-            [ReadOnly] public ComponentTypeHandle<SkeletonWorldBounds>      worldRenderBoundsHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonWorldBounds>      worldRenderBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkOptimizedSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
 
             public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>       perCameraCullingMaskHandle;
             public ComponentTypeHandle<ChunkPerCameraSkeletonCullingSplitsMask> perCameraCullingSplitsMaskHandle;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                ref var mask        = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
-                var     chunkBounds = chunk.GetChunkComponentRefRO(in chunkWorldRenderBoundsHandle);
+                ref var mask        = ref chunk.GetChunkComponentRefRW(ref perCameraCullingMaskHandle);
+                var     chunkBounds = chunk.GetChunkComponentRefRO(ref chunkWorldRenderBoundsHandle);
                 mask                = default;
 
                 // Note: Unlike Entities Graphics, we always assume per-instance culling.
@@ -164,7 +164,7 @@ namespace Latios.Kinemation.Systems
                 // However, for splits, it makes more sense to follow Entities Graphics approach.
                 // Therefore the actual strategy is to clear splits, enable them as we progress,
                 // and then mask the splits against our visibility mask.
-                ref var splitMasks = ref chunk.GetChunkComponentRefRW(in perCameraCullingSplitsMaskHandle);
+                ref var splitMasks = ref chunk.GetChunkComponentRefRW(ref perCameraCullingSplitsMaskHandle);
                 splitMasks         = default;
 
                 var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);

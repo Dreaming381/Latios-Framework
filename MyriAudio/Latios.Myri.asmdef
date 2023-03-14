@@ -3,6 +3,7 @@
     "rootNamespace": "Latios.Myri",
     "references": [
         "Latios.Core",
+        "Latios.Transforms",
         "Unity.Audio.DSPGraph",
         "Unity.Burst",
         "Unity.Collections",
@@ -10,7 +11,6 @@
         "Unity.Jobs",
         "Unity.Mathematics",
         "Unity.Media.Utilities",
-        "Unity.Transforms",
         "Unity.Entities.Hybrid"
     ],
     "includePlatforms": [],

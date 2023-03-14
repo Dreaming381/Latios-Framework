@@ -1,4 +1,5 @@
-﻿using Unity.Entities;
+﻿using Latios.Transforms;
+using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -94,13 +95,9 @@ namespace Latios.Psyshock
     public struct ColliderCastResult
     {
         /// <summary>
-        /// Where the hit occurred on the translated caster in world space. Should be the same as hitpointOnTarget
+        /// Where the hit occurred in world space. The hitpoint should be the same for both objects.
         /// </summary>
-        public float3 hitpointOnCaster;
-        /// <summary>
-        /// Where the hit occurred on the stationary target in world space. Should be the same as hitpointOnCaster
-        /// </summary>
-        public float3 hitpointOnTarget;
+        public float3 hitpoint;
         /// <summary>
         /// The outward normal of the caster at the hitpoint in world space
         /// </summary>
@@ -141,6 +138,11 @@ namespace Latios.Psyshock
         /// The index in the CollisionLayer of the body that generated the corresponding result
         /// </summary>
         public int bodyIndex;
+        /// <summary>
+        /// The index of the body that generated the corresponding result relative to the original EntityQuery or NativeArrays
+        /// used to create the CollisionLayer
+        /// </summary>
+        public int sourceIndex;
 
         /// <summary>
         /// The entity in the CollisionLayer that generated the corresponding result
@@ -153,7 +155,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// The transform in the CollisionLayer that generated the corresponding result
         /// </summary>
-        public RigidTransform transform => body.transform;
+        public TransformQvvs transform => body.transform;
     }
 }
 

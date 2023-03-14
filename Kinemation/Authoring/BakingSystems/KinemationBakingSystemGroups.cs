@@ -27,14 +27,13 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddManagedSystem<CreateShadowHierarchiesSystem>();  // sync
             GetOrCreateAndAddManagedSystem<GatherMeshBindingPathsFromShadowHierarchySystem>();  // sync
             GetOrCreateAndAddManagedSystem<PruneShadowHierarchiesSystem>();  // sync
-            //GetOrCreateAndAddManagedSystem<BuildOptimizedBoneToRootSystem2>();  // sync
-            GetOrCreateAndAddManagedSystem<BuildOptimizedBoneToRootBufferSystem>();  // sync
-            GetOrCreateAndAddManagedSystem<GatherSkeletonBindingPathsFromShadowHierarchySystem>();
+            GetOrCreateAndAddManagedSystem<BuildOptimizedBoneTransformsSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<GatherSkeletonBindingPathsFromShadowHierarchySystem>();  // sync
             GetOrCreateAndAddManagedSystem<AssignExportedBoneIndicesSystem>();  // sync
             GetOrCreateAndAddManagedSystem<GatherOptimizedHierarchyFromShadowHierarchySystem>();  // sync -> async
 
             GetOrCreateAndAddSystem<BindSkinnedMeshesToSkeletonsSystem>();  // async -> sync
-            GetOrCreateAndAddManagedSystem<MeshSkinningSmartBlobberSystem>();  // sync -> async
+            GetOrCreateAndAddManagedSystem<MeshDeformDataSmartBlobberSystem>();  // sync -> async
             GetOrCreateAndAddSystem<FindExposedBonesBakingSystem>();  // async -> sync
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
 

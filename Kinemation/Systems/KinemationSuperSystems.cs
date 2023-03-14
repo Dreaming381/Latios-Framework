@@ -18,19 +18,54 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<FrustumCullExposedSkeletonsSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullOptimizedSkeletonsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateLODsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<RenderQuickToggleEnableFlagCullingSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedEntitiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<AllocateDeformedMeshesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<AllocateLinearBlendMatricesSystem>();
-            GetOrCreateAndAddManagedSystem<SkinningDispatchSystem>();
+            GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedPostProcessEntitiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullUnskinnedEntitiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<CopySkinWithCullingSystem>();
-            GetOrCreateAndAddManagedSystem<UploadMaterialPropertiesSystem>();
+            GetOrCreateAndAddUnmanagedSystem<AllocateDeformMaterialPropertiesSystem>();
+            GetOrCreateAndAddUnmanagedSystem<CopyDeformWithCullingSystem>();
+
+            GetOrCreateAndAddManagedSystem<CullingRoundRobinDispatchSuperSystem>();
+
             GetOrCreateAndAddUnmanagedSystem<GenerateBrgDrawCommandsSystem>();
         }
     }
 
+    /// <summary>
+    /// This super system executes special dispatch culling systems in round-robin fashion.
+    /// This is because dispatch systems typically require two separate sync points each to
+    /// interact with the graphics API. By executing these phases in round-robin, the worker
+    /// threads are able to stay busy during a single system's sync point, as each system
+    /// only needs to sync with its own jobs.
+    /// </summary>
+    [DisableAutoCreation]
+    public class CullingRoundRobinDispatchSuperSystem : SuperSystem
+    {
+        protected override void CreateSystems()
+        {
+            EnableSystemSorting = false;
+
+            GetOrCreateAndAddManagedSystem<UploadDynamicMeshesSystem>();
+            GetOrCreateAndAddManagedSystem<BlendShapesDispatchSystem>();
+            GetOrCreateAndAddManagedSystem<SkinningDispatchSystem>();
+            GetOrCreateAndAddManagedSystem<UploadMaterialPropertiesSystem>();
+
+            worldBlackboardEntity.AddComponent<CullingComputeDispatchActiveState>();
+        }
+
+        protected override void OnUpdate()
+        {
+            worldBlackboardEntity.SetComponentData(new CullingComputeDispatchActiveState { state = CullingComputeDispatchState.Collect });
+            base.OnUpdate();
+            worldBlackboardEntity.SetComponentData(new CullingComputeDispatchActiveState { state = CullingComputeDispatchState.Write });
+            base.OnUpdate();
+            worldBlackboardEntity.SetComponentData(new CullingComputeDispatchActiveState { state = CullingComputeDispatchState.Dispatch });
+            base.OnUpdate();
+        }
+    }
+
     [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
-    [UpdateAfter(typeof(RenderBoundsUpdateSystem))]
+    [UpdateBefore(typeof(RenderBoundsUpdateSystem))]
     [DisableAutoCreation]
     public class KinemationRenderUpdateSuperSystem : RootSuperSystem
     {
@@ -38,9 +73,12 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
+            GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateSkinnedMeshChunkBoundsSystem>();
-            GetOrCreateAndAddManagedSystem<BeginPerFrameMeshSkinningBuffersUploadSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
+            GetOrCreateAndAddUnmanagedSystem<UpdateBrgBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosLODRequirementsUpdateSystem>();
+            GetOrCreateAndAddManagedSystem<BeginPerFrameDeformMeshBuffersUploadSystem>();
         }
     }
 
@@ -53,13 +91,12 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddManagedSystem<EndPerFrameMeshSkinningBuffersUploadSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateMatrixPreviousSystem>();
+            GetOrCreateAndAddManagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<CombineExposedBonesSystem>();
+            GetOrCreateAndAddUnmanagedSystem<UpdateSkinnedPostProcessMatrixBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<ClearPerFrameCullingMasksSystem>();
-            //GetOrCreateAndAddUnmanagedSystem<UpdateChunkComputeDeformMetadataSystem>();
-            //GetOrCreateAndAddUnmanagedSystem<UpdateChunkLinearBlendMetadataSystem>();
-            GetOrCreateAndAddUnmanagedSystem<ResetPerFrameSkinningMetadataJob>();
+            GetOrCreateAndAddUnmanagedSystem<InitializeAndClassifyPerFrameDeformMetadataSystem>();
         }
     }
 
@@ -71,9 +108,9 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<AddMissingMatrixCacheSystem>();
-            GetOrCreateAndAddUnmanagedSystem<AddMissingMasksSystem>();
-            GetOrCreateAndAddUnmanagedSystem<SkeletonMeshBindingReactiveSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosUpdateEntitiesGraphicsChunkStructureSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosAddWorldAndChunkRenderBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<KinemationBindingReactiveSystem>();
         }
     }
 
@@ -85,9 +122,9 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<AddMissingMatrixCacheSystem>();
-            GetOrCreateAndAddUnmanagedSystem<AddMissingMasksSystem>();
-            GetOrCreateAndAddUnmanagedSystem<SkeletonMeshBindingReactiveSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosUpdateEntitiesGraphicsChunkStructureSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosAddWorldAndChunkRenderBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<KinemationBindingReactiveSystem>();
         }
     }
 }

@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
+using Latios.Transforms;
+using Latios.Transforms.Authoring;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -37,13 +39,7 @@ namespace Latios.Psyshock.Authoring
             if (colliders.Count == 0)
                 return false;
 
-            baker.AddComponent(blobBakingEntity, new CompoundColliderBakingRootTransform
-            {
-                worldTransform = compoundTransform.localToWorldMatrix
-            });
-
-            var    buffer        = baker.AddBuffer<CompoundColliderBakingSubCollider>(blobBakingEntity);
-            float3 compoundScale = compoundTransform.lossyScale;
+            var buffer = baker.AddBuffer<CompoundColliderBakingSubCollider>(blobBakingEntity);
 
             foreach (var unityCollider in colliders)
             {
@@ -52,38 +48,24 @@ namespace Latios.Psyshock.Authoring
                 if (unityCollider is UnityEngine.MeshCollider)
                     continue;
 
-                var  currentTransform = baker.GetComponent<UnityEngine.Transform>(unityCollider);
-                var  scale            = currentTransform.lossyScale / compoundScale;
-                bool nonUniformScale  = math.cmax(scale) - math.cmin(scale) > 1.0E-5f;
+                var currentTransform = baker.GetComponent<UnityEngine.Transform>(unityCollider);
+                var transformQvvs    = currentTransform.GetQvvsRelativeTo(compoundTransform);
 
                 if (unityCollider is UnityEngine.SphereCollider unitySphere)
                 {
-                    if (nonUniformScale)
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            $"Failed to bake {unitySphere.gameObject.name} in compound. Only uniform scaling is supported on SphereCollider. Lossy Scale divergence was: {math.cmax(scale) - math.cmin(scale)}");
-                        continue;
-                    }
-
                     buffer.Add(new CompoundColliderBakingSubCollider
                     {
                         collider = new SphereCollider
                         {
-                            center = unitySphere.center,
-                            radius = unitySphere.radius * scale.x
+                            center      = unitySphere.center,
+                            radius      = unitySphere.radius,
+                            stretchMode = SphereCollider.StretchMode.StretchCenter
                         },
-                        worldTransform = currentTransform.localToWorldMatrix
+                        transform = transformQvvs
                     });
                 }
                 else if (unityCollider is UnityEngine.CapsuleCollider unityCapsule)
                 {
-                    if (nonUniformScale)
-                    {
-                        UnityEngine.Debug.LogWarning(
-                            $"Failed to bake {unityCapsule.gameObject.name} in compound. Only uniform scaling is supported on CapsuleCollider. Lossy Scale divergence was: {math.cmax(scale) - math.cmin(scale)}");
-                        continue;
-                    }
-
                     float3 dir;
                     if (unityCapsule.direction == 0)
                     {
@@ -101,11 +83,12 @@ namespace Latios.Psyshock.Authoring
                     {
                         collider = new CapsuleCollider
                         {
-                            pointB = (float3)unityCapsule.center + ((unityCapsule.height / 2f - unityCapsule.radius) * unityCapsule.transform.lossyScale.x * dir),
-                            pointA = (float3)unityCapsule.center - ((unityCapsule.height / 2f - unityCapsule.radius) * unityCapsule.transform.lossyScale.x * dir),
-                            radius = unityCapsule.radius * scale.x
+                            pointB      = (float3)unityCapsule.center + ((unityCapsule.height / 2f - unityCapsule.radius) * dir),
+                            pointA      = (float3)unityCapsule.center - ((unityCapsule.height / 2f - unityCapsule.radius) * dir),
+                            radius      = unityCapsule.radius,
+                            stretchMode = CapsuleCollider.StretchMode.StretchPoints
                         },
-                        worldTransform = currentTransform.localToWorldMatrix
+                        transform = transformQvvs
                     });
                 }
                 else if (unityCollider is UnityEngine.BoxCollider unityBox)
@@ -115,9 +98,9 @@ namespace Latios.Psyshock.Authoring
                         collider = new BoxCollider
                         {
                             center   = unityBox.center,
-                            halfSize = unityBox.size * scale / 2f
+                            halfSize = unityBox.size / 2f
                         },
-                        worldTransform = currentTransform.localToWorldMatrix
+                        transform = transformQvvs
                     });
                 }
             }
@@ -129,14 +112,8 @@ namespace Latios.Psyshock.Authoring
     [TemporaryBakingType]
     internal struct CompoundColliderBakingSubCollider : IBufferElementData
     {
-        public Collider collider;
-        public float4x4 worldTransform;
-    }
-
-    [TemporaryBakingType]
-    internal struct CompoundColliderBakingRootTransform : IComponentData
-    {
-        public float4x4 worldTransform;
+        public Collider      collider;
+        public TransformQvvs transform;
     }
 }
 namespace Latios.Psyshock.Authoring.Systems
@@ -167,23 +144,18 @@ namespace Latios.Psyshock.Authoring.Systems
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         partial struct Job : IJobEntity
         {
-            public void Execute(ref SmartBlobberResult result, in CompoundColliderBakingRootTransform rootTransform, in DynamicBuffer<CompoundColliderBakingSubCollider> buffer)
+            public void Execute(ref SmartBlobberResult result, in DynamicBuffer<CompoundColliderBakingSubCollider> buffer)
             {
                 var     builder        = new BlobBuilder(Allocator.Temp);
                 ref var root           = ref builder.ConstructRoot<CompoundColliderBlob>();
                 var     blobColliders  = builder.Allocate(ref root.colliders, buffer.Length);
                 var     blobTransforms = builder.Allocate(ref root.transforms, buffer.Length);
 
-                var rootInverse = math.inverse(rootTransform.worldTransform);
-
                 Aabb aabb = new Aabb(float.MaxValue, float.MinValue);
                 for (int i = 0; i < buffer.Length; i++)
                 {
-                    var ltr      = new Unity.Transforms.LocalToWorld { Value = math.mul(rootInverse, buffer[i].worldTransform) };
-                    var rotation                                             = quaternion.LookRotationSafe(ltr.Forward, ltr.Up);
-
-                    blobColliders[i]  = buffer[i].collider;
-                    blobTransforms[i] = new RigidTransform(rotation, ltr.Position);
+                    blobColliders[i]  = Physics.ScaleStretchCollider(buffer[i].collider, buffer[i].transform.scale, buffer[i].transform.stretch);
+                    blobTransforms[i] = new RigidTransform(buffer[i].transform.rotation, buffer[i].transform.position);
                     var newbox        = Physics.AabbFrom(in blobColliders[i], in blobTransforms[i]);
                     aabb.min          = math.min(aabb.min, newbox.min);
                     aabb.max          = math.max(aabb.max, newbox.max);

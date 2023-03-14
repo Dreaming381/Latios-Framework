@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
@@ -38,11 +39,15 @@ namespace Latios.Psyshock
         /// <summary>
         /// The transform of the collider
         /// </summary>
-        public RigidTransform transform => body.transform;
+        public TransformQvvs transform => body.transform;
         /// <summary>
         /// The index of the collider in the CollisionLayer
         /// </summary>
         public int bodyIndex => m_bodyIndexRelative + m_bucket.count;
+        /// <summary>
+        /// The index of the collider relative to the original EntityQuery or NativeArrays used to create the CollisionLayer
+        /// </summary>
+        public int sourceIndex => m_bucket.srcIndices[m_bodyIndexRelative];
         /// <summary>
         /// An index that is guaranteed to be deterministic and unique between threads for a given FindObjects operation,
         /// and can be used as the sortKey for command buffers
@@ -86,7 +91,7 @@ namespace Latios.Psyshock
             }
         }
 
-        internal FindObjectsResult(CollisionLayer layer, BucketSlices bucket, int jobIndex, bool isThreadSafe)
+        internal FindObjectsResult(in CollisionLayer layer, in BucketSlices bucket, int jobIndex, bool isThreadSafe)
         {
             m_layer             = layer;
             m_bucket            = bucket;
@@ -113,7 +118,7 @@ namespace Latios.Psyshock
         /// <param name="layer">The CollisionLayer to find colliders whose Aabbs overlap the queried Aabb</param>
         /// <param name="processor">The processor with initialized containers and values to process each found result</param>
         /// <returns>A config object as part of a fluent chain</returns>
-        public static FindObjectsConfig<T> FindObjects<T>(Aabb aabb, in CollisionLayer layer, in T processor) where T : struct, IFindObjectsProcessor
+        public static FindObjectsConfig<T> FindObjects<T>(in Aabb aabb, in CollisionLayer layer, in T processor) where T : struct, IFindObjectsProcessor
         {
             return new FindObjectsConfig<T>
             {
@@ -155,7 +160,7 @@ namespace Latios.Psyshock
         /// </summary>
         public void RunImmediate()
         {
-            FindObjectsInternal.RunImmediate(aabb, layer, processor);
+            FindObjectsInternal.RunImmediate(in aabb, in layer, processor);
         }
 
         /// <summary>

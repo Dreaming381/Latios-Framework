@@ -6,16 +6,36 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
+    /// <summary>
+    /// A convex hull collider shape that can be scaled and stretched in local space efficiently.
+    /// It is often derived from a Mesh.
+    /// </summary>
     [Serializable]
     [StructLayout(LayoutKind.Explicit)]
     public struct ConvexCollider
     {
+        /// <summary>
+        /// The blob asset containing the raw convex hull data
+        /// </summary>
         [FieldOffset(0)] public BlobAssetReference<ConvexColliderBlob> convexColliderBlob;
-        [FieldOffset(8)] public float3                                 scale;
+        /// <summary>
+        /// The premultiplied scale and stretch in local space
+        /// </summary>
+        [FieldOffset(8)] public float3 scale;
 
-        public ConvexCollider(BlobAssetReference<ConvexColliderBlob> convexColliderBlob) : this(convexColliderBlob, new float3(1f, 1f, 1f)) {
+        /// <summary>
+        /// Creates a new ConvexCollider
+        /// </summary>
+        /// <param name="convexColliderBlob">The blob asset containing the raw convex hull data</param>
+        public ConvexCollider(BlobAssetReference<ConvexColliderBlob> convexColliderBlob) : this(convexColliderBlob, new float3(1f, 1f, 1f))
+        {
         }
 
+        /// <summary>
+        /// Creates a new ConvexCollider
+        /// </summary>
+        /// <param name="convexColliderBlob">The blob asset containing the raw convex hull data</param>
+        /// <param name="scale">The premultiplied scale and stretch in local space</param>
         public ConvexCollider(BlobAssetReference<ConvexColliderBlob> convexColliderBlob, float3 scale)
         {
             this.convexColliderBlob = convexColliderBlob;
@@ -23,6 +43,10 @@ namespace Latios.Psyshock
         }
     }
 
+    /// <summary>
+    /// A definition of a raw baked convex hull. This definition is designed for SIMD operations
+    /// and direct traversal is only recommended for advanced users.
+    /// </summary>
     public struct ConvexColliderBlob
     {
         public BlobArray<float>  verticesX;

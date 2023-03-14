@@ -1,0 +1,23 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CopyTransformUnions
+
+// Can be a float3x4, a QVVS, or a DQS
+struct TransformUnion
+{
+    float4 a;
+    float4 b;
+    float4 c;
+};
+
+uniform StructuredBuffer<TransformUnion> _src;
+uniform RWStructuredBuffer<TransformUnion> _dst;
+
+int _start;
+
+// Todo: What is the nominal value per platform?
+[numthreads(64, 1, 1)]
+void CopyTransformUnions(uint3 id : SV_DispatchThreadID)
+{
+    int index = _start + id.x;
+    _dst[index] = _src[index];
+}

@@ -1,3 +1,5 @@
+using System;
+using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -9,7 +11,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
 using Unity.Rendering;
-using Unity.Transforms;
 using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
@@ -45,7 +46,8 @@ namespace Latios.Kinemation.Systems
                 // = visibilityItems,
                 EntitiesGraphicsChunkInfo = state.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                 MaterialMeshInfo          = state.GetComponentTypeHandle<MaterialMeshInfo>(true),
-                LocalToWorld              = state.GetComponentTypeHandle<LocalToWorld>(true),
+                WorldTransform            = state.GetComponentTypeHandle<WorldTransform>(true),
+                PostProcessMatrix         = state.GetComponentTypeHandle<PostProcessMatrix>(true),
                 DepthSorted               = state.GetComponentTypeHandle<DepthSorted_Tag>(true),
                 RenderFilterSettings      = state.GetSharedComponentTypeHandle<RenderFilterSettings>(),
                 LightMaps                 = state.GetSharedComponentTypeHandle<LightMaps>(),
@@ -81,7 +83,8 @@ namespace Latios.Kinemation.Systems
             m_emitDrawCommandsJob.chunkPerCameraCullingSplitsMaskHandle.Update(ref state);
             m_emitDrawCommandsJob.EntitiesGraphicsChunkInfo.Update(ref state);
             m_emitDrawCommandsJob.MaterialMeshInfo.Update(ref state);
-            m_emitDrawCommandsJob.LocalToWorld.Update(ref state);
+            m_emitDrawCommandsJob.WorldTransform.Update(ref state);
+            m_emitDrawCommandsJob.PostProcessMatrix.Update(ref state);
             m_emitDrawCommandsJob.DepthSorted.Update(ref state);
             m_emitDrawCommandsJob.RenderFilterSettings.Update(ref state);
             m_emitDrawCommandsJob.LightMaps.Update(ref state);
@@ -239,7 +242,8 @@ namespace Latios.Kinemation.Systems
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>  EntitiesGraphicsChunkInfo;
             [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>           MaterialMeshInfo;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>               LocalToWorld;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>             WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
             [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag>            DepthSorted;
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
             [ReadOnly] public SharedComponentTypeHandle<LightMaps>            LightMaps;
@@ -283,10 +287,12 @@ namespace Latios.Kinemation.Systems
 
                     int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
 
-                    var  materialMeshInfos = chunk.GetNativeArray(ref MaterialMeshInfo);
-                    var  localToWorlds     = chunk.GetNativeArray(ref LocalToWorld);
-                    bool isDepthSorted     = chunk.Has(ref DepthSorted);
-                    bool isLightMapped     = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+                    var  materialMeshInfos   = chunk.GetNativeArray(ref MaterialMeshInfo);
+                    var  worldTransforms     = chunk.GetNativeArray(ref WorldTransform);
+                    var  postProcessMatrices = chunk.GetNativeArray(ref PostProcessMatrix);
+                    bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
+                    bool isDepthSorted       = chunk.Has(ref DepthSorted);
+                    bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
 
                     // Check if the chunk has statically disabled motion (i.e. never in motion pass)
                     // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
@@ -297,7 +303,9 @@ namespace Latios.Kinemation.Systems
                     if (hasMotion)
                     {
                         bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
-                        bool transformChanged = chunk.DidChange(ref LocalToWorld, LastSystemVersion);
+                        bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
+                        if (hasPostProcess)
+                            transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
 #if ENABLE_DOTS_DEFORMATION_MOTION_VECTORS
                         bool isDeformed = chunk.Has(ref DeformedMeshIndex);
 #else
@@ -308,8 +316,20 @@ namespace Latios.Kinemation.Systems
 
                     int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
 
-                    var mask       = chunk.GetChunkComponentRefRO(in chunkPerCameraCullingMaskHandle);
-                    var splitsMask = chunk.GetChunkComponentRefRO(in chunkPerCameraCullingSplitsMaskHandle);
+                    var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
+                    var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
+
+                    TransformQvvs* postProcessDepthSortingTransformsPtr = null;
+                    if (isDepthSorted && hasPostProcess)
+                    {
+                        // In this case, we don't actually have a component that represents the rendered position.
+                        // So we allocate a new array and compute the world positions. We store them in TransformQvvs
+                        // so that the read pointer looks the same as our WorldTransforms.
+                        // We compute them in the inner loop since only the visible instances are read from later,
+                        // and it is a lot cheaper to only compute the visible instances.
+                        var allocator                        = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
+                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<TransformQvvs>(allocator, chunk.Count);
+                    }
 
                     for (int j = 0; j < 2; j++)
                     {
@@ -358,8 +378,24 @@ namespace Latios.Kinemation.Systems
                             if (isDepthSorted)
                             {
                                 settings.Flags |= BatchDrawCommandFlags.HasSortingPosition;
-                                DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
-                                                                  (float4x4*)localToWorlds.GetUnsafeReadOnlyPtr());
+                                // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
+                                // We also customize the code where this pointer is read.
+                                if (hasPostProcess)
+                                {
+                                    var index = j * 64 + bitIndex;
+                                    var f4x4  = new float4x4(new float4(postProcessMatrices[index].postProcessMatrix.c0, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
+                                    postProcessDepthSortingTransformsPtr[index].position = math.transform(f4x4, worldTransforms[index].position);
+                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
+                                                                      (float4x4*)postProcessDepthSortingTransformsPtr);
+                                }
+                                else
+                                {
+                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
+                                                                      (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr());
+                                }
                             }
                             else
                             {
@@ -368,6 +404,163 @@ namespace Latios.Kinemation.Systems
                         }
                     }
                 }
+            }
+        }
+
+        [BurstCompile]
+        internal unsafe struct ExpandVisibleInstancesJob : IJobParallelForDefer
+        {
+            public ChunkDrawCommandOutput DrawCommandOutput;
+
+            public void Execute(int index)
+            {
+                var workItem        = DrawCommandOutput.WorkItems.ElementAt(index);
+                var header          = workItem.Arrays;
+                var transformHeader = workItem.TransformArrays;
+                int binIndex        = workItem.BinIndex;
+
+                var bin                    = DrawCommandOutput.BinIndices.ElementAt(binIndex);
+                int binInstanceOffset      = bin.InstanceOffset;
+                int binPositionOffset      = bin.PositionOffset;
+                int workItemInstanceOffset = workItem.PrefixSumNumInstances;
+                int headerInstanceOffset   = 0;
+
+                int*    visibleInstances = DrawCommandOutput.CullingOutputDrawCommands->visibleInstances;
+                float3* sortingPositions = (float3*)DrawCommandOutput.CullingOutputDrawCommands->instanceSortingPositions;
+
+                if (transformHeader == null)
+                {
+                    while (header != null)
+                    {
+                        ExpandArray(
+                            visibleInstances,
+                            header,
+                            binInstanceOffset + workItemInstanceOffset + headerInstanceOffset);
+
+                        headerInstanceOffset += header->NumInstances;
+                        header                = header->Next;
+                    }
+                }
+                else
+                {
+                    while (header != null)
+                    {
+                        UnityEngine.Debug.Assert(transformHeader != null);
+
+                        int instanceOffset = binInstanceOffset + workItemInstanceOffset + headerInstanceOffset;
+                        int positionOffset = binPositionOffset + workItemInstanceOffset + headerInstanceOffset;
+
+                        ExpandArrayWithPositions(
+                            visibleInstances,
+                            sortingPositions,
+                            header,
+                            transformHeader,
+                            instanceOffset,
+                            positionOffset);
+
+                        headerInstanceOffset += header->NumInstances;
+                        header                = header->Next;
+                        transformHeader       = transformHeader->Next;
+                    }
+                }
+            }
+
+            private int ExpandArray(
+                int*                                      visibleInstances,
+                DrawStream<DrawCommandVisibility>.Header* header,
+                int instanceOffset)
+            {
+                int numStructs = header->NumElements;
+
+                for (int i = 0; i < numStructs; ++i)
+                {
+                    var visibility   = *header->Element(i);
+                    int numInstances = ExpandVisibility(visibleInstances + instanceOffset, visibility);
+                    UnityEngine.Debug.Assert(numInstances > 0);
+                    instanceOffset += numInstances;
+                }
+
+                return instanceOffset;
+            }
+
+            private int ExpandArrayWithPositions(
+                int*                                      visibleInstances,
+                float3*                                   sortingPositions,
+                DrawStream<DrawCommandVisibility>.Header* header,
+                DrawStream<IntPtr>.Header*                transformHeader,
+                int instanceOffset,
+                int positionOffset)
+            {
+                int numStructs = header->NumElements;
+
+                for (int i = 0; i < numStructs; ++i)
+                {
+                    var visibility   = *header->Element(i);
+                    var transforms   = (TransformQvvs*)(*transformHeader->Element(i));
+                    int numInstances = ExpandVisibilityWithPositions(
+                        visibleInstances + instanceOffset,
+                        sortingPositions + positionOffset,
+                        visibility,
+                        transforms);
+                    UnityEngine.Debug.Assert(numInstances > 0);
+                    instanceOffset += numInstances;
+                    positionOffset += numInstances;
+                }
+
+                return instanceOffset;
+            }
+
+            private int ExpandVisibility(int* outputInstances, DrawCommandVisibility visibility)
+            {
+                int numInstances = 0;
+                int startIndex   = visibility.ChunkStartIndex;
+
+                for (int i = 0; i < 2; ++i)
+                {
+                    ulong qword = visibility.VisibleInstances[i];
+                    while (qword != 0)
+                    {
+                        int   bitIndex                 = math.tzcnt(qword);
+                        ulong mask                     = 1ul << bitIndex;
+                        qword                         ^= mask;
+                        int instanceIndex              = (i << 6) + bitIndex;
+                        int visibilityIndex            = startIndex + instanceIndex;
+                        outputInstances[numInstances]  = visibilityIndex;
+                        ++numInstances;
+                    }
+                }
+
+                return numInstances;
+            }
+
+            private int ExpandVisibilityWithPositions(
+                int*                  outputInstances,
+                float3*               outputSortingPosition,
+                DrawCommandVisibility visibility,
+                TransformQvvs*        transforms)
+            {
+                int numInstances = 0;
+                int startIndex   = visibility.ChunkStartIndex;
+
+                for (int i = 0; i < 2; ++i)
+                {
+                    ulong qword = visibility.VisibleInstances[i];
+                    while (qword != 0)
+                    {
+                        int   bitIndex     = math.tzcnt(qword);
+                        ulong mask         = 1ul << bitIndex;
+                        qword             ^= mask;
+                        int instanceIndex  = (i << 6) + bitIndex;
+
+                        int visibilityIndex                 = startIndex + instanceIndex;
+                        outputInstances[numInstances]       = visibilityIndex;
+                        outputSortingPosition[numInstances] = transforms[instanceIndex].position;
+
+                        ++numInstances;
+                    }
+                }
+
+                return numInstances;
             }
         }
 

@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Latios.Transforms;
+using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
@@ -16,6 +17,30 @@ namespace Latios.Psyshock
             float3 worldCenter  = math.transform(transform, center);
             float3 worldExtents = LatiosMath.RotateExtents(extents, transform.c0.xyz, transform.c1.xyz, transform.c2.xyz);
             return new Aabb(worldCenter - worldExtents, worldCenter + worldExtents);
+        }
+
+        /// <summary>
+        /// Gets an Aabb transformed by the TransformQvvs, expanding it if necessary
+        /// </summary>
+        /// <param name="qvvs">A transform to apply to the Aabb</param>
+        /// <param name="localAabb">An Aabb in a local space</param>
+        /// <returns>A conservative Aabb around an object in world space that was encapsuled by localAabb in local space</returns>
+        public static Aabb TransformAabb(in TransformQvvs qvvs, in Aabb localAabb)
+        {
+            var newAabb  = localAabb;
+            newAabb.min *= qvvs.scale * qvvs.stretch;
+            newAabb.max *= qvvs.scale * qvvs.stretch;
+
+            GetCenterExtents(newAabb, out var center, out var extents);
+            float3 x = math.rotate(qvvs.rotation, new float3(extents.x, 0, 0));
+            float3 y = math.rotate(qvvs.rotation, new float3(0, extents.y, 0));
+            float3 z = math.rotate(qvvs.rotation, new float3(0, 0, extents.z));
+            extents  = math.abs(x) + math.abs(y) + math.abs(z);
+            center   = math.transform(new RigidTransform(qvvs.rotation, qvvs.position), center);
+
+            newAabb.min = center - extents;
+            newAabb.max = center + extents;
+            return newAabb;
         }
 
         /// <summary>

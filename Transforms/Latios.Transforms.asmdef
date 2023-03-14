@@ -1,0 +1,22 @@
+{
+    "name": "Latios.Transforms",
+    "rootNamespace": "Latios.Transforms",
+    "references": [
+        "Unity.Mathematics",
+        "Unity.Entities",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Jobs",
+        "Latios.Core",
+        "Unity.Entities.Hybrid"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
