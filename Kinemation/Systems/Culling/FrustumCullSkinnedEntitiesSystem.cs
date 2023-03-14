@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -8,9 +9,8 @@ using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine.Rendering;
 
-// Todo: If this gets slow, try sweeping through the culled skeleton buffers
-// and a chunk index chunkComponent from the skinned meshes to write to a per-thread
-// mask buffer.
+using static Unity.Entities.SystemAPI;
+
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
@@ -19,6 +19,7 @@ namespace Latios.Kinemation.Systems
     public partial struct FrustumCullSkinnedEntitiesSystem : ISystem
     {
         EntityQuery          m_metaQuery;
+        EntityQuery          m_postProcessMatrixQuery;
         LatiosWorldUnmanaged latiosWorld;
 
         FindChunksNeedingFrustumCullingJob m_findJob;
@@ -29,14 +30,16 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAny<ChunkComputeDeformMemoryMetadata>(true).WithAny<ChunkLinearBlendSkinningMemoryMetadata>(true)
-                          .WithAll<ChunkPerFrameCullingMask>(true).WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false)
-                          .UseWriteGroups().Build();
+            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkSkinningCullingTag>(true).WithAll<ChunkPerFrameCullingMask>(true)
+                          .WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
+            m_postProcessMatrixQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<ChunkSkinningCullingTag>(true, true)
+                                       .WithAll<ChunkPerFrameCullingMask>( true).WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).Build();
 
             m_findJob = new FindChunksNeedingFrustumCullingJob
             {
                 perCameraCullingMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                chunkHeaderHandle          = state.GetComponentTypeHandle<ChunkHeader>(true)
+                chunkHeaderHandle          = state.GetComponentTypeHandle<ChunkHeader>(true),
+                postProcessMatrixHandle    = state.GetComponentTypeHandle<PostProcessMatrix>(true)
             };
 
             m_singleJob = new SingleSplitCullingJob
@@ -66,6 +69,7 @@ namespace Latios.Kinemation.Systems
             m_findJob.chunkHeaderHandle.Update(ref state);
             m_findJob.chunksToProcess = chunkList.AsParallelWriter();
             m_findJob.perCameraCullingMaskHandle.Update(ref state);
+            m_findJob.postProcessMatrixHandle.Update(ref state);
             state.Dependency = m_findJob.ScheduleParallelByRef(m_metaQuery, state.Dependency);
 
             var cullRequestType = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().viewType;
@@ -103,6 +107,7 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>               chunkHeaderHandle;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>         postProcessMatrixHandle;
 
             public NativeList<ArchetypeChunk>.ParallelWriter chunksToProcess;
 
@@ -116,7 +121,8 @@ namespace Latios.Kinemation.Systems
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
                     var mask = masks[i];
-                    if ((mask.lower.Value | mask.upper.Value) != 0)
+                    // Skinned PostProcessMatrix entities are handled in a separate system.
+                    if ((mask.lower.Value | mask.upper.Value) != 0 && !headers[i].ArchetypeChunk.Has(ref postProcessMatrixHandle))
                     {
                         chunksCache[chunksCount] = headers[i].ArchetypeChunk;
                         chunksCount++;
@@ -137,8 +143,7 @@ namespace Latios.Kinemation.Systems
 
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>                 dependentHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask> chunkSkeletonMaskHandle;
-
-            [ReadOnly] public EntityStorageInfoLookup esiLookup;
+            [ReadOnly] public EntityStorageInfoLookup                                esiLookup;
 
             public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraMaskHandle;
 
@@ -149,7 +154,7 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                ref var cameraMask = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
+                ref var cameraMask = ref chunk.GetChunkComponentRefRW(ref chunkPerCameraMaskHandle);
                 if (!chunk.Has(ref dependentHandle))
                 {
                     cameraMask = default;
@@ -194,8 +199,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>                       dependentHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>       chunkSkeletonMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraSkeletonCullingSplitsMask> chunkSkeletonSplitsMaskHandle;
-
-            [ReadOnly] public EntityStorageInfoLookup esiLookup;
+            [ReadOnly] public EntityStorageInfoLookup                                      esiLookup;
 
             public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraMaskHandle;
             public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraSplitsMaskHandle;
@@ -207,8 +211,8 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                ref var cameraMask       = ref chunk.GetChunkComponentRefRW(in chunkPerCameraMaskHandle);
-                ref var cameraSplitsMask = ref chunk.GetChunkComponentRefRW(in chunkPerCameraSplitsMaskHandle);
+                ref var cameraMask       = ref chunk.GetChunkComponentRefRW(ref chunkPerCameraMaskHandle);
+                ref var cameraSplitsMask = ref chunk.GetChunkComponentRefRW(ref chunkPerCameraSplitsMaskHandle);
                 cameraSplitsMask         = default;
 
                 var rootRefs = chunk.GetNativeArray(ref dependentHandle);
@@ -250,7 +254,7 @@ namespace Latios.Kinemation.Systems
 
                 if (result)
                 {
-                    var referenceSplits = info.Chunk.GetChunkComponentRefRO(in chunkSkeletonSplitsMaskHandle);
+                    var referenceSplits = info.Chunk.GetChunkComponentRefRO(ref chunkSkeletonSplitsMaskHandle);
                     splits              = referenceSplits.ValueRO.splitMasks[info.IndexInChunk];
                 }
                 return result;

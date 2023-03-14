@@ -1,4 +1,5 @@
-﻿using Unity.Entities;
+﻿using Latios.Transforms;
+using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -8,9 +9,18 @@ namespace Latios.Psyshock
     /// </summary>
     public struct ColliderBody
     {
-        public Collider       collider;
-        public RigidTransform transform;
-        public Entity         entity;
+        /// <summary>
+        /// The Collider associated with the AABB
+        /// </summary>
+        public Collider collider;
+        /// <summary>
+        /// The transform of the collider
+        /// </summary>
+        public TransformQvvs transform;
+        /// <summary>
+        /// The entity associated with the collider
+        /// </summary>
+        public Entity entity;
     }
 }
 

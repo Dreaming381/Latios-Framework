@@ -305,12 +305,6 @@ namespace Latios
             return this;
         }
 
-        [System.Obsolete("(UnityUpgradable) -> IncludeDisabledEntities")]
-        public FluentQuery IncludeDisabled()
-        {
-            return IncludeDisabledEntities();
-        }
-
         /// <summary>
         /// Allows prefab entities to be included in the query
         /// </summary>

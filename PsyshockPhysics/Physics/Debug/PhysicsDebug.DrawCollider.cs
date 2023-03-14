@@ -1,5 +1,6 @@
 ﻿using Color = UnityEngine.Color;
 using Debug = UnityEngine.Debug;
+using Latios.Transforms;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -222,15 +223,12 @@ namespace Latios.Psyshock
         /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc for any subcolliders which have round features</param>
         public static void DrawCollider(in CompoundCollider compound, in RigidTransform transform, Color color, int segmentsPerPi = 6)
         {
-            ref var blob  = ref compound.compoundColliderBlob.Value;
-            var     scale = new PhysicsScale(compound.scale);
+            ref var blob = ref compound.compoundColliderBlob.Value;
 
             for (int i = 0; i < blob.blobColliders.Length; i++)
             {
-                var c               = Physics.ScaleCollider(blob.colliders[i], scale);
-                var localTransform  = blob.transforms[i];
-                localTransform.pos *= compound.scale;
-                var t               = math.mul(transform, localTransform);
+                compound.GetScaledStretchedSubCollider(i, out var c, out var localTransform);
+                var t = math.mul(transform, localTransform);
                 DrawCollider(c, t, color, segmentsPerPi);
             }
         }
@@ -265,6 +263,20 @@ namespace Latios.Psyshock
                     DrawCollider(in collider.m_compound, transform, color, segmentsPerPi);
                     break;
             }
+        }
+
+        /// <summary>
+        /// Draws a wireframe of a collider using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="sphere">The collider to draw</param>
+        /// <param name="transform">The transform of the collider in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc if the collider has round features</param>
+        public static void DrawCollider(in Collider collider, in TransformQvvs transform, Color color, int segmentsPerPi = 6)
+        {
+            var c = collider;
+            Physics.ScaleStretchCollider(ref c, transform.scale, transform.stretch);
+            DrawCollider(in c, new RigidTransform(transform.rotation, transform.position), color, segmentsPerPi);
         }
     }
 }

@@ -1,0 +1,120 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ assembly name="System.Core" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ output extension=".gen.cs" #>
+<#
+string[] colliderTypeNames = 
+{
+	"Sphere",
+	"Capsule",
+	"Box",
+	"Triangle",
+	"Convex",
+	"Compound"
+};
+#>
+using Unity.Burst;
+using Unity.Mathematics;
+
+namespace Latios.Psyshock
+{
+	internal static class ColliderColliderDispatch
+	{
+		public static bool DistanceBetween(in Collider colliderA,
+                                           in RigidTransform aTransform,
+                                           in Collider colliderB,
+                                           in RigidTransform bTransform,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result)
+		{
+			switch ((colliderA.type, colliderB.type))
+			{
+<#
+int i = 0;
+foreach (var colliderTypeNameA in colliderTypeNames)
+{
+	var colliderNameA = colliderTypeNameA.ToLower();
+	int j = 0;
+	foreach (var colliderTypeNameB in colliderTypeNames)
+	{
+		var colliderNameB = colliderTypeNameB.ToLower();
+#>
+				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+<#
+		if (i < j)
+		{
+#>
+				{
+					var r = <#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result);
+					
+					(result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+					return r;
+				}
+<#
+		}
+		else
+		{
+#>
+					return <#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, out result);
+<#
+		}
+		j++;			
+	}
+	i++;
+}
+#>
+				default:
+					result = default;
+					return false;
+			}
+		}
+
+		public static bool ColliderCast(in Collider colliderToCast,
+                                         in RigidTransform castStart,
+                                         float3 castEnd,
+                                         in Collider target,
+                                         in RigidTransform targetTransform,
+                                         out ColliderCastResult result)
+        {
+            switch ((colliderToCast.type, target.type))
+            {
+<#
+i = 0;
+foreach (var colliderTypeNameA in colliderTypeNames)
+{
+	var colliderNameA = colliderTypeNameA.ToLower();
+	int j = 0;
+	foreach (var colliderTypeNameB in colliderTypeNames)
+	{
+		var colliderNameB = colliderTypeNameB.ToLower();
+#>
+				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+<#
+		if (i < j)
+		{
+#>
+					return <#= colliderTypeNameA #><#= colliderTypeNameB #>.ColliderCast(in colliderToCast.m_<#= colliderNameA #>, in castStart, castEnd, in target.m_<#= colliderNameB #>, in targetTransform, out result);
+<#
+		}
+		else
+		{
+#>
+					return <#= colliderTypeNameB #><#= colliderTypeNameA #>.ColliderCast(in colliderToCast.m_<#= colliderNameA #>, in castStart, castEnd, in target.m_<#= colliderNameB #>, in targetTransform, out result);
+<#
+		}
+		j++;			
+	}
+	i++;
+}
+#>
+				default:
+					result = default;
+					return false;
+			}
+		}
+	}
+}

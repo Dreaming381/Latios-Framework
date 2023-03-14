@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Psyshock
 {
@@ -15,26 +15,18 @@ namespace Latios.Psyshock
     /// </summary>
     public struct BuildCollisionLayerTypeHandles
     {
-        [ReadOnly] public ComponentTypeHandle<Collider>     collider;
-        [ReadOnly] public ComponentTypeHandle<Translation>  translation;
-        [ReadOnly] public ComponentTypeHandle<Rotation>     rotation;
-        [ReadOnly] public ComponentTypeHandle<PhysicsScale> scale;
-        [ReadOnly] public ComponentTypeHandle<Parent>       parent;
-        [ReadOnly] public ComponentTypeHandle<LocalToWorld> localToWorld;
-        [ReadOnly] public EntityTypeHandle                  entity;
+        [ReadOnly] public ComponentTypeHandle<Collider>       collider;
+        [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransform;
+        [ReadOnly] public EntityTypeHandle                    entity;
 
         /// <summary>
         /// Constructs the BuildCollsionLayer type handles using a managed system
         /// </summary>
         public BuildCollisionLayerTypeHandles(ComponentSystemBase system)
         {
-            collider     = system.GetComponentTypeHandle<Collider>(true);
-            translation  = system.GetComponentTypeHandle<Translation>(true);
-            rotation     = system.GetComponentTypeHandle<Rotation>(true);
-            scale        = system.GetComponentTypeHandle<PhysicsScale>(true);
-            parent       = system.GetComponentTypeHandle<Parent>(true);
-            localToWorld = system.GetComponentTypeHandle<LocalToWorld>(true);
-            entity       = system.GetEntityTypeHandle();
+            collider       = system.GetComponentTypeHandle<Collider>(true);
+            worldTransform = system.GetComponentTypeHandle<WorldTransform>(true);
+            entity         = system.GetEntityTypeHandle();
         }
 
         /// <summary>
@@ -42,13 +34,9 @@ namespace Latios.Psyshock
         /// </summary>
         public BuildCollisionLayerTypeHandles(ref SystemState system)
         {
-            collider     = system.GetComponentTypeHandle<Collider>(true);
-            translation  = system.GetComponentTypeHandle<Translation>(true);
-            rotation     = system.GetComponentTypeHandle<Rotation>(true);
-            scale        = system.GetComponentTypeHandle<PhysicsScale>(true);
-            parent       = system.GetComponentTypeHandle<Parent>(true);
-            localToWorld = system.GetComponentTypeHandle<LocalToWorld>(true);
-            entity       = system.GetEntityTypeHandle();
+            collider       = system.GetComponentTypeHandle<Collider>(true);
+            worldTransform = system.GetComponentTypeHandle<WorldTransform>(true);
+            entity         = system.GetEntityTypeHandle();
         }
 
         /// <summary>
@@ -57,11 +45,7 @@ namespace Latios.Psyshock
         public void Update(SystemBase system)
         {
             collider.Update(system);
-            translation.Update(system);
-            rotation.Update(system);
-            scale.Update(system);
-            parent.Update(system);
-            localToWorld.Update(system);
+            worldTransform.Update(system);
             entity.Update(system);
         }
 
@@ -71,11 +55,7 @@ namespace Latios.Psyshock
         public void Update(ref SystemState system)
         {
             collider.Update(ref system);
-            translation.Update(ref system);
-            rotation.Update(ref system);
-            scale.Update(ref system);
-            parent.Update(ref system);
-            localToWorld.Update(ref system);
+            worldTransform.Update(ref system);
             entity.Update(ref system);
         }
     }
@@ -91,14 +71,11 @@ namespace Latios.Psyshock
         internal NativeArray<Aabb>         aabbs;
         internal NativeArray<ColliderBody> bodies;
 
-        internal NativeArray<int> remapSrcIndices;
-
         internal CollisionLayerSettings settings;
 
         internal bool hasQueryData;
         internal bool hasBodiesArray;
         internal bool hasAabbsArray;
-        internal bool hasRemapSrcIndices;
 
         internal int count;
 
@@ -120,7 +97,7 @@ namespace Latios.Psyshock
         /// </summary>
         public static FluentQuery PatchQueryForBuildingCollisionLayer(this FluentQuery fluent)
         {
-            return fluent.WithAllWeak<Collider>();
+            return fluent.WithAllWeak<Collider>().WithAllWeak<WorldTransform>();
         }
 
         #region Starters
@@ -273,36 +250,6 @@ namespace Latios.Psyshock
             return config.WithSubdivisions(new int3(x, y, z));
         }
 
-        /// <summary>
-        /// Specifies a NativeArray that should be written to where when indexed by a bodyIndex in a FindPairsResult or FindObjects result
-        /// specifies the original array index of entityInQueryIndex of the ColliderBody in the layer
-        /// </summary>
-        public static BuildCollisionLayerConfig WithRemapArray(this BuildCollisionLayerConfig config, NativeArray<int> remapSrcIndices)
-        {
-            ValidateRemapArrayIsRightLength(remapSrcIndices, config.count, config.hasQueryData);
-
-            config.remapSrcIndices    = remapSrcIndices;
-            config.hasRemapSrcIndices = true;
-            return config;
-        }
-
-        /// <summary>
-        /// Specifies a NativeArray that should be allocated and written to where when indexed by a bodyIndex in a FindPairsResult or FindObjects result
-        /// specifies the original array index of entityInQueryIndex of the ColliderBody in the layer
-        /// </summary>
-        /// <param name="remapSrcIndices">The generated array containing source indices</param>
-        /// <param name="allocator">The allocator to use for allocating the array</param>
-        public static BuildCollisionLayerConfig WithRemapArray(this BuildCollisionLayerConfig config,
-                                                               out NativeArray<int>             remapSrcIndices,
-                                                               AllocatorManager.AllocatorHandle allocator)
-        {
-            remapSrcIndices = CollectionHelper.CreateNativeArray<int>(config.count, allocator, NativeArrayOptions.UninitializedMemory);
-
-            config.remapSrcIndices    = remapSrcIndices;
-            config.hasRemapSrcIndices = true;
-            return config;
-        }
-
         #endregion
 
         #region Schedulers
@@ -323,24 +270,12 @@ namespace Latios.Psyshock
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
-                    BuildCollisionLayerInternal.BuildImmediate(ref layer, config.remapSrcIndices, config.bodies, config.aabbs);
-                else
-                {
-                    var remapArray = new NativeArray<int>(layer.Count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                    BuildCollisionLayerInternal.BuildImmediate(ref layer, remapArray, config.bodies, config.aabbs);
-                }
+                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies, config.aabbs);
             }
             else if (config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
-                    BuildCollisionLayerInternal.BuildImmediate(ref layer, config.remapSrcIndices, config.bodies, config.aabbs);
-                else
-                {
-                    var remapArray = new NativeArray<int>(layer.Count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                    BuildCollisionLayerInternal.BuildImmediate(ref layer, remapArray, config.bodies, config.aabbs);
-                }
+                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies, config.aabbs);
             }
             else
             {
@@ -378,9 +313,6 @@ namespace Latios.Psyshock
                 var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
-                NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
-                                                                                                                             Allocator.TempJob,
-                                                                                                                             NativeArrayOptions.UninitializedMemory);
                 var part1Indices = config.query.CalculateBaseEntityIndexArray(Allocator.TempJob);
                 new BuildCollisionLayerInternal.Part1FromQueryJob
                 {
@@ -401,70 +333,43 @@ namespace Latios.Psyshock
                 new BuildCollisionLayerInternal.Part3Job
                 {
                     layerIndices       = layerIndices,
-                    unsortedSrcIndices = remapSrcIndices
+                    unsortedSrcIndices = layer.srcIndices
                 }.Run(count);
 
                 new BuildCollisionLayerInternal.Part4Job
                 {
                     bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = remapSrcIndices,
+                    unsortedSrcIndices   = layer.srcIndices,
                     trees                = layer.intervalTrees,
                     xMinMaxs             = xMinMaxs
                 }.Run(layer.BucketCount);
 
                 new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
-                    colliderAoS     = aos,
-                    layer           = layer,
-                    remapSrcIndices = remapSrcIndices
+                    colliderAoS = aos,
+                    layer       = layer,
                 }.Run(count);
-
-                if (!config.hasRemapSrcIndices)
-                    remapSrcIndices.Dispose();
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.aabbs.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
+
+                new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
                 {
-                    new BuildCollisionLayerInternal.BuildFromDualArraysSingleWithRemapJob
-                    {
-                        layer           = layer,
-                        aabbs           = config.aabbs,
-                        bodies          = config.bodies,
-                        remapSrcIndices = config.remapSrcIndices
-                    }.Run();
-                }
-                else
-                {
-                    new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
-                    {
-                        layer  = layer,
-                        aabbs  = config.aabbs,
-                        bodies = config.bodies
-                    }.Run();
-                }
+                    layer  = layer,
+                    aabbs  = config.aabbs,
+                    bodies = config.bodies
+                }.Run();
             }
             else if (config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
+
+                new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
                 {
-                    new BuildCollisionLayerInternal.BuildFromColliderArraySingleWithRemapJob
-                    {
-                        layer           = layer,
-                        bodies          = config.bodies,
-                        remapSrcIndices = config.remapSrcIndices
-                    }.Run();
-                }
-                else
-                {
-                    new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
-                    {
-                        layer  = layer,
-                        bodies = config.bodies
-                    }.Run();
-                }
+                    layer  = layer,
+                    bodies = config.bodies
+                }.Run();
             }
             else
                 throw new InvalidOperationException("Something went wrong with the BuildCollisionError configuration.");
@@ -494,9 +399,6 @@ namespace Latios.Psyshock
                 var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
-                NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
-                                                                                                                             Allocator.TempJob,
-                                                                                                                             NativeArrayOptions.UninitializedMemory);
                 var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
                 jh               = new BuildCollisionLayerInternal.Part1FromQueryJob
                 {
@@ -517,72 +419,48 @@ namespace Latios.Psyshock
                 jh = new BuildCollisionLayerInternal.Part3Job
                 {
                     layerIndices       = layerIndices,
-                    unsortedSrcIndices = remapSrcIndices
+                    unsortedSrcIndices = layer.srcIndices
                 }.Schedule(jh);
 
                 jh = new BuildCollisionLayerInternal.Part4Job
                 {
                     bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = remapSrcIndices,
+                    unsortedSrcIndices   = layer.srcIndices,
                     trees                = layer.intervalTrees,
                     xMinMaxs             = xMinMaxs
                 }.Schedule(jh);
 
                 jh = new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
-                    colliderAoS     = aos,
-                    layer           = layer,
-                    remapSrcIndices = remapSrcIndices
+                    colliderAoS = aos,
+                    layer       = layer,
                 }.Schedule(jh);
 
-                if (!config.hasRemapSrcIndices)
-                    jh = remapSrcIndices.Dispose(jh);
                 return jh;
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.aabbs.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
+
+                jh = new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
                 {
-                    jh = new BuildCollisionLayerInternal.BuildFromDualArraysSingleWithRemapJob
-                    {
-                        layer           = layer,
-                        aabbs           = config.aabbs,
-                        bodies          = config.bodies,
-                        remapSrcIndices = config.remapSrcIndices
-                    }.Schedule(jh);
-                }
-                else
-                {
-                    jh = new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
-                    {
-                        layer  = layer,
-                        aabbs  = config.aabbs,
-                        bodies = config.bodies
-                    }.Schedule(jh);
-                }
+                    layer  = layer,
+                    aabbs  = config.aabbs,
+                    bodies = config.bodies
+                }.Schedule(jh);
+
                 return jh;
             }
             else if (config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                if (config.hasRemapSrcIndices)
+
+                jh = new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
                 {
-                    jh = new BuildCollisionLayerInternal.BuildFromColliderArraySingleWithRemapJob
-                    {
-                        layer           = layer,
-                        bodies          = config.bodies,
-                        remapSrcIndices = config.remapSrcIndices
-                    }.Schedule(jh);
-                }
-                else
-                {
-                    jh = new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
-                    {
-                        layer  = layer,
-                        bodies = config.bodies
-                    }.Schedule(jh);
-                }
+                    layer  = layer,
+                    bodies = config.bodies
+                }.Schedule(jh);
+
                 return jh;
             }
             else
@@ -613,10 +491,6 @@ namespace Latios.Psyshock
                 var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
-                NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
-                                                                                                                             Allocator.TempJob,
-                                                                                                                             NativeArrayOptions.UninitializedMemory);
-
                 var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
                 jh               = new BuildCollisionLayerInternal.Part1FromQueryJob
                 {
@@ -637,12 +511,12 @@ namespace Latios.Psyshock
                 jh = new BuildCollisionLayerInternal.Part3Job
                 {
                     layerIndices       = layerIndices,
-                    unsortedSrcIndices = remapSrcIndices
+                    unsortedSrcIndices = layer.srcIndices
                 }.Schedule(count, 512, jh);
 
                 jh = new BuildCollisionLayerInternal.Part4Job
                 {
-                    unsortedSrcIndices   = remapSrcIndices,
+                    unsortedSrcIndices   = layer.srcIndices,
                     xMinMaxs             = xMinMaxs,
                     trees                = layer.intervalTrees,
                     bucketStartAndCounts = layer.bucketStartsAndCounts
@@ -650,13 +524,9 @@ namespace Latios.Psyshock
 
                 jh = new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
-                    layer           = layer,
-                    colliderAoS     = aos,
-                    remapSrcIndices = remapSrcIndices
+                    layer       = layer,
+                    colliderAoS = aos,
                 }.Schedule(count, 128, jh);
-
-                if (!config.hasRemapSrcIndices)
-                    jh = remapSrcIndices.Dispose(jh);
 
                 return jh;
             }
@@ -666,10 +536,6 @@ namespace Latios.Psyshock
                 int count        = config.bodies.Length;
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
-                NativeArray<int> remapSrcIndices = config.hasRemapSrcIndices ? config.remapSrcIndices : new NativeArray<int>(count,
-                                                                                                                             Allocator.TempJob,
-                                                                                                                             NativeArrayOptions.UninitializedMemory);
 
                 NativeArray<Aabb> aabbs = config.hasAabbsArray ? config.aabbs : new NativeArray<Aabb>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -704,30 +570,25 @@ namespace Latios.Psyshock
                 jh = new BuildCollisionLayerInternal.Part3Job
                 {
                     layerIndices       = layerIndices,
-                    unsortedSrcIndices = remapSrcIndices
+                    unsortedSrcIndices = layer.srcIndices
                 }.Schedule(count, 512, jh);
 
                 jh = new BuildCollisionLayerInternal.Part4Job
                 {
                     bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = remapSrcIndices,
+                    unsortedSrcIndices   = layer.srcIndices,
                     trees                = layer.intervalTrees,
                     xMinMaxs             = xMinMaxs
                 }.Schedule(layer.BucketCount, 1, jh);
 
                 jh = new BuildCollisionLayerInternal.Part5FromArraysJob
                 {
-                    aabbs           = aabbs,
-                    bodies          = config.bodies,
-                    layer           = layer,
-                    remapSrcIndices = remapSrcIndices
+                    aabbs  = aabbs,
+                    bodies = config.bodies,
+                    layer  = layer,
                 }.Schedule(count, 128, jh);
 
-                if ((!config.hasAabbsArray) && (!config.hasRemapSrcIndices))
-                    jh = JobHandle.CombineDependencies(remapSrcIndices.Dispose(jh), aabbs.Dispose(jh));
-                else if (!config.hasRemapSrcIndices)
-                    jh = remapSrcIndices.Dispose(jh);
-                else if (!config.hasAabbsArray)
+                if (!config.hasAabbsArray)
                     jh = aabbs.Dispose(jh);
 
                 return jh;

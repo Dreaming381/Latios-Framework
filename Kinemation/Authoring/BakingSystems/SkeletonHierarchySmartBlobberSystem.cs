@@ -87,25 +87,39 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         partial struct Job : IJobEntity
         {
-            public void Execute(ref SmartBlobberResult result, in DynamicBuffer<OptimizedSkeletonHierarchyParentIndex> parentIndicess)
+            public unsafe void Execute(ref SmartBlobberResult result, in DynamicBuffer<OptimizedSkeletonHierarchyParentIndex> parentIndices)
             {
                 var builder = new BlobBuilder(Allocator.Temp);
 
-                ref var root        = ref builder.ConstructRoot<OptimizedSkeletonHierarchyBlob>();
-                var     indices     = builder.Allocate(ref root.parentIndices, parentIndicess.Length);
-                var     hasPSI      = builder.Allocate(ref root.hasParentScaleInverseBitmask, (int)math.ceil(parentIndicess.Length / 64f));  // length is max 16 bits so this division is safe in float.
-                var     hasChildPSI = builder.Allocate(ref root.hasChildWithParentScaleInverseBitmask, hasPSI.Length);
+                ref var root    = ref builder.ConstructRoot<OptimizedSkeletonHierarchyBlob>();
+                var     indices = builder.Allocate(ref root.parentIndices, parentIndices.Length);
 
-                root.hasAnyParentScaleInverseBone = false;
-                for (int i = 0; i < hasPSI.Length; i++)
+                var childBuffers = new NativeArray<UnsafeList<short> >(parentIndices.Length, Allocator.Temp, NativeArrayOptions.ClearMemory);
+
+                for (int i = 0; i < parentIndices.Length; i++)
                 {
-                    hasPSI[i]      = new BitField64(0UL);
-                    hasChildPSI[i] = new BitField64(0UL);
+                    indices[i] = (short)parentIndices[i].parentIndex;
+
+                    if (!childBuffers[parentIndices[i].parentIndex].IsCreated)
+                        childBuffers[parentIndices[i].parentIndex] = new UnsafeList<short>(4, Allocator.Temp);
+                    var buffer                                     = childBuffers[parentIndices[i].parentIndex];
+                    buffer.Add((short)i);
+                    childBuffers[parentIndices[i].parentIndex] = buffer;
                 }
-                for (int i = 0; i < parentIndicess.Length; i++)
+
+                var children = builder.Allocate(ref root.childrenIndices, parentIndices.Length);
+                for (int i = 0; i < parentIndices.Length; i++)
                 {
-                    indices[i] = (short)parentIndicess[i].parentIndex;
+                    if (childBuffers[i].IsCreated)
+                    {
+                        builder.ConstructFromNativeArray(ref children[i], childBuffers[i].Ptr, childBuffers[i].Length);
+                    }
+                    else
+                    {
+                        builder.Allocate(ref children[i], 0);
+                    }
                 }
+
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<OptimizedSkeletonHierarchyBlob>(Allocator.Persistent));
             }
         }

@@ -8,7 +8,6 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Kinemation
 {

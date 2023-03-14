@@ -3,6 +3,7 @@
     "rootNamespace": "Latios.Kinemation",
     "references": [
         "Latios.Core",
+        "Latios.Transforms",
         "Latios.Psyshock",
         "Unity.Burst",
         "Unity.Collections",

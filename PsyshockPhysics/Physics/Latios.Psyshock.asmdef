@@ -3,11 +3,11 @@
     "rootNamespace": "Latios.Psyshock",
     "references": [
         "Latios.Core",
+        "Latios.Transforms",
         "Unity.Entities",
         "Unity.Collections",
         "Unity.Mathematics",
         "Unity.Jobs",
-        "Unity.Transforms",
         "Unity.Entities.Hybrid",
         "Unity.Burst"
     ],

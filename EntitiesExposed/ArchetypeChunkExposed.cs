@@ -5,7 +5,7 @@ namespace Unity.Entities.Exposed
 {
     public static class ArchetypeChunkExposedExtensions
     {
-        public static unsafe ref T GetChunkComponentRefRW<T>(in this ArchetypeChunk chunk, in ComponentTypeHandle<T> chunkComponentTypeHandle) where T : unmanaged, IComponentData
+        public static unsafe ref T GetChunkComponentRefRW<T>(in this ArchetypeChunk chunk, ref ComponentTypeHandle<T> chunkComponentTypeHandle) where T : unmanaged, IComponentData
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(chunkComponentTypeHandle.m_Safety);
@@ -17,7 +17,7 @@ namespace Unity.Entities.Exposed
             return ref UnsafeUtility.AsRef<T>(ptr);
         }
 
-        public static unsafe RefRO<T> GetChunkComponentRefRO<T>(in this ArchetypeChunk chunk, in ComponentTypeHandle<T> chunkComponentTypeHandle) where T : unmanaged,
+        public static unsafe RefRO<T> GetChunkComponentRefRO<T>(in this ArchetypeChunk chunk, ref ComponentTypeHandle<T> chunkComponentTypeHandle) where T : unmanaged,
         IComponentData
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS

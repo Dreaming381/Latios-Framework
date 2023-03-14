@@ -111,7 +111,7 @@ namespace Latios.Kinemation
     /// Usage: Read Only (No exceptions!)
     /// This lives on the worldBlackboardEntity and is set whenever the global list of instanced
     /// material properties changes. Search through this buffer to find the correct bit to set in
-    /// the ChunkMaterialPropertyDirtyMask.
+    /// the ChunkMaterialPropertyDirtyMask. All types are created via ComponentType.ReadOnly().
     /// </summary>
     [InternalBufferCapacity(0)]
     public struct MaterialPropertyComponentType : IBufferElementData

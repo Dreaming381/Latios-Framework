@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -38,11 +39,11 @@ namespace Latios.Psyshock
         /// <summary>
         /// The full ColliderBody of the first collider in the pair
         /// </summary>
-        public ColliderBody bodyA => m_layerA.bodies[indexA];
+        public ColliderBody bodyA => m_layerA.bodies[bodyIndexA];
         /// <summary>
         /// The full ColliderBody of the second collider in the pair
         /// </summary>
-        public ColliderBody bodyB => m_layerB.bodies[indexB];
+        public ColliderBody bodyB => m_layerB.bodies[bodyIndexB];
         /// <summary>
         /// The first collider in the pair
         /// </summary>
@@ -54,19 +55,29 @@ namespace Latios.Psyshock
         /// <summary>
         /// The transform of the first collider in the pair
         /// </summary>
-        public RigidTransform transformA => bodyA.transform;
+        public TransformQvvs transformA => bodyA.transform;
         /// <summary>
         /// The transform of the second collider in the pair
         /// </summary>
-        public RigidTransform transformB => bodyB.transform;
+        public TransformQvvs transformB => bodyB.transform;
         /// <summary>
         /// The index of the first collider in the pair within its CollisionLayer
         /// </summary>
-        public int indexA => m_bodyAIndex;
+        public int bodyIndexA => m_bodyAIndex;
         /// <summary>
         /// The index of the second collider in the pair within its CollisionLayer
         /// </summary>
-        public int indexB => m_bodyBIndex;
+        public int bodyIndexB => m_bodyBIndex;
+        /// <summary>
+        /// The index of the first collider in the pair relative to the original EntityQuery or NativeArrays used to
+        /// create the CollisionLayer.
+        /// </summary>
+        public int sourceIndexA => m_layerA.srcIndices[bodyIndexA];
+        /// <summary>
+        /// The index of the second collider in the pair relative to the original EntityQuery or NativeArrays used to
+        /// create the CollisionLayer.
+        /// </summary>
+        public int sourceIndexB => m_layerB.srcIndices[bodyIndexB];
         /// <summary>
         /// An index that is guaranteed to be deterministic and unique between threads for a given FindPairs operation,
         /// and can be used as the sortKey for command buffers

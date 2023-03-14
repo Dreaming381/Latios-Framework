@@ -7,7 +7,9 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    // The concrete type of a collider
+    /// <summary>
+    /// An enum representing the specific type of collider stored in the Collider struct
+    /// </summary>
     public enum ColliderType : byte
     {
         //Convex Primitive types
@@ -35,10 +37,21 @@ namespace Latios.Psyshock
         //192+ ?
     }
 
+    /// <summary>
+    /// A struct which contains one of any of the types of collider shapes supported by Psyshock.
+    /// For those familiar with C or C++, this struct effectively acts like a union of all those types.
+    /// This type can be implicitly casted to any of those types and those types can also be implicitly
+    /// casted to this type. The specific shape type stored in this struct can be obtained via the `type` property.
+    /// </summary>
     [Serializable]
     [StructLayout(LayoutKind.Explicit)]
     public unsafe partial struct Collider : IComponentData
     {
+        /// <summary>
+        /// The specific shape type stored in this instance.
+        /// </summary>
+        public ColliderType type => m_type;
+
         [FieldOffset(0)]
         Storage m_storage;
 
@@ -74,8 +87,6 @@ namespace Latios.Psyshock
 
         //[FieldOffset(8)]
         //UnsafeUntypedBlobAssetReference m_blobRef;
-
-        public ColliderType type => m_type;
 
         private struct Storage
         {

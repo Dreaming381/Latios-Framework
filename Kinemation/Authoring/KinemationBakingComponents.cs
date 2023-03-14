@@ -71,46 +71,9 @@ namespace Latios.Kinemation.Authoring
     }
 
     [TemporaryBakingType]
-    internal struct PendingMeshSkinningBlob : IComponentData
+    internal struct PendingMeshDeformDataBlob : IComponentData
     {
-        public SmartBlobberHandle<MeshSkinningBlob> blobHandle;
-    }
-
-    internal class SkeletonConversionContext : IComponentData
-    {
-        public BoneTransformData[]       skeleton;
-        public bool                      isOptimized;
-        public Animator                  animator;
-        public SkeletonSettingsAuthoring authoring;
-
-        public GameObject shadowHierarchy
-        {
-            get
-            {
-                if (m_shadowHierarchy == null)
-                {
-                    m_shadowHierarchy = ShadowHierarchyBuilder.BuildShadowHierarchy(animator.gameObject, isOptimized);
-                }
-                return m_shadowHierarchy;
-            }
-        }
-        private GameObject m_shadowHierarchy = null;
-
-        public void DestroyShadowHierarchy()
-        {
-            if (m_shadowHierarchy != null)
-            {
-                m_shadowHierarchy.DestroyDuringConversion();
-            }
-        }
-    }
-
-    internal class SkinnedMeshConversionContext : IComponentData
-    {
-        public string[]                     bonePathsReversed;
-        public SkeletonConversionContext    skeletonContext;
-        public SkinnedMeshRenderer          renderer;
-        public SkinnedMeshSettingsAuthoring authoring;
+        public SmartBlobberHandle<MeshDeformDataBlob> blobHandle;
     }
 }
 

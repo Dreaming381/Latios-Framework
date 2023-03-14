@@ -1,11 +1,11 @@
 ﻿using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Myri
 {
@@ -51,59 +51,24 @@ namespace Latios.Myri
         [BurstCompile]
         public struct UpdateListenersJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<AudioListener> listenerHandle;
-            [ReadOnly] public ComponentTypeHandle<Translation>   translationHandle;
-            [ReadOnly] public ComponentTypeHandle<Rotation>      rotationHandle;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>  ltwHandle;
-            public NativeList<ListenerWithTransform>             listenersWithTransforms;
+            [ReadOnly] public ComponentTypeHandle<AudioListener>  listenerHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransformHandle;
+            public NativeList<ListenerWithTransform>              listenersWithTransforms;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var listeners = chunk.GetNativeArray(ref listenerHandle);
-                if (chunk.Has(ref ltwHandle))
+                var listeners       = chunk.GetNativeArray(ref listenerHandle);
+                var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                for (int i = 0; i < chunk.Count; i++)
                 {
-                    var ltws = chunk.GetNativeArray(ref ltwHandle);
-                    for (int i = 0; i < chunk.Count; i++)
+                    var l = listeners[i];
+                    //This culling desyncs the listener indices from the graph handling logic.
+                    //Todo: Figure out how to bring this optimization back.
+                    //if (l.volume > 0f)
                     {
-                        var l = listeners[i];
-                        //This culling desyncs the listener indices from the graph handling logic.
-                        //Todo: Figure out how to bring this optimization back.
-                        //if (l.volume > 0f)
-                        {
-                            l.itdResolution                                                  = math.clamp(l.itdResolution, 0, 15);
-                            var ltw                                                          = ltws[i];
-                            var transform                                                    = new RigidTransform(quaternion.LookRotation(ltw.Forward, ltw.Up), ltw.Position);
-                            listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform });
-                        }
-                    }
-                }
-                else
-                {
-                    bool                     hasTranslation = chunk.Has(ref translationHandle);
-                    bool                     hasRotation    = chunk.Has(ref rotationHandle);
-                    NativeArray<Translation> translations   = default;
-                    NativeArray<Rotation>    rotations      = default;
-                    if (hasTranslation)
-                        translations = chunk.GetNativeArray(ref translationHandle);
-                    if (hasRotation)
-                        rotations = chunk.GetNativeArray(ref rotationHandle);
-                    for (int i = 0; i < chunk.Count; i++)
-                    {
-                        var l = listeners[i];
-                        //This culling desyncs the listener indices from the graph handling logic.
-                        //Todo: Figure out how to bring this optimization back.
-                        //if (l.volume > 0f)
-                        {
-                            l.itdResolution = math.clamp(l.itdResolution, 0, 15);
-
-                            var transform = RigidTransform.identity;
-                            if (hasRotation)
-                                transform.rot = rotations[i].Value;
-                            if (hasTranslation)
-                                transform.pos = translations[i].Value;
-
-                            listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform });
-                        }
+                        l.itdResolution                                                  = math.clamp(l.itdResolution, 0, 15);
+                        var transform                                                    = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position);
+                        listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform });
                     }
                 }
             }
@@ -116,10 +81,7 @@ namespace Latios.Myri
         {
             public ComponentTypeHandle<AudioSourceOneShot>                           oneshotHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>            coneHandle;
-            [ReadOnly] public ComponentTypeHandle<Translation>                       translationHandle;
-            [ReadOnly] public ComponentTypeHandle<Rotation>                          rotationHandle;
-            [ReadOnly] public ComponentTypeHandle<Parent>                            parentHandle;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>                      ltwHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>                    worldTransformHandle;
             [NativeDisableParallelForRestriction] public NativeArray<OneshotEmitter> emitters;
             [ReadOnly] public NativeReference<int>                                   audioFrame;
             [ReadOnly] public NativeReference<int>                                   lastPlayedAudioFrame;
@@ -147,202 +109,35 @@ namespace Latios.Myri
                     }
                 }
 
-                bool ltw = chunk.Has(ref ltwHandle);
-                bool p   = chunk.Has(ref parentHandle);
-                bool t   = chunk.Has(ref translationHandle);
-                bool r   = chunk.Has(ref rotationHandle);
-                bool c   = chunk.Has(ref coneHandle);
-
-                int mask  = math.select(0, 0x10, ltw);
-                mask     += math.select(0, 0x8, p);
-                mask     += math.select(0, 0x4, t);
-                mask     += math.select(0, 0x2, r);
-                mask     += math.select(0, 0x1, c);
-
-                //Note: We only care about rotation if there is also a cone
-                switch (mask)
+                if (chunk.Has(ref coneHandle))
                 {
-                    case 0x0: ProcessNoTransform(chunk, firstEntityIndex); break;
-                    case 0x1: ProcessCone(chunk, firstEntityIndex); break;
-                    case 0x2: ProcessNoTransform(chunk, firstEntityIndex); break;
-                    case 0x3: ProcessRotationCone(chunk, firstEntityIndex); break;
-                    case 0x4: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x5: ProcessTranslationCone(chunk, firstEntityIndex); break;
-                    case 0x6: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x7: ProcessTranslationRotationCone(chunk, firstEntityIndex); break;
-
-                    case 0x8: ErrorCase(); break;
-                    case 0x9: ErrorCase(); break;
-                    case 0xa: ErrorCase(); break;
-                    case 0xb: ErrorCase(); break;
-                    case 0xc: ErrorCase(); break;
-                    case 0xd: ErrorCase(); break;
-                    case 0xe: ErrorCase(); break;
-                    case 0xf: ErrorCase(); break;
-
-                    case 0x10: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x11: ProcessCone(chunk, firstEntityIndex); break;
-                    case 0x12: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x13: ProcessRotationCone(chunk, firstEntityIndex); break;
-                    case 0x14: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x15: ProcessTranslationCone(chunk, firstEntityIndex); break;
-                    case 0x16: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x17: ProcessTranslationRotationCone(chunk, firstEntityIndex); break;
-
-                    case 0x18: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x19: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1a: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1b: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1c: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1d: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1e: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1f: ProcessLtwCone(chunk, firstEntityIndex); break;
-
-                    default: ErrorCase(); break;
-                }
-            }
-
-            void ProcessNoTransform(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                AudioSourceEmitterCone cone     = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
+                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var cones           = chunk.GetNativeArray(ref coneHandle);
+                    for (int i = 0; i < chunk.Count; i++)
                     {
-                        source    = oneshots[i],
-                        transform = RigidTransform.identity,
-                        cone      = cone,
-                        useCone   = false
-                    };
+                        emitters[firstEntityIndex + i] = new OneshotEmitter
+                        {
+                            source    = oneshots[i],
+                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
+                            cone      = cones[i],
+                            useCone   = true
+                        };
+                    }
                 }
-            }
-
-            void ProcessCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                var cones    = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
+                else
                 {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
+                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    for (int i = 0; i < chunk.Count; i++)
                     {
-                        source    = oneshots[i],
-                        transform = RigidTransform.identity,
-                        cone      = cones[i],
-                        useCone   = true
-                    };
+                        emitters[firstEntityIndex + i] = new OneshotEmitter
+                        {
+                            source    = oneshots[i],
+                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
+                            cone      = default,
+                            useCone   = false
+                        };
+                    }
                 }
-            }
-
-            void ProcessRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var oneshots  = chunk.GetNativeArray(ref oneshotHandle);
-                var rotations = chunk.GetNativeArray(ref rotationHandle);
-                var cones     = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(rotations[i].Value, float3.zero),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessTranslation(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    oneshots     = chunk.GetNativeArray(ref oneshotHandle);
-                var                    translations = chunk.GetNativeArray(ref translationHandle);
-                AudioSourceEmitterCone cone         = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(quaternion.identity, translations[i].Value),
-                        cone      = cone,
-                        useCone   = false
-                    };
-                }
-            }
-
-            void ProcessTranslationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var oneshots     = chunk.GetNativeArray(ref oneshotHandle);
-                var translations = chunk.GetNativeArray(ref translationHandle);
-                var cones        = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(quaternion.identity, translations[i].Value),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessTranslationRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var oneshots     = chunk.GetNativeArray(ref oneshotHandle);
-                var translations = chunk.GetNativeArray(ref translationHandle);
-                var rotations    = chunk.GetNativeArray(ref rotationHandle);
-                var cones        = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(rotations[i].Value, translations[i].Value),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessLtw(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                var                    ltws     = chunk.GetNativeArray(ref ltwHandle);
-                AudioSourceEmitterCone cone     = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var ltw                        = ltws[i];
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(quaternion.LookRotationSafe(ltw.Forward, ltw.Up), ltw.Position),
-                        cone      = cone,
-                        useCone   = false
-                    };
-                }
-            }
-
-            void ProcessLtwCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                var ltws     = chunk.GetNativeArray(ref ltwHandle);
-                var cones    = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var ltw                        = ltws[i];
-                    emitters[firstEntityIndex + i] = new OneshotEmitter
-                    {
-                        source    = oneshots[i],
-                        transform = new RigidTransform(quaternion.LookRotationSafe(ltw.Forward, ltw.Up), ltw.Position),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-            void ErrorCase()
-            {
-                throw new System.InvalidOperationException("OneshotsUpdateJob received an invalid EntityQuery");
             }
         }
 
@@ -353,10 +148,7 @@ namespace Latios.Myri
         {
             public ComponentTypeHandle<AudioSourceLooped>                           loopedHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>           coneHandle;
-            [ReadOnly] public ComponentTypeHandle<Translation>                      translationHandle;
-            [ReadOnly] public ComponentTypeHandle<Rotation>                         rotationHandle;
-            [ReadOnly] public ComponentTypeHandle<Parent>                           parentHandle;
-            [ReadOnly] public ComponentTypeHandle<LocalToWorld>                     ltwHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>                   worldTransformHandle;
             [NativeDisableParallelForRestriction] public NativeArray<LoopedEmitter> emitters;
             [ReadOnly] public NativeReference<int>                                  audioFrame;
             [ReadOnly] public NativeReference<int>                                  lastConsumedBufferId;
@@ -430,202 +222,35 @@ namespace Latios.Myri
                     }
                 }
 
-                bool ltw = chunk.Has(ref ltwHandle);
-                bool p   = chunk.Has(ref parentHandle);
-                bool t   = chunk.Has(ref translationHandle);
-                bool r   = chunk.Has(ref rotationHandle);
-                bool c   = chunk.Has(ref coneHandle);
-
-                int mask  = math.select(0, 0x10, ltw);
-                mask     += math.select(0, 0x8, p);
-                mask     += math.select(0, 0x4, t);
-                mask     += math.select(0, 0x2, r);
-                mask     += math.select(0, 0x1, c);
-
-                //Note: We only care about rotation if there is also a cone
-                switch (mask)
+                if (chunk.Has(ref coneHandle))
                 {
-                    case 0x0: ProcessNoTransform(chunk, firstEntityIndex); break;
-                    case 0x1: ProcessCone(chunk, firstEntityIndex); break;
-                    case 0x2: ProcessNoTransform(chunk, firstEntityIndex); break;
-                    case 0x3: ProcessRotationCone(chunk, firstEntityIndex); break;
-                    case 0x4: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x5: ProcessTranslationCone(chunk, firstEntityIndex); break;
-                    case 0x6: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x7: ProcessTranslationRotationCone(chunk, firstEntityIndex); break;
-
-                    case 0x8: ErrorCase(); break;
-                    case 0x9: ErrorCase(); break;
-                    case 0xa: ErrorCase(); break;
-                    case 0xb: ErrorCase(); break;
-                    case 0xc: ErrorCase(); break;
-                    case 0xd: ErrorCase(); break;
-                    case 0xe: ErrorCase(); break;
-                    case 0xf: ErrorCase(); break;
-
-                    case 0x10: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x11: ProcessCone(chunk, firstEntityIndex); break;
-                    case 0x12: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x13: ProcessRotationCone(chunk, firstEntityIndex); break;
-                    case 0x14: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x15: ProcessTranslationCone(chunk, firstEntityIndex); break;
-                    case 0x16: ProcessTranslation(chunk, firstEntityIndex); break;
-                    case 0x17: ProcessTranslationRotationCone(chunk, firstEntityIndex); break;
-
-                    case 0x18: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x19: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1a: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1b: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1c: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1d: ProcessLtwCone(chunk, firstEntityIndex); break;
-                    case 0x1e: ProcessLtw(chunk, firstEntityIndex); break;
-                    case 0x1f: ProcessLtwCone(chunk, firstEntityIndex); break;
-
-                    default: ErrorCase(); break;
-                }
-            }
-
-            void ProcessNoTransform(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    loopeds = chunk.GetNativeArray(ref loopedHandle);
-                AudioSourceEmitterCone cone    = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
+                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var cones           = chunk.GetNativeArray(ref coneHandle);
+                    for (int i = 0; i < chunk.Count; i++)
                     {
-                        source    = loopeds[i],
-                        transform = RigidTransform.identity,
-                        cone      = cone,
-                        useCone   = false
-                    };
+                        emitters[firstEntityIndex + i] = new LoopedEmitter
+                        {
+                            source    = looped[i],
+                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
+                            cone      = cones[i],
+                            useCone   = true
+                        };
+                    }
                 }
-            }
-
-            void ProcessCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var loopeds = chunk.GetNativeArray(ref loopedHandle);
-                var cones   = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
+                else
                 {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
+                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    for (int i = 0; i < chunk.Count; i++)
                     {
-                        source    = loopeds[i],
-                        transform = RigidTransform.identity,
-                        cone      = cones[i],
-                        useCone   = true
-                    };
+                        emitters[firstEntityIndex + i] = new LoopedEmitter
+                        {
+                            source    = looped[i],
+                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
+                            cone      = default,
+                            useCone   = false
+                        };
+                    }
                 }
-            }
-
-            void ProcessRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var loopeds   = chunk.GetNativeArray(ref loopedHandle);
-                var rotations = chunk.GetNativeArray(ref rotationHandle);
-                var cones     = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(rotations[i].Value, float3.zero),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessTranslation(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    loopeds      = chunk.GetNativeArray(ref loopedHandle);
-                var                    translations = chunk.GetNativeArray(ref translationHandle);
-                AudioSourceEmitterCone cone         = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(quaternion.identity, translations[i].Value),
-                        cone      = cone,
-                        useCone   = false
-                    };
-                }
-            }
-
-            void ProcessTranslationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var loopeds      = chunk.GetNativeArray(ref loopedHandle);
-                var translations = chunk.GetNativeArray(ref translationHandle);
-                var cones        = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(quaternion.identity, translations[i].Value),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessTranslationRotationCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var loopeds      = chunk.GetNativeArray(ref loopedHandle);
-                var translations = chunk.GetNativeArray(ref translationHandle);
-                var rotations    = chunk.GetNativeArray(ref rotationHandle);
-                var cones        = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(rotations[i].Value, translations[i].Value),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            void ProcessLtw(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var                    loopeds = chunk.GetNativeArray(ref loopedHandle);
-                var                    ltws    = chunk.GetNativeArray(ref ltwHandle);
-                AudioSourceEmitterCone cone    = default;
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var ltw                        = ltws[i];
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(quaternion.LookRotationSafe(ltw.Forward, ltw.Up), ltw.Position),
-                        cone      = cone,
-                        useCone   = false
-                    };
-                }
-            }
-
-            void ProcessLtwCone(ArchetypeChunk chunk, int firstEntityIndex)
-            {
-                var loopeds = chunk.GetNativeArray(ref loopedHandle);
-                var ltws    = chunk.GetNativeArray(ref ltwHandle);
-                var cones   = chunk.GetNativeArray(ref coneHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var ltw                        = ltws[i];
-                    emitters[firstEntityIndex + i] = new LoopedEmitter
-                    {
-                        source    = loopeds[i],
-                        transform = new RigidTransform(quaternion.LookRotationSafe(ltw.Forward, ltw.Up), ltw.Position),
-                        cone      = cones[i],
-                        useCone   = true
-                    };
-                }
-            }
-
-            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-            void ErrorCase()
-            {
-                throw new System.InvalidOperationException("LoopedsUpdateJob received an invalid EntityQuery");
             }
         }
     }

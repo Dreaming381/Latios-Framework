@@ -1,85 +1,97 @@
 using System;
-using System.Collections.Generic;
 using Latios.Psyshock;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
 using UnityEngine.Rendering;
 
 namespace Latios.Kinemation
 {
-    // Meshes
-    internal struct MatrixPreviousCache : IComponentData
-    {
-        public float2x4 cachedFirstTwoRows;
-    }
-
-    [WriteGroup(typeof(LocalToParent))]
+    #region Meshes
     internal struct SkeletonDependent : ICleanupComponentData
     {
         public EntityWith<SkeletonRootTag>                  root;
-        public BlobAssetReference<MeshSkinningBlob>         skinningBlob;
         public BlobAssetReference<MeshBindingPathsBlob>     meshBindingBlob;
         public BlobAssetReference<SkeletonBindingPathsBlob> skeletonBindingBlob;
-        public int                                          meshEntryIndex;
         public int                                          boneOffsetEntryIndex;
-        public float                                        shaderEffectRadialBounds;
+        public int                                          indexInDependentSkinnedMeshesBuffer;
     }
 
+    internal struct BoundMesh : ICleanupComponentData
+    {
+        public BlobAssetReference<MeshDeformDataBlob> meshBlob;
+        public int                                    meshEntryIndex;
+    }
+
+    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
+    internal struct ChunkSkinningCullingTag : IComponentData { }
+
     [MaterialProperty("_ComputeMeshIndex")]
-    internal struct ComputeDeformShaderIndex : IComponentData
+    internal struct LegacyComputeDeformShaderIndex : IComponentData
     {
         public uint firstVertexIndex;
     }
 
-    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
-    internal struct ChunkComputeDeformMemoryMetadata : IComponentData
+    [MaterialProperty("_DOTSDeformationParams")]
+    internal struct LegacyDotsDeformParamsShaderIndex : IComponentData
     {
-        public int vertexStartPrefixSum;
+        public uint4 parameters;
+        // x = current,
+        // y = previous,
+        // z = 0
+        // w = unused
     }
 
     [MaterialProperty("_SkinMatrixIndex")]
-    internal struct LinearBlendSkinningShaderIndex : IComponentData
+    internal struct LegacyLinearBlendSkinningShaderIndex : IComponentData
     {
-        public int firstMatrixIndex;
+        public uint firstMatrixIndex;
+    }
+
+    internal struct ChunkDeformPrefixSums : IComponentData
+    {
+        public uint currentMatrix;
+        public uint previousMatrix;
+        public uint twoAgoMatrix;
+        public uint currentDqs;
+        public uint previousDqs;
+        public uint twoAgoDqs;
+        public uint currentDeform;
+        public uint previousDeform;
+        public uint twoAgoDeform;
+        // Legacy are aliases/combinations of these
+    }
+
+    internal struct ChunkDeformExtraRadialBounds : IComponentData
+    {
+        public float radialBounds;
     }
 
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
-    internal struct ChunkLinearBlendSkinningMemoryMetadata : IComponentData
-    {
-        public int bonesStartPrefixSum;
-    }
+    internal struct ChunkCopyDeformTag : IComponentData { }
+    #endregion
 
-    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
-    internal struct ChunkCopySkinShaderData : IComponentData
-    {
-        // Todo: Can chunk components be tags?
-        //internal byte dummy;
-    }
-
+    #region Skeletons
     // All skeletons
     // This is system state to prevent copies on instantiate
     [InternalBufferCapacity(1)]
     internal struct DependentSkinnedMesh : ICleanupBufferElementData
     {
         public EntityWith<SkeletonDependent> skinnedMesh;
-        public int                           meshVerticesStart;
-        public int                           meshVerticesCount;
-        public int                           meshWeightsStart;
-        public int                           meshBindPosesStart;
-        public int                           meshBindPosesCount;
-        public int                           boneOffsetsStart;
+        // Todo: Store entry indices instead?
+        public uint  meshVerticesStart;
+        public uint  meshWeightsStart;
+        public uint  meshBindPosesStart;
+        public uint  boneOffsetsCount;
+        public uint  boneOffsetsStart;
+        public float meshRadialOffset;
     }
 
-    [MaximumChunkCapacity(128)]
-    internal struct PerFrameSkeletonBufferMetadata : IComponentData
+    internal struct SkeletonBoundsOffsetFromMeshes : IComponentData
     {
-        public int bufferId;
-        public int startIndexInBuffer;
+        public float radialBoundsInWorldSpace;
     }
 
     // Exposed skeletons
@@ -96,7 +108,6 @@ namespace Latios.Kinemation
     internal struct BoneBounds : IComponentData
     {
         public float radialOffsetInBoneSpace;
-        public float radialOffsetInWorldSpace;
     }
 
     internal struct BoneWorldBounds : IComponentData
@@ -115,12 +126,7 @@ namespace Latios.Kinemation
     // to track conversions between skeleton types.
     internal struct OptimizedSkeletonTag : ICleanupComponentData { }
 
-    internal struct SkeletonShaderBoundsOffset : IComponentData
-    {
-        public float radialBoundsInWorldSpace;
-    }
-
-    internal struct SkeletonWorldBounds : IComponentData
+    internal struct OptimizedSkeletonWorldBounds : IComponentData
     {
         public AABB bounds;
     }
@@ -132,10 +138,11 @@ namespace Latios.Kinemation
         public float radialOffsetInBoneSpace;
     }
 
-    internal struct ChunkSkeletonWorldBounds : IComponentData
+    internal struct ChunkOptimizedSkeletonWorldBounds : IComponentData
     {
         public AABB chunkBounds;
     }
+    #endregion
 
     #region Blackboard
     internal struct ExposedCullingIndexManagerTag : IComponentData { }
@@ -166,45 +173,51 @@ namespace Latios.Kinemation
 
     internal struct MeshGpuUploadCommand
     {
-        public BlobAssetReference<MeshSkinningBlob> blob;
-        public int                                  verticesIndex;
-        public int                                  weightsIndex;
-        public int                                  bindPosesIndex;
+        public BlobAssetReference<MeshDeformDataBlob> blob;
+        public uint                                   verticesIndex;
+        public uint                                   weightsIndex;
+        public uint                                   bindPosesIndex;
+        public uint                                   blendShapesIndex;
     }
 
     internal struct MeshGpuEntry
     {
-        public BlobAssetReference<MeshSkinningBlob> blob;
-        public int                                  referenceCount;
-        public int                                  verticesStart;
-        public int                                  weightsStart;
-        public int                                  bindPosesStart;
+        public BlobAssetReference<MeshDeformDataBlob> blob;
+        public int                                    referenceCount;
+        public uint                                   verticesStart;
+        public uint                                   weightsStart;
+        public uint                                   bindPosesStart;
+        public uint                                   blendShapesStart;
         // Blob Assets can disappear before cleanup (thanks subscenes).
         // So we cache the sizes here since that's all we need for cleanup.
-        public int verticesCount;
-        public int weightsCount;
-        public int bindPosesCount;
+        public uint verticesCount;
+        public uint weightsCount;
+        public uint bindPosesCount;
+        public uint blendShapesCount;
     }
 
     internal struct MeshGpuRequiredSizes
     {
-        public int requiredVertexBufferSize;
-        public int requiredWeightBufferSize;
-        public int requiredBindPoseBufferSize;
-        public int requiredVertexUploadSize;
-        public int requiredWeightUploadSize;
-        public int requiredBindPoseUploadSize;
+        public uint requiredVertexBufferSize;
+        public uint requiredWeightBufferSize;
+        public uint requiredBindPoseBufferSize;
+        public uint requiredBlendShapesBufferSize;
+        public uint requiredVertexUploadSize;
+        public uint requiredWeightUploadSize;
+        public uint requiredBindPoseUploadSize;
+        public uint requiredBlendShapesUploadSize;
     }
 
     internal struct MeshGpuManager : ICollectionComponent
     {
-        public NativeHashMap<BlobAssetReference<MeshSkinningBlob>, int> blobIndexMap;
+        public NativeHashMap<BlobAssetReference<MeshDeformDataBlob>, int> blobIndexMap;
 
         public NativeList<MeshGpuEntry> entries;
         public NativeList<int>          indexFreeList;
-        public NativeList<int2>         verticesGaps;
-        public NativeList<int2>         weightsGaps;
-        public NativeList<int2>         bindPosesGaps;
+        public NativeList<uint2>        verticesGaps;
+        public NativeList<uint2>        weightsGaps;
+        public NativeList<uint2>        bindPosesGaps;
+        public NativeList<uint2>        blendShapesGaps;
 
         public NativeList<MeshGpuUploadCommand>      uploadCommands;
         public NativeReference<MeshGpuRequiredSizes> requiredBufferSizes;
@@ -222,6 +235,7 @@ namespace Latios.Kinemation
             inputDeps = verticesGaps.Dispose(inputDeps);
             inputDeps = weightsGaps.Dispose(inputDeps);
             inputDeps = bindPosesGaps.Dispose(inputDeps);
+            inputDeps = blendShapesGaps.Dispose(inputDeps);
             inputDeps = uploadCommands.Dispose(inputDeps);
             inputDeps = requiredBufferSizes.Dispose(inputDeps);
             return inputDeps;
@@ -232,13 +246,13 @@ namespace Latios.Kinemation
 
     internal struct BoneOffsetsEntry
     {
-        public uint2 hash;
-        public int   pathsReferences;
-        public int   overridesReferences;
-        public int   start;
-        public short count;
-        public short gpuCount;
-        public bool  isValid;
+        public uint2  hash;
+        public int    pathsReferences;
+        public int    overridesReferences;
+        public uint   start;
+        public ushort count;
+        public ushort gpuCount;
+        public bool   isValid;
     }
 
     internal struct PathMappingPair : IEquatable<PathMappingPair>
@@ -262,7 +276,7 @@ namespace Latios.Kinemation
         public NativeList<BoneOffsetsEntry> entries;
         public NativeList<short>            offsets;
         public NativeList<int>              indexFreeList;
-        public NativeList<int2>             gaps;
+        public NativeList<uint2>            gaps;
         public NativeReference<bool>        isDirty;
 
         public NativeHashMap<uint2, int>           hashToEntryMap;
@@ -286,55 +300,60 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct GpuUploadBuffersTag : IComponentData { }
+    internal struct MeshGpuUploadBuffersTag : IComponentData { }
 
-    internal struct GpuUploadBuffers : IManagedStructComponent
+    internal struct MeshGpuUploadBuffers : IManagedStructComponent
     {
         // Not owned by this
-        public UnityEngine.ComputeBuffer verticesBuffer;
-        public UnityEngine.ComputeBuffer weightsBuffer;
-        public UnityEngine.ComputeBuffer bindPosesBuffer;
-        public UnityEngine.ComputeBuffer boneOffsetsBuffer;
-        public UnityEngine.ComputeBuffer verticesUploadBuffer;
-        public UnityEngine.ComputeBuffer weightsUploadBuffer;
-        public UnityEngine.ComputeBuffer bindPosesUploadBuffer;
-        public UnityEngine.ComputeBuffer boneOffsetsUploadBuffer;
-        public UnityEngine.ComputeBuffer verticesUploadMetaBuffer;
-        public UnityEngine.ComputeBuffer weightsUploadMetaBuffer;
-        public UnityEngine.ComputeBuffer bindPosesUploadMetaBuffer;
-        public UnityEngine.ComputeBuffer boneOffsetsUploadMetaBuffer;
+        public UnityEngine.GraphicsBuffer verticesBuffer;
+        public UnityEngine.GraphicsBuffer weightsBuffer;
+        public UnityEngine.GraphicsBuffer bindPosesBuffer;
+        public UnityEngine.GraphicsBuffer blendShapesBuffer;
+        public UnityEngine.GraphicsBuffer boneOffsetsBuffer;
+        public UnityEngine.GraphicsBuffer verticesUploadBuffer;
+        public UnityEngine.GraphicsBuffer weightsUploadBuffer;
+        public UnityEngine.GraphicsBuffer bindPosesUploadBuffer;
+        public UnityEngine.GraphicsBuffer blendShapesUploadBuffer;
+        public UnityEngine.GraphicsBuffer boneOffsetsUploadBuffer;
+        public UnityEngine.GraphicsBuffer verticesUploadMetaBuffer;
+        public UnityEngine.GraphicsBuffer weightsUploadMetaBuffer;
+        public UnityEngine.GraphicsBuffer bindPosesUploadMetaBuffer;
+        public UnityEngine.GraphicsBuffer blendShapesUploadMetaBuffer;
+        public UnityEngine.GraphicsBuffer boneOffsetsUploadMetaBuffer;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GpuUploadBuffersTag>();
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuUploadBuffersTag>();
     }
 
-    internal struct GpuUploadBuffersMappedTag : IComponentData { }
+    internal struct MeshGpuUploadBuffersMappedTag : IComponentData { }
 
-    internal struct GpuUploadBuffersMapped : ICollectionComponent
+    internal struct MeshGpuUploadBuffersMapped : ICollectionComponent
     {
         // No actual containers here, but represents the mappings of the compute buffers.
-        public int  verticesUploadBufferWriteCount;
-        public int  weightsUploadBufferWriteCount;
-        public int  bindPosesUploadBufferWriteCount;
-        public int  boneOffsetsUploadBufferWriteCount;
-        public int  verticesUploadMetaBufferWriteCount;
-        public int  weightsUploadMetaBufferWriteCount;
-        public int  bindPosesUploadMetaBufferWriteCount;
-        public int  boneOffsetsUploadMetaBufferWriteCount;
+        public uint verticesUploadBufferWriteCount;
+        public uint weightsUploadBufferWriteCount;
+        public uint bindPosesUploadBufferWriteCount;
+        public uint blendShapesUploadBufferWriteCount;
+        public uint boneOffsetsUploadBufferWriteCount;
+        public uint verticesUploadMetaBufferWriteCount;
+        public uint weightsUploadMetaBufferWriteCount;
+        public uint bindPosesUploadMetaBufferWriteCount;
+        public uint blendShapesUploadMetaBufferWriteCount;
+        public uint boneOffsetsUploadMetaBufferWriteCount;
         public bool needsMeshCommitment;
         public bool needsBoneOffsetCommitment;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GpuUploadBuffersMappedTag>();
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuUploadBuffersMappedTag>();
 
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
 
-    internal struct ComputeBufferManagerTag : IComponentData { }
+    internal struct GraphicsBufferManagerTag : IComponentData { }
 
-    internal struct ComputeBufferManager : IManagedStructComponent
+    internal struct GraphicsBufferManager : IManagedStructComponent
     {
-        public ComputeBufferTrackingPool pool;
+        public GraphicsBufferTrackingPool pool;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ComputeBufferManagerTag>();
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GraphicsBufferManagerTag>();
     }
 
     internal struct BrgCullingContextTag : IComponentData { }
@@ -376,23 +395,10 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct BoneMatricesPerFrameBuffersManagerTag : IComponentData { }
-
-    internal struct BoneMatricesPerFrameBuffersManager : IManagedStructComponent
+    internal struct MaxRequiredDeformData : IComponentData
     {
-        public List<UnityEngine.ComputeBuffer> boneMatricesBuffers;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BoneMatricesPerFrameBuffersManagerTag>();
-    }
-
-    internal struct MaxRequiredDeformVertices : IComponentData
-    {
-        public int verticesCount;
-    }
-
-    internal struct MaxRequiredLinearBlendMatrices : IComponentData
-    {
-        public int matricesCount;
+        public uint maxRequiredBoneTransformsForVertexSkinning;
+        public uint maxRequiredDeformVertices;
     }
 
     internal struct MaterialPropertiesUploadContextTag : IComponentData { }
@@ -418,7 +424,7 @@ namespace Latios.Kinemation
     {
         public NativeList<AABB> allAabbs;
         public NativeList<AABB> batchedAabbs;
-        public const int        kCountPerBatch = 32;  // Todo: Is there a better size?
+        public const int        kCountPerBatch = 1 << 32;  // Todo: Is there a better size?
 
         public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ExposedSkeletonBoundsArraysTag>();
         public JobHandle TryDispose(JobHandle inputDeps)
@@ -429,6 +435,47 @@ namespace Latios.Kinemation
             inputDeps = allAabbs.Dispose(inputDeps);
             return batchedAabbs.Dispose(inputDeps);
         }
+    }
+
+    internal struct BrgAabb : IComponentData
+    {
+        public Aabb aabb;
+    }
+
+    // Int because this will grow in the future and it would be great to not have a regression
+    internal enum DeformClassification : int
+    {
+        None = 1 << 0,
+        CurrentDeform = 1 << 0,
+        PreviousDeform = 1 << 1,
+        TwoAgoDeform = 1 << 2,
+        CurrentVertexMatrix = 1 << 3,
+        PreviousVertexMatrix = 1 << 4,
+        TwoAgoVertexMatrix = 1 << 5,
+        CurrentVertexDqs = 1 << 6,
+        PreviousVertexDqs = 1 << 7,
+        TwoAgoVertexDqs = 1 << 8,
+        LegacyLbs = 1 << 9,
+        LegacyCompute = 1 << 10,
+        LegacyDotsDefom = 1 << 11,
+        RequiresUploadDynamicMesh = 1 << 12,
+        RequiresGpuComputeBlendShapes = 1 << 13,
+        RequiresGpuComputeMatrixSkinning = 1 << 14,
+        RequiresGpuComputeDqsSkinning = 1 << 15,
+        AnyCurrentDeform = CurrentDeform | LegacyCompute | LegacyDotsDefom,
+        AnyPreviousDeform = PreviousDeform | LegacyDotsDefom,
+    }
+
+    internal struct DeformClassificationMapTag : IComponentData { }
+
+    internal struct DeformClassificationMap : ICollectionComponent
+    {
+        public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
+
+        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<DeformClassificationMapTag>();
+
+        // The data is owned by a world or system rewindable allocator.
+        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
     #endregion
 }

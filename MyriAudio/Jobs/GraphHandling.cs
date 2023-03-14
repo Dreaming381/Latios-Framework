@@ -272,7 +272,7 @@ namespace Latios.Myri
                         listenerGraphStateLookup[entity] = listenerGraphState;
                     }
 
-                    var fakePortRealPortHashmap = new NativeParallelHashMap<int, int>(8, Allocator.Temp);
+                    var fakePortRealPortHashmap = new NativeHashMap<int, int>(8, Allocator.Temp);
                     int ildPortsUsed            = 0;
                     //Build connections for existing entities
                     for (int i = 0; i < existingEntities.Length; i++)

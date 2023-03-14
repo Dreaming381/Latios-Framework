@@ -1,0 +1,23 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CopyBlendShapes
+
+struct BlendShapeVertexDelta
+{
+    uint index;
+    float3 position;
+    float3 normal;
+    float3 tangent;
+};
+
+uniform StructuredBuffer<BlendShapeVertexDelta> _src;
+uniform RWStructuredBuffer<BlendShapeVertexDelta> _dst;
+
+int _start;
+
+// Todo: What is the nominal value per platform?
+[numthreads(64, 1, 1)]
+void CopyBlendShapes(uint3 id : SV_DispatchThreadID)
+{
+    int index = _start + id.x;
+    _dst[index] = _src[index];
+}

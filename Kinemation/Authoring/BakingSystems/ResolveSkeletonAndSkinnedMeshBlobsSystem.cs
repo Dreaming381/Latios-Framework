@@ -102,11 +102,11 @@ namespace Latios.Kinemation.Authoring.Systems
             public EntityCommandBuffer.ParallelWriter ecb;
             public SmartBlobberResolverLookup         resolverLookup;
 
-            public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndexInQuery, ref MeshSkinningBlobReference reference, in PendingMeshSkinningBlob handle)
+            public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndexInQuery, ref MeshDeformDataBlobReference reference, in PendingMeshDeformDataBlob handle)
             {
                 var blob = handle.blobHandle.Resolve(ref resolverLookup);
-                if (blob == BlobAssetReference<MeshSkinningBlob>.Null)
-                    ecb.RemoveComponent<MeshSkinningBlobReference>(chunkIndexInQuery, entity);
+                if (blob == BlobAssetReference<MeshDeformDataBlob>.Null)
+                    ecb.RemoveComponent<MeshDeformDataBlobReference>(chunkIndexInQuery, entity);
                 else
                     reference.blob = blob;
             }

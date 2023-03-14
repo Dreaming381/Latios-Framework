@@ -105,9 +105,11 @@ namespace Latios.Kinemation.Authoring
                         continue;
 
                     boneGoBuffer.Add(new ExportedBoneGameObjectRef { authoringGameObjectForBone = child });
-                    boneEntityBuffer.Add(new OptimizedSkeletonExportedBone { boneEntity         = GetEntity(child, TransformUsageFlags.ManualOverride) });
+                    boneEntityBuffer.Add(new OptimizedSkeletonExportedBone { boneEntity         = GetEntity(child) });
                 }
-                this.RequestAddAndPopulateOptimizedBoneToRootForAnimator(GetEntity(), authoring);
+
+                AddBuffer<OptimizedBoneInertialBlendState>();
+                this.RequestAddAndPopulateOptimizedBoneTransformsForAnimator(GetEntity(), authoring);
             }
 
             m_breadthQueue.Clear();
@@ -117,14 +119,15 @@ namespace Latios.Kinemation.Authoring
 
     public static class SkeletonBakerExtensions
     {
-        public static void RequestAddAndPopulateOptimizedBoneToRootForAnimator(this IBaker baker, Entity target, Animator animator)
+        public static void RequestAddAndPopulateOptimizedBoneTransformsForAnimator(this IBaker baker, Entity target, Animator animator)
         {
             if (animator == null)
                 return;
 
             baker.DependsOn(animator.avatar);
             baker.AddComponent(target, new ShadowHierarchyRequest { animatorToBuildShadowFor = animator });
-            baker.AddBuffer<OptimizedBoneToRoot>(target);
+            baker.AddBuffer<OptimizedBoneTransform>(target);
+            baker.AddComponent<OptimizedSkeletonState>(target);
         }
     }
 }

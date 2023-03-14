@@ -1,0 +1,475 @@
+#pragma kernel CopyKernel
+#pragma kernel ReplaceKernel
+
+static const float kEpsilon = 0.000001f;
+
+static const uint kOperationType_Upload = 0;
+static const uint kOperationType_Matrix_4x4 = 1;
+static const uint kOperationType_Matrix_Inverse_4x4 = 2;
+static const uint kOperationType_Matrix_3x4 = 3;
+static const uint kOperationType_Matrix_Inverse_3x4 = 4;
+static const uint kOperationType_StridedUpload = 5;
+static const uint kOperationType_Qvvs_Matrix_3x4 = 6;
+static const uint kOperationType_Qvvs_Matrix_3x4_Inverse = 7;
+
+struct Operation
+{
+    uint type;
+    uint srcOffset;
+    int srcStride;
+    uint dstOffset;
+    uint dstOffsetExtra;
+    int dstStride;
+    uint size;
+    uint count;
+};
+static const uint SizeofOperation = 8 * 4;
+
+ByteAddressBuffer srcBuffer;
+RWByteAddressBuffer dstBuffer;
+
+// Place constants into globals so CBUFFER macros (and SRP headers) are not needed
+int operationsBase;
+int replaceOperationSize;
+
+
+Operation LoadOperation(int operationIndex)
+{
+    int offset = operationIndex * SizeofOperation;
+
+    Operation operation;
+    operation.type = srcBuffer.Load(offset + 0 * 4);
+    operation.srcOffset = srcBuffer.Load(offset + 1 * 4);
+    operation.srcStride = srcBuffer.Load(offset + 2 * 4);
+    operation.dstOffset = srcBuffer.Load(offset + 3 * 4);
+    operation.dstOffsetExtra = srcBuffer.Load(offset + 4 * 4);
+    operation.dstStride = srcBuffer.Load(offset + 5 * 4);
+    operation.size = srcBuffer.Load(offset + 6 * 4);
+    operation.count = srcBuffer.Load(offset + 7 * 4);
+
+    return operation;
+}
+
+#define GROUP_SIZE 64
+#define NUM_BYTES_PER_THREAD 4
+#define NUM_BYTES_PER_GROUP (GROUP_SIZE * NUM_BYTES_PER_THREAD)
+
+void CopyToGPU(Operation operation, uint threadID)
+{
+    uint numFullWaves = (operation.size * operation.count) / NUM_BYTES_PER_GROUP;
+
+    uint srcIndex = (threadID * NUM_BYTES_PER_THREAD) % operation.size;
+    uint dstIndex = threadID * NUM_BYTES_PER_THREAD;
+    for (uint i = 0; i < numFullWaves; i += 1)
+    {
+        uint val = srcBuffer.Load(srcIndex + operation.srcOffset);
+        dstBuffer.Store(dstIndex + operation.dstOffset, val);
+
+        srcIndex = (srcIndex + NUM_BYTES_PER_GROUP) % operation.size;
+        dstIndex += NUM_BYTES_PER_GROUP;
+    }
+
+    if (dstIndex < (operation.size * operation.count))
+    {
+        uint val = srcBuffer.Load(srcIndex + operation.srcOffset);
+        dstBuffer.Store(dstIndex + operation.dstOffset, val);
+    }
+}
+
+void DivModUsingFloats(int x, int y, out int quotient, out int remainder)
+{
+    float fx = x;
+    float fy = y;
+    float integral = 0;
+    float fractional = 0;
+    fractional = modf(fx / fy, integral);
+    int rem = round(fractional * fy);
+    // This can happen on GPU because the fractional can be like 0.999
+    if (rem == y)
+    {
+        quotient = round(integral) + 1;
+        remainder = 0;
+    }
+    else
+    {
+        quotient = round(integral);
+        remainder = rem;
+    }
+}
+
+#define NUM_DWORDS_PER_GROUP (NUM_BYTES_PER_GROUP / 4)
+
+void CopyToGPUStrided(Operation operation, uint threadID)
+{
+    int elemSizeInDwords = operation.size >> 2;
+
+    int elemsPerGroup = 0;
+    int dwordLoopIncrement = 0;
+
+    DivModUsingFloats(
+        NUM_DWORDS_PER_GROUP, elemSizeInDwords,
+        elemsPerGroup, dwordLoopIncrement);
+
+    int elemIndex = 0;
+    int dwordIndex = 0;
+
+    DivModUsingFloats(threadID, elemSizeInDwords,
+        elemIndex, dwordIndex);
+
+    int srcOffset = operation.srcOffset + elemIndex * operation.srcStride + (dwordIndex << 2);
+    int dstOffset = operation.dstOffset + elemIndex * operation.dstStride + (dwordIndex << 2);
+
+    int srcEnd = operation.srcOffset + operation.count * operation.srcStride;
+    int srcBytesPerLoop = elemsPerGroup * operation.srcStride + (dwordLoopIncrement << 2);
+    int dstBytesPerLoop = elemsPerGroup * operation.dstStride + (dwordLoopIncrement << 2);
+
+    while (srcOffset < srcEnd)
+    {
+        uint data = srcBuffer.Load(srcOffset);
+        dstBuffer.Store(dstOffset, data);
+
+        srcOffset += srcBytesPerLoop;
+        dstOffset += dstBytesPerLoop;
+        dwordIndex += dwordLoopIncrement;
+
+        if (dwordIndex >= elemSizeInDwords)
+        {
+            int newDwordIndex = dwordIndex - elemSizeInDwords;
+            int byteAdjustment = (newDwordIndex - dwordIndex) << 2;
+
+            srcOffset += operation.srcStride + byteAdjustment;
+            dstOffset += operation.dstStride + byteAdjustment;
+
+            dwordIndex = newDwordIndex;
+        }
+    }
+}
+
+struct Qvvs
+{
+    float4 rotation;
+    float4 position;
+    float4 stretchScale;
+};
+
+Qvvs loadQvvsSrc(ByteAddressBuffer buf, uint offset)
+{
+    Qvvs qvvs = (Qvvs)0;
+    qvvs.rotation = asfloat(buf.Load4(offset + 0 * 16));
+    qvvs.position = asfloat(buf.Load4(offset + 1 * 16));
+    qvvs.stretchScale = asfloat(buf.Load4(offset + 2 * 16));
+    return qvvs;
+}
+
+float3x4 loadMatrixSrc(ByteAddressBuffer buf, uint offset)
+{
+    // Read in 4 columns of float3 data each.
+    // Done in 3 load4 and then repacking into final 3x4 matrix
+    float4 p1 = asfloat(buf.Load4(offset + 0 * 16));
+    float4 p2 = asfloat(buf.Load4(offset + 1 * 16));
+    float4 p3 = asfloat(buf.Load4(offset + 2 * 16));
+
+    return float3x4(
+        p1.x, p1.w, p2.z, p3.y,
+        p1.y, p2.x, p2.w, p3.z,
+        p1.z, p2.y, p3.x, p3.w
+        );
+}
+
+void storeMatrixDst_4x4(RWByteAddressBuffer buf, uint offset, float3x4 mat)
+{
+    // Write our the columns
+    buf.Store4(offset + 0, asuint(float4(mat._m00, mat._m10, mat._m20, 0.0)));
+    buf.Store4(offset + 16, asuint(float4(mat._m01, mat._m11, mat._m21, 0.0)));
+    buf.Store4(offset + 32, asuint(float4(mat._m02, mat._m12, mat._m22, 0.0)));
+    buf.Store4(offset + 48, asuint(float4(mat._m03, mat._m13, mat._m23, 1.0)));
+}
+
+void storeMatrixDst_3x4(RWByteAddressBuffer buf, uint offset, float3x4 mat)
+{
+    // Pack the 4 float3 columns as 3 float4 so we can write it out using store4
+    float4 p1 = float4(mat._m00, mat._m10, mat._m20, mat._m01);
+    float4 p2 = float4(mat._m11, mat._m21, mat._m02, mat._m12);
+    float4 p3 = float4(mat._m22, mat._m03, mat._m13, mat._m23);
+    buf.Store4(offset + 0, asuint(p1));
+    buf.Store4(offset + 16, asuint(p2));
+    buf.Store4(offset + 32, asuint(p3));
+}
+
+float csum(float3 v)
+{
+    return v.x + v.y + v.z;
+}
+
+void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
+{
+    float4 v2 = v + v;
+
+    uint3 npn = uint3(0x80000000, 0x00000000, 0x80000000);
+    uint3 nnp = uint3(0x80000000, 0x80000000, 0x00000000);
+    uint3 pnn = uint3(0x00000000, 0x80000000, 0x80000000);
+    c0 = v2.y * asfloat(asuint(v.yxw) ^ npn) - v2.z * asfloat(asuint(v.zwx) ^ pnn) + float3(1, 0, 0);
+    c1 = v2.z * asfloat(asuint(v.wzy) ^ nnp) - v2.x * asfloat(asuint(v.yxw) ^ npn) + float3(0, 1, 0);
+    c2 = v2.x * asfloat(asuint(v.zwx) ^ pnn) - v2.y * asfloat(asuint(v.wzy) ^ nnp) + float3(0, 0, 1);
+}
+
+float3x4 convertQvvsToFloat3x4(Qvvs qvvs)
+{
+    float3 scale = qvvs.stretchScale.xyz * qvvs.stretchScale.w;
+    float3 c0 = 0;
+    float3 c1 = 0;
+    float3 c2 = 0;
+    fromQuaternion(qvvs.rotation, c0, c1, c2);
+    c0 *= scale.x;
+    c1 *= scale.y;
+    c2 *= scale.z;
+    return float3x4(
+        c0.x, c1.x, c2.x, qvvs.position.x,
+        c0.y, c1.y, c2.y, qvvs.position.y,
+        c0.z, c1.z, c2.z, qvvs.position.z
+        );
+}
+
+float3x3 inverse3x3(float3x3 m)
+{
+    float3 c0 = m._m00_m10_m20;
+    float3 c1 = m._m01_m11_m21;
+    float3 c2 = m._m02_m12_m22;
+
+    float3 t0 = float3(c1.x, c2.x, c0.x);
+    float3 t1 = float3(c1.y, c2.y, c0.y);
+    float3 t2 = float3(c1.z, c2.z, c0.z);
+
+    float3 m0 = t1 * t2.yzx - t1.yzx * t2;
+    float3 m1 = t0.yzx * t2 - t0 * t2.yzx;
+    float3 m2 = t0 * t1.yzx - t0.yzx * t1;
+
+    float det = csum(t0.zxy * m0);
+
+    if (abs(det) < kEpsilon)
+    {
+        return float3x3(
+            1.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 1.0f);
+    }
+    else
+    {
+        return float3x3(m0, m1, m2) * rcp(det);
+    }
+}
+
+float3x4 inverseAffine(float3x4 m)
+{
+    float3x3 inv = inverse3x3((float3x3)m);
+    float3 trans = float3(m._m03, m._m13, m._m23);
+    float3 invTrans = -mul(trans, inv);
+    return float3x4(
+        inv._m00, inv._m10, inv._m20, invTrans.x,
+        inv._m01, inv._m11, inv._m21, invTrans.y,
+        inv._m02, inv._m12, inv._m22, invTrans.z);
+}
+
+void CopyMatrix_4x4(Operation operation, uint din, uint dout)
+{
+    float3x4 orig = loadMatrixSrc(srcBuffer, operation.srcOffset + din);
+    storeMatrixDst_4x4(dstBuffer, operation.dstOffset + dout, orig);
+}
+
+void CopyMatrix_3x4(Operation operation, uint din, uint dout)
+{
+    float3x4 orig = loadMatrixSrc(srcBuffer, operation.srcOffset + din);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffset + dout, orig);
+}
+
+void CopyAndInverseMatrix_4x4(Operation operation, uint din, uint dout)
+{
+    float3x4 orig = loadMatrixSrc(srcBuffer, operation.srcOffset + din);
+    float3x4 inv = inverseAffine(orig);
+    storeMatrixDst_4x4(dstBuffer, operation.dstOffset + dout, orig);
+    storeMatrixDst_4x4(dstBuffer, operation.dstOffsetExtra + dout, inv);
+}
+
+void CopyAndInverseMatrix_3x4(Operation operation, uint din, uint dout)
+{
+    float3x4 orig = loadMatrixSrc(srcBuffer, operation.srcOffset + din);
+    float3x4 inv = inverseAffine(orig);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffset + dout, orig);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffsetExtra + dout, inv);
+}
+
+void CopyAndConvertQvvs_3x4(Operation operation, uint din, uint dout)
+{
+    Qvvs orig = loadQvvsSrc(srcBuffer, operation.srcOffset + din);
+    float3x4 cvt = convertQvvsToFloat3x4(orig);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffset + dout, cvt);
+}
+
+// Todo: Invert QVVS instead of matrix?
+void CopyConvertAndInvertQvvs_3x4(Operation operation, uint din, uint dout)
+{
+    Qvvs orig = loadQvvsSrc(srcBuffer, operation.srcOffset + din);
+    float3x4 cvt = convertQvvsToFloat3x4(orig);
+    float3x4 inv = inverseAffine(cvt);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffset + dout, cvt);
+    storeMatrixDst_3x4(dstBuffer, operation.dstOffsetExtra + dout, inv);
+}
+
+#define NUM_MATRIX_INPUT_BYTES_PER_THREAD 48
+#define NUM_MATRIX_INPUT_BYTES_PER_GROUP (GROUP_SIZE * NUM_MATRIX_INPUT_BYTES_PER_THREAD)
+#define NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_4x4 64
+#define NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_4x4 (GROUP_SIZE * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_4x4)
+#define NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4 48
+#define NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_3x4 (GROUP_SIZE * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4)
+
+void MatricesToGPU_4x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_4x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyMatrix_4x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_4x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyMatrix_4x4(operation, inputIndex, outputIndex);
+    }
+}
+
+void MatricesToGPU_3x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyMatrix_3x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_3x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyMatrix_3x4(operation, inputIndex, outputIndex);
+    }
+}
+
+void InverseMatricesToGPU_4x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_4x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyAndInverseMatrix_4x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_4x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyAndInverseMatrix_4x4(operation, inputIndex, outputIndex);
+    }
+}
+
+void InverseMatricesToGPU_3x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyAndInverseMatrix_3x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_3x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyAndInverseMatrix_3x4(operation, inputIndex, outputIndex);
+    }
+}
+
+void QvvsToGPU_3x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyAndConvertQvvs_3x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_3x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyAndConvertQvvs_3x4(operation, inputIndex, outputIndex);
+    }
+}
+
+void InverseQvvsToGPU_3x4(Operation operation, uint threadID)
+{
+    uint numFullWaves = operation.size / NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+    uint inputIndex = threadID * NUM_MATRIX_INPUT_BYTES_PER_THREAD;
+    uint outputIndex = threadID * NUM_MATRIX_OUTPUT_BYTES_PER_THREAD_3x4;
+
+    for (uint i = 0; i < numFullWaves; ++i)
+    {
+        CopyConvertAndInvertQvvs_3x4(operation, inputIndex, outputIndex);
+        inputIndex += NUM_MATRIX_INPUT_BYTES_PER_GROUP;
+        outputIndex += NUM_MATRIX_OUTPUT_BYTES_PER_GROUP_3x4;
+    }
+
+    if (inputIndex < operation.size)
+    {
+        CopyConvertAndInvertQvvs_3x4(operation, inputIndex, outputIndex);
+    }
+}
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void CopyKernel(uint threadID : SV_GroupThreadID, uint groupID : SV_GroupID)
+{
+    Operation operation = LoadOperation(operationsBase + groupID);
+
+    if (operation.type == kOperationType_Upload)
+        CopyToGPU(operation, threadID);
+    else if (operation.type == kOperationType_Matrix_4x4)
+        MatricesToGPU_4x4(operation, threadID);
+    else if (operation.type == kOperationType_Matrix_Inverse_4x4)
+        InverseMatricesToGPU_4x4(operation, threadID);
+    else if (operation.type == kOperationType_Matrix_3x4)
+        MatricesToGPU_3x4(operation, threadID);
+    else if (operation.type == kOperationType_Matrix_Inverse_3x4)
+        InverseMatricesToGPU_3x4(operation, threadID);
+    else if (operation.type == kOperationType_StridedUpload)
+        CopyToGPUStrided(operation, threadID);
+    else if (operation.type == kOperationType_Qvvs_Matrix_3x4)
+        QvvsToGPU_3x4(operation, threadID);
+    else if (operation.type == kOperationType_Qvvs_Matrix_3x4_Inverse)
+        InverseQvvsToGPU_3x4(operation, threadID);
+}
+
+[numthreads(GROUP_SIZE, 1, 1)]
+void ReplaceKernel(uint threadID : SV_GroupThreadID, uint groupID : SV_GroupID)
+{
+    Operation operation;
+    operation.type = kOperationType_Upload;
+    operation.srcOffset = 0;
+    operation.dstOffset = 0;
+    operation.dstOffsetExtra = 0;
+    operation.size = replaceOperationSize;
+    operation.count = 1;
+
+    CopyToGPU(operation, threadID);
+}
+

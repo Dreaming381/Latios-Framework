@@ -34,7 +34,6 @@ namespace Latios.Psyshock.Authoring
     public struct ColliderBakerWorker : ISmartBakeItem<ColliderAuthoring>
     {
         SmartBlobberHandle<CompoundColliderBlob> m_handle;
-        float                                    m_scale;
 
         public bool Bake(ColliderAuthoring authoring, IBaker baker)
         {
@@ -64,14 +63,7 @@ namespace Latios.Psyshock.Authoring
                 }
             }
             var transform = smartBaker.GetComponent<Transform>();
-            var scale     = transform.lossyScale;
-            if (math.cmax(scale) - math.cmin(scale) > 1.0E-5f)
-            {
-                Debug.LogWarning(
-                    $"Failed to bake {transform.gameObject.name} as compound. Only uniform scaling is supported for compound colliders. Lossy Scale divergence was: {math.cmax(scale) - math.cmin(scale)}");
-            }
-            m_scale  = scale.x;
-            m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_compoundList, transform);
+            m_handle      = smartBaker.RequestCreateBlobAsset(smartBaker.m_compoundList, transform);
             return true;
         }
 
@@ -80,7 +72,9 @@ namespace Latios.Psyshock.Authoring
             Collider collider = new CompoundCollider
             {
                 compoundColliderBlob = m_handle.Resolve(entityManager),
-                scale                = m_scale
+                scale                = 1f,
+                stretch              = 1f,
+                stretchMode          = CompoundCollider.StretchMode.RotateStretchLocally
             };
             entityManager.AddComponentData(entity, collider);
         }

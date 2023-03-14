@@ -142,8 +142,8 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                ref var mask        = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
-                var     chunkBounds = chunk.GetChunkComponentRefRO(in chunkWorldRenderBoundsHandle);
+                ref var mask        = ref chunk.GetChunkComponentRefRW(ref perCameraCullingMaskHandle);
+                var     chunkBounds = chunk.GetChunkComponentRefRO(ref chunkWorldRenderBoundsHandle);
 
                 // Note: Unlike Entities Graphics, we always assume per-instance culling.
                 // The only way disabling per-instance culling happens is via custom code
@@ -200,8 +200,8 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                ref var mask        = ref chunk.GetChunkComponentRefRW(in perCameraCullingMaskHandle);
-                var     chunkBounds = chunk.GetChunkComponentRefRO(in chunkWorldRenderBoundsHandle);
+                ref var mask        = ref chunk.GetChunkComponentRefRW(ref perCameraCullingMaskHandle);
+                var     chunkBounds = chunk.GetChunkComponentRefRO(ref chunkWorldRenderBoundsHandle);
 
                 // Note: Unlike Entities Graphics, we always assume per-instance culling.
                 // The only way disabling per-instance culling happens is via custom code
@@ -224,7 +224,7 @@ namespace Latios.Kinemation.Systems
                 // However, for splits, it makes more sense to follow Entities Graphics approach.
                 // Therefore the actual strategy is to clear splits, enable them as we progress,
                 // and then mask the splits against our visibility mask.
-                ref var splitMasks = ref chunk.GetChunkComponentRefRW(in perCameraCullingSplitsMaskHandle);
+                ref var splitMasks = ref chunk.GetChunkComponentRefRW(ref perCameraCullingSplitsMaskHandle);
                 splitMasks         = default;
 
                 var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);

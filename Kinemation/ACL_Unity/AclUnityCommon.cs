@@ -6,11 +6,34 @@ using Unity.Mathematics;
 namespace AclUnity
 {
     [StructLayout(LayoutKind.Explicit, Size = 48)]
-    public struct Qvv
+    public struct Qvvs
     {
         [FieldOffset(0)] public quaternion rotation;
         [FieldOffset(16)] public float4    translation;
-        [FieldOffset(32)] public float4    scale;
+        [FieldOffset(32)] public float4    stretchScale;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size = 16)]
+    public struct ClipHeader
+    {
+        public enum ClipType : byte
+        {
+            Skeleton,
+            SkeletonWithUniformScales,
+            Scalars
+        }
+
+        [FieldOffset(0)] public ClipType clipType;
+        [FieldOffset(2)] public short    trackCount;
+        [FieldOffset(4)] public float    sampleRate;
+        [FieldOffset(8)] public float    duration;
+        [FieldOffset(12)] public uint    offsetToUniformScalesStartInBytes;
+
+        public static unsafe ClipHeader Read(void* compressedClip)
+        {
+            Decompression.CheckCompressedClipIsValid(compressedClip);
+            return *(ClipHeader*)compressedClip;
+        }
     }
 
     public struct SemanticVersion
@@ -18,6 +41,7 @@ namespace AclUnity
         public short major;
         public short minor;
         public short patch;
+        public bool  isPreview;
 
         public bool IsValid => major > 0 || minor > 0 || patch > 0;
         public bool IsUnrecognized => major == -1 && minor == -1 && patch == -1;
@@ -43,7 +67,31 @@ namespace AclUnity
             short patch                        = (short)(version & 0x3ff);
             short minor                        = (short)((version >> 10) & 0x3ff);
             short major                        = (short)((version >> 20) & 0x3ff);
-            return new SemanticVersion { major = major, minor = minor, patch = patch };
+            bool  isPreview                    = patch > 500;
+            patch                              = isPreview ? (short)(patch - 500) : patch;
+            return new SemanticVersion { major = major, minor = minor, patch = patch, isPreview = isPreview };
+        }
+
+        public static SemanticVersion GetUnityVersion()
+        {
+            int version = 0;
+            if (X86.Avx2.IsAvx2Supported)
+                version = AVX.getVersion();
+            else
+            {
+                //UnityEngine.Debug.Log("Fetched without AVX");
+                version = NoExtensions.getVersion();
+            }
+
+            if (version == -1)
+                return new SemanticVersion { major = -1, minor = -1, patch = -1 };
+
+            short patch                        = (short)(version & 0x3ff);
+            short minor                        = (short)((version >> 10) & 0x3ff);
+            short major                        = (short)((version >> 20) & 0x3ff);
+            bool  isPreview                    = patch > 500;
+            patch                              = isPreview ? (short)(patch - 500) : patch;
+            return new SemanticVersion { major = major, minor = minor, patch = patch, isPreview = isPreview };
         }
 
         public static string GetPluginName()
@@ -60,12 +108,16 @@ namespace AclUnity
         {
             [DllImport(dllName)]
             public static extern int getVersion();
+            [DllImport(dllName)]
+            public static extern int getUnityVersion();
         }
 
         static class AVX
         {
             [DllImport(dllNameAVX)]
             public static extern int getVersion();
+            [DllImport(dllNameAVX)]
+            public static extern int getUnityVersion();
         }
     }
 }

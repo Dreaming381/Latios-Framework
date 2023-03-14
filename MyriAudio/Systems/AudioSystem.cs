@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Latios.Transforms;
 using Unity.Audio;
 using Unity.Burst;
 using Unity.Collections;
@@ -53,10 +54,7 @@ namespace Latios.Myri.Systems
         ComponentTypeHandle<AudioSourceOneShot>     m_oneshotHandle;
         ComponentTypeHandle<AudioSourceLooped>      m_loopedHandle;
         ComponentTypeHandle<AudioSourceEmitterCone> m_coneHandle;
-        ComponentTypeHandle<Translation>            m_translationHandle;
-        ComponentTypeHandle<Rotation>               m_rotationHandle;
-        ComponentTypeHandle<LocalToWorld>           m_ltwHandle;
-        ComponentTypeHandle<Parent>                 m_parentHandle;
+        ComponentTypeHandle<WorldTransform>         m_worldTransformHandle;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -130,15 +128,12 @@ namespace Latios.Myri.Systems
                                                                                                                                                             m_ildNode);
             commandBlock.Cancel();
 
-            m_entityHandle      = state.GetEntityTypeHandle();
-            m_listenerHandle    = state.GetComponentTypeHandle<AudioListener>(true);
-            m_oneshotHandle     = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
-            m_loopedHandle      = state.GetComponentTypeHandle<AudioSourceLooped>(false);
-            m_coneHandle        = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
-            m_translationHandle = state.GetComponentTypeHandle<Translation>(true);
-            m_rotationHandle    = state.GetComponentTypeHandle<Rotation>(true);
-            m_ltwHandle         = state.GetComponentTypeHandle<LocalToWorld>(true);
-            m_parentHandle      = state.GetComponentTypeHandle<Parent>(true);
+            m_entityHandle         = state.GetEntityTypeHandle();
+            m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);
+            m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
+            m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
+            m_coneHandle           = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
+            m_worldTransformHandle = state.GetComponentTypeHandle<WorldTransform>(true);
         }
 
         [BurstCompile]
@@ -156,10 +151,7 @@ namespace Latios.Myri.Systems
             m_oneshotHandle.Update(ref state);
             m_loopedHandle.Update(ref state);
             m_coneHandle.Update(ref state);
-            m_translationHandle.Update(ref state);
-            m_rotationHandle.Update(ref state);
-            m_ltwHandle.Update(ref state);
-            m_parentHandle.Update(ref state);
+            m_worldTransformHandle.Update(ref state);
 
             var audioSettingsLookup          = GetComponentLookup<AudioSettings>(true);
             var listenerLookup               = GetComponentLookup<AudioListener>(true);
@@ -209,9 +201,7 @@ namespace Latios.Myri.Systems
             var captureListenersJH = new InitUpdateDestroy.UpdateListenersJob
             {
                 listenerHandle          = m_listenerHandle,
-                translationHandle       = m_translationHandle,
-                rotationHandle          = m_rotationHandle,
-                ltwHandle               = m_ltwHandle,
+                worldTransformHandle    = m_worldTransformHandle,
                 listenersWithTransforms = listenersWithTransforms
             }.Schedule(m_aliveListenersQuery, ecsJH);
 
@@ -272,10 +262,7 @@ namespace Latios.Myri.Systems
             updateOneshotsJH = new InitUpdateDestroy.UpdateOneshotsJob
             {
                 oneshotHandle             = m_oneshotHandle,
-                ltwHandle                 = m_ltwHandle,
-                translationHandle         = m_translationHandle,
-                rotationHandle            = m_rotationHandle,
-                parentHandle              = m_parentHandle,
+                worldTransformHandle      = m_worldTransformHandle,
                 coneHandle                = m_coneHandle,
                 audioFrame                = m_audioFrame,
                 lastPlayedAudioFrame      = m_lastPlayedAudioFrame,
@@ -290,10 +277,7 @@ namespace Latios.Myri.Systems
             updateLoopedJH = new InitUpdateDestroy.UpdateLoopedJob
             {
                 loopedHandle              = m_loopedHandle,
-                ltwHandle                 = m_ltwHandle,
-                translationHandle         = m_translationHandle,
-                rotationHandle            = m_rotationHandle,
-                parentHandle              = m_parentHandle,
+                worldTransformHandle      = m_worldTransformHandle,
                 coneHandle                = m_coneHandle,
                 audioFrame                = m_audioFrame,
                 lastConsumedBufferId      = m_lastReadBufferId,

@@ -1,0 +1,934 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel MeshSkinning
+
+// We are still dispatching a group per mesh, so we don't want this to be too small.
+// But no need to push for 1024 anymore either, as we don't use groupshared in this version.
+#define THREAD_GROUP_SIZE 256
+#define THREAD_GROUP_DIVISOR 1024/THREAD_GROUP_SIZE
+
+// We disable this warning because it assumes that we only get 16 VGPRs per thread with a threadgroup size of 1024.
+// Desktop and console support 32 per thread with good occupancy. This shader uses 30 on GCN Vega.
+#pragma warning(disable: 4714)
+
+static const uint kMeshOpSkinMatVertInSrc = 0;
+static const uint kMeshOpSkinMatVertInDst = 1;
+static const uint kMeshOpSkinDqsVertInSrc = 2;
+static const uint kMeshOpSkinDqsVertInDst = 3;
+static const uint kMeshOpSkinDqsWorldVertInDst = 4;
+
+struct BoneWeight
+{
+    float weight;
+    uint packed;
+};
+
+struct Vertex
+{
+    float3 position;
+    float3 normal;
+    float3 tangent;
+};
+
+// Can be a float3x4, a QVVS, or a DQS
+struct TransformUnion
+{
+    float4 a;
+    float4 b;
+    float4 c;
+};
+
+struct Qvvs
+{
+    float4 rotation;
+    float4 position;
+    float4 stretchScale;
+};
+
+// Dual Quaternion with Scale
+struct Dqs
+{
+    float4 r; // real
+    float4 d; // dual
+    float4 scale;
+};
+
+uniform ByteAddressBuffer                _boneWeights;
+uniform StructuredBuffer<Vertex>         _srcVertices;
+uniform StructuredBuffer<TransformUnion> _bindPoses;
+uniform StructuredBuffer<TransformUnion> _boneTransforms;
+
+// Stride of uint4
+uniform ByteAddressBuffer _metaBuffer;
+
+uniform RWStructuredBuffer<Vertex>          _dstVertices   : register(u1);
+
+uint _startOffset;
+
+void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
+{
+    float4 v2 = v + v;
+
+    uint3 npn = uint3(0x80000000, 0x00000000, 0x80000000);
+    uint3 nnp = uint3(0x80000000, 0x80000000, 0x00000000);
+    uint3 pnn = uint3(0x00000000, 0x80000000, 0x80000000);
+    c0 = v2.y * asfloat(asuint(v.yxw) ^ npn) - v2.z * asfloat(asuint(v.zwx) ^ pnn) + float3(1, 0, 0);
+    c1 = v2.z * asfloat(asuint(v.wzy) ^ nnp) - v2.x * asfloat(asuint(v.yxw) ^ npn) + float3(0, 1, 0);
+    c2 = v2.x * asfloat(asuint(v.zwx) ^ pnn) - v2.y * asfloat(asuint(v.wzy) ^ nnp) + float3(0, 0, 1);
+}
+
+float4 mulQuatQuat(float4 a, float4 b)
+{
+    return float4(a.wwww * b + (a.xyzx * b.wwwx + a.yzxy * b.zxyy) * float4(1, 1, 1, -1) - a.zxyz * b.yzxz);
+}
+
+float3x4 qvvsToMatrix(Qvvs qvvs)
+{
+    float3 scale = qvvs.stretchScale.xyz * qvvs.stretchScale.w;
+    float3 c0 = 0;
+    float3 c1 = 0;
+    float3 c2 = 0;
+    fromQuaternion(qvvs.rotation, c0, c1, c2);
+    c0 *= scale.x;
+    c1 *= scale.y;
+    c2 *= scale.z;
+    return float3x4(
+        c0.x, c1.x, c2.x, qvvs.position.x,
+        c0.y, c1.y, c2.y, qvvs.position.y,
+        c0.z, c1.z, c2.z, qvvs.position.z
+        );
+}
+
+float3x4 transformUnionMatrixToMatrix(TransformUnion transform)
+{
+    return float3x4(
+        transform.a.x, transform.a.w, transform.b.z, transform.c.y,
+        transform.a.y, transform.b.x, transform.b.w, transform.c.z,
+        transform.a.z, transform.b.y, transform.c.x, transform.c.w
+        );
+}
+
+Dqs transformUnionDqsToDqs(TransformUnion transform)
+{
+    Dqs result = (Dqs)0;
+    result.r = transform.a;
+    result.d = transform.b;
+    result.scale.xyz = transform.c.xyz;
+    return result;
+}
+
+float3x4 mul3x4(float3x4 a, float3x4 b)
+{
+    float4x4 x = 0.;
+    x._m00 = a._m00;
+    x._m10 = a._m10;
+    x._m20 = a._m20;
+    x._m30 = 0.;
+    x._m01 = a._m01;
+    x._m11 = a._m11;
+    x._m21 = a._m21;
+    x._m31 = 0.;
+    x._m02 = a._m02;
+    x._m12 = a._m12;
+    x._m22 = a._m22;
+    x._m32 = 0.;
+    x._m03 = a._m03;
+    x._m13 = a._m13;
+    x._m23 = a._m23;
+    x._m33 = 1.;
+
+    float4x4 y = 0.;
+    y._m00 = b._m00;
+    y._m10 = b._m10;
+    y._m20 = b._m20;
+    y._m30 = 0.;
+    y._m01 = b._m01;
+    y._m11 = b._m11;
+    y._m21 = b._m21;
+    y._m31 = 0.;
+    y._m02 = b._m02;
+    y._m12 = b._m12;
+    y._m22 = b._m22;
+    y._m32 = 0.;
+    y._m03 = b._m03;
+    y._m13 = b._m13;
+    y._m23 = b._m23;
+    y._m33 = 1.;
+
+    float4x4 r = mul(x, y);
+
+    float3x4 result = 0.;
+    result._m00 = r._m00;
+    result._m10 = r._m10;
+    result._m20 = r._m20;
+
+    result._m01 = r._m01;
+    result._m11 = r._m11;
+    result._m21 = r._m21;
+
+    result._m02 = r._m02;
+    result._m12 = r._m12;
+    result._m22 = r._m22;
+
+    result._m03 = r._m03;
+    result._m13 = r._m13;
+    result._m23 = r._m23;
+
+    return result;
+}
+
+[numthreads(THREAD_GROUP_SIZE, 1, 1)]
+void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+{
+    const uint groupId = groupIds.x;
+    const uint4 commandsA = _metaBuffer.Load4((groupId * 2 + _startOffset) * 16);
+    const uint4 commandsB = _metaBuffer.Load4((groupId * 2 + 1 + _startOffset) * 16);
+
+    const uint boneCount = commandsA.x & 0xffff;
+    const uint operation = commandsA.x >> 16;
+    const uint meshBindposesStart = commandsA.y;
+    const uint bonesStartIndex = commandsA.z;
+
+    const uint meshVerticesStart = commandsB.y;
+    const uint meshWeightsStart = commandsB.z;
+    const uint dstStart = commandsB.w;
+
+    if (operation == kMeshOpSkinMatVertInSrc)
+    {
+        // Skin vertices using matrices in memory and vertices from source memory.
+        const uint meshVerticesCount = _boneWeights.Load(meshWeightsStart * 8);
+        uint currentWeightBatchStart = meshWeightsStart;
+        uint nextWeightBatchStart = meshWeightsStart;
+
+        uint vertexIndexBase = 0;
+        for (vertexIndexBase = 0; vertexIndexBase + 1023 < meshVerticesCount; vertexIndexBase += 1024)
+        {
+            nextWeightBatchStart += _boneWeights.Load(currentWeightBatchStart * 8 + 4);
+            currentWeightBatchStart++;
+
+            [unroll]
+            for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                float3x4 deform = 0;
+
+                do
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+
+                    deform += skinMatrix * weight;
+                } while (!isEnd);
+
+                Vertex dstVertex = (Vertex)0;
+                Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE];
+                dstVertex.position = mul(deform, float4(vertex.position, 1));
+                dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+            }
+
+            currentWeightBatchStart = nextWeightBatchStart;
+        }
+
+        currentWeightBatchStart++;
+        [unroll]
+        for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+        {
+            if (vertexIndexBase + threadId < meshVerticesCount)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                float3x4 deform = 0;
+
+                do
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+
+                    deform += skinMatrix * weight;
+                } while (!isEnd);
+
+                Vertex dstVertex = (Vertex)0;
+                Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE];
+                dstVertex.position = mul(deform, float4(vertex.position, 1));
+                dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+            }
+        }
+    }
+    else if (operation == kMeshOpSkinMatVertInDst)
+    {
+        // Skin vertices using matrices in memory and vertices from source memory.
+        const uint meshVerticesCount = _boneWeights.Load(meshWeightsStart * 8);
+        uint currentWeightBatchStart = meshWeightsStart;
+        uint nextWeightBatchStart = meshWeightsStart;
+
+        uint vertexIndexBase = 0;
+        for (vertexIndexBase = 0; vertexIndexBase + 1023 < meshVerticesCount; vertexIndexBase += 1024)
+        {
+            nextWeightBatchStart += _boneWeights.Load(currentWeightBatchStart * 8 + 4);
+            currentWeightBatchStart++;
+
+            [unroll]
+            for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                float3x4 deform = 0;
+
+                do
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+
+                    deform += skinMatrix * weight;
+                } while (!isEnd);
+
+                Vertex dstVertex = (Vertex)0;
+                Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE];
+                dstVertex.position = mul(deform, float4(vertex.position, 1));
+                dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+            }
+
+            currentWeightBatchStart = nextWeightBatchStart;
+        }
+
+        currentWeightBatchStart++;
+        [unroll]
+        for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+        {
+            if (vertexIndexBase + threadId < meshVerticesCount)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                float3x4 deform = 0;
+
+                do
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+
+                    deform += skinMatrix * weight;
+                } while (!isEnd);
+
+                Vertex dstVertex = (Vertex)0;
+                Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE];
+                dstVertex.position = mul(deform, float4(vertex.position, 1));
+                dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+            }
+        }
+    }
+    else if (operation == kMeshOpSkinDqsVertInSrc)
+    {
+        // Skin vertices using bindpose Dual Quaternions in groupshared memory and vertices from source memory. (Part 1 / 2)
+        const uint meshVerticesCount = _boneWeights.Load(meshWeightsStart * 8);
+        uint currentWeightBatchStart = meshWeightsStart;
+        uint nextWeightBatchStart = meshWeightsStart;
+
+        uint vertexIndexBase = 0;
+        for (vertexIndexBase = 0; vertexIndexBase + 1023 < meshVerticesCount; vertexIndexBase += 1024)
+        {
+            nextWeightBatchStart += _boneWeights.Load(currentWeightBatchStart * 8 + 4);
+            currentWeightBatchStart++;
+
+            [unroll]
+            for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+
+                bool isEnd = false;
+                //float3x4 deform = 0;
+                float4 bindposeReal = 0;
+                float4 bindposeDual = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                }
+
+                {
+                    // Todo: Deform via DQS directly?
+                    float mag = length(bindposeReal);
+                    bindposeReal /= mag;
+                    bindposeDual /= mag;
+
+                    Qvvs bpQvvs = (Qvvs)0;
+                    bpQvvs.rotation = bindposeReal;
+                    bindposeReal.xyz = -bindposeReal.xyz;
+                    bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
+                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+
+                    float3x4 deform = qvvsToMatrix(bpQvvs);
+                    float3x4 scale = float3x4(
+                        localScale.x, 0, 0, 0,
+                        0, localScale.y, 0, 0,
+                        0, 0, localScale.z, 0
+                        );
+                    deform = mul3x4(scale, deform);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+
+            currentWeightBatchStart = nextWeightBatchStart;
+        }
+
+        currentWeightBatchStart++;
+        [unroll]
+        for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+        {
+            if (vertexIndexBase + threadId < meshVerticesCount)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                //float3x4 deform = 0;
+                float4 bindposeReal = 0;
+                float4 bindposeDual = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                }
+
+                {
+                    // Todo: Deform via DQS directly?
+                    float mag = length(bindposeReal);
+                    bindposeReal /= mag;
+                    bindposeDual /= mag;
+
+                    Qvvs bpQvvs = (Qvvs)0;
+                    bpQvvs.rotation = bindposeReal;
+                    bindposeReal.xyz = -bindposeReal.xyz;
+                    bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
+                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+
+                    float3x4 deform = qvvsToMatrix(bpQvvs);
+                    float3x4 scale = float3x4(
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0
+                        );
+                    deform = mul3x4(scale, deform);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+        }
+    }
+    else if (operation == kMeshOpSkinDqsVertInDst)
+    {
+        // Skin vertices using bindpose Dual Quaternions in groupshared memory and vertices from destination memory. (Part 1 / 2)
+        const uint meshVerticesCount = _boneWeights.Load(meshWeightsStart * 8);
+        uint currentWeightBatchStart = meshWeightsStart;
+        uint nextWeightBatchStart = meshWeightsStart;
+
+        uint vertexIndexBase = 0;
+        for (vertexIndexBase = 0; vertexIndexBase + 1023 < meshVerticesCount; vertexIndexBase += 1024)
+        {
+            nextWeightBatchStart += _boneWeights.Load(currentWeightBatchStart * 8 + 4);
+            currentWeightBatchStart++;
+
+            [unroll]
+            for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+
+                bool isEnd = false;
+                //float3x4 deform = 0;
+                float4 bindposeReal = 0;
+                float4 bindposeDual = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                }
+
+                {
+                    // Todo: Deform via DQS directly?
+                    float mag = length(bindposeReal);
+                    bindposeReal /= mag;
+                    bindposeDual /= mag;
+
+                    Qvvs bpQvvs = (Qvvs)0;
+                    bpQvvs.rotation = bindposeReal;
+                    bindposeReal.xyz = -bindposeReal.xyz;
+                    bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
+                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+
+                    float3x4 deform = qvvsToMatrix(bpQvvs);
+                    float3x4 scale = float3x4(
+                        localScale.x, 0, 0, 0,
+                        0, localScale.y, 0, 0,
+                        0, 0, localScale.z, 0
+                        );
+                    deform = mul3x4(scale, deform);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+
+            currentWeightBatchStart = nextWeightBatchStart;
+        }
+
+        currentWeightBatchStart++;
+        [unroll]
+        for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+        {
+            if (vertexIndexBase + threadId < meshVerticesCount)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                //float3x4 deform = 0;
+                float4 bindposeReal = 0;
+                float4 bindposeDual = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    bindposeReal += dqs.r * weight;
+                    bindposeDual += dqs.d * weight;
+                    localScale += dqs.scale.xyz * weight;
+                }
+
+                {
+                    // Todo: Deform via DQS directly?
+                    float mag = length(bindposeReal);
+                    bindposeReal /= mag;
+                    bindposeDual /= mag;
+
+                    Qvvs bpQvvs = (Qvvs)0;
+                    bpQvvs.rotation = bindposeReal;
+                    bindposeReal.xyz = -bindposeReal.xyz;
+                    bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
+                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+
+                    float3x4 deform = qvvsToMatrix(bpQvvs);
+                    float3x4 scale = float3x4(
+                        1, 0, 0, 0,
+                        0, 1, 0, 0,
+                        0, 0, 1, 0
+                        );
+                    deform = mul3x4(scale, deform);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+        }
+    }
+    if (operation == kMeshOpSkinDqsVertInSrc || operation == kMeshOpSkinDqsVertInDst)
+    {
+        // Skin vertices using World Dual Quaternions in groupshared memory and vertices from destination memory. (Part 2 / 2)
+        const uint meshVerticesCount = _boneWeights.Load(meshWeightsStart * 8);
+        DeviceMemoryBarrierWithGroupSync();
+
+        uint currentWeightBatchStart = meshWeightsStart;
+        uint nextWeightBatchStart = meshWeightsStart;
+
+        uint vertexIndexBase = 0;
+        for (vertexIndexBase = 0; vertexIndexBase + 1023 < meshVerticesCount; vertexIndexBase += 1024)
+        {
+            nextWeightBatchStart += _boneWeights.Load(currentWeightBatchStart * 8 + 4);
+            currentWeightBatchStart++;
+
+            [unroll]
+            for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+
+                bool isEnd = false;
+                //float3x4 deform = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                float4 worldReal = 0;
+                float4 worldDual = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
+                    worldReal += dqs.r * weight;
+                    worldDual += dqs.d * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    worldReal += dqs.r * weight;
+                    worldDual += dqs.d * weight;
+                }
+
+                {
+                    float mag = length(worldReal);
+                    worldReal /= mag;
+                    worldDual /= mag;
+
+                    Qvvs worldQvvs = (Qvvs)0;
+                    worldQvvs.rotation = worldReal;
+                    worldReal.xyz = -worldReal.xyz;
+                    worldQvvs.position.xyz = mulQuatQuat(2 * worldDual, worldReal).xyz;
+                    worldQvvs.stretchScale = float4(localScale, 1);
+
+                    float3x4 deform = qvvsToMatrix(worldQvvs);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+
+            currentWeightBatchStart = nextWeightBatchStart;
+        }
+
+        currentWeightBatchStart++;
+        [unroll]
+        for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
+        {
+            if (vertexIndexBase + threadId < meshVerticesCount)
+            {
+                uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
+                bool isEnd = false;
+                //float3x4 deform = 0;
+
+                float3 localScale = 0;
+                float4 firstBoneRot = 0;
+
+                float4 worldReal = 0;
+                float4 worldDual = 0;
+
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
+                    worldReal += dqs.r * weight;
+                    worldDual += dqs.d * weight;
+                    firstBoneRot = dqs.r;
+                }
+
+                while (!isEnd)
+                {
+                    uint2 temp = _boneWeights.Load2(nextWeightIndex * 8);
+                    BoneWeight boneWeight = (BoneWeight)0;
+                    boneWeight.weight = asfloat(temp.x);
+                    boneWeight.packed = temp.y;
+                    float weight = boneWeight.weight;
+                    isEnd = weight < 0.;
+                    weight = abs(weight);
+                    uint boneIndex = boneWeight.packed & 0x7fff;
+                    nextWeightIndex += boneWeight.packed >> 22;
+                    nextWeightIndex++;
+
+                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
+                    if (dot(dqs.r, firstBoneRot) < 0)
+                        dqs.r.w = -dqs.r.w;
+                    worldReal += dqs.r * weight;
+                    worldDual += dqs.d * weight;
+                }
+
+                {
+                    float mag = length(worldReal);
+                    worldReal /= mag;
+                    worldDual /= mag;
+
+                    Qvvs worldQvvs = (Qvvs)0;
+                    worldQvvs.rotation = worldReal;
+                    worldReal.xyz = -worldReal.xyz;
+                    worldQvvs.position.xyz = mulQuatQuat(2 * worldDual, worldReal).xyz;
+                    worldQvvs.stretchScale = float4(localScale, 1);
+
+                    float3x4 deform = qvvsToMatrix(worldQvvs);
+
+                    // This forces the load to be deferred until after deform is computed, saving VGPRs
+                    uint cancel = any(deform != 0) ? 1 : 0;
+
+                    Vertex dstVertex = (Vertex)0;
+                    Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
+                    dstVertex.position = mul(deform, float4(vertex.position, 1));
+                    dstVertex.normal = mul(deform, float4(vertex.normal, 0));
+                    dstVertex.tangent = mul(deform, float4(vertex.tangent, 0));
+
+                    _dstVertices[dstStart + vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE] = dstVertex;
+                }
+            }
+        }
+    }
+}

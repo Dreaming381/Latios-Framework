@@ -7,7 +7,6 @@ using Unity.Entities.Graphics;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using UnityEditor.SceneManagement;
 using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
@@ -170,7 +169,7 @@ namespace Latios.Kinemation.Systems
                     int editorRenderDataIndex = chunk.GetSharedComponentIndex(ref editorDataComponentHandle);  // Safe to call even if chunk doesn't have component
 
                     // If we can't find a culling mask, use the default
-                    ulong chunkSceneCullingMask = EditorSceneManager.DefaultSceneCullingMask;
+                    ulong chunkSceneCullingMask = UnityEditor.SceneManagement.EditorSceneManager.DefaultSceneCullingMask;
                     if (editorRenderDataIndex >= 0)
                     {
                         if (batchEditorSharedIndexToSceneMaskMap.TryGetValue(editorRenderDataIndex, out var data))

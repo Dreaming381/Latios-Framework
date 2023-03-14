@@ -413,11 +413,11 @@ namespace Latios
                     }
                 }
                 //Step 5: Get locations of new entities
-                var locations = new NativeArray<EntityLocationInChunk>(count, Allocator.Temp);
+                var locations = new NativeArray<EntityStorageInfo>(count, Allocator.Temp);
                 for (int i = 0; i < count; i++)
                 {
                     //locations[i] = eet.EntityManager.GetEntityLocationInChunk(instantiatedEntities[i]);
-                    locations[i] = em.GetEntityLocationInChunk(instantiatedEntities[i]);
+                    locations[i] = em.GetStorageInfo(instantiatedEntities[i]);
                 }
                 //Step 6: Sort chunks and build final lists
                 RadixSort.RankSortInt3(ranks, locations.Reinterpret<WrappedEntityLocationInChunk>());
@@ -429,13 +429,13 @@ namespace Latios
                 for (int i = 0; i < count; i++)
                 {
                     var loc              = locations[ranks[i]];
-                    indicesInChunks[i]   = loc.indexInChunk;
+                    indicesInChunks[i]   = loc.IndexInChunk;
                     componentDataPtrs[i] = sortedComponentDataPtrs[ranks[i]];
-                    if (loc.chunk != lastChunk)
+                    if (loc.Chunk != lastChunk)
                     {
-                        chunks.AddNoResize(loc.chunk);
+                        chunks.AddNoResize(loc.Chunk);
                         chunkRanges.AddNoResize(new int2(i, 1));
-                        lastChunk = loc.chunk;
+                        lastChunk = loc.Chunk;
                     }
                     else
                     {
@@ -447,14 +447,14 @@ namespace Latios
 
             struct WrappedEntityLocationInChunk : IRadixSortableInt3
             {
-                public EntityLocationInChunk elic;
+                public EntityStorageInfo elic;
 
                 public int3 GetKey3()
                 {
-                    var c = elic.ChunkAddressAsUlong;
+                    var c = elic.Chunk.GetChunkPtrAsUlong();
                     int x = (int)(c >> 32);
                     int y = (int)(c & 0xFFFFFFFF);
-                    int z = elic.indexInChunk;
+                    int z = elic.IndexInChunk;
                     return new int3(x, y, z);
                 }
             }

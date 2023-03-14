@@ -354,6 +354,42 @@ namespace Latios.Unsafe
                 UnsafeUtility.CopyPtrToStructure(m_readAddress, out T t);
                 return t;
             }
+
+            internal Enumerator GetNextThreadEnumerator()
+            {
+                return new Enumerator(m_perThreadBlockList + 1, m_elementSize, m_elementsPerBlock);
+            }
+        }
+
+        public AllThreadsEnumerator GetEnumerator()
+        {
+            return new AllThreadsEnumerator(new Enumerator(m_perThreadBlockLists, m_elementSize, m_elementsPerBlock));
+        }
+
+        public struct AllThreadsEnumerator
+        {
+            Enumerator m_enumerator;
+            int        m_threadIndex;
+
+            internal AllThreadsEnumerator(Enumerator thread0Enumerator)
+            {
+                m_enumerator  = thread0Enumerator;
+                m_threadIndex = 0;
+            }
+
+            public bool MoveNext()
+            {
+                while (!m_enumerator.MoveNext())
+                {
+                    m_threadIndex++;
+                    if (m_threadIndex >= JobsUtility.MaxJobThreadCount)
+                        return false;
+                    m_enumerator = m_enumerator.GetNextThreadEnumerator();
+                }
+                return true;
+            }
+
+            public T GetCurrent<T>() where T : struct => m_enumerator.GetCurrent<T>();
         }
     }
 

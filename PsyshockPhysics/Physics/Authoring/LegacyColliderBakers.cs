@@ -21,19 +21,11 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!m_helper.ShouldBake(authoring))
                 return;
 
-            var    transform  = GetComponent<UnityEngine.Transform>();
-            float3 lossyScale = transform.lossyScale;
-            if (math.cmax(lossyScale) - math.cmin(lossyScale) > 1.0E-5f)
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"Failed to bake {authoring.gameObject.name}. Only uniform scaling is supported on SphereCollider. Lossy Scale divergence was: {math.cmax(lossyScale) - math.cmin(lossyScale)}");
-                return;
-            }
-
             AddComponent((Collider) new SphereCollider
             {
-                center = authoring.center,
-                radius = authoring.radius * transform.localScale.x
+                center      = authoring.center,
+                radius      = authoring.radius,
+                stretchMode = SphereCollider.StretchMode.StretchCenter
             });
         }
     }
@@ -53,15 +45,6 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!m_helper.ShouldBake(authoring))
                 return;
 
-            var    transform  = GetComponent<UnityEngine.Transform>();
-            float3 lossyScale = transform.lossyScale;
-            if (math.cmax(lossyScale) - math.cmin(lossyScale) > 1.0E-5f)
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"Failed to bake {authoring.gameObject.name}. Only uniform scaling is supported on CapsuleCollider. Lossy Scale divergence was: {math.cmax(lossyScale) - math.cmin(lossyScale)}");
-                return;
-            }
-
             float3 dir;
             if (authoring.direction == 0)
             {
@@ -77,9 +60,10 @@ namespace Latios.Psyshock.Authoring.Systems
             }
             AddComponent((Collider) new CapsuleCollider
             {
-                pointB = (float3)authoring.center + ((authoring.height / 2f - authoring.radius) * authoring.transform.lossyScale.x * dir),
-                pointA = (float3)authoring.center - ((authoring.height / 2f - authoring.radius) * authoring.transform.lossyScale.x * dir),
-                radius = authoring.radius * authoring.transform.lossyScale.x
+                pointB      = (float3)authoring.center + ((authoring.height / 2f - authoring.radius) * dir),
+                pointA      = (float3)authoring.center - ((authoring.height / 2f - authoring.radius) * dir),
+                radius      = authoring.radius,
+                stretchMode = CapsuleCollider.StretchMode.StretchPoints
             });
         }
     }
@@ -99,13 +83,10 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!m_helper.ShouldBake(authoring))
                 return;
 
-            var    transform  = GetComponent<UnityEngine.Transform>();
-            float3 lossyScale = transform.lossyScale;
-
             AddComponent((Collider) new BoxCollider
             {
                 center   = authoring.center,
-                halfSize = authoring.size * lossyScale / 2f
+                halfSize = authoring.size / 2f
             });
         }
     }
@@ -113,7 +94,6 @@ namespace Latios.Psyshock.Authoring.Systems
     public struct LegacyConvexColliderBakerWorker : ISmartBakeItem<UnityEngine.MeshCollider>
     {
         SmartBlobberHandle<ConvexColliderBlob> m_handle;
-        float3                                 m_lossyScale;
 
         public bool Bake(UnityEngine.MeshCollider authoring, IBaker baker)
         {
@@ -123,8 +103,7 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!(baker as LegacyConvexColliderBaker).m_helper.ShouldBake(authoring))
                 return false;
 
-            m_handle     = baker.RequestCreateBlobAsset(authoring.sharedMesh);
-            m_lossyScale = baker.GetComponent<UnityEngine.Transform>().lossyScale;
+            m_handle = baker.RequestCreateBlobAsset(authoring.sharedMesh);
             return m_handle.IsValid;
         }
 
@@ -133,7 +112,7 @@ namespace Latios.Psyshock.Authoring.Systems
             Collider collider = new ConvexCollider
             {
                 convexColliderBlob = m_handle.Resolve(entityManager),
-                scale              = m_lossyScale
+                scale              = 1f
             };
             entityManager.AddComponentData(entity, collider);
         }
@@ -201,13 +180,6 @@ namespace Latios.Psyshock.Authoring.Systems
             if (smartBaker.m_colliderCache.Count < 2)
                 return false;
 
-            var scale = transform.lossyScale;
-            if (math.cmax(scale) - math.cmin(scale) > 1.0E-5f)
-            {
-                UnityEngine.Debug.LogWarning(
-                    $"Failed to bake {transform.gameObject.name} as compound. Only uniform scaling is supported for compound colliders. Lossy Scale divergence was: {math.cmax(scale) - math.cmin(scale)}");
-            }
-            m_scale  = scale.x;
             m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_colliderCache, transform);
             return true;
         }
@@ -217,7 +189,8 @@ namespace Latios.Psyshock.Authoring.Systems
             Collider collider = new CompoundCollider
             {
                 compoundColliderBlob = m_handle.Resolve(entityManager),
-                scale                = m_scale
+                scale                = 1f,
+                stretch              = 1f
             };
             entityManager.AddComponentData(entity, collider);
         }

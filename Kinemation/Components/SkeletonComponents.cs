@@ -1,10 +1,10 @@
 using System;
 using System.Runtime.InteropServices;
+using Latios.Transforms;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Kinemation
 {
@@ -137,13 +137,13 @@ namespace Latios.Kinemation
     [InternalBufferCapacity(0)]
     public struct BoneReference : IBufferElementData
     {
-        public EntityWith<LocalToWorld> bone;
+        public EntityWith<WorldTransform> bone;
     }
 
     /// <summary>
     /// An optional flag component which specifies if the bone entities
     /// need to be resynced with the BoneReference buffer
-    /// Usage: If a skeleton has this component and a value of true,
+    /// Usage: If a skeleton has this component and its enabled,
     /// it will synchronize its skeleton with all the bones in the buffer,
     /// populating the BoneIndex, removing old bones from culling, and
     /// allowing new bones to report culling.
@@ -151,9 +151,8 @@ namespace Latios.Kinemation
     /// required if you modify the BoneReference buffer after that system
     /// has ran on the skeleton entity once.
     /// </summary>
-    public struct BoneReferenceIsDirtyFlag : IComponentData
+    public struct BoneReferenceIsDirtyFlag : IComponentData, IEnableableComponent
     {
-        public bool isDirty;
     }
 
     #endregion
@@ -170,20 +169,11 @@ namespace Latios.Kinemation
         /// </summary>
         public BlobArray<short> parentIndices;
         /// <summary>
-        /// A bit array specifying if a bone expects ParentScaleInverse behavior to be applied.
-        /// This allows animators to achieve extreme and often cartoony expressions.
+        /// The indices of each bone's children. If the bone does not have children,
+        /// The inner blob array at the bone's index is empty.
+        /// A maximum of 32767 bones is supported.
         /// </summary>
-        public BlobArray<BitField64> hasParentScaleInverseBitmask;
-        /// <summary>
-        /// A bit array specifying if a bone needs to calculate an inverse scale because a
-        /// child requires it for ParentScaleInverse behavior.
-        /// </summary>
-        public BlobArray<BitField64> hasChildWithParentScaleInverseBitmask;
-        /// <summary>
-        /// If true, at least one bone expects ParentScaleInverse behavior to be applied.
-        /// Some fast-paths may be enabled when this value is false.
-        /// </summary>
-        public bool hasAnyParentScaleInverseBone;
+        public BlobArray<BlobArray<short> > childrenIndices;
     }
 
     /// <summary>
@@ -196,26 +186,58 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// The bone matrices of an optimized hierarchy which get copied to exported bones
-    /// and uploaded to the GPU for skinning
-    /// Usage: Read or Write for Animations
-    /// When animating an optimized hierarchy, you must write to this buffer.
-    /// The matrices are the bone transform relative to the root. Use the
-    /// OptimizedSkeletonHierarchyBlobReference to compute hierarchical transforms.
+    /// The bone transforms of an optimized skeleton. Each bone has 3 sets of two transforms,
+    /// for a total of 6 transforms. In each set, there is a local space and root space transform.
+    /// The three sets provide the current frame, previous frame, and 2 frames prior transforms.
+    /// The roles of the three sets are rotated every frame. The sequence of transforms is as follows:
+    /// - All setA root transforms
+    /// - All setA local transforms
+    /// - All setB root transforms
+    /// - All setB local transforms
+    /// - All setC root transforms
+    /// - All setC local transforms
+    /// Usage: Prefer to use OptimizedSkeletonAspect instead of this component directly.
     /// </summary>
     [InternalBufferCapacity(0)]
-    public struct OptimizedBoneToRoot : IBufferElementData
+    public struct OptimizedBoneTransform : IBufferElementData
     {
-        public float4x4 boneToRoot;
+        public TransformQvvs boneTransform;
     }
 
     /// <summary>
-    /// Describes an exported bone entity which should inherit the transform of an
-    /// optimized bone.
+    /// The control state for an optimized skeleton. This component keeps track of the transform set rotations,
+    /// whether or not anything interacted with the pose during the frame, and animation sampling and blending
+    /// statuses.
+    /// Usage: Prefer to use OptimizedSkeletonAspect instead of this component directly.
+    /// </summary>
+    public struct OptimizedSkeletonState : IComponentData
+    {
+        public enum Flags : byte
+        {
+            RotationMask = 0x07,
+            WasPreviousDirty = 0x04,
+            NeedsHistorySync = 0x10,
+            IsDirty = 0x20,
+            NextSampleShouldAdd = 0x40,
+            NeedsSync = 0x80
+        }
+
+        public Flags state;
+
+        // mask & 3 == current write set
+        // mask & 4 == wasPreviousDirty
+        // mask != 3
+        internal static readonly int[] CurrentFromMask      = { 0, 1, 2, 0, 0, 1, 2 };
+        internal static readonly int[] TickStartingFromMask = { 2, 0, 1, 2, 2, 0, 1};
+        internal static readonly int[] PreviousFromMask     = { 2, 0, 1, 1, 1, 2, 0};
+    }
+
+    /// <summary>
+    /// Describes an exported bone entity which should inherit the root transform
+    /// of an optimized bone as the the entity's LocalTransform.
     /// Usage: Add to an entity to make it track a bone in an optimized skeleton.
     /// The exported bone should be parented to the skeleton entity.
     /// </summary>
-    [WriteGroup(typeof(LocalToParent))]
     public struct CopyLocalToParentFromBone : IComponentData
     {
         public short boneIndex;

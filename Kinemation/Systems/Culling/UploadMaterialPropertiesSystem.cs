@@ -1,4 +1,7 @@
+using System.Collections.Generic;
 using Latios;
+using Latios.Kinemation.SparseUpload;
+using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -7,22 +10,20 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
 using UnityEngine.Profiling;
-using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class UploadMaterialPropertiesSystem : SubSystem
+    public partial class UploadMaterialPropertiesSystem : CullingComputeDispatchSubSystemBase
     {
         EntityQuery m_metaQuery;
 
         private UnityEngine.GraphicsBuffer        m_GPUPersistentInstanceData;
         internal UnityEngine.GraphicsBufferHandle m_GPUPersistentInstanceBufferHandle;
-        private SparseUploader                    m_GPUUploader;
-        private ThreadedSparseUploader            m_ThreadedGPUUploader;
+        private LatiosSparseUploader              m_GPUUploader;
+        private LatiosThreadedSparseUploader      m_ThreadedGPUUploader;
 
         private long m_persistentInstanceDataSize;
 
@@ -30,6 +31,8 @@ namespace Latios.Kinemation.Systems
         const long kGPUBufferSizeInitial = 32 * 1024 * 1024;
 
         internal ComponentTypeCache.BurstCompatibleTypeArray m_burstCompatibleTypeArray;
+
+        bool m_firstTimeThisFrame = false;
 
 #if DEBUG_LOG_MEMORY_USAGE
         private static ulong PrevUsedSpace = 0;
@@ -47,7 +50,15 @@ namespace Latios.Kinemation.Systems
                 (int)m_persistentInstanceDataSize / 4,
                 4);
             m_GPUPersistentInstanceBufferHandle = m_GPUPersistentInstanceData.bufferHandle;
-            m_GPUUploader                       = new SparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
+            m_GPUUploader                       = new LatiosSparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
+        }
+
+        public override bool ShouldUpdateSystem()
+        {
+            // Todo: We need a more consistent way to check that this is the first time.
+            if (worldBlackboardEntity.GetComponentData<CullingContext>().cullIndexThisFrame == 0)
+                m_firstTimeThisFrame = true;
+            return base.ShouldUpdateSystem();
         }
 
         // Todo: Get rid of the hard system dependencies.
@@ -75,134 +86,126 @@ namespace Latios.Kinemation.Systems
             return false;
         }
 
-        protected override unsafe void OnUpdate()
+        protected override IEnumerable<bool> UpdatePhase()
         {
-            Profiler.BeginSample("GetBlackboardData");
-            var context               = worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(false);
-            var materialPropertyTypes = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true);
-            Profiler.EndSample();
-
-            // Conservative estimate is that every known type is in every chunk. There will be
-            // at most one operation per type per chunk, which will be either an actual
-            // chunk data upload, or a default value blit (a single type should not have both).
-            int conservativeMaximumGpuUploads = context.hybridRenderedChunkCount * materialPropertyTypes.Length;
-            var gpuUploadOperations           = new NativeArray<GpuUploadOperation>(
-                conservativeMaximumGpuUploads,
-                Allocator.TempJob,
-                NativeArrayOptions.UninitializedMemory);
-            var numGpuUploadOperations = new NativeReference<int>(
-                Allocator.TempJob,
-                NativeArrayOptions.ClearMemory);
-
-            m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
-            Dependency = new ComputeOperationsJob
+            while (true)
             {
-                ChunkHeader                     = GetComponentTypeHandle<ChunkHeader>(true),
-                ChunkProperties                 = context.chunkProperties,
-                chunkPropertyDirtyMaskHandle    = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                chunkPerCameraCullingMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                ComponentTypes                  = m_burstCompatibleTypeArray,
-                GpuUploadOperations             = gpuUploadOperations,
-                EntitiesGraphicsChunkInfo       = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                LocalToWorldType                = TypeManager.GetTypeIndex<LocalToWorld>(),
-                NumGpuUploadOperations          = numGpuUploadOperations,
-                PrevLocalToWorldType            = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
-                PrevWorldToLocalType            = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
-                WorldToLocalType                = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
-            }.ScheduleParallel(m_metaQuery, Dependency);
-            CompleteDependency();
-            Dependency = default;
+                if (!GetPhaseActions(CullingComputeDispatchState.Collect, out var terminate))
+                {
+                    yield return false;
+                    continue;
+                }
+                if (terminate)
+                    break;
 
-            UnityEngine.Debug.Assert(numGpuUploadOperations.Value <= gpuUploadOperations.Length, "Maximum GPU upload operation count exceeded");
+                var context               = worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(true);
+                var materialPropertyTypes = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true);
+                var culling               = worldBlackboardEntity.GetComponentData<CullingContext>();
 
-            ComputeUploadSizeRequirements(
-                numGpuUploadOperations.Value, gpuUploadOperations, context.valueBlits,
-                out int numOperations, out int totalUploadBytes, out int biggestUploadBytes);
+                // Conservative estimate is that every known type is in every chunk. There will be
+                // at most one operation per type per chunk, which will be either an actual
+                // chunk data upload, or a default value blit (a single type should not have both).
+                int conservativeMaximumGpuUploads = context.hybridRenderedChunkCount * materialPropertyTypes.Length;
+                var gpuUploadOperations           = CollectionHelper.CreateNativeArray<GpuUploadOperation>(
+                    conservativeMaximumGpuUploads,
+                    WorldUpdateAllocator,
+                    NativeArrayOptions.UninitializedMemory);
+                var numGpuUploadOperations = new NativeReference<int>(
+                    WorldUpdateAllocator,
+                    NativeArrayOptions.ClearMemory);
+
+                m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
+                var collectJh = new ComputeOperationsJob
+                {
+                    ChunkHeader                       = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
+                    ChunkProperties                   = context.chunkProperties,
+                    chunkPropertyDirtyMaskHandle      = SystemAPI.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                    chunkPerCameraCullingMaskHandle   = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                    ComponentTypes                    = m_burstCompatibleTypeArray,
+                    GpuUploadOperations               = gpuUploadOperations,
+                    EntitiesGraphicsChunkInfo         = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                    WorldTransformType                = TypeManager.GetTypeIndex<WorldTransform>(),
+                    NumGpuUploadOperations            = numGpuUploadOperations,
+                    TickStartingTransformType         = TypeManager.GetTypeIndex<TickStartingTransform>(),
+                    TickStartingTransformPreviousType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+                    WorldTransformInverseType         = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
+                    postProcessMatrixHandle           = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
+                    previousPostProcessMatrixHandle   = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true)
+                }.ScheduleParallel(m_metaQuery, Dependency);
+
+                var uploadSizeRequirements = new NativeReference<UploadSizeRequirements>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+                Dependency                 = new ComputeUploadSizeRequirementsJob
+                {
+                    numGpuUploadOperations = numGpuUploadOperations,
+                    gpuUploadOperations    = gpuUploadOperations,
+                    valueBlits             = context.valueBlits,
+                    requirements           = uploadSizeRequirements
+                }.Schedule(collectJh);
+
+                yield return true;
+
+                if (!GetPhaseActions(CullingComputeDispatchState.Write, out terminate))
+                    continue;
+                if (terminate)
+                    break;
+
+                UnityEngine.Debug.Assert(numGpuUploadOperations.Value <= gpuUploadOperations.Length, "Maximum GPU upload operation count exceeded");
 
 #if DEBUG_LOG_UPLOADS
-            if (numOperations > 0)
-            {
-                Debug.Log($"GPU upload operations: {numOperations}, GPU upload bytes: {totalUploadBytes}");
-            }
+                if (numOperations > 0)
+                {
+                    Debug.Log($"GPU upload operations: {numOperations}, GPU upload bytes: {totalUploadBytes}");
+                }
 #endif
 
-            // BeginUpdate()
-            Profiler.BeginSample("StartUpdate");
+                // Todo: Once blits are removed in newer Entities versions, we can add early-out checks here.
+                var sizeRequirements  = uploadSizeRequirements.Value;
+                m_ThreadedGPUUploader = m_GPUUploader.Begin(sizeRequirements.totalUploadBytes, sizeRequirements.biggestUploadBytes, sizeRequirements.numOperations);
 
-            m_ThreadedGPUUploader = m_GPUUploader.Begin(totalUploadBytes, biggestUploadBytes, numOperations);
-            Profiler.EndSample();
+                // This is a different update, so we need to resecure this collection component.
+                // Also, this time we write to it.
+                context = worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(false);
 
-            new ExecuteGpuUploads
-            {
-                GpuUploadOperations    = gpuUploadOperations,
-                ThreadedSparseUploader = m_ThreadedGPUUploader,
-            }.Schedule(numGpuUploadOperations.Value, 1).Complete();
-            numGpuUploadOperations.Dispose();
-            gpuUploadOperations.Dispose();
+                var writeJh = new ExecuteGpuUploads
+                {
+                    GpuUploadOperations    = gpuUploadOperations,
+                    ThreadedSparseUploader = m_ThreadedGPUUploader,
+                }.Schedule(numGpuUploadOperations.Value, 1, Dependency);
 
-            // UploadAllBlits()
-            // Todo: Do only on first culling pass?
-            Profiler.BeginSample("UploadAllBlits");
-            UploadBlitJob uploadJob = new UploadBlitJob()
-            {
-                BlitList               = context.valueBlits,
-                ThreadedSparseUploader = m_ThreadedGPUUploader
-            };
-            Profiler.EndSample();
+                // Todo: Do only on first culling pass?
+                UploadBlitJob uploadJob = new UploadBlitJob()
+                {
+                    BlitList               = context.valueBlits,
+                    ThreadedSparseUploader = m_ThreadedGPUUploader
+                };
+                writeJh    = uploadJob.ScheduleByRef(context.valueBlits.Length, 1, writeJh);
+                Dependency = new ClearBlitsJob { blits = context.valueBlits }.Schedule(writeJh);
 
-            uploadJob.Schedule(context.valueBlits.Length, 1).Complete();
-            context.valueBlits.Clear();
+                yield return true;
 
-            Profiler.BeginSample("EndUpdate");
-            try
-            {
-                m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader);
+                if (!GetPhaseActions(CullingComputeDispatchState.Dispatch, out terminate))
+                    continue;
+
+                try
+                {
+                    m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader, m_firstTimeThisFrame);
+                    m_firstTimeThisFrame = false;
+                }
+                finally
+                {
+                    m_GPUUploader.FrameCleanup();
+                }
+
+                if (terminate)
+                    break;
             }
-            finally
-            {
-                m_GPUUploader.FrameCleanup();
-            }
-            Profiler.EndSample();
         }
 
-        protected override void OnDestroy()
+        protected override void OnDestroyDispatchSystem()
         {
             m_GPUUploader.Dispose();
             m_GPUPersistentInstanceData.Dispose();
             m_burstCompatibleTypeArray.Dispose(default);
-        }
-
-        private void ComputeUploadSizeRequirements(
-            int numGpuUploadOperations,
-            NativeArray<GpuUploadOperation> gpuUploadOperations,
-            NativeList<ValueBlitDescriptor> valueBlits,
-            out int _numOperations,
-            out int _totalUploadBytes,
-            out int _biggestUploadBytes)
-        {
-            var numOperations      = numGpuUploadOperations + valueBlits.Length;
-            var totalUploadBytes   = 0;
-            var biggestUploadBytes = 0;
-            Job.WithCode(() =>
-            {
-                for (int i = 0; i < numGpuUploadOperations; ++i)
-                {
-                    var numBytes        = gpuUploadOperations[i].BytesRequiredInUploadBuffer;
-                    totalUploadBytes   += numBytes;
-                    biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
-                }
-
-                for (int i = 0; i < valueBlits.Length; ++i)
-                {
-                    var numBytes        = valueBlits[i].BytesRequiredInUploadBuffer;
-                    totalUploadBytes   += numBytes;
-                    biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
-                }
-            }).Run();
-
-            _numOperations      = numOperations;
-            _totalUploadBytes   = totalUploadBytes;
-            _biggestUploadBytes = biggestUploadBytes;
         }
 
         [BurstCompile]
@@ -212,12 +215,14 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>       chunkPropertyDirtyMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>               ChunkHeader;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>         postProcessMatrixHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousPostProcessMatrix> previousPostProcessMatrixHandle;
 
             [ReadOnly] public NativeArray<ChunkProperty> ChunkProperties;
-            public int                                   LocalToWorldType;
-            public int                                   WorldToLocalType;
-            public int                                   PrevLocalToWorldType;
-            public int                                   PrevWorldToLocalType;
+            public int                                   WorldTransformType;
+            public int                                   WorldTransformInverseType;
+            public int                                   TickStartingTransformType;
+            public int                                   TickStartingTransformPreviousType;
 
             [NativeDisableParallelForRestriction] public NativeArray<GpuUploadOperation> GpuUploadOperations;
             [NativeDisableParallelForRestriction] public NativeReference<int>            NumGpuUploadOperations;
@@ -263,9 +268,9 @@ namespace Latios.Kinemation.Systems
                     {
                         var chunkProperty = ChunkProperties[i];
                         var type          = chunkProperty.ComponentTypeIndex;
-                        if (type == WorldToLocalType)
+                        if (type == WorldTransformInverseType)
                             dstOffsetWorldToLocal = chunkProperty.GPUDataBegin;
-                        else if (type == PrevWorldToLocalType)
+                        else if (type == TickStartingTransformPreviousType)
                             dstOffsetPrevWorldToLocal = chunkProperty.GPUDataBegin;
                     }
 
@@ -276,8 +281,8 @@ namespace Latios.Kinemation.Systems
                         var typeIndex     = ComponentTypes.TypeIndexToArrayIndex[ComponentTypeCache.GetArrayIndex(chunkProperty.ComponentTypeIndex)];
 
                         var chunkType          = chunkProperty.ComponentTypeIndex;
-                        var isLocalToWorld     = chunkType == LocalToWorldType;
-                        var isPrevLocalToWorld = chunkType == PrevLocalToWorldType;
+                        var isLocalToWorld     = chunkType == WorldTransformType;
+                        var isPrevLocalToWorld = chunkType == TickStartingTransformType;
 
                         bool copyComponentData = typeIndex >= 64 ? dirtyMask.upper.IsSet(typeIndex - 64) : dirtyMask.lower.IsSet(typeIndex);
 
@@ -299,18 +304,21 @@ namespace Latios.Kinemation.Systems
                             var dstOffset = chunkProperty.GPUDataBegin;
                             if (isLocalToWorld || isPrevLocalToWorld)
                             {
-                                var numMatrices = sizeBytes / sizeof(float4x4);
-                                AddMatrixUpload(
+                                var numQvvs = sizeBytes / sizeof(TransformQvvs);
+
+                                void* extraPtr = null;
+                                if (isLocalToWorld)
+                                    extraPtr = chunk.GetComponentDataPtrRO(ref postProcessMatrixHandle);
+                                else
+                                    extraPtr = chunk.GetComponentDataPtrRO(ref previousPostProcessMatrixHandle);
+
+                                AddQvvsUpload(
                                     srcPtr,
-                                    numMatrices,
+                                    numQvvs,
                                     dstOffset,
                                     isLocalToWorld ? dstOffsetWorldToLocal : dstOffsetPrevWorldToLocal,
-                                    (chunkProperty.ValueSizeBytesCPU == 4 * 4 * 3) ?
-                                    ThreadedSparseUploader.MatrixType.MatrixType3x4 :
-                                    ThreadedSparseUploader.MatrixType.MatrixType4x4,
-                                    (chunkProperty.ValueSizeBytesGPU == 4 * 4 * 3) ?
-                                    ThreadedSparseUploader.MatrixType.MatrixType3x4 :
-                                    ThreadedSparseUploader.MatrixType.MatrixType4x4);
+                                    extraPtr
+                                    );
                             }
                             else
                             {
@@ -380,6 +388,226 @@ namespace Latios.Kinemation.Systems
                     // Debug.Assert(false, "Maximum amount of GPU upload operations exceeded");
                 }
             }
+
+            private unsafe void AddQvvsUpload(
+                void* srcPtr,
+                int numQvvs,
+                int dstOffset,
+                int dstOffsetInverse,
+                void* srcExtraPtr)
+            {
+                int* numGpuUploadOperations = (int*)NumGpuUploadOperations.GetUnsafePtr();
+                int  index                  = System.Threading.Interlocked.Add(ref numGpuUploadOperations[0], 1) - 1;
+
+                if (index < GpuUploadOperations.Length)
+                {
+                    GpuUploadOperations[index] = new GpuUploadOperation
+                    {
+                        Kind = (srcExtraPtr == null) ?
+                               GpuUploadOperation.UploadOperationKind.SOAQvvsUpload3x4 :
+                               GpuUploadOperation.UploadOperationKind.SOACombineQvvsMatrixUpload3x4,
+                        Src              = srcPtr,
+                        SrcExtra         = srcExtraPtr,
+                        DstOffset        = dstOffset,
+                        DstOffsetInverse = dstOffsetInverse,
+                        Size             = numQvvs,
+                    };
+                }
+                else
+                {
+                    // Debug.Assert(false, "Maximum amount of GPU upload operations exceeded");
+                }
+            }
+        }
+
+        struct UploadSizeRequirements
+        {
+            public int numOperations;
+            public int totalUploadBytes;
+            public int biggestUploadBytes;
+        }
+
+        [BurstCompile]
+        struct ComputeUploadSizeRequirementsJob : IJob
+        {
+            [ReadOnly] public NativeReference<int>            numGpuUploadOperations;
+            [ReadOnly] public NativeArray<GpuUploadOperation> gpuUploadOperations;
+            [ReadOnly] public NativeList<ValueBlitDescriptor> valueBlits;
+            public NativeReference<UploadSizeRequirements>    requirements;
+
+            public void Execute()
+            {
+                var numOperations      = numGpuUploadOperations.Value + valueBlits.Length;
+                var totalUploadBytes   = 0;
+                var biggestUploadBytes = 0;
+                for (int i = 0; i < numGpuUploadOperations.Value; ++i)
+                {
+                    var numBytes        = gpuUploadOperations[i].BytesRequiredInUploadBuffer;
+                    totalUploadBytes   += numBytes;
+                    biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
+                }
+
+                for (int i = 0; i < valueBlits.Length; ++i)
+                {
+                    var numBytes        = valueBlits[i].BytesRequiredInUploadBuffer;
+                    totalUploadBytes   += numBytes;
+                    biggestUploadBytes  = math.max(biggestUploadBytes, numBytes);
+                }
+
+                requirements.Value = new UploadSizeRequirements
+                {
+                    numOperations      = numOperations,
+                    totalUploadBytes   = totalUploadBytes,
+                    biggestUploadBytes = biggestUploadBytes
+                };
+            }
+        }
+
+        // Describes a single set of data to be uploaded from the CPU to the GPU during this frame.
+        // The operations are collected up front so their total size can be known for buffer allocation
+        // purposes, and for effectively load balancing the upload memcpy work.
+        internal unsafe struct GpuUploadOperation
+        {
+            public enum UploadOperationKind
+            {
+                Memcpy,  // raw upload of a byte block to the GPU
+                SOAMatrixUpload3x4,  // upload matrices from CPU, invert on GPU, write in SoA arrays, 3x4 destination
+                SOAMatrixUpload4x4,  // upload matrices from CPU, invert on GPU, write in SoA arrays, 4x4 destination
+                                     // TwoMatrixUpload, // upload matrices from CPU, write them and their inverses to GPU (for transform sharing branch)
+                SOAQvvsUpload3x4,  // upload qvvs transforms from CPU, convert and invert on GPU, write in SoA arrays, 3x4 destination
+                SOACombineQvvsMatrixUpload3x4  // combine qvvs transforms with matrices on CPU, upload, invert on GPU, write in SoA arrays, 3x4 destination
+            }
+
+            // Which kind of upload operation this is
+            public UploadOperationKind Kind;
+            // If a matrix upload, what matrix type is this?
+            public LatiosThreadedSparseUploader.MatrixType SrcMatrixType;
+            // Pointer to source data, whether raw byte data, matrices, or qvvs
+            public void* Src;
+            // Pointer to extra source data that should be combined, typically for qvvs * matrices
+            public void* SrcExtra;
+            // GPU offset to start writing destination data in
+            public int DstOffset;
+            // GPU offset to start writing any inverse matrices in, if applicable
+            public int DstOffsetInverse;
+            // Size in bytes for raw operations, size in whole matrices for matrix operations
+            public int Size;
+
+            // Raw uploads require their size in bytes from the upload buffer.
+            // Matrix operations require a single 48-byte matrix per matrix.
+            public int BytesRequiredInUploadBuffer => (Kind == UploadOperationKind.Memcpy) ?
+            Size :
+            (Size * UnsafeUtility.SizeOf<float3x4>());
+        }
+
+        [BurstCompile]
+        internal unsafe struct ExecuteGpuUploads : IJobParallelFor
+        {
+            [ReadOnly] public NativeArray<GpuUploadOperation> GpuUploadOperations;
+            public LatiosThreadedSparseUploader               ThreadedSparseUploader;
+
+            public void Execute(int index)
+            {
+                var uploadOperation = GpuUploadOperations[index];
+
+                switch (uploadOperation.Kind)
+                {
+                    case GpuUploadOperation.UploadOperationKind.Memcpy:
+                        ThreadedSparseUploader.AddUpload(
+                            uploadOperation.Src,
+                            uploadOperation.Size,
+                            uploadOperation.DstOffset);
+                        break;
+                    case GpuUploadOperation.UploadOperationKind.SOAMatrixUpload3x4:
+                    case GpuUploadOperation.UploadOperationKind.SOAMatrixUpload4x4:
+                        var dstType = (uploadOperation.Kind == GpuUploadOperation.UploadOperationKind.SOAMatrixUpload3x4) ?
+                                      LatiosThreadedSparseUploader.MatrixType.MatrixType3x4 :
+                                      LatiosThreadedSparseUploader.MatrixType.MatrixType4x4;
+                        if (uploadOperation.DstOffsetInverse < 0)
+                        {
+                            ThreadedSparseUploader.AddMatrixUpload(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset,
+                                uploadOperation.SrcMatrixType,
+                                dstType);
+                        }
+                        else
+                        {
+                            ThreadedSparseUploader.AddMatrixUploadAndInverse(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset,
+                                uploadOperation.DstOffsetInverse,
+                                uploadOperation.SrcMatrixType,
+                                dstType);
+                        }
+                        break;
+                    case GpuUploadOperation.UploadOperationKind.SOAQvvsUpload3x4:
+                        if (uploadOperation.DstOffsetInverse < 0)
+                        {
+                            ThreadedSparseUploader.AddQvvsUpload(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset);
+                        }
+                        else
+                        {
+                            ThreadedSparseUploader.AddQvvsUploadAndInverse(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset,
+                                uploadOperation.DstOffsetInverse);
+                        }
+                        break;
+                    case GpuUploadOperation.UploadOperationKind.SOACombineQvvsMatrixUpload3x4:
+                        if (uploadOperation.DstOffsetInverse < 0)
+                        {
+                            ThreadedSparseUploader.AddQvvsUpload(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset,
+                                uploadOperation.SrcExtra);
+                        }
+                        else
+                        {
+                            ThreadedSparseUploader.AddQvvsUploadAndInverse(
+                                uploadOperation.Src,
+                                uploadOperation.Size,
+                                uploadOperation.DstOffset,
+                                uploadOperation.DstOffsetInverse,
+                                uploadOperation.SrcExtra);
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        [BurstCompile]
+        internal unsafe struct UploadBlitJob : IJobParallelFor
+        {
+            [ReadOnly] public NativeList<ValueBlitDescriptor> BlitList;
+            public LatiosThreadedSparseUploader               ThreadedSparseUploader;
+
+            public void Execute(int index)
+            {
+                ValueBlitDescriptor blit = BlitList[index];
+                ThreadedSparseUploader.AddUpload(
+                    &blit.Value,
+                    (int)blit.ValueSizeBytes,
+                    (int)blit.DestinationOffset,
+                    (int)blit.Count);
+            }
+        }
+
+        [BurstCompile]
+        struct ClearBlitsJob : IJob
+        {
+            public NativeList<ValueBlitDescriptor> blits;
+
+            public void Execute() => blits.Clear();
         }
     }
 }

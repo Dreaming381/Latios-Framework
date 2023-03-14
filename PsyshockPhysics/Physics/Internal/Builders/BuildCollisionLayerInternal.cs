@@ -1,11 +1,11 @@
 ﻿using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Psyshock
 {
@@ -13,10 +13,10 @@ namespace Latios.Psyshock
     {
         public struct ColliderAoSData
         {
-            public Collider       collider;
-            public RigidTransform rigidTransform;
-            public Aabb           aabb;
-            public Entity         entity;
+            public Collider      collider;
+            public TransformQvvs rigidTransform;
+            public Aabb          aabb;
+            public Entity        entity;
         }
 
         #region Jobs
@@ -36,255 +36,44 @@ namespace Latios.Psyshock
             {
                 var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
 
-                bool ltw = chunk.Has(ref typeGroup.localToWorld);
-                bool p   = chunk.Has(ref typeGroup.parent);
-                bool t   = chunk.Has(ref typeGroup.translation);
-                bool r   = chunk.Has(ref typeGroup.rotation);
-                bool s   = chunk.Has(ref typeGroup.scale);
-
-                int mask  = math.select(0, 0x10, ltw);
-                mask     += math.select(0, 0x8, p);
-                mask     += math.select(0, 0x4, t);
-                mask     += math.select(0, 0x2, r);
-                mask     += math.select(0, 0x1, s);
-
-                switch (mask)
+                var chunkEntities   = chunk.GetNativeArray(typeGroup.entity);
+                var chunkColliders  = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTransforms = chunk.GetNativeArray(ref typeGroup.worldTransform);
+                var enumerator      = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
+                while (enumerator.NextEntityIndex(out var i, out var index))
                 {
-                    case 0x0: ProcessNoTransform(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1: ProcessScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x2: ProcessRotation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x3: ProcessRotationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x4: ProcessTranslation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x5: ProcessTranslationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x6: ProcessTranslationRotation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x7: ProcessTranslationRotationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
+                    var collider  = chunkColliders[i];
+                    var transform = chunkTransforms[i];
+                    var entity    = chunkEntities[i];
 
-                    case 0x8: ErrorCase(); break;
-                    case 0x9: ErrorCase(); break;
-                    case 0xa: ErrorCase(); break;
-                    case 0xb: ErrorCase(); break;
-                    case 0xc: ErrorCase(); break;
-                    case 0xd: ErrorCase(); break;
-                    case 0xe: ErrorCase(); break;
-                    case 0xf: ErrorCase(); break;
+                    Aabb aabb = Physics.AabbFrom(in collider, in transform.worldTransform);
 
-                    case 0x10: ProcessLocalToWorld(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x11: ProcessScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x12: ProcessRotation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x13: ProcessRotationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x14: ProcessTranslation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x15: ProcessTranslationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x16: ProcessTranslationRotation(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x17: ProcessTranslationRotationScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
+                    colliderAoS[index] = new ColliderAoSData
+                    {
+                        collider       = collider,
+                        rigidTransform = transform.worldTransform,
+                        aabb           = aabb,
+                        entity         = entity
+                    };
+                    xMinMaxs[index] = new float2(aabb.min.x, aabb.max.x);
 
-                    case 0x18: ProcessParent(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x19: ProcessParentScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1a: ProcessParent(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1b: ProcessParentScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1c: ProcessParent(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1d: ProcessParentScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1e: ProcessParent(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
-                    case 0x1f: ProcessParentScale(in chunk, useEnabledMask, chunkEnabledMask, firstEntityIndex); break;
+                    int3 minBucket = math.int3(math.floor((aabb.min - layer.worldMin) / layer.worldAxisStride));
+                    int3 maxBucket = math.int3(math.floor((aabb.max - layer.worldMin) / layer.worldAxisStride));
+                    minBucket      = math.clamp(minBucket, 0, layer.worldSubdivisionsPerAxis - 1);
+                    maxBucket      = math.clamp(maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
 
-                    default: ErrorCase(); break;
-                }
-            }
-
-            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-            private void ErrorCase()
-            {
-                throw new System.InvalidOperationException("BuildCollisionLayer.Part1FromQueryJob received an invalid EntityQuery");
-            }
-
-            private void ProcessNoTransform(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
-                var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], RigidTransform.identity);
-                }
-            }
-
-            private void ProcessScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkScales    = chunk.GetNativeArray(ref typeGroup.scale);
-                var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var collider = Physics.ScaleCollider(chunkColliders[i], chunkScales[i]);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], in collider, RigidTransform.identity);
-                }
-            }
-
-            private void ProcessRotation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkRotations = chunk.GetNativeArray(ref typeGroup.rotation);
-                var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var rigidTransform = new RigidTransform(chunkRotations[i].Value, float3.zero);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], in rigidTransform);
-                }
-            }
-
-            private void ProcessRotationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities  = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkRotations = chunk.GetNativeArray(ref typeGroup.rotation);
-                var chunkScales    = chunk.GetNativeArray(ref typeGroup.scale);
-                var enumerator     = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var collider       = Physics.ScaleCollider(chunkColliders[i], chunkScales[i]);
-                    var rigidTransform = new RigidTransform(chunkRotations[i].Value, float3.zero);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], in collider, in rigidTransform);
-                }
-            }
-
-            private void ProcessTranslation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
-                var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var rigidTransform = new RigidTransform(quaternion.identity, chunkTranslations[i].Value);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], in rigidTransform);
-                }
-            }
-
-            private void ProcessTranslationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
-                var chunkScales       = chunk.GetNativeArray(ref typeGroup.scale);
-                var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var collider       = Physics.ScaleCollider(chunkColliders[i], chunkScales[i]);
-                    var rigidTransform = new RigidTransform(quaternion.identity, chunkTranslations[i].Value);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], in collider, in rigidTransform);
-                }
-            }
-
-            private void ProcessTranslationRotation(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
-                var chunkRotations    = chunk.GetNativeArray(ref typeGroup.rotation);
-                var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var rigidTransform = new RigidTransform(chunkRotations[i].Value, chunkTranslations[i].Value);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], in rigidTransform);
-                }
-            }
-
-            private void ProcessTranslationRotationScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities     = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders    = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkTranslations = chunk.GetNativeArray(ref typeGroup.translation);
-                var chunkRotations    = chunk.GetNativeArray(ref typeGroup.rotation);
-                var chunkScales       = chunk.GetNativeArray(ref typeGroup.scale);
-                var enumerator        = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var collider       = Physics.ScaleCollider(chunkColliders[i], chunkScales[i]);
-                    var rigidTransform = new RigidTransform(chunkRotations[i].Value, chunkTranslations[i].Value);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], in collider, in rigidTransform);
-                }
-            }
-
-            private void ProcessLocalToWorld(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
-                var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var localToWorld   = chunkLocalToWorlds[i];
-                    var rotation       = quaternion.LookRotationSafe(localToWorld.Forward, localToWorld.Up);
-                    var position       = localToWorld.Position;
-                    var rigidTransform = new RigidTransform(rotation, position);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], in rigidTransform);
-                }
-            }
-
-            private void ProcessParent(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
-                var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var localToWorld   = chunkLocalToWorlds[i];
-                    var rotation       = quaternion.LookRotationSafe(localToWorld.Forward, localToWorld.Up);
-                    var position       = localToWorld.Position;
-                    var rigidTransform = new RigidTransform(rotation, position);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], chunkColliders[i], in rigidTransform);
-                }
-            }
-
-            private void ProcessParentScale(in ArchetypeChunk chunk, bool useEnabledMask, in v128 chunkEnabledMask, int firstEntityIndex)
-            {
-                var chunkEntities      = chunk.GetNativeArray(typeGroup.entity);
-                var chunkColliders     = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkLocalToWorlds = chunk.GetNativeArray(ref typeGroup.localToWorld);
-                var chunkScales        = chunk.GetNativeArray(ref typeGroup.scale);
-                var enumerator         = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
-                while (enumerator.NextEntityIndex(out var i, out var entityInQueryIndex))
-                {
-                    var localToWorld   = chunkLocalToWorlds[i];
-                    var rotation       = quaternion.LookRotationSafe(localToWorld.Forward, localToWorld.Up);
-                    var position       = localToWorld.Position;
-                    var rigidTransform = new RigidTransform(rotation, position);
-                    var collider       = Physics.ScaleCollider(chunkColliders[i], chunkScales[i]);
-                    ProcessEntity(entityInQueryIndex, chunkEntities[i], in collider, in rigidTransform);
-                }
-            }
-
-            private void ProcessEntity(int index, Entity entity, in Collider collider, in RigidTransform rigidTransform)
-            {
-                Aabb aabb = Physics.AabbFrom(in collider, in rigidTransform);
-
-                colliderAoS[index] = new ColliderAoSData
-                {
-                    collider       = collider,
-                    rigidTransform = rigidTransform,
-                    aabb           = aabb,
-                    entity         = entity
-                };
-                xMinMaxs[index] = new float2(aabb.min.x, aabb.max.x);
-
-                int3 minBucket = math.int3(math.floor((aabb.min - layer.worldMin) / layer.worldAxisStride));
-                int3 maxBucket = math.int3(math.floor((aabb.max - layer.worldMin) / layer.worldAxisStride));
-                minBucket      = math.clamp(minBucket, 0, layer.worldSubdivisionsPerAxis - 1);
-                maxBucket      = math.clamp(maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
-
-                if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
-                {
-                    layerIndices[index] = layer.bucketStartsAndCounts.Length - 1;
-                }
-                else if (math.all(minBucket == maxBucket))
-                {
-                    layerIndices[index] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
-                }
-                else
-                {
-                    layerIndices[index] = layer.bucketStartsAndCounts.Length - 2;
+                    if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
+                    {
+                        layerIndices[index] = layer.bucketStartsAndCounts.Length - 1;
+                    }
+                    else if (math.all(minBucket == maxBucket))
+                    {
+                        layerIndices[index] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                    }
+                    else
+                    {
+                        layerIndices[index] = layer.bucketStartsAndCounts.Length - 2;
+                    }
                 }
             }
         }
@@ -484,17 +273,15 @@ namespace Latios.Psyshock
             [ReadOnly, DeallocateOnJobCompletion]
             public NativeArray<ColliderAoSData> colliderAoS;
 
-            [ReadOnly] public NativeArray<int> remapSrcIndices;
-
             public void Execute()
             {
-                for (int i = 0; i < remapSrcIndices.Length; i++)
+                for (int i = 0; i < layer.srcIndices.Length; i++)
                     Execute(i);
             }
 
             public void Execute(int i)
             {
-                var aos         = colliderAoS[remapSrcIndices[i]];
+                var aos         = colliderAoS[layer.srcIndices[i]];
                 layer.bodies[i] = new ColliderBody
                 {
                     collider  = aos.collider,
@@ -517,17 +304,16 @@ namespace Latios.Psyshock
 
             [ReadOnly] public NativeArray<Aabb>         aabbs;
             [ReadOnly] public NativeArray<ColliderBody> bodies;
-            [ReadOnly] public NativeArray<int>          remapSrcIndices;
 
             public void Execute()
             {
-                for (int i = 0; i < remapSrcIndices.Length; i++)
+                for (int i = 0; i < layer.srcIndices.Length; i++)
                     Execute(i);
             }
 
             public void Execute(int i)
             {
-                int src            = remapSrcIndices[i];
+                int src            = layer.srcIndices[i];
                 layer.bodies[i]    = bodies[src];
                 layer.xmins[i]     = aabbs[src].min.x;
                 layer.xmaxs[i]     = aabbs[src].max.x;
@@ -546,8 +332,7 @@ namespace Latios.Psyshock
 
             public void Execute()
             {
-                var remapSrcArray = new NativeArray<int>(layer.Count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                BuildImmediate(ref layer, remapSrcArray, bodies);
+                BuildImmediate(ref layer, bodies);
             }
         }
 
@@ -563,52 +348,18 @@ namespace Latios.Psyshock
 
             public void Execute()
             {
-                var remapSrcArray = new NativeArray<int>(layer.Count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                BuildImmediate(ref layer, remapSrcArray, bodies, aabbs);
-            }
-        }
-
-        //Single
-        //All five steps for custom arrays with remap
-        [BurstCompile]
-        public struct BuildFromColliderArraySingleWithRemapJob : IJob
-        {
-            public CollisionLayer layer;
-
-            [ReadOnly] public NativeArray<ColliderBody> bodies;
-            public NativeArray<int>                     remapSrcIndices;
-
-            public void Execute()
-            {
-                BuildImmediate(ref layer, remapSrcIndices, bodies);
-            }
-        }
-
-        //Single
-        //All five steps for custom arrays with remap
-        [BurstCompile]
-        public struct BuildFromDualArraysSingleWithRemapJob : IJob
-        {
-            public CollisionLayer layer;
-
-            [ReadOnly] public NativeArray<Aabb>         aabbs;
-            [ReadOnly] public NativeArray<ColliderBody> bodies;
-            public NativeArray<int>                     remapSrcIndices;
-
-            public void Execute()
-            {
-                BuildImmediate(ref layer, remapSrcIndices, bodies, aabbs);
+                BuildImmediate(ref layer, bodies, aabbs);
             }
         }
 
         #endregion
 
         #region Immediate
-        public static void BuildImmediate(ref CollisionLayer layer, NativeArray<int> remapSrcArray, NativeArray<ColliderBody> bodies)
+        public static void BuildImmediate(ref CollisionLayer layer, NativeArray<ColliderBody> bodies)
         {
-            var aabbs        = new NativeArray<Aabb>(remapSrcArray.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            var layerIndices = new NativeArray<int>(remapSrcArray.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            var xMinMaxs     = new NativeArray<float2>(remapSrcArray.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var aabbs        = new NativeArray<Aabb>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var layerIndices = new NativeArray<int>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var xMinMaxs     = new NativeArray<float2>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 
             var p1 = new Part1FromColliderBodyArrayJob
             {
@@ -632,7 +383,7 @@ namespace Latios.Psyshock
             var p3 = new Part3Job
             {
                 layerIndices       = layerIndices,
-                unsortedSrcIndices = remapSrcArray
+                unsortedSrcIndices = layer.srcIndices
             };
             for (int i = 0; i < layer.Count; i++)
             {
@@ -642,7 +393,7 @@ namespace Latios.Psyshock
             var p4 = new Part4Job
             {
                 bucketStartAndCounts = layer.bucketStartsAndCounts,
-                unsortedSrcIndices   = remapSrcArray,
+                unsortedSrcIndices   = layer.srcIndices,
                 trees                = layer.intervalTrees,
                 xMinMaxs             = xMinMaxs
             };
@@ -653,10 +404,9 @@ namespace Latios.Psyshock
 
             var p5 = new Part5FromArraysJob
             {
-                aabbs           = aabbs,
-                bodies          = bodies,
-                layer           = layer,
-                remapSrcIndices = remapSrcArray
+                aabbs  = aabbs,
+                bodies = bodies,
+                layer  = layer,
             };
             for (int i = 0; i < layer.Count; i++)
             {
@@ -664,10 +414,10 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void BuildImmediate(ref CollisionLayer layer, NativeArray<int> remapSrcArray, NativeArray<ColliderBody> bodies, NativeArray<Aabb> aabbs)
+        public static void BuildImmediate(ref CollisionLayer layer, NativeArray<ColliderBody> bodies, NativeArray<Aabb> aabbs)
         {
-            var layerIndices = new NativeArray<int>(remapSrcArray.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            var xMinMaxs     = new NativeArray<float2>(remapSrcArray.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var layerIndices = new NativeArray<int>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var xMinMaxs     = new NativeArray<float2>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
 
             var p1 = new Part1FromDualArraysJob
             {
@@ -690,7 +440,7 @@ namespace Latios.Psyshock
             var p3 = new Part3Job
             {
                 layerIndices       = layerIndices,
-                unsortedSrcIndices = remapSrcArray
+                unsortedSrcIndices = layer.srcIndices
             };
             for (int i = 0; i < layer.Count; i++)
             {
@@ -700,7 +450,7 @@ namespace Latios.Psyshock
             var p4 = new Part4Job
             {
                 bucketStartAndCounts = layer.bucketStartsAndCounts,
-                unsortedSrcIndices   = remapSrcArray,
+                unsortedSrcIndices   = layer.srcIndices,
                 xMinMaxs             = xMinMaxs
             };
             for (int i = 0; i < layer.BucketCount; i++)
@@ -710,10 +460,9 @@ namespace Latios.Psyshock
 
             var p5 = new Part5FromArraysJob
             {
-                aabbs           = aabbs,
-                bodies          = bodies,
-                layer           = layer,
-                remapSrcIndices = remapSrcArray
+                aabbs  = aabbs,
+                bodies = bodies,
+                layer  = layer,
             };
             for (int i = 0; i < layer.Count; i++)
             {
