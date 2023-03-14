@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.6.5]
+# Latios Framework for Unity ECS – [0.6.6]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -34,8 +34,9 @@ rendering features.
 This version targets Entities 1.0.0 prerelease 15. If you are still using
 Entities 0.51.1, please use the framework version 0.5.8 instead.
 
-**Note: This release is not compatible with Prerelease 44 due to instability
-issues with that release.**
+**Note: This release is not compatible with Entities Prerelease 47 due to
+instability issues with that release.** An experimental compatible version can
+be obtained on request.
 
 The 0.6.x series uses Transforms V1, which can be enabled in your project via
 the Scripting Define Symbol ENABLE_TRANSFORM_V1. If you are using Transforms V2,

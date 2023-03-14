@@ -143,9 +143,15 @@ namespace AclUnity
                                                                      &outCompressedSizeInBytes);
             }
 
+            var resultArray = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            var safety = AtomicSafetyHandle.Create();
+            NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref resultArray, safety);
+#endif
+
             return new AclCompressedClipResult
             {
-                compressedData = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>(compressedClipPtr, outCompressedSizeInBytes, Allocator.None),
+                compressedData = resultArray
             };
         }
 

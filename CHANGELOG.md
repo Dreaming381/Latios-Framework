@@ -9,6 +9,14 @@ Versioning](http://semver.org/spec/v2.0.0.html).
 You can find changelogs for the individual modules inside the Documentation\~
 directory.
 
+## [0.6.6] – 2023-3-13
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Changed
+
+-   Updated Kinemation to v0.6.6
+
 ## [0.6.5] – 2023-2-18
 
 Officially supports Entities [1.0.0 prerelease 15]

@@ -41,8 +41,8 @@ namespace Latios.Kinemation.Authoring.Systems
                                 exportedBones.ElementAt(i).boneIndex = currentIndex;
                                 break;
                             }
+                            i++;
                         }
-                        i++;
                     }
                     currentIndex++;
 

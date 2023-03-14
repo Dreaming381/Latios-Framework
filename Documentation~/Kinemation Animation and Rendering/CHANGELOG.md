@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [0.6.6] – 2023-3-13
+
+Officially supports Entities [1.0.0 prerelease 15]
+
+### Fixed
+
+-   Fixed AclUnity compression of scalar clips not initializing safety for the
+    compressed clip result
+-   Fixed exported bones not being assigned correctly during baking when there
+    were more than one in a skeleton
+
 ## [0.6.5] – 2023-2-18
 
 Officially supports Entities [1.0.0 prerelease 15]
@@ -22,8 +33,6 @@ Officially supports Entities [1.0.0 prerelease 15]
 
 ### Fixed
 
--   Fixed exported bones not being assigned correctly during baking when there
-    were more than one in a skeleton
 -   Fixed children of exported bone Game Objects being reparented directly to
     the skeleton during baking rather than the exported bones
 -   Fixed an issue where Kinemation `SuperSystems` may have been sorted by
