@@ -106,10 +106,11 @@ namespace Latios.Transforms.Systems
 
             state.CompleteDependency();
 
-            state.EntityManager.RemoveComponent(m_deadChildrenQuery, new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
-                                                                                          ComponentType.ReadWrite<LocalTransform>(),
-                                                                                          ComponentType.ReadWrite<ParentToWorldTransform>(),
-                                                                                          ComponentType.ReadWrite<CopyParentWorldTransformTag>()));
+            state.EntityManager.RemoveComponent<Child>(m_deadParentsQuery);
+            state.EntityManager.RemoveComponent(       m_deadChildrenQuery, new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
+                                                                                                 ComponentType.ReadWrite<LocalTransform>(),
+                                                                                                 ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                                                 ComponentType.ReadWrite<CopyParentWorldTransformTag>()));
             state.EntityManager.AddComponent(                m_newChildrenNotCopyParentQuery, new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
                                                                                                                    ComponentType.ReadWrite<LocalTransform>(),
                                                                                                                    ComponentType.ReadWrite<ParentToWorldTransform>()));
@@ -339,7 +340,7 @@ namespace Latios.Transforms.Systems
                         }
 
                         // If the new parent is null or deleted, we want to remove the parent components from the child
-                        if (Hint.Unlikely(newParents[i] == Entity.Null || worldTransformLookup.HasComponent(newParents[i])))
+                        if (Hint.Unlikely(newParents[i] == Entity.Null || !worldTransformLookup.HasComponent(newParents[i])))
                             childrenWithNullParentsBlocklist.Write(children[i], threadIndex);
                         else
                         {

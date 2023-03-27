@@ -14,8 +14,7 @@ using static Unity.Entities.SystemAPI;
 namespace Latios.Kinemation
 {
     [RequireMatchingQueriesForUpdate]
-    [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
-    [UpdateBefore(typeof(LODRequirementsUpdateSystem))]  // FreezeStaticLODObjects system has an UpdateAfter dependency on this
+    [UpdateBefore(typeof(FreezeStaticLODObjects))]  // FreezeStaticLODObjects system has an UpdateAfter dependency on this
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.EntitySceneOptimizations | WorldSystemFilterFlags.Editor)]
     [DisableAutoCreation]
     [BurstCompile]

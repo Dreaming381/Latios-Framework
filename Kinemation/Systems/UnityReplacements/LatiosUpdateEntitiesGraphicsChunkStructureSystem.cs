@@ -70,7 +70,7 @@ namespace Latios.Kinemation
         {
         }
 
-        [BurstCompile]
+        //[BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
 #if UNITY_EDITOR

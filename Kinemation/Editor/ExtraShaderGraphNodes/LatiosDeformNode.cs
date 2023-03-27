@@ -176,7 +176,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                     if (source == Source.Custom)
                         sb.AppendLine("uint baseIndex = asuint(customBase);");
                     else
-                        sb.AppendLine($"uint baseIndex = UNITY_ACCESS_HYBRID_INSTANCED_PROP({GetPropertyReferenceName()}, uint");
+                        sb.AppendLine($"uint baseIndex = asuint(UNITY_ACCESS_HYBRID_INSTANCED_PROP({GetPropertyReferenceName()}, float));");
 
                     sb.AppendLine("sampleDeform(vertexId, baseIndex, positionOut, normalOut, tangentOut);");
                     sb.AppendLine("#endif");

@@ -62,6 +62,8 @@ namespace Latios.Kinemation.Systems
                 m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning512");
             else
                 m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
+            m_expansionShader         = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("SkeletonMeshExpansion");
+            m_meshSkinningShader      = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("MeshSkinning");
 
             // Compute
             _dstTransforms          = UnityEngine.Shader.PropertyToID("_dstTransforms");
@@ -118,7 +120,8 @@ namespace Latios.Kinemation.Systems
                     chunkHeaderHandle          = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
                     chunksToProcess            = meshChunks.AsParallelWriter(),
                     perCameraCullingMaskHandle = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                    perFrameCullingMaskHandle  = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true)
+                    perFrameCullingMaskHandle  = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                    skeletonDependentHandle    = SystemAPI.GetComponentTypeHandle<SkeletonDependent>(true)
                 }.ScheduleParallel(m_skinnedMeshMetaQuery, Dependency);
 
                 collectJh = new CollectVisibleMeshesJob
@@ -239,14 +242,14 @@ namespace Latios.Kinemation.Systems
                 var shaderTransformsBuffer = graphicsPool.GetSkinningTransformsBuffer(requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning);
                 var shaderDeformBuffer     = graphicsPool.GetDeformBuffer(requiredDeformSizes.maxRequiredDeformVertices);
 
-                m_batchSkinningShader.SetBuffer(0, _dstTransforms,  shaderTransformsBuffer);
-                m_batchSkinningShader.SetBuffer(0, _dstVertices,    shaderDeformBuffer);
-                m_batchSkinningShader.SetBuffer(0, _srcVertices,    graphicsPool.GetMeshVerticesBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _boneWeights,    graphicsPool.GetMeshWeightsBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _bindPoses,      graphicsPool.GetMeshBindPosesBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _boneOffsets,    graphicsPool.GetBoneOffsetsBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _metaBuffer,     skinningMetaBuffer);
-                m_batchSkinningShader.SetBuffer(0, _boneTransforms, boneTransformsBuffer);
+                m_batchSkinningShader.SetBuffer(0, _dstTransforms,          shaderTransformsBuffer);
+                m_batchSkinningShader.SetBuffer(0, _dstVertices,            shaderDeformBuffer);
+                m_batchSkinningShader.SetBuffer(0, _srcVertices,            graphicsPool.GetMeshVerticesBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _boneWeights,            graphicsPool.GetMeshWeightsBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _bindPoses,              graphicsPool.GetMeshBindPosesBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _boneOffsets,            graphicsPool.GetBoneOffsetsBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _metaBuffer,             skinningMetaBuffer);
+                m_batchSkinningShader.SetBuffer(0, _skeletonQvvsTransforms, boneTransformsBuffer);
 
                 for (int dispatchesRemaining = (int)layouts.batchSkinningHeadersCount, offset = 0; dispatchesRemaining > 0;)
                 {
@@ -257,11 +260,11 @@ namespace Latios.Kinemation.Systems
                     dispatchesRemaining -= dispatchCount;
                 }
 
-                m_expansionShader.SetBuffer(0, _dstTransforms,  shaderTransformsBuffer);
-                m_expansionShader.SetBuffer(0, _bindPoses,      graphicsPool.GetMeshBindPosesBufferRO());
-                m_expansionShader.SetBuffer(0, _boneOffsets,    graphicsPool.GetBoneOffsetsBufferRO());
-                m_expansionShader.SetBuffer(0, _metaBuffer,     skinningMetaBuffer);
-                m_expansionShader.SetBuffer(0, _boneTransforms, boneTransformsBuffer);
+                m_expansionShader.SetBuffer(0, _dstTransforms,          shaderTransformsBuffer);
+                m_expansionShader.SetBuffer(0, _bindPoses,              graphicsPool.GetMeshBindPosesBufferRO());
+                m_expansionShader.SetBuffer(0, _boneOffsets,            graphicsPool.GetBoneOffsetsBufferRO());
+                m_expansionShader.SetBuffer(0, _metaBuffer,             skinningMetaBuffer);
+                m_expansionShader.SetBuffer(0, _skeletonQvvsTransforms, boneTransformsBuffer);
 
                 for (int dispatchesRemaining = (int)layouts.expansionHeadersCount, offset = (int)layouts.expansionHeadersStart; dispatchesRemaining > 0;)
                 {
@@ -277,7 +280,7 @@ namespace Latios.Kinemation.Systems
                 m_meshSkinningShader.SetBuffer(0, _boneWeights,    graphicsPool.GetMeshWeightsBufferRO());
                 m_meshSkinningShader.SetBuffer(0, _bindPoses,      graphicsPool.GetMeshBindPosesBufferRO());
                 m_meshSkinningShader.SetBuffer(0, _metaBuffer,     skinningMetaBuffer);
-                m_meshSkinningShader.SetBuffer(0, _boneTransforms, boneTransformsBuffer);
+                m_meshSkinningShader.SetBuffer(0, _boneTransforms, shaderTransformsBuffer);
 
                 for (int dispatchesRemaining = (int)layouts.meshSkinningCommandsCount, offset = (int)layouts.meshSkinningCommandsStart; dispatchesRemaining > 0;)
                 {
@@ -505,20 +508,20 @@ namespace Latios.Kinemation.Systems
 
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
 
-            public ComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex> legacyLbsHandle;
-            public ComponentTypeHandle<LegacyComputeDeformShaderIndex>       legacyComputeDeformHandle;
-            public ComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>    legacyDotsDeformHandle;
+            [ReadOnly] public ComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex> legacyLbsHandle;
+            [ReadOnly] public ComponentTypeHandle<LegacyComputeDeformShaderIndex>       legacyComputeDeformHandle;
+            [ReadOnly] public ComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>    legacyDotsDeformHandle;
 
-            public ComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>  currentMatrixVertexHandle;
-            public ComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex> previousMatrixVertexHandle;
-            public ComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>   twoAgoMatrixVertexHandle;
-            public ComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>     currentDqsVertexHandle;
-            public ComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>    previousDqsVertexHandle;
-            public ComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>      twoAgoDqsVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>  currentMatrixVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex> previousMatrixVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>   twoAgoMatrixVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>     currentDqsVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>    previousDqsVertexHandle;
+            [ReadOnly] public ComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>      twoAgoDqsVertexHandle;
 
-            public ComponentTypeHandle<CurrentDeformShaderIndex>  currentDeformHandle;
-            public ComponentTypeHandle<PreviousDeformShaderIndex> previousDeformHandle;
-            public ComponentTypeHandle<TwoAgoDeformShaderIndex>   twoAgoDeformHandle;
+            [ReadOnly] public ComponentTypeHandle<CurrentDeformShaderIndex>  currentDeformHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousDeformShaderIndex> previousDeformHandle;
+            [ReadOnly] public ComponentTypeHandle<TwoAgoDeformShaderIndex>   twoAgoDeformHandle;
 
             public UnsafeParallelBlockList requestsBlockList;
 
@@ -801,7 +804,7 @@ namespace Latios.Kinemation.Systems
                     int    i                = 0;
                     Entity previousSkeleton = Entity.Null;
                     var    enumerator       = requestsBlockList.GetEnumerator();
-                    while (!enumerator.MoveNext())
+                    while (enumerator.MoveNext())
                     {
                         var request = enumerator.GetCurrent<MeshSkinningRequestWithSkeletonTarget>();
                         if (request.skeletonEntity == previousSkeleton)
@@ -852,7 +855,7 @@ namespace Latios.Kinemation.Systems
                 {
                     int i          = 0;
                     var enumerator = requestsBlockList.GetEnumerator();
-                    while (!enumerator.MoveNext())
+                    while (enumerator.MoveNext())
                     {
                         requests[dstIndices[i]] = enumerator.GetCurrent<MeshSkinningRequestWithSkeletonTarget>().request;
                         i++;
@@ -883,10 +886,16 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 if (groupedSkinningRequests.Length == 0)
+                {
+                    perChunkPrefixSums[unfilteredChunkIndex] = default;
                     return;
+                }
                 var mask = chunk.GetChunkComponentData(ref skeletonCullingMaskHandle);
                 if ((mask.lower.Value | mask.upper.Value) == 0)
+                {
+                    perChunkPrefixSums[unfilteredChunkIndex] = default;
                     return;
+                }
 
                 skinningStream.BeginForEachIndex(unfilteredChunkIndex);
                 chunkPrefixSums = default;
@@ -1266,6 +1275,7 @@ namespace Latios.Kinemation.Systems
                                     indexInDependentBuffer = indexInDependentBuffer,
                                     gpuDstStart            = requests[nextRequest].shaderDstIndex
                                 });
+                                header.meshCommandCount++;
                             }
                             skinningStream.Write(new SkinningStreamMeshCommand
                             {
@@ -1308,6 +1318,13 @@ namespace Latios.Kinemation.Systems
                                     });
                                     header.meshCommandCount++;
                                 }
+                                skinningStream.Write(new SkinningStreamMeshCommand
+                                {
+                                    batchOp                = SkinningStreamMeshCommand.BatchOp.MulGsMatWithBindposesStoreGs,
+                                    indexInDependentBuffer = indexInDependentBuffer,
+                                    gpuDstStart            = requests[nextRequest].shaderDstIndex
+                                });
+                                header.meshCommandCount++;
                                 skinningStream.Write(new SkinningStreamMeshCommand
                                 {
                                     batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst | SkinningStreamMeshCommand.BatchOp.UseSkeletonCountAsGsBaseAddress,
@@ -1879,7 +1896,7 @@ namespace Latios.Kinemation.Systems
 
                     batchSkinningHeadersCount = running.batchSkinningHeadersCount,
                     expansionHeadersCount     = running.expansionHeadersCount,
-                    meshSkinningCommandsCount = running.meshSkinningCommandsCount
+                    meshSkinningCommandsCount = running.meshSkinningCommandsCount,
                 };
                 maxData.ValueRW.maxRequiredBoneTransformsForVertexSkinning += running.meshSkinningExtraBoneTransformsCount;
             }

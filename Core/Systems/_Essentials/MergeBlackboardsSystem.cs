@@ -4,6 +4,8 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 
+// Todo: Merge Enabled bits
+
 namespace Latios.Systems
 {
     /// <summary>

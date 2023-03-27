@@ -15,6 +15,10 @@ namespace Latios.Transforms
                 {
                     system.Enabled = false;
                 }
+                if (type.Name.StartsWith("Companion") && type.Namespace != null && type.Namespace.StartsWith("Unity.Entities"))
+                {
+                    system.Enabled = false;
+                }
             }
 
             BootstrapTools.InjectSystem(typeof(Systems.TransformSuperSystem), world, defaultComponentSystemGroup);

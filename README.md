@@ -1,6 +1,6 @@
 ![](Documentation~/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.0-Alpha.1]
+# Latios Framework for Unity ECS – [0.7.0-Alpha.2]
 
 **This is a prerelease version of the Latios Framework version 0.7 which is
 still under development. Changelogs and Documentation, including the remainder

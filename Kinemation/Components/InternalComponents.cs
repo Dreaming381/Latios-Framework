@@ -445,7 +445,7 @@ namespace Latios.Kinemation
     // Int because this will grow in the future and it would be great to not have a regression
     internal enum DeformClassification : int
     {
-        None = 1 << 0,
+        None = 0,
         CurrentDeform = 1 << 0,
         PreviousDeform = 1 << 1,
         TwoAgoDeform = 1 << 2,

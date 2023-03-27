@@ -27,7 +27,7 @@ namespace Latios.Kinemation
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
-    public partial struct LatiosLightProbeUpdateSystem : ISystem
+    public partial struct LatiosLightProbeUpdateSystem : ISystem, ISystemShouldUpdate
     {
         LatiosWorldUnmanaged latiosWorld;
         EntityQuery          m_probeGridQuery;
@@ -51,10 +51,18 @@ namespace Latios.Kinemation
             state.EntityManager.RemoveComponent<TetrahedralizationChangeCallbackReceiver>(state.SystemHandle);
         }
 
+        bool m_isValidLightProbesGrid;
+
+        public bool ShouldUpdateSystem(ref SystemState state)
+        {
+            m_isValidLightProbesGrid = IsValidLightProbeGrid();
+            return true;
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            if (!IsValidLightProbeGrid())
+            if (!m_isValidLightProbesGrid)
             {
                 state.EntityManager.SetComponentData(state.SystemHandle, new RequiresFullRebuild { requiresFullRebuild = true});
                 return;

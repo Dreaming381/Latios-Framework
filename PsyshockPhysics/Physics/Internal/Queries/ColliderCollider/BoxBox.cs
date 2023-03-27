@@ -1222,6 +1222,10 @@ namespace Latios.Psyshock
             float3 bestDistances  = math.min(distancesToMin, distancesToMax);
             float  bestDistance   = math.cmin(bestDistances);
             bool3  bestAxisMask   = bestDistance == bestDistances;
+            // Prioritize y first, then z, then x if multiple distances perfectly match.
+            // Todo: Should this be configurabe?
+            bestAxisMask.xz &= !bestAxisMask.y;
+            bestAxisMask.x  &= !bestAxisMask.z;
 
             //Step 2: Find the point that matches the bestDistance for the bestDistanceMask and has the least deviation when clamped to the AABB
             simdFloat3 distancesToMin03 = points03 + aabb;

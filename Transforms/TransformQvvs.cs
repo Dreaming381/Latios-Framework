@@ -63,7 +63,7 @@ namespace Latios.Transforms
             scale    = 1f
         };
 
-        public TransformQvs(float3 position, quaternion rotation, float scale = -1f)
+        public TransformQvs(float3 position, quaternion rotation, float scale = 1f)
         {
             this.position = position;
             this.rotation = rotation;

@@ -407,7 +407,7 @@ namespace Latios.Kinemation.Systems
                                                                                            ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>()));
             }
 
-            if (haveNewExposedSkeletons | haveDeadExposedSkeletons | haveDeadExposedSkeletons2 | haveNewMeshes | haveBindableMeshes | haveDeadMeshes)
+            if (haveNewExposedSkeletons | haveDeadExposedSkeletons | haveDeadExposedSkeletons2 | haveNewDeformMeshes | haveBindableMeshes | haveDeadDeformMeshes)
             {
                 var jhs = new NativeList<JobHandle>(4, Allocator.Temp);
                 jhs.Add(cullingJH);
@@ -1638,8 +1638,8 @@ namespace Latios.Kinemation.Systems
 
                 for (int j = 0; j < depsBuffer.Length; j++)
                 {
-                    var skinningState                                         = skeletonDependentLookup.GetRefRW(depsBuffer[i].skinnedMesh, false);
-                    skinningState.ValueRW.indexInDependentSkinnedMeshesBuffer = i;
+                    var skinningState                                         = skeletonDependentLookup.GetRefRW(depsBuffer[j].skinnedMesh, false);
+                    skinningState.ValueRW.indexInDependentSkinnedMeshesBuffer = j;
                 }
             }
 
