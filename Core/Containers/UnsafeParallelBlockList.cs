@@ -333,7 +333,7 @@ namespace Latios.Unsafe
                 if (m_readAddress > m_lastByteAddressInBlock)
                 {
                     m_blockIndex++;
-                    if (m_blockIndex >= m_perThreadBlockList->blocks.Length)
+                    if (m_perThreadBlockList->elementCount == 0 || m_blockIndex >= m_perThreadBlockList->blocks.Length)
                         return false;
 
                     int elementsInBlock      = math.min(m_elementsPerBlock, m_perThreadBlockList->elementCount - m_blockIndex * m_elementsPerBlock);

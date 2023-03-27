@@ -113,7 +113,7 @@ namespace Latios.Psyshock.Authoring.Systems
             {
                 var mesh         = meshes[i].Value;
                 var builder      = builders[i];
-                builder.meshName = mesh.name;
+                builder.meshName = mesh.name ?? default;
                 builders[i]      = builder;
                 m_meshCache.Add(mesh);
             }

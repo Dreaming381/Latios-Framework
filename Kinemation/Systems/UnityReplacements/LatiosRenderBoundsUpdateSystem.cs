@@ -17,8 +17,7 @@ namespace Latios.Kinemation
     /// A system that updates the WorldRenderBounds for entities that have both a WorldTransform and RenderBounds component.
     /// </summary>
     [RequireMatchingQueriesForUpdate]
-    [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
-    [UpdateBefore(typeof(RenderBoundsUpdateSystem))]  // UpdateSceneBoundingVolumeFromRendererBounds has an UpdateAfter dependency
+    [UpdateBefore(typeof(UpdateSceneBoundingVolumeFromRendererBounds))]  // UpdateSceneBoundingVolumeFromRendererBounds has an UpdateAfter dependency
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.EntitySceneOptimizations | WorldSystemFilterFlags.Editor)]
     [DisableAutoCreation]
     [BurstCompile]

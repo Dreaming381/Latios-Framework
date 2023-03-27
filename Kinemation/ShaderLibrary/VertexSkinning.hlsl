@@ -158,10 +158,10 @@ void vertexSkinMatrix(uint4 boneIndices, float4 boneWeights, uint skeletonBase, 
     {
         mat += transformUnionMatrixToMatrix(_latiosBoneTransforms[skeletonBase + boneIndices.w]) * boneWeights.w;
     }
-
-    position = (mat * float4(position, 1)).xyz;
-    normalOut = (mat * float4(normal, 0)).xyz;
-    tangent = (mat * float4(tangent, 0)).xyz;
+    
+    position = mul(mat, float4(position, 1)).xyz;
+    normal = mul(mat, float4(normal, 0)).xyz;
+    tangent = mul(mat, float4(tangent, 0)).xyz;
 #endif
 }
 
@@ -173,7 +173,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         Dqs dqs = transformUnionDqsToDqs(_latiosBindPoses[skeletonBase.y + boneIndices.x]);
         float4 bindposeReal = dqs.r * boneWeights.x;
         float4 bindposeDual = dqs.d * boneWeights.x;
-        float3 localScale = dqs.localScale;
+        float3 localScale = dqs.scale;
         float4 firstBoneRot = dqs.r;
 
         if (boneWeights.y > 0.0)
@@ -234,7 +234,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         Dqs dqs = transformUnionDqsToDqs(_latiosBoneTransforms[skeletonBase.x + boneIndices.x]);
         float4 worldReal = dqs.r * boneWeights.x;
         float4 worldDual = dqs.d * boneWeights.x;
-        float3 localScale = dqs.localScale;
+        float3 localScale = dqs.scale;
         float4 firstBoneRot = dqs.r;
 
         if (boneWeights.y > 0.0)

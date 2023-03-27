@@ -229,7 +229,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                 sb.AppendLine($"#define PREVENT_REPEAT_{source}_{algorithm}");
                 sb.AppendLine($"void {GetFunctionName()}(" +
                               // Todo: Make as uint?
-                              (source == Source.Custom ? (algorithm == Algorithm.Matrix ? $"float customBase, " : $"float2 customBase") : "") +
+                              (source == Source.Custom ? (algorithm == Algorithm.Matrix ? $"float customBase, " : $"float2 customBase, ") : "") +
                               "uint4 indices, " +
                               "$precision4 weights, " +
                               "$precision3 positionIn, " +
@@ -245,11 +245,12 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                     sb.AppendLine("normalOut = normalIn;");
                     sb.AppendLine("tangentOut = tangentIn;");
                     sb.AppendLine("#if defined(UNITY_DOTS_INSTANCING_ENABLED)");
-                    var indexType = algorithm == Algorithm.Matrix ? "uint" : "uint2";
+                    var indexType    = algorithm == Algorithm.Matrix ? "uint" : "uint2";
+                    var propertyType = algorithm == Algorithm.Matrix ? "float" : "float2";
                     if (source == Source.Custom)
                         sb.AppendLine($"{indexType} baseIndex = asuint(customBase);");
                     else
-                        sb.AppendLine($"{indexType} baseIndex = UNITY_ACCESS_HYBRID_INSTANCED_PROP({GetPropertyReferenceName()}, {indexType}");
+                        sb.AppendLine($"{indexType} baseIndex = asuint(UNITY_ACCESS_HYBRID_INSTANCED_PROP({GetPropertyReferenceName()}, {propertyType}));");
 
                     if (algorithm == Algorithm.Matrix)
                         sb.AppendLine("vertexSkinMatrix(indices, weights, baseIndex, positionOut, normalOut, tangentOut);");

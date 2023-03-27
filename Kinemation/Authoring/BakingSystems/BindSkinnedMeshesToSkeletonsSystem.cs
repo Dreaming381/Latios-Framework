@@ -88,7 +88,9 @@ namespace Latios.Kinemation.Authoring.Systems
             public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndexInQuery, ref BindSkeletonRoot root)
             {
                 if (root.root == Entity.Null)
+                {
                     ecb.RemoveComponent<BindSkeletonRoot>(chunkIndexInQuery, entity);
+                }
             }
         }
     }

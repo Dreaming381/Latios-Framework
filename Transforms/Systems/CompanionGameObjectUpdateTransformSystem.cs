@@ -11,6 +11,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Transforms.Systems
 {
+    [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
     public partial struct CompanionGameObjectUpdateTransformSystem : ISystem
@@ -36,6 +37,7 @@ namespace Latios.Transforms.Systems
         EntityQuery m_createdQuery;
         EntityQuery m_destroyedQuery;
         EntityQuery m_modifiedQuery;
+        EntityQuery m_existQuery;
 
         public void OnCreate(ref SystemState state)
         {
@@ -63,6 +65,7 @@ namespace Latios.Transforms.Systems
             }
                 );
             m_modifiedQuery.SetChangedVersionFilter(typeof(CompanionLink));
+            m_existQuery = state.GetEntityQuery(ComponentType.ReadOnly<CompanionLink>(), ComponentType.ReadOnly<WorldTransform>());
         }
 
         public void OnDestroy(ref SystemState state)
