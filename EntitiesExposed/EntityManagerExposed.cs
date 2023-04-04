@@ -14,8 +14,8 @@ namespace Unity.Entities.Exposed
             entityManager.AddComponent(dst, componentType);
             var handle = entityManager.GetDynamicSharedComponentTypeHandle(componentType);
             var chunk  = entityManager.GetStorageInfo(src);
-            var index  = chunk.Chunk.GetSharedComponentIndex(handle);
-            var box    = index != 0 ? chunk.Chunk.GetSharedComponentDataBoxed(handle, entityManager) : null;
+            var index  = chunk.Chunk.GetSharedComponentIndex(ref handle);
+            var box    = index != 0 ? chunk.Chunk.GetSharedComponentDataBoxed(ref handle, entityManager) : null;
             entityManager.SetSharedComponentDataBoxedDefaultMustBeNull(dst, componentType.TypeIndex, box);
         }
 

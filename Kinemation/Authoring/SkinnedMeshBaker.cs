@@ -322,8 +322,6 @@ namespace Latios.Kinemation.Authoring
                 baker.AddComponent(entity, lodComponent);
             }
 
-            baker.ConfigureEditorRenderData(entity, renderer.gameObject, true);
-
             var                              material                   = renderMesh.material;
             FixedList128Bytes<ComponentType> materialPropertyTypesToAdd = default;
 
@@ -425,8 +423,6 @@ namespace Latios.Kinemation.Authoring
                     var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
                     baker.AddComponent(meshEntity, lodComponent);
                 }
-
-                baker.ConfigureEditorRenderData(meshEntity, renderer.gameObject, true);
 
                 DeformClassification classification = DeformClassification.None;
                 if (material.HasProperty(s_legacyLbsProperty))

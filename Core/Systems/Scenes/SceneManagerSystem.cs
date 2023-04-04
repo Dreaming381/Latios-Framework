@@ -17,7 +17,7 @@ namespace Latios.Systems
     /// This system is not installed by default.
     /// </summary>
     [DisableAutoCreation]
-    [UpdateInGroup(typeof(LatiosInitializationSystemGroup), OrderFirst = true)]
+    [UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]
     [UpdateAfter(typeof(SyncPointPlaybackSystemDispatch))]
     public partial class SceneManagerSystem : SubSystem
     {

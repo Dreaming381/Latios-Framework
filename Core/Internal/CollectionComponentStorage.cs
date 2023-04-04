@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -8,6 +11,7 @@ using Unity.Mathematics;
 
 namespace Latios
 {
+    [BurstCompile]
     internal unsafe struct CollectionComponentStorage : IDisposable
     {
         struct Key : IEquatable<Key>
@@ -31,8 +35,8 @@ namespace Latios
 
         struct RegisteredType
         {
-            public ComponentType associatedType;
-            public ComponentType tagType;
+            public ComponentType existType;
+            public ComponentType cleanupType;
             public int           typedStorageIndex;
         }
 
@@ -40,7 +44,7 @@ namespace Latios
         {
             public void* ptr;
 
-            public ref TypedCollectionComponentStorage<T> As<T>() where T : unmanaged, ICollectionComponent
+            public ref TypedCollectionComponentStorage<T> As<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
             {
                 return ref UnsafeUtility.AsRef<TypedCollectionComponentStorage<T> >(ptr);
             }
@@ -59,51 +63,46 @@ namespace Latios
             m_allocator            = allocator;
         }
 
+        delegate FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> GetFunctionPtrDelegate();
+        static Dictionary<ComponentType, FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> > m_cleanupToFunctionLookup;
+
         public void Dispose()
         {
+            if (m_cleanupToFunctionLookup == null)
+                m_cleanupToFunctionLookup = new Dictionary<ComponentType, FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> >();
             foreach (var registeredType in m_registeredTypeLookup.GetValueArray(Allocator.Temp))
             {
-                if (DisposerBase.s_disposers.TryGetValue(registeredType.tagType, out var disposer))
+                if (!m_cleanupToFunctionLookup.TryGetValue(registeredType.cleanupType, out var functionPtr))
                 {
-                    disposer.Dispose(m_storagePtrs[registeredType.typedStorageIndex]);
-                    continue;
+                    var managedType = registeredType.cleanupType.GetManagedType();
+                    var method      = managedType.GetMethod("GetBurstDispatchFunctionPtr", BindingFlags.Static | BindingFlags.Public);
+                    var invokable   = method.CreateDelegate(typeof(GetFunctionPtrDelegate)) as GetFunctionPtrDelegate;
+                    functionPtr     = invokable();
+                    m_cleanupToFunctionLookup.Add(registeredType.cleanupType, functionPtr);
                 }
-
-                var collectionType = registeredType.tagType.GetManagedType().GetGenericArguments();
-                disposer           = Activator.CreateInstance(typeof(Disposer<>).MakeGenericType(collectionType)) as DisposerBase;
-                disposer.Dispose(m_storagePtrs[registeredType.typedStorageIndex]);
-                DisposerBase.s_disposers.Add(registeredType.tagType, disposer);
+                DispatchDisposeToSourceGen(functionPtr, (CollectionComponentStorage*)UnsafeUtility.AddressOf(ref this), registeredType.typedStorageIndex);
             }
         }
 
-        abstract class DisposerBase
+        [BurstCompile]
+        public static void DispatchDisposeToSourceGen(FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
+                                                      CollectionComponentStorage*                                                           thisPtr,
+                                                      int storageIndex)
         {
-            public abstract void Dispose(StoragePtr ptr);
-
-            public static System.Collections.Generic.Dictionary<ComponentType, DisposerBase> s_disposers = new System.Collections.Generic.Dictionary<ComponentType, DisposerBase>();
+            InternalSourceGen.CollectionComponentOperations.DisposeCollectionStorage(functionPtr, thisPtr, storageIndex);
         }
 
-        class Disposer<T> : DisposerBase where T : unmanaged, ICollectionComponent
-        {
-            public override void Dispose(StoragePtr ptr)
-            {
-                ptr.As<T>().Dispose();
-            }
-        }
-
-        //private Dictionary<Type, TypedCollectionStorageBase> m_typeMap      = new Dictionary<Type, TypedCollectionStorageBase>();
-        //private Dictionary<Type, ComponentType>              m_associateMap = new Dictionary<Type, ComponentType>();
-
-        public ComponentType GetAssociatedType<T>() where T : unmanaged, ICollectionComponent
+        public ComponentType GetExistType<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             var typeHash = BurstRuntime.GetHashCode64<T>();
             if (!m_registeredTypeLookup.TryGetValue(typeHash, out var element))
             {
+                var t   = new T();
                 element = new RegisteredType
                 {
-                    associatedType    = new T().AssociatedComponentType,
+                    existType         = t.componentType,
                     typedStorageIndex = m_storagePtrs.Length,
-                    tagType           = ComponentType.ReadWrite<CollectionComponentCleanupTag<T> >()
+                    cleanupType       = t.cleanupType
                 };
 
                 var storage                            = AllocatorManager.Allocate<TypedCollectionComponentStorage<T> >(m_allocator);
@@ -115,7 +114,32 @@ namespace Latios
                 m_storagePtrs.Add(new StoragePtr { ptr = storage });
                 m_registeredTypeLookup.Add(typeHash, element);
             }
-            return element.associatedType;
+            return element.existType;
+        }
+
+        public ComponentType GetCleanupType<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            var typeHash = BurstRuntime.GetHashCode64<T>();
+            if (!m_registeredTypeLookup.TryGetValue(typeHash, out var element))
+            {
+                var t   = new T();
+                element = new RegisteredType
+                {
+                    existType         = t.componentType,
+                    typedStorageIndex = m_storagePtrs.Length,
+                    cleanupType       = t.cleanupType
+                };
+
+                var storage                            = AllocatorManager.Allocate<TypedCollectionComponentStorage<T> >(m_allocator);
+                storage->collectionComponents          = new NativeList<T>(m_allocator);
+                storage->freeStack                     = new NativeList<int>(m_allocator);
+                storage->readHandles                   = new NativeList<FixedList512Bytes<JobHandle> >(m_allocator);
+                storage->writeHandles                  = new NativeList<JobHandle>(m_allocator);
+                storage->typeIndex                     = element.typedStorageIndex;
+                m_storagePtrs.Add(new StoragePtr { ptr = storage });
+                m_registeredTypeLookup.Add(typeHash, element);
+            }
+            return element.cleanupType;
         }
 
         public bool IsHandleValid(in CollectionComponentHandle handle)
@@ -126,7 +150,7 @@ namespace Latios
 
         // Returns true if added
         public bool AddOrSetCollectionComponentAndDisposeOld<T>(Entity entity, T value, out JobHandle disposeHandle, out CollectionComponentRef<T> newRef) where T : unmanaged,
-        ICollectionComponent
+        ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index >= 0)
@@ -157,7 +181,8 @@ namespace Latios
             return true;
         }
 
-        public CollectionComponentRef<T> GetCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent
+        public CollectionComponentRef<T> GetCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
@@ -168,7 +193,8 @@ namespace Latios
             return new CollectionComponentRef<T>(ref tcs, entity, index);
         }
 
-        public bool TryGetCollectionComponent<T>(Entity entity, out CollectionComponentRef<T> storedRef) where T : unmanaged, ICollectionComponent
+        public bool TryGetCollectionComponent<T>(Entity entity, out CollectionComponentRef<T> storedRef) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
@@ -181,7 +207,8 @@ namespace Latios
             return true;
         }
 
-        public CollectionComponentRef<T> GetOrAddDefaultCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent
+        public CollectionComponentRef<T> GetOrAddDefaultCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
@@ -206,14 +233,15 @@ namespace Latios
             return new CollectionComponentRef<T>(ref tcs, entity, index);
         }
 
-        public bool HasCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent
+        public bool HasCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             GetTypedCollectionStorage<T>(entity, out int index);
             return index >= 0;
         }
 
         //Returns true if the component can be safely disposed.
-        public bool RemoveIfPresentAndDisposeCollectionComponent<T>(Entity entity, out JobHandle disposeHandle) where T : unmanaged, ICollectionComponent
+        public bool RemoveIfPresentAndDisposeCollectionComponent<T>(Entity entity, out JobHandle disposeHandle) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             var tcs = GetTypedCollectionStorage<T>(entity, out int index);
 
@@ -230,7 +258,7 @@ namespace Latios
 
         //Returns new ref.
         public CollectionComponentRef<T> SetCollectionComponentAndDisposeOld<T>(Entity entity, T value, out JobHandle disposeHandle) where T : unmanaged,
-        ICollectionComponent
+        ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
@@ -243,7 +271,14 @@ namespace Latios
             return new CollectionComponentRef<T>(ref tcs, entity, index);
         }
 
-        private ref TypedCollectionComponentStorage<T> GetTypedCollectionStorage<T>(Entity entity, out int indexInTypedStorage) where T : unmanaged, ICollectionComponent
+        public void DisposeTypeUsingSourceGenDispatch<T>(int storagePtrIndex) where T : unmanaged,
+        ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            m_storagePtrs[storagePtrIndex].As<T>().Dispose();
+        }
+
+        private ref TypedCollectionComponentStorage<T> GetTypedCollectionStorage<T>(Entity entity, out int indexInTypedStorage) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             var key = new Key { typeHash = BurstRuntime.GetHashCode64<T>(), entity = entity };
             if (m_twoLevelLookup.TryGetValue(key, out var indices))
@@ -254,11 +289,12 @@ namespace Latios
 
             if (!m_registeredTypeLookup.TryGetValue(key.typeHash, out var element))
             {
+                var t   = new T();
                 element = new RegisteredType
                 {
-                    associatedType    = new T().AssociatedComponentType,
+                    existType         = t.componentType,
                     typedStorageIndex = m_storagePtrs.Length,
-                    tagType           = ComponentType.ReadWrite<CollectionComponentCleanupTag<T> >()
+                    cleanupType       = t.cleanupType
                 };
 
                 var storage                            = AllocatorManager.Allocate<TypedCollectionComponentStorage<T> >(m_allocator);
@@ -276,7 +312,7 @@ namespace Latios
         }
     }
 
-    internal struct TypedCollectionComponentStorage<T> : IDisposable where T : unmanaged, ICollectionComponent
+    internal struct TypedCollectionComponentStorage<T> : IDisposable where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
     {
         public NativeList<T>                             collectionComponents;
         public NativeList<JobHandle>                     writeHandles;
@@ -328,7 +364,7 @@ namespace Latios
         }
     }
 
-    internal unsafe struct CollectionComponentRef<T> where T : unmanaged, ICollectionComponent
+    internal unsafe struct CollectionComponentRef<T> where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
     {
         TypedCollectionComponentStorage<T>* m_storage;
         Entity                              m_entity;

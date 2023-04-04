@@ -43,6 +43,10 @@
 #define ENABLE_PICKING
 #endif
 
+#if (ENABLE_UNITY_COLLECTIONS_CHECKS || DEVELOPMENT_BUILD) && !DISABLE_MATERIALMESHINFO_BOUNDS_CHECKING
+#define ENABLE_MATERIALMESHINFO_BOUNDS_CHECKING
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -135,10 +139,6 @@ namespace Latios.Kinemation.Systems
         private HeapAllocator m_GPUPersistentAllocator;
         private HeapBlock     m_SharedZeroAllocation;
 
-        private GraphicsBuffer            m_GlobalValuesCbuffer;
-        private BatchRendererGroupGlobals m_GlobalValues;
-        private bool                      m_GlobalValuesDirty;
-
         private HeapAllocator m_ChunkMetadataAllocator;
 
         private NativeList<BatchInfo>      m_BatchInfos;
@@ -150,8 +150,8 @@ namespace Latios.Kinemation.Systems
 
         private NativeList<ValueBlitDescriptor> m_ValueBlits;
 
-        NativeMultiHashMap<int, MaterialPropertyType>    m_NameIDToMaterialProperties;
-        NativeParallelHashMap<int, MaterialPropertyType> m_TypeIndexToMaterialProperty;
+        NativeParallelMultiHashMap<int, MaterialPropertyType> m_NameIDToMaterialProperties;
+        NativeParallelHashMap<int, MaterialPropertyType>      m_TypeIndexToMaterialProperty;
 
         static Dictionary<Type, NamedPropertyMapping> s_TypeToPropertyMappings = new Dictionary<Type, NamedPropertyMapping>();
 
@@ -166,10 +166,6 @@ namespace Latios.Kinemation.Systems
 
         // Burst accessible filter settings for each RenderFilterSettings shared component index
         private NativeParallelHashMap<int, BatchFilterSettings> m_FilterSettings;
-#if UNITY_EDITOR
-        private List<EditorRenderData> m_EditorRenderDatas = new List<EditorRenderData>();
-        private NativeParallelHashMap<int, BatchEditorRenderData> m_BatchEditorDatas;
-#endif
 
 #if ENABLE_PICKING
         Material m_PickingMaterial;
@@ -324,15 +320,12 @@ namespace Latios.Kinemation.Systems
             });
 
             // Collect all components with [MaterialProperty] attribute
-            m_NameIDToMaterialProperties  = new NativeMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
+            m_NameIDToMaterialProperties  = new NativeParallelMultiHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
             m_TypeIndexToMaterialProperty = new NativeParallelHashMap<int, MaterialPropertyType>(256, Allocator.Persistent);
 
             m_GraphicsArchetypes = new EntitiesGraphicsArchetypes(256);
 
             m_FilterSettings = new NativeParallelHashMap<int, BatchFilterSettings>(256, Allocator.Persistent);
-#if UNITY_EDITOR
-            m_BatchEditorDatas = new NativeParallelHashMap<int, BatchEditorRenderData>(256, Allocator.Persistent);
-#endif
 
             // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS (*cough Latios Transforms)
 #if SRP_10_0_0_OR_NEWER
@@ -347,9 +340,6 @@ namespace Latios.Kinemation.Systems
 #if ENABLE_PICKING
             RegisterMaterialPropertyType(typeof(Entity), "unity_EntityId");
 #endif
-
-            m_GlobalValues      = BatchRendererGroupGlobals.Default;
-            m_GlobalValuesDirty = true;
 
             foreach (var typeInfo in TypeManager.AllTypes)
             {
@@ -367,11 +357,6 @@ namespace Latios.Kinemation.Systems
                     }
                 }
             }
-
-            m_GlobalValuesCbuffer = new GraphicsBuffer(
-                GraphicsBuffer.Target.Constant,
-                1,
-                UnsafeUtility.SizeOf<BatchRendererGroupGlobals>());
 
             m_ThreadLocalAllocators = new ThreadLocalAllocator(-1);
 
@@ -474,16 +459,6 @@ namespace Latios.Kinemation.Systems
 
             inputDeps = JobHandle.CombineDependencies(inputDeps, updateFilterSettingsHandle);
 
-#if UNITY_EDITOR
-            Profiler.BeginSample("UpdateSceneCullingMasks");
-            var updateSceneCullingMasks = UpdateSceneCullingMasks(inputDeps);
-            Profiler.EndSample();
-
-            inputDeps = JobHandle.CombineDependencies(inputDeps, updateSceneCullingMasks);
-#endif
-            UpdateGlobalAmbientProbe(new SHCoefficients(RenderSettings.ambientProbe));
-            UpdateSpecCubeHDRDecode(ReflectionProbe.defaultTextureHDRDecodeValues);
-
             int totalChunks = 0;
             var done        = new JobHandle();
             try
@@ -551,15 +526,19 @@ namespace Latios.Kinemation.Systems
             var splitsBuffer = worldBlackboardEntity.GetBuffer<CullingSplitElement>(false);
             splitsBuffer.Reinterpret<CullingSplit>().AddRange(batchCullingContext.cullingSplits);
             var packedSplits                = worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(false);
-            packedSplits.packedSplits.Value = new CullingSplits(ref batchCullingContext, QualitySettings.shadowProjection, m_ThreadLocalAllocators.GeneralAllocator);
+            packedSplits.packedSplits.Value = CullingSplits.Create(&batchCullingContext, QualitySettings.shadowProjection, m_ThreadLocalAllocators.GeneralAllocator->Handle);
             worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new BrgCullingContext
             {
                 cullingThreadLocalAllocator                          = m_ThreadLocalAllocators,
                 batchCullingOutput                                   = cullingOutput,
                 batchFilterSettingsByRenderFilterSettingsSharedIndex = m_FilterSettings,
+                // To be able to access the material/mesh IDs, we need access to the registered material/mesh
+                // arrays. If we can't get them, then we simply skip in those cases.
+                brgRenderMeshArrays =
+                    World.GetExistingSystemManaged<RegisterMaterialsAndMeshesSystem>()?.BRGRenderMeshArrays ??
+                    new NativeParallelHashMap<int, BRGRenderMeshArray>(),
 #if UNITY_EDITOR
-                batchEditorSharedIndexToSceneMaskMap = m_BatchEditorDatas,
-                includeExcludeListFilter             = includeExcludeListFilter,
+                includeExcludeListFilter = includeExcludeListFilter,
 #endif
             });
             worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(  default, false);
@@ -670,7 +649,10 @@ namespace Latios.Kinemation.Systems
             JobHandle done = default;
             Profiler.BeginSample("UpdateAllBatches");
 
-            done = UpdateAllBatches(inputDependencies, out totalChunks);
+            if (!m_EntitiesGraphicsRenderedQuery.IsEmptyIgnoreFilter)
+                done = UpdateAllBatches(inputDependencies, out totalChunks);
+            else
+                totalChunks = 0;
 
             Profiler.EndSample();
 
@@ -727,34 +709,6 @@ namespace Latios.Kinemation.Systems
             };
         }
 
-        private JobHandle UpdateSceneCullingMasks(JobHandle inputDeps)
-        {
-#if UNITY_EDITOR
-            m_EditorRenderDatas.Clear();
-            m_SharedComponentIndices.Clear();
-
-            // TODO: Maybe this could be partially jobified?
-
-            EntityManager.GetAllUniqueSharedComponentsManaged(m_EditorRenderDatas, m_SharedComponentIndices);
-
-            m_BatchEditorDatas.Clear();
-            for (int i = 0; i < m_SharedComponentIndices.Count; ++i)
-            {
-                int sharedIndex = m_SharedComponentIndices[i];
-                var editorData  = m_EditorRenderDatas[i];
-
-                var batchData = new BatchEditorRenderData();
-                batchData.SceneCullingMask = editorData.SceneCullingMask;
-
-                m_BatchEditorDatas[sharedIndex] = batchData;
-            }
-
-            m_EditorRenderDatas.Clear();
-            m_SharedComponentIndices.Clear();
-#endif
-            return new JobHandle();
-        }
-
         private void ResetIds()
         {
             m_SortedBatchIds = new SortedSet<int>();
@@ -797,8 +751,6 @@ namespace Latios.Kinemation.Systems
 
         private void Dispose()
         {
-            m_GlobalValuesCbuffer.Dispose();
-
             if (ErrorShaderEnabled)
                 Material.DestroyImmediate(m_ErrorMaterial);
 
@@ -828,9 +780,7 @@ namespace Latios.Kinemation.Systems
             m_GraphicsArchetypes.Dispose();
 
             m_FilterSettings.Dispose();
-#if UNITY_EDITOR
-            m_BatchEditorDatas.Dispose();
-#endif
+
             if (!m_cullingCallbackFinalJobHandles.IsEmpty)
                 JobHandle.CompleteAll(m_cullingCallbackFinalJobHandles.AsArray());
             m_cullingCallbackFinalJobHandles.Dispose();
@@ -1074,10 +1024,6 @@ namespace Latios.Kinemation.Systems
             // TODO: Need to wait for new chunk updating to complete, so there are no more jobs writing to the bitfields.
             entitiesGraphicsCompleted.Complete();
 
-            Profiler.BeginSample("BlitDirtyGlobalValues");
-            BlitDirtyGlobalValues();
-            Profiler.EndSample();
-
             Profiler.BeginSample("StartUpdate");
             StartUpdate();
             Profiler.EndSample();
@@ -1097,18 +1043,6 @@ namespace Latios.Kinemation.Systems
             JobHandle outputDeps = drawCommandFlagsUpdated;
 
             return outputDeps;
-        }
-
-        private static BatchRendererGroupGlobals[] s_GlobalsArray = new BatchRendererGroupGlobals[1] { default };
-        private void BlitDirtyGlobalValues()
-        {
-            if (m_GlobalValuesDirty)
-            {
-                // SetData needs an array, so put the data in a helper array
-                s_GlobalsArray[0] = m_GlobalValues;
-                m_GlobalValuesCbuffer.SetData(s_GlobalsArray);
-                m_GlobalValuesDirty = false;
-            }
         }
 
         private void UpdateGlobalAABB()
@@ -1578,8 +1512,9 @@ namespace Latios.Kinemation.Systems
 
         private void EndUpdate()
         {
-            // Globally bind the BRG globals cbuffer so all shaders can access it.
-            Shader.SetGlobalConstantBuffer(BatchRendererGroupGlobals.kGlobalsPropertyId, m_GlobalValuesCbuffer, 0, m_GlobalValuesCbuffer.stride);
+#if ENABLE_MATERIALMESHINFO_BOUNDS_CHECKING
+            World.GetExistingSystemManaged<RegisterMaterialsAndMeshesSystem>()?.LogBoundsCheckErrorMessages();
+#endif
         }
 
         internal static NativeList<T> NewNativeListResized<T>(int length, Allocator allocator,
@@ -1589,38 +1524,6 @@ namespace Latios.Kinemation.Systems
             list.Resize(length, resizeOptions);
 
             return list;
-        }
-
-        internal void UpdateSpecCubeHDRDecode(Vector4 specCubeHDRDecode)
-        {
-            if (!Enabled)
-                return;
-
-            bool hdrDecodeDirty = specCubeHDRDecode != m_GlobalValues.SpecCube0_HDR;
-            if (hdrDecodeDirty)
-            {
-                m_GlobalValues.SpecCube0_HDR = specCubeHDRDecode;
-                m_GlobalValues.SpecCube1_HDR = specCubeHDRDecode;
-                m_GlobalValuesDirty          = true;
-            }
-        }
-
-        internal void UpdateGlobalAmbientProbe(SHCoefficients globalAmbientProbe)
-        {
-            if (!Enabled)
-                return;
-
-            bool globalAmbientProbeDirty = globalAmbientProbe != m_GlobalValues.SHCoefficients;
-            if (globalAmbientProbeDirty)
-            {
-                m_GlobalValues.SHCoefficients = globalAmbientProbe;
-                m_GlobalValuesDirty           = true;
-
-#if DEBUG_LOG_AMBIENT_PROBE
-                Debug.Log(
-                    $"Global Ambient probe: {globalAmbientProbe.SHAr} {globalAmbientProbe.SHAg} {globalAmbientProbe.SHAb} {globalAmbientProbe.SHBr} {globalAmbientProbe.SHBg} {globalAmbientProbe.SHBb} {globalAmbientProbe.SHC}");
-#endif
-            }
         }
 
         /// <summary>
@@ -1649,8 +1552,19 @@ namespace Latios.Kinemation.Systems
         /// <param name="mesh">A mesh ID received from <see cref="RegisterMesh"/>.</param>
         public void UnregisterMesh(BatchMeshID mesh) => m_BatchRendererGroup.UnregisterMesh(mesh);
 
-        internal Mesh GetMesh(BatchMeshID mesh) => m_BatchRendererGroup.GetRegisteredMesh(mesh);
-        internal Material GetMaterial(BatchMaterialID material) => m_BatchRendererGroup.GetRegisteredMaterial(material);
+        /// <summary>
+        /// Returns the <see cref="Mesh"/> that corresponds to the given registered mesh ID, or <c>null</c> if no such mesh exists.
+        /// </summary>
+        /// <param name="mesh">A mesh ID received from <see cref="RegisterMesh"/>.</param>
+        /// <returns>The <see cref="Mesh"/> object corresponding to the given mesh ID if the ID is valid, or <c>null</c> if it's not valid.</returns>
+        public Mesh GetMesh(BatchMeshID mesh) => m_BatchRendererGroup.GetRegisteredMesh(mesh);
+
+        /// <summary>
+        /// Returns the <see cref="Material"/> that corresponds to the given registered material ID, or <c>null</c> if no such material exists.
+        /// </summary>
+        /// <param name="material">A material ID received from <see cref="RegisterMaterial"/>.</param>
+        /// <returns>The <see cref="Material"/> object corresponding to the given material ID if the ID is valid, or <c>null</c> if it's not valid.</returns>
+        public Material GetMaterial(BatchMaterialID material) => m_BatchRendererGroup.GetRegisteredMaterial(material);
 
         /// <summary>
         /// Converts a type index into a type name.

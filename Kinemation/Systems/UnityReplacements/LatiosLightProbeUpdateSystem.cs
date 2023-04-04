@@ -168,17 +168,15 @@ namespace Latios.Kinemation
                     {
                         // The documentation specifies that this index should be initially set to 0,
                         // and then each frame it can be updated to the previous frame's values for faster queries.
-                        // SHCoefficients for some reason has a padding Vector4. I don't think this helps in any way.
-                        // But we can at least borrow one of the components to store the index.
-                        // Since this is a full rebuild, we set the input index to zero.
+                        // Since this is a full rebuild, we set the input index to 0.
                         int tetIndex = 0;
                         lightProbeQuery.CalculateInterpolatedLightAndOcclusionProbe(worldTransforms[i].position, ref tetIndex, out var shl2, out _);
                         var result = new BuiltinMaterialPropertyUnity_SHCoefficients()
                         {
                             Value = new SHCoefficients(shl2)
                         };
-                        result.Value.Padding.x = math.asfloat(tetIndex);
-                        shArray[i]             = result;
+                        //result.Value.Padding.x = math.asfloat(tetIndex);
+                        shArray[i] = result;
                     }
                 }
                 else
@@ -187,16 +185,16 @@ namespace Latios.Kinemation
                     {
                         // The documentation specifies that this index should be initially set to 0,
                         // and then each frame it can be updated to the previous frame's values for faster queries.
-                        // SHCoefficients for some reason has a padding Vector4. I don't think this helps in any way.
-                        // But we can at least borrow one of the components to store the index.
-                        int tetIndex = math.asint(shArray[i].Value.Padding.x);
+                        // However, we don't have a component to store this, so for now we just set it to 0 every time.
+                        //int tetIndex = math.asint(shArray[i].Value.Padding.x);
+                        int tetIndex = 0;
                         lightProbeQuery.CalculateInterpolatedLightAndOcclusionProbe(worldTransforms[i].position, ref tetIndex, out var shl2, out _);
                         var result = new BuiltinMaterialPropertyUnity_SHCoefficients()
                         {
                             Value = new SHCoefficients(shl2)
                         };
-                        result.Value.Padding.x = math.asfloat(tetIndex);
-                        shArray[i]             = result;
+                        //result.Value.Padding.x = math.asfloat(tetIndex);
+                        shArray[i] = result;
                     }
                 }
             }

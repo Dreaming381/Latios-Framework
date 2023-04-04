@@ -6,7 +6,7 @@ namespace Latios.Kinemation.Authoring.Systems
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
     [DisableAutoCreation]
-    public class KinemationSmartBlobberBakingGroup : ComponentSystemGroup
+    public partial class KinemationSmartBlobberBakingGroup : ComponentSystemGroup
     {
         void GetOrCreateAndAddSystem<T>() where T : unmanaged, ISystem
         {
@@ -48,7 +48,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBakerBakingGroup))]
-    public class KinemationSmartBlobberResolverBakingGroup : ComponentSystemGroup
+    public partial class KinemationSmartBlobberResolverBakingGroup : ComponentSystemGroup
     {
         void GetOrCreateAndAddSystem<T>() where T : unmanaged, ISystem
         {

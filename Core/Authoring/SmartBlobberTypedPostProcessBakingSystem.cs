@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using GameObject = UnityEngine.GameObject;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -38,21 +39,17 @@ namespace Latios.Authoring.Systems
             m_resultHandle       = GetComponentTypeHandle<SmartBlobberResult>(false);
             m_trackingDataHandle = GetComponentTypeHandle<SmartBlobberTrackingData>(false);
             m_entityHandle       = GetEntityTypeHandle();
-
-            m_resultLookup       = GetComponentLookup<SmartBlobberResult>(true);
-            m_trackingDataLookup = GetComponentLookup<SmartBlobberTrackingData>(false);
         }
 
         protected sealed override void OnUpdate()
         {
             // Step 1: Update handles
             var blobAssetStore = m_bakingSystemReference.BlobAssetStore;
+            var typeHash       = blobAssetStore.GetTypeHashForBurst<TBlobType>();
 
             m_resultHandle.Update(this);
             m_trackingDataHandle.Update(this);
             m_entityHandle.Update(this);
-            m_resultLookup.Update(this);
-            m_trackingDataLookup.Update(this);
 
             // Step 2: Build blobs and hashes
             Dependency = new ComputeHashesJob
@@ -61,31 +58,15 @@ namespace Latios.Authoring.Systems
                 trackingDataHandle = m_trackingDataHandle,
                 entityHandle       = m_entityHandle
             }.ScheduleParallel(m_query, Dependency);
-            CompleteDependency();
 
-            // Step 3: filter with BlobAssetComputationContext
-            var computationContext = new BlobAssetComputationContext<SmartBlobberTrackingData, TBlobType>(blobAssetStore, 128, Allocator.TempJob);
-            new SmartBlobberTools<TBlobType>.FindBlobsThatShouldBeKeptJob
+            // Step 3: Filter with BlobAssetStore and Deduplicate
+            Dependency = new SmartBlobberTools<TBlobType>.DeduplicateBlobsWithBlobAssetStoreJob
             {
-                context            = computationContext,
-                trackingDataHandle = m_trackingDataHandle
-            }.Run(m_query);
-
-            new SmartBlobberTools<TBlobType>.MarkBlobsToKeep
-            {
-                context            = computationContext,
-                resultLookup       = m_resultLookup,
-                trackingDataLookup = m_trackingDataLookup
-            }.Run();
-
-            // Step 4: Dispose unused blobs and collect final blobs
-            new SmartBlobberTools<TBlobType>.DeduplicateBlobsJob
-            {
-                context            = computationContext,
+                blobAssetStore     = blobAssetStore,
+                burstTypeHash      = typeHash,
                 resultHandle       = m_resultHandle,
-                trackingDataHandle = m_trackingDataHandle
-            }.Run(m_query);
-            computationContext.Dispose();
+                trackingDataHandle = m_trackingDataHandle,
+            }.Schedule(m_query, Dependency);
         }
     }
 
@@ -108,26 +89,24 @@ namespace Latios.Authoring.Systems
                 blob.Reinterpret<int>().GetUnsafePtr();  // Invokes ValidateAllowNull()
                 if (blob.Reinterpret<int>() == BlobAssetReference<int>.Null)
                 {
-                    var trackingData          = trackingDataArray[i];
-                    trackingData.isNull       = true;
-                    trackingData.isFinalized  = true;
-                    trackingData.thisEntity   = entityArray[i];
-                    trackingData.shouldBeKept = false;
-                    trackingDataArray[i]      = trackingData;
+                    var trackingData         = trackingDataArray[i];
+                    trackingData.isNull      = true;
+                    trackingData.isFinalized = true;
+                    trackingData.thisEntity  = entityArray[i];
+                    trackingDataArray[i]     = trackingData;
                 }
                 else
                 {
-                    var length                = blob.GetLength();
-                    var hash32                = (uint)(blob.GetHash64() & 0xffffffff);
-                    var hash64                = xxHash3.Hash64(blob.Reinterpret<int>().GetUnsafePtr(), length);
-                    var hash128               = new Hash128(hash64.x, hash64.y, (uint)length, hash32);
-                    var trackingData          = trackingDataArray[i];
-                    trackingData.hash         = hash128;
-                    trackingData.isNull       = false;
-                    trackingData.isFinalized  = true;
-                    trackingData.thisEntity   = entityArray[i];
-                    trackingData.shouldBeKept = false;
-                    trackingDataArray[i]      = trackingData;
+                    var length               = blob.GetLength();
+                    var hash32               = (uint)(blob.GetHash64() & 0xffffffff);
+                    var hash64               = xxHash3.Hash64(blob.Reinterpret<int>().GetUnsafePtr(), length);
+                    var hash128              = new Hash128(hash64.x, hash64.y, (uint)length, hash32);
+                    var trackingData         = trackingDataArray[i];
+                    trackingData.hash        = hash128;
+                    trackingData.isNull      = false;
+                    trackingData.isFinalized = true;
+                    trackingData.thisEntity  = entityArray[i];
+                    trackingDataArray[i]     = trackingData;
                 }
             }
         }
@@ -140,90 +119,48 @@ namespace Latios.Authoring
     public partial struct SmartBlobberTools<TBlobType> where TBlobType : unmanaged
     {
         [BurstCompile]
-        internal struct FindBlobsThatShouldBeKeptJob : IJobChunk
+        internal struct DeduplicateBlobsWithBlobAssetStoreJob : IJobChunk
         {
-            public BlobAssetComputationContext<SmartBlobberTrackingData, TBlobType> context;
-            [ReadOnly] public ComponentTypeHandle<SmartBlobberTrackingData>         trackingDataHandle;
+            public BlobAssetStore                                blobAssetStore;
+            public ComponentTypeHandle<SmartBlobberTrackingData> trackingDataHandle;
+            public ComponentTypeHandle<SmartBlobberResult>       resultHandle;
+            public uint                                          burstTypeHash;
+
+            [NativeDisableContainerSafetyRestriction] NativeHashSet<Hash128> disposedBlobs;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var array = chunk.GetNativeArray(ref trackingDataHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var td = array[i];
-                    if (td.isNull)
-                        continue;
-
-                    context.AssociateBlobAssetWithUnityObject(td.hash, td.authoringInstanceID);
-                    if (context.NeedToComputeBlobAsset(td.hash))
-                    {
-                        context.AddBlobAssetToCompute(td.hash, td);
-                    }
-                }
-            }
-        }
-
-        [BurstCompile]
-        internal struct MarkBlobsToKeep : IJob
-        {
-            public BlobAssetComputationContext<SmartBlobberTrackingData, TBlobType> context;
-            public ComponentLookup<SmartBlobberTrackingData>                        trackingDataLookup;
-            [ReadOnly] public ComponentLookup<SmartBlobberResult>                   resultLookup;
-
-            public unsafe void Execute()
-            {
-                var filteredTrackingData = context.GetSettings(Allocator.Temp);
-                foreach (var td in filteredTrackingData)
-                {
-                    resultLookup[td.thisEntity].blob.Reinterpret<int>().GetUnsafePtr();  // Invokes ValidateAllowNull()
-                    context.AddComputedBlobAsset(td.hash, resultLookup[td.thisEntity].blob.Reinterpret<TBlobType>());
-                    trackingDataLookup.GetRefRW(td.thisEntity, false).ValueRW.shouldBeKept = true;
-                }
-            }
-        }
-
-        [BurstCompile]
-        internal struct DeduplicateBlobsJob : IJobChunk
-        {
-            public BlobAssetComputationContext<SmartBlobberTrackingData, TBlobType> context;
-            [ReadOnly] public ComponentTypeHandle<SmartBlobberTrackingData>         trackingDataHandle;
-            public ComponentTypeHandle<SmartBlobberResult>                          resultHandle;
-
-            [NativeDisableContainerSafetyRestriction] NativeHashSet<BlobAssetReference<TBlobType> > disposedBlobs;
-
-            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-            {
                 if (!disposedBlobs.IsCreated)
-                    disposedBlobs = new NativeHashSet<BlobAssetReference<TBlobType> >(128, Allocator.Temp);
+                    disposedBlobs = new NativeHashSet<Hash128>(128, Allocator.Temp);
 
-                var trackingDataArray = chunk.GetNativeArray(ref trackingDataHandle);
-                var resultArray       = chunk.GetNativeArray(ref resultHandle);
+                var trackingDatas = chunk.GetNativeArray(ref trackingDataHandle);
+                var blobs         = chunk.GetNativeArray(ref resultHandle).Reinterpret<UnsafeUntypedBlobAssetReference>();
                 for (int i = 0; i < chunk.Count; i++)
                 {
-                    var td = trackingDataArray[i];
+                    var td = trackingDatas[i];
                     if (td.isNull)
                         continue;
 
-                    // The reference is already up-to-date
-                    if (td.shouldBeKept)
-                        continue;
-
-                    var blob = resultArray[i].blob.Reinterpret<TBlobType>();
-                    //blob.GetUnsafePtr();  // Invokes ValidateAllowNull()
-                    //blob.Dispose();
-                    if (!context.GetBlobAsset(td.hash, out var savedBlob))
+                    if (disposedBlobs.Contains(td.hash))
                     {
-                        UnityEngine.Debug.Log($"Blob hash {td.hash} was lost in BlobAssetStore.");
-                        resultArray[i] = default;
-                        continue;
+                        if (!blobAssetStore.TryGetBlobAssetWithBurstHash<TBlobType>(td.hash, burstTypeHash, out var storedBlob))
+                        {
+                            UnityEngine.Debug.LogError($"Blob hash {td.hash} was lost in BlobAssetStore. This is likely a Unity bug. Please report!");
+                            blobs[i] = default;
+                            continue;
+                        }
+                        blobs[i] = UnsafeUntypedBlobAssetReference.Create(storedBlob);
                     }
-                    if (blob != savedBlob && disposedBlobs.Add(blob))
+                    else
                     {
-                        blob.Dispose();
+                        var blob       = blobs[i].Reinterpret<TBlobType>();
+                        var backupBlob = blob;
+                        if (!blobAssetStore.TryAddBlobAssetWithBurstHash(td.hash, burstTypeHash, ref blob) && backupBlob != blob)
+                        {
+                            blobs[i] = UnsafeUntypedBlobAssetReference.Create(blob);
+                            disposedBlobs.Add(td.hash);
+                        }
                     }
-
-                    savedBlob.GetUnsafePtr();  // Invokes ValidateAllowNull()
-                    resultArray[i] = new SmartBlobberResult { blob = UnsafeUntypedBlobAssetReference.Create(savedBlob) };
                 }
             }
         }

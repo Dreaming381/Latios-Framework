@@ -80,9 +80,8 @@ namespace Latios.Kinemation.Systems
             m_editorJob.entityHandle.Update(ref state);
 
             var engineContext = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(true);
-            m_editorJob.batchEditorSharedIndexToSceneMaskMap = engineContext.batchEditorSharedIndexToSceneMaskMap;
-            m_editorJob.sceneCullingMask                     = m_job.cullingContext.sceneCullingMask;
-            m_editorJob.includeExcludeFilter                 = engineContext.includeExcludeListFilter;
+            m_editorJob.sceneCullingMask     = m_job.cullingContext.sceneCullingMask;
+            m_editorJob.includeExcludeFilter = engineContext.includeExcludeListFilter;
 
             state.Dependency = m_editorJob.ScheduleParallelByRef(m_metaQuery, state.Dependency);
 #endif
@@ -151,7 +150,6 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public EntityTypeHandle entityHandle;
 
             [ReadOnly] public DynamicSharedComponentTypeHandle editorDataComponentHandle;
-            [ReadOnly] public NativeParallelHashMap<int, BatchEditorRenderData> batchEditorSharedIndexToSceneMaskMap;
             [ReadOnly] public IncludeExcludeListFilter includeExcludeFilter;
 
             public ulong sceneCullingMask;
@@ -170,12 +168,9 @@ namespace Latios.Kinemation.Systems
 
                     // If we can't find a culling mask, use the default
                     ulong chunkSceneCullingMask = UnityEditor.SceneManagement.EditorSceneManager.DefaultSceneCullingMask;
-                    if (editorRenderDataIndex >= 0)
+                    if (chunk.Has(ref editorDataComponentHandle))
                     {
-                        if (batchEditorSharedIndexToSceneMaskMap.TryGetValue(editorRenderDataIndex, out var data))
-                        {
-                            chunkSceneCullingMask = data.SceneCullingMask;
-                        }
+                        chunkSceneCullingMask = *(ulong*)chunk.GetDynamicSharedComponentDataAddress(ref editorDataComponentHandle);
                     }
 
                     // Cull the chunk if the scene mask intersection is empty.
