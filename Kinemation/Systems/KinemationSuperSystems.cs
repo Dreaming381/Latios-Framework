@@ -8,7 +8,7 @@ namespace Latios.Kinemation.Systems
     /// to customize the culling loop.
     /// </summary>
     [DisableAutoCreation]
-    public class KinemationCullingSuperSystem : SuperSystem
+    public partial class KinemationCullingSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {
@@ -39,7 +39,7 @@ namespace Latios.Kinemation.Systems
     /// only needs to sync with its own jobs.
     /// </summary>
     [DisableAutoCreation]
-    public class CullingRoundRobinDispatchSuperSystem : SuperSystem
+    public partial class CullingRoundRobinDispatchSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {
@@ -67,7 +67,7 @@ namespace Latios.Kinemation.Systems
     [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
     [UpdateBefore(typeof(RenderBoundsUpdateSystem))]
     [DisableAutoCreation]
-    public class KinemationRenderUpdateSuperSystem : RootSuperSystem
+    public partial class KinemationRenderUpdateSuperSystem : RootSuperSystem
     {
         protected override void CreateSystems()
         {
@@ -85,7 +85,7 @@ namespace Latios.Kinemation.Systems
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     [UpdateAfter(typeof(LatiosEntitiesGraphicsSystem))]
     [DisableAutoCreation]
-    public class KinemationPostRenderSuperSystem : SuperSystem
+    public partial class KinemationPostRenderSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {
@@ -102,7 +102,7 @@ namespace Latios.Kinemation.Systems
 
     [UpdateInGroup(typeof(StructuralChangePresentationSystemGroup))]
     [DisableAutoCreation]
-    public class KinemationRenderSyncPointSuperSystem : SuperSystem
+    public partial class KinemationRenderSyncPointSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {
@@ -116,7 +116,7 @@ namespace Latios.Kinemation.Systems
 
     [UpdateInGroup(typeof(Latios.Systems.LatiosWorldSyncGroup))]
     [DisableAutoCreation]
-    public class KinemationFrameSyncPointSuperSystem : SuperSystem
+    public partial class KinemationFrameSyncPointSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {

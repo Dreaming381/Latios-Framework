@@ -17,6 +17,12 @@ namespace Latios.Transforms.Authoring.Systems
     [BurstCompile]
     public partial struct TransformBakingSystem : ISystem
     {
+        [BakingType]
+        struct PreviousRuntimeFlags : IComponentData
+        {
+            public RuntimeTransformComponentFlags previousFlags;
+        }
+
         EntityQuery m_query;
 
         public void OnCreate(ref SystemState state)
@@ -44,7 +50,8 @@ namespace Latios.Transforms.Authoring.Systems
                 parentToWorldTransformHandle = GetComponentTypeHandle<ParentToWorldTransform>(false),
                 transformAuthoringHandle     = GetComponentTypeHandle<TransformAuthoring>(true),
                 transformAuthoringLookup     = GetComponentLookup<TransformAuthoring>(true),
-                worldTransformHandle         = GetComponentTypeHandle<WorldTransform>(false)
+                worldTransformHandle         = GetComponentTypeHandle<WorldTransform>(false),
+                previousFlagsHandle          = GetComponentTypeHandle<PreviousRuntimeFlags>(false)
             };
 
             state.Dependency = job.ScheduleParallelByRef(m_query, state.Dependency);
@@ -64,6 +71,7 @@ namespace Latios.Transforms.Authoring.Systems
             public ComponentTypeHandle<ParentToWorldTransform>        parentToWorldTransformHandle;
             public ComponentTypeHandle<LocalTransform>                localTransformHandle;
             public ComponentTypeHandle<Parent>                        parentHandle;
+            public ComponentTypeHandle<PreviousRuntimeFlags>          previousFlagsHandle;
 
             public EntityCommandBuffer.ParallelWriter ecb;
             public uint                               lastSystemVersion;
@@ -79,6 +87,7 @@ namespace Latios.Transforms.Authoring.Systems
                 bool hasLocalTransform         = chunk.Has(ref localTransformHandle);
                 bool hasStatic                 = chunk.Has<Unity.Transforms.Static>();  // Despite the namespace, this is in Unity.Entities assembly
                 bool hasIdentityLocalToParent  = chunk.Has<CopyParentWorldTransformTag>();
+                bool hasPreviousFlags          = chunk.Has(ref previousFlagsHandle);
 
                 var entities                = chunk.GetNativeArray(entityHandle);
                 var transformAuthoringArray = chunk.GetNativeArray(ref transformAuthoringHandle);
@@ -87,16 +96,33 @@ namespace Latios.Transforms.Authoring.Systems
                 var parentToWorldTransformArray = chunk.GetNativeArray(ref parentToWorldTransformHandle);
                 var localTransformArray         = chunk.GetNativeArray(ref localTransformHandle);
                 var parentArray                 = chunk.GetNativeArray(ref parentHandle);
+                var previousFlagsArray          = chunk.GetNativeArray(ref previousFlagsHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var transformAuthoring = transformAuthoringArray[i];
-                    if ((transformAuthoring.RuntimeTransformUsage & TransformUsageFlags.ManualOverride) != 0)
+                    if (!hasPreviousFlags)
+                    {
+                        ecb.AddComponent(unfilteredChunkIndex, entities[i], new PreviousRuntimeFlags { previousFlags = transformAuthoring.RuntimeTransformUsage });
+                    }
+
+                    if ((transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.ManualOverride) != 0)
+                    {
+                        if (!hasPreviousFlags || (previousFlagsArray[i].previousFlags & RuntimeTransformComponentFlags.ManualOverride) == 0)
+                        {
+                            var cts = new ComponentTypeSet(ComponentType.ReadOnly<WorldTransform>(),
+                                                           ComponentType.ReadOnly<LocalTransform>(),
+                                                           ComponentType.ReadOnly<ParentToWorldTransform>(),
+                                                           ComponentType.ReadOnly<Parent>());
+
+                            ecb.RemoveComponent(unfilteredChunkIndex, entities[i], cts);
+                        }
                         continue;
+                    }
 
                     bool needsWorldTransform = false;
                     bool needsLocalTransform = false;
-                    if (transformAuthoring.RuntimeTransformUsage == TransformUsageFlags.None)
+                    if (transformAuthoring.RuntimeTransformUsage == RuntimeTransformComponentFlags.None)
                     {
                         // Do nothing
                     }
@@ -104,13 +130,10 @@ namespace Latios.Transforms.Authoring.Systems
                     {
                         needsWorldTransform = true;
                     }
-                    else if ((transformAuthoring.RuntimeTransformUsage &
-                              (TransformUsageFlags.Default | TransformUsageFlags.ReadGlobalTransform | TransformUsageFlags.WriteGlobalTransform)) != 0)
+                    else
                     {
-                        needsWorldTransform = true;
-
-                        if (transformAuthoring.RuntimeParent != Entity.Null)
-                            needsLocalTransform = true;
+                        needsWorldTransform = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.LocalToWorld) != 0;
+                        needsLocalTransform = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.RequestParent) != 0;
                     }
 
                     if (needsLocalTransform == false && needsWorldTransform == false &&

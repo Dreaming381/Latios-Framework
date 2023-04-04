@@ -22,6 +22,25 @@ namespace Latios
         internal int                       m_version;
 
         /// <summary>
+        /// Checks if this instance is valid. Will throw if the instance used to be valid but was disposed.
+        /// </summary>
+        public bool isValid
+        {
+            get
+            {
+                if (m_impl == null)
+                    return false;
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
+
+                return true;
+            }
+        }
+
+        /// <summary>
         /// If set to true, the World will stop updating systems if an exception is caught by the LatiosWorld.
         /// </summary>
         public bool zeroToleranceForExceptions
@@ -126,21 +145,22 @@ namespace Latios
         /// <param name="entity">The entity to add the managed struct component to</param>
         /// <param name="component">The data for the managed struct component</param>
         /// <returns>False if the component was already present, true otherwise</returns>
-        public bool AddManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent
+        public bool AddManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent,
+        InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
-            var  em            = m_impl->m_worldUnmanaged.EntityManager;
-            bool hasAssociated = em.AddComponent(                                entity, managedStructComponent.AssociatedComponentType);
-            em.AddComponent<ManagedComponentCleanupTag<T> >(entity);
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
                 m_impl->m_managedStructStorage = GCHandle.Alloc(managedStructStorage, GCHandleType.Normal);
             }
-            //((ManagedStructComponentStorage)m_impl->m_managedStructStorage.Target).AddComponent(entity, managedStructComponent);
+
+            var  em            = m_impl->m_worldUnmanaged.EntityManager;
+            bool hasAssociated = em.AddComponent(entity, managedStructComponent.componentType);
+            em.AddComponent(entity, managedStructComponent.cleanupType);
             (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).AddComponent(entity, managedStructComponent);
             return hasAssociated;
         }
@@ -151,22 +171,24 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         /// <param name="entity">The entity to remove the managed struct component from</param>
         /// <returns>Returns true if the entity had the managed struct component, false otherwise</returns>
-        public bool RemoveManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public bool RemoveManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
-            var  em            = m_impl->m_worldUnmanaged.EntityManager;
-            bool hadAssociated = em.RemoveComponent(                                entity, new T().AssociatedComponentType);
-            em.RemoveComponent<ManagedComponentCleanupTag<T> >(entity);
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
                 m_impl->m_managedStructStorage = GCHandle.Alloc(managedStructStorage, GCHandleType.Normal);
             }
 
-            (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).RemoveComponent<T>(entity);
+            var  storage       = (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage);
+            var  em            = m_impl->m_worldUnmanaged.EntityManager;
+            bool hadAssociated = em.RemoveComponent(entity, storage.GetExistType<T>());
+            em.RemoveComponent(entity, storage.GetCleanupType<T>());
+
+            storage.RemoveComponent<T>(entity);
             return hadAssociated;
         }
 
@@ -174,20 +196,23 @@ namespace Latios
         /// Gets the managed struct component instance from the entity
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
-        public T GetManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public T GetManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
-            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, new T().AssociatedComponentType))
-                throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
                 m_impl->m_managedStructStorage = GCHandle.Alloc(managedStructStorage, GCHandleType.Normal);
             }
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).GetExistType<T>()))
+                throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
+#endif
+
             return (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage).GetOrAddDefaultComponent<T>(entity);
         }
 
@@ -198,13 +223,14 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         /// <param name="entity">The entity which has the managed struct component to be replaced</param>
         /// <param name="component">The new managed struct component value</param>
-        public void SetManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent
+        public void SetManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent,
+        InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 
-            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, managedStructComponent.AssociatedComponentType))
+            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, managedStructComponent.componentType))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
             if (m_impl->m_managedStructStorage == default)
@@ -220,7 +246,7 @@ namespace Latios
         /// Returns true if the entity has the managed struct component. False otherwise.
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
-        public bool HasManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public bool HasManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
@@ -235,7 +261,18 @@ namespace Latios
             }
 
             var storage = (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage);
-            return em.HasComponent(entity, storage.GetAssociatedType<T>());
+            return em.HasComponent(entity, storage.GetExistType<T>());
+        }
+
+        internal ManagedStructComponentStorage GetManagedStructStorage()
+        {
+            if (m_impl->m_managedStructStorage == default)
+            {
+                var managedStructStorage       = new ManagedStructComponentStorage();
+                m_impl->m_managedStructStorage = GCHandle.Alloc(managedStructStorage, GCHandleType.Normal);
+                return managedStructStorage;
+            }
+            return (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage);
         }
         #endregion
 
@@ -252,15 +289,16 @@ namespace Latios
         /// <param name="entity">The entity in which the collection component should be added</param>
         /// <param name="collectionComponent">The collection component value</param>
         /// <returns>True if the component was added, false if it was set</returns>
-        public bool AddOrSetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent
+        public bool AddOrSetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
 
-            bool hasAssociated = m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.AssociatedComponentType);
-            m_impl->m_worldUnmanaged.EntityManager.AddComponent<CollectionComponentCleanupTag<T> >(entity);
+            bool hasAssociated = m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.componentType);
+            m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.cleanupType);
             var replaced = m_impl->m_collectionComponentStorage.AddOrSetCollectionComponentAndDisposeOld(entity, collectionComponent, out var disposeHandle, out var newRef);
             m_impl->m_collectionDependencies.Add(new LatiosWorldUnmanagedImpl.CollectionDependency
             {
@@ -281,16 +319,16 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="entity">The entity in that has the collection component which should be removed</param>
         /// <returns>True if the entity had the AssociatedComponentType, false otherwise</returns>
-        public bool RemoveCollectionComponentAndDispose<T>(Entity entity) where T : unmanaged, ICollectionComponent
+        public bool RemoveCollectionComponentAndDispose<T>(Entity entity) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
 
-            var  type          = m_impl->m_collectionComponentStorage.GetAssociatedType<T>();
+            var  type          = m_impl->m_collectionComponentStorage.GetExistType<T>();
             bool hadAssociated = m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(entity, type);
-            m_impl->m_worldUnmanaged.EntityManager.RemoveComponent<CollectionComponentCleanupTag<T> >(entity);
+            m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(entity, m_impl->m_collectionComponentStorage.GetCleanupType<T>());
             var disposed = m_impl->m_collectionComponentStorage.RemoveIfPresentAndDisposeCollectionComponent<T>(entity, out var disposeHandle);
             if (disposed)
                 m_impl->CompleteOrMergeDisposeDependency(disposeHandle);
@@ -307,13 +345,13 @@ namespace Latios
         /// <param name="entity">The entity that has the collection component</param>
         /// <param name="readOnly">Specifies if the collection component will only be read by the system</param>
         /// <returns>The collection component instance</returns>
-        public T GetCollectionComponent<T>(Entity entity, bool readOnly) where T : unmanaged, ICollectionComponent
+        public T GetCollectionComponent<T>(Entity entity, bool readOnly) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 
-            var type = m_impl->m_collectionComponentStorage.GetAssociatedType<T>();
+            var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
@@ -330,13 +368,14 @@ namespace Latios
         }
 
         // Note: Always ReadWrite. This method is not recommended unless you know what you are doing.
-        public T GetCollectionComponent<T>(Entity entity, out JobHandle combinedReadWriteHandle) where T : unmanaged, ICollectionComponent
+        public T GetCollectionComponent<T>(Entity entity, out JobHandle combinedReadWriteHandle) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 
-            var type = m_impl->m_collectionComponentStorage.GetAssociatedType<T>();
+            var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
@@ -369,13 +408,14 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="entity">The entity that has the collection component to be replaced</param>
         /// <param name="collectionComponent">The new collection component value</param>
-        public void SetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent
+        public void SetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 
-            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, collectionComponent.AssociatedComponentType))
+            if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, collectionComponent.componentType))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
             var replaced = m_impl->m_collectionComponentStorage.AddOrSetCollectionComponentAndDisposeOld(entity, collectionComponent, out var disposeHandle, out var newRef);
@@ -392,13 +432,13 @@ namespace Latios
         /// Returns true if the entity has the associated component type for the collection component type
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
-        public bool HasCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent
+        public bool HasCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
-            var type = m_impl->m_collectionComponentStorage.GetAssociatedType<T>();
+            var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             return m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type);
         }
 
@@ -412,7 +452,8 @@ namespace Latios
         /// <param name="entity">The entity with the collection component whose dependency should be updated</param>
         /// <param name="handle">The new dependency for the collection component</param>
         /// <param name="isReadOnlyHandle">True if the dependency to update only read the collection component</param>
-        public void UpdateCollectionComponentDependency<T>(Entity entity, JobHandle handle, bool isReadOnlyHandle) where T : unmanaged, ICollectionComponent
+        public void UpdateCollectionComponentDependency<T>(Entity entity, JobHandle handle, bool isReadOnlyHandle) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
 

@@ -153,8 +153,6 @@ namespace Latios.Kinemation.Authoring
                 var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
                 baker.AddComponent(entity, lodComponent);
             }
-
-            baker.ConfigureEditorRenderData(entity, renderer.gameObject, true);
         }
 
         internal static void ConvertToMultipleEntities<T>(
@@ -180,7 +178,7 @@ namespace Latios.Kinemation.Authoring
                 Entity meshEntity;
                 if (root == null)
                 {
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Default, false, $"{baker.GetName()}-MeshRendererEntity");
+                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
 
                     // Update Transform components:
                     baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
@@ -220,8 +218,6 @@ namespace Latios.Kinemation.Authoring
                     var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
                     baker.AddComponent(meshEntity, lodComponent);
                 }
-
-                baker.ConfigureEditorRenderData(meshEntity, renderer.gameObject, true);
             }
         }
     }

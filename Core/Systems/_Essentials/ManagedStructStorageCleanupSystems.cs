@@ -1,242 +1,330 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using Debug = UnityEngine.Debug;
+using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 
 namespace Latios.Systems
 {
-    internal interface ManagedComponentsReactiveSystem
-    {
-        EntityQuery Query { get; }
-    }
-
-    /// <summary>
-    /// A system group responsible for creating and running all dynamically generated systems which synchronize the state
-    /// of managed struct components and collection components with their respective AssociatedComponentType each.
-    /// If you encounter errors with this system using IL2CPP, make sure you have Smaller Builds as the IL2CPP generation mode.
-    /// </summary>
     [DisableAutoCreation]
     [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderFirst = true)]
     [UpdateAfter(typeof(MergeBlackboardsSystem))]
-    public class ManagedComponentsReactiveSystemGroup : RootSuperSystem
+    [BurstCompile]
+    public unsafe partial struct CollectionComponentsReactiveSystem : ISystem
     {
-        struct AssociatedTypeCleanupTagTypePair : IEquatable<AssociatedTypeCleanupTagTypePair>
-        {
-            public ComponentType associatedType;
-            public ComponentType cleanupTagType;
+        LatiosWorldUnmanaged latiosWorld;
 
-            public bool Equals(AssociatedTypeCleanupTagTypePair other)
-            {
-                return associatedType == other.associatedType && cleanupTagType == other.cleanupTagType;
-            }
+        struct CollectionComponentDispatchable
+        {
+            public EntityQuery                                                                           addQuery;
+            public EntityQuery                                                                           removeQuery;
+            public FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr;
         }
 
-        private EntityQuery m_allSystemsQuery;
+        NativeList<CollectionComponentDispatchable> m_dispatchables;
 
-        public override bool ShouldUpdateSystem()
+        delegate FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> GetFunctionPtrDelegate();
+
+        public void OnCreate(ref SystemState state)
         {
-            for (int i = 0; i < Systems.Count; i++)
+            NativeList<ComponentType> cleanupTypes = default;
+            GetAllTagCleanupComponentTypes(ref cleanupTypes, ref m_dispatchables, TypeManager.GetTypeCount());
+
+            var cleanupInterfaceType = typeof(InternalSourceGen.StaticAPI.ICollectionComponentCleanup);
+            foreach (var cleanupType in cleanupTypes)
             {
-                var mcrs = Systems[i] as ManagedComponentsReactiveSystem;
-                if (!mcrs.Query.IsEmptyIgnoreFilter)
-                    return true;
-            }
-            return false;
-
-            //return m_allSystemsQuery.IsEmptyIgnoreFilter == false;
-        }
-
-        //private struct ManagedDefeatStripTag : IComponentData { }
-        //private struct ManagedDefeatStripComponent : IManagedComponent
-        //{
-        //    public Type AssociatedComponentType => typeof(ManagedDefeatStripTag);
-        //}
-        //
-        //private struct CollectionDefeatStripTag : IComponentData { }
-        //private struct CollectionDefeatStripComponent : ICollectionComponent
-        //{
-        //    public Type AssociatedComponentType => typeof(ManagedDefeatStripTag);
-        //    public JobHandle Dispose(JobHandle inputDeps) => default;
-        //}
-
-        protected override void CreateSystems()
-        {
-            // Defeat stripping
-            //World.DestroySystem(World.CreateSystem<ManagedComponentCreateSystem<ManagedDefeatStripComponent> >());
-            //World.DestroySystem(World.CreateSystem<ManagedComponentDestroySystem<ManagedDefeatStripComponent> >());
-            //World.DestroySystem(World.CreateSystem<CollectionComponentCreateSystem<CollectionDefeatStripComponent> >());
-            //World.DestroySystem(World.CreateSystem<CollectionComponentDestroySystem<CollectionDefeatStripComponent> >());
-
-            EnableSystemSorting = false;
-
-            var managedCreateType         = typeof(ManagedComponentCreateSystem<>);
-            var managedDestroyType        = typeof(ManagedComponentDestroySystem<>);
-            var collectionCreateType      = typeof(CollectionComponentCreateSystem<>);
-            var collectionDestroyType     = typeof(CollectionComponentDestroySystem<>);
-            var managedSysStateTagType    = typeof(ManagedComponentCleanupTag<>);
-            var collectionSysStateTagType = typeof(CollectionComponentCleanupTag<>);
-
-            var typePairs = new NativeParallelHashSet<AssociatedTypeCleanupTagTypePair>(128, Allocator.TempJob);
-
-            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-            foreach (var assembly in assemblies)
-            {
-                if (!BootstrapTools.IsAssemblyReferencingLatios(assembly))
+                var managedType = cleanupType.GetManagedType();
+                if (!cleanupInterfaceType.IsAssignableFrom(managedType))
                     continue;
 
-                foreach (var type in assembly.GetTypes())
+                var method    = managedType.GetMethod("GetBurstDispatchFunctionPtr", BindingFlags.Static | BindingFlags.Public);
+                var invokable = method.CreateDelegate(typeof(GetFunctionPtrDelegate)) as GetFunctionPtrDelegate;
+                m_dispatchables.Add(new CollectionComponentDispatchable
                 {
-                    if (type.GetCustomAttribute(typeof(DisableAutoTypeRegistrationAttribute)) != null)
-                        continue;
+                    functionPtr = invokable()
+                });
+            }
 
-                    if (type == typeof(IManagedStructComponent) || type == typeof(ICollectionComponent)
-                        //|| type == typeof(ManagedDefeatStripComponent) ||
-                        //type == typeof(CollectionDefeatStripComponent)
-                        )
-                        continue;
+            OnCreateBurst(ref state, (CollectionComponentsReactiveSystem*)UnsafeUtility.AddressOf(ref this));
+        }
 
-                    if (typeof(IManagedStructComponent).IsAssignableFrom(type))
-                    {
-                        GetOrCreateAndAddSystem(managedCreateType.MakeGenericType(type));
-                        GetOrCreateAndAddSystem(managedDestroyType.MakeGenericType(type));
-                        typePairs.Add(new AssociatedTypeCleanupTagTypePair
-                        {
-                            cleanupTagType = ComponentType.ReadOnly(managedSysStateTagType.MakeGenericType(type)),
-                            associatedType = ComponentType.ReadOnly((Activator.CreateInstance(type) as IManagedStructComponent).AssociatedComponentType.GetManagedType())
-                        });
-                    }
-                    else if (typeof(ICollectionComponent).IsAssignableFrom(type))
-                    {
-                        GetOrCreateAndAddSystem(collectionCreateType.MakeGenericType(type));
-                        GetOrCreateAndAddSystem(collectionDestroyType.MakeGenericType(type));
-                        typePairs.Add(new AssociatedTypeCleanupTagTypePair
-                        {
-                            cleanupTagType = ComponentType.ReadOnly(collectionSysStateTagType.MakeGenericType(type)),
-                            associatedType = ComponentType.ReadOnly((Activator.CreateInstance(type) as ICollectionComponent).AssociatedComponentType.GetManagedType())
-                        });
-                    }
+        [BurstCompile]
+        static void GetAllTagCleanupComponentTypes(ref NativeList<ComponentType> cleanupTypes, ref NativeList<CollectionComponentDispatchable> dispatchables, int typeCount)
+        {
+            cleanupTypes = new NativeList<ComponentType>(Allocator.Temp);
+
+            //foreach (var type in TypeManager.AllTypes)
+            for (int i = 0; i < typeCount; i++)
+            {
+                var typeIndex = TypeManager.GetTypeInfo(new TypeIndex { Value = i }).TypeIndex;
+                if (typeIndex.IsComponentType && typeIndex.IsCleanupComponent && typeIndex.IsZeroSized && !typeIndex.IsManagedType && !typeIndex.IsEnableable)
+                {
+                    cleanupTypes.Add(ComponentType.FromTypeIndex(typeIndex));
                 }
             }
 
-            //Todo: Bug in Unity prevents iterating over NativeHashSet (value is defaulted).
-            var               typePairsArr = typePairs.ToNativeArray(Allocator.TempJob);
-            EntityQueryDesc[] descs        = new EntityQueryDesc[typePairsArr.Length * 2];
-            int               i            = 0;
-            foreach (var pair in typePairsArr)
+            dispatchables = new NativeList<CollectionComponentDispatchable>(cleanupTypes.Length, Allocator.Persistent);
+        }
+
+        [BurstCompile]
+        static void OnCreateBurst(ref SystemState state, CollectionComponentsReactiveSystem* thisPtr)
+        {
+            thisPtr->latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            for (int i = 0; i < thisPtr->m_dispatchables.Length; i++)
             {
-                descs[i] = new EntityQueryDesc
+                var dispatchable = thisPtr->m_dispatchables[i];
+                InternalSourceGen.CollectionComponentOperations.CreateQueries(dispatchable.functionPtr, ref state, out var addQuery, out var removeQuery);
+                dispatchable.addQuery       = addQuery;
+                dispatchable.removeQuery    = removeQuery;
+                thisPtr->m_dispatchables[i] = dispatchable;
+            }
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            var entityHandle = SystemAPI.GetEntityTypeHandle();
+            foreach (var component in m_dispatchables)
+            {
+                if (!component.addQuery.IsEmptyIgnoreFilter || !component.removeQuery.IsEmptyIgnoreFilter)
                 {
-                    All  = new ComponentType[] { pair.associatedType },
-                    None = new ComponentType[] { pair.cleanupTagType }
-                };
-                i++;
-                descs[i] = new EntityQueryDesc
+                    InternalSourceGen.CollectionComponentOperations.SyncQueries(component.functionPtr, latiosWorld, entityHandle, component.addQuery, component.removeQuery);
+                }
+            }
+        }
+
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state)
+        {
+            m_dispatchables.Dispose();
+        }
+    }
+
+    [DisableAutoCreation]
+    [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderFirst = true)]
+    [UpdateAfter(typeof(MergeBlackboardsSystem))]
+    [BurstCompile]
+    public unsafe partial struct ManagedStructComponentsReactiveSystem : ISystem
+    {
+        LatiosWorldUnmanaged latiosWorld;
+
+        struct ManagedStructComponentDispatchable
+        {
+            public EntityQuery   addQuery;
+            public EntityQuery   removeQuery;
+            public ComponentType existType;
+            public ComponentType cleanupType;
+        }
+
+        interface IManagedStructManipulator
+        {
+            public void Add(Entity entity, ManagedStructComponentStorage storage);
+            public void Remove(Entity entity, ManagedStructComponentStorage storage);
+            public ComponentType existType { get; }
+            public ComponentType cleanupType { get; }
+        }
+
+        class ManagedStructManipulator<T> : IManagedStructManipulator where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
+        {
+            T m_default = default;
+
+            public void Add(Entity entity, ManagedStructComponentStorage storage)
+            {
+                storage.AddComponent(entity, m_default);
+            }
+
+            public void Remove(Entity entity, ManagedStructComponentStorage storage)
+            {
+                storage.RemoveComponent<T>(entity);
+            }
+
+            public ComponentType existType => m_default.componentType;
+            public ComponentType cleanupType => m_default.cleanupType;
+        }
+
+        NativeList<ManagedStructComponentDispatchable> m_dispatchables;
+        GCHandle                                       m_manipulatorsHandle;
+        //List<IManagedStructManipulator> m_manipulators;
+
+        delegate System.Type GetManagedStructTypeDelegate();
+
+        public void OnCreate(ref SystemState state)
+        {
+            NativeList<ComponentType> cleanupTypes = default;
+            GetAllTagCleanupComponentTypes(ref cleanupTypes, ref m_dispatchables, TypeManager.GetTypeCount());
+
+            var cleanupInterfaceType   = typeof(InternalSourceGen.StaticAPI.IManagedStructComponentCleanup);
+            var manipulatorGenericType = typeof(ManagedStructManipulator<>);
+            var manipulators           = new List<IManagedStructManipulator>();
+
+            foreach (var cleanupType in cleanupTypes)
+            {
+                var managedType = cleanupType.GetManagedType();
+                if (!cleanupInterfaceType.IsAssignableFrom(managedType))
+                    continue;
+
+                var typeMethod  = managedType.GetMethod("GetManagedStructComponentType", BindingFlags.Static | BindingFlags.Public);
+                var structType  = (typeMethod.CreateDelegate(typeof(GetManagedStructTypeDelegate)) as GetManagedStructTypeDelegate)();
+                var manipulator = Activator.CreateInstance(manipulatorGenericType.MakeGenericType(structType)) as IManagedStructManipulator;
+                m_dispatchables.Add(new ManagedStructComponentDispatchable
                 {
-                    All  = new ComponentType[] { pair.cleanupTagType },
-                    None = new ComponentType[] { pair.associatedType }
-                };
+                    existType   = manipulator.existType,
+                    cleanupType = manipulator.cleanupType
+                });
+
+                manipulators.Add(manipulator);
+            }
+
+            m_manipulatorsHandle = GCHandle.Alloc(manipulators, GCHandleType.Normal);
+
+            OnCreateBurst(ref state, (ManagedStructComponentsReactiveSystem*)UnsafeUtility.AddressOf(ref this));
+        }
+
+        [BurstCompile]
+        static void GetAllTagCleanupComponentTypes(ref NativeList<ComponentType> cleanupTypes, ref NativeList<ManagedStructComponentDispatchable> dispatchables, int typeCount)
+        {
+            cleanupTypes = new NativeList<ComponentType>(Allocator.Temp);
+
+            //foreach (var type in TypeManager.AllTypes)
+            for (int i = 0; i < typeCount; i++)
+            {
+                var typeIndex = TypeManager.GetTypeInfo(new TypeIndex { Value = i }).TypeIndex;
+                if (typeIndex.IsComponentType && typeIndex.IsCleanupComponent && typeIndex.IsZeroSized && !typeIndex.IsManagedType && !typeIndex.IsEnableable)
+                {
+                    cleanupTypes.Add(ComponentType.FromTypeIndex(typeIndex));
+                }
+            }
+
+            dispatchables = new NativeList<ManagedStructComponentDispatchable>(cleanupTypes.Length, Allocator.Persistent);
+        }
+
+        [BurstCompile]
+        static void OnCreateBurst(ref SystemState state, ManagedStructComponentsReactiveSystem* thisPtr)
+        {
+            thisPtr->latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            var queryBuilder = new EntityQueryBuilder(Allocator.Temp);
+
+            FixedList32Bytes<ComponentType> exist   = default;
+            FixedList32Bytes<ComponentType> cleanup = default;
+
+            for (int i = 0; i < thisPtr->m_dispatchables.Length; i++)
+            {
+                var dispatchable = thisPtr->m_dispatchables[i];
+                exist.Add(dispatchable.existType);
+                cleanup.Add(dispatchable.cleanupType);
+                dispatchable.addQuery = queryBuilder.WithAll(ref exist).WithNone(ref cleanup).Build(ref state);
+                queryBuilder.Reset();
+                dispatchable.removeQuery = queryBuilder.WithAll(ref cleanup).WithNone(ref exist).Build(ref state);
+                queryBuilder.Reset();
+                thisPtr->m_dispatchables[i] = dispatchable;
+                exist.Clear();
+                cleanup.Clear();
+            }
+        }
+
+        public void OnUpdate(ref SystemState state)
+        {
+            UnsafeList<int> addIndices    = default;
+            UnsafeList<int> removeIndices = default;
+            if (FindNonEmptyQueryIndices(m_dispatchables, ref addIndices, ref removeIndices))
+            {
+                if (!latiosWorld.isValid)
+                {
+                    UnityEngine.Debug.LogError("LatiosWorldUnmanaged is invalid inside managed struct component processing. This may be a bug. Please report!");
+                    return;
+                }
+
+                var storage      = latiosWorld.GetManagedStructStorage();
+                var manipulators = m_manipulatorsHandle.Target as List<IManagedStructManipulator>;
+                if (addIndices.IsCreated)
+                {
+                    foreach (var i in addIndices)
+                    {
+                        var                 manipulator  = manipulators[i];
+                        NativeArray<Entity> entities     = default;
+                        ref var             dispatchable = ref m_dispatchables.ElementAt(i);
+                        GetNativeArrayForQuery(dispatchable.addQuery, ref entities);
+                        foreach (var entity in entities)
+                        {
+                            manipulator.Add(entity, storage);
+                        }
+                        var cleanupType = manipulator.cleanupType;
+                        AddComponentToQuery(ref state, ref dispatchable, in cleanupType);
+                    }
+                }
+                if (removeIndices.IsCreated)
+                {
+                    foreach (var i in addIndices)
+                    {
+                        var                 manipulator  = manipulators[i];
+                        NativeArray<Entity> entities     = default;
+                        ref var             dispatchable = ref m_dispatchables.ElementAt(i);
+                        GetNativeArrayForQuery(dispatchable.removeQuery, ref entities);
+                        foreach (var entity in entities)
+                        {
+                            manipulator.Remove(entity, storage);
+                        }
+                        var cleanupType = manipulator.cleanupType;
+                        RemoveComponentFromQuery(ref state, ref dispatchable, in cleanupType);
+                    }
+                }
+            }
+        }
+
+        [BurstCompile]
+        static bool FindNonEmptyQueryIndices(in NativeList<ManagedStructComponentDispatchable> dispatchables, ref UnsafeList<int> addIndices, ref UnsafeList<int> removeIndices)
+        {
+            int i = 0;
+            foreach (var component in dispatchables)
+            {
+                if (!component.addQuery.IsEmptyIgnoreFilter)
+                {
+                    if (!addIndices.IsCreated)
+                        addIndices = new UnsafeList<int>(8, Allocator.Temp);
+                    addIndices.Add(i);
+                }
+                if (!component.removeQuery.IsEmptyIgnoreFilter)
+                {
+                    if (!removeIndices.IsCreated)
+                        removeIndices = new UnsafeList<int>(8, Allocator.Temp);
+                    removeIndices.Add(i);
+                }
                 i++;
             }
-            //Bug in Unity prevents constructing this EntityQuery because the scratch buffer is hardcoded to a size of 1024 which is not enough.
-            //m_allSystemsQuery = GetEntityQuery(descs);
-            typePairsArr.Dispose();
-            typePairs.Dispose();
+            return addIndices.IsCreated || removeIndices.IsCreated;
         }
 
-        protected override void OnDestroy()
+        [BurstCompile]
+        static void GetNativeArrayForQuery(in EntityQuery query, ref NativeArray<Entity> entities)
         {
-            base.OnDestroy();
-        }
-    }
-
-    internal partial class ManagedComponentCreateSystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, IManagedStructComponent
-    {
-        private EntityQuery m_query;
-        public EntityQuery Query => m_query;
-
-        protected override void OnCreate()
-        {
-            m_query = GetEntityQuery(ComponentType.Exclude<ManagedComponentCleanupTag<T> >(), ComponentType.ReadOnly(new T().AssociatedComponentType.GetManagedType()));
+            entities = query.ToEntityArray(Allocator.Temp);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        static void AddComponentToQuery(ref SystemState state, ref ManagedStructComponentDispatchable dispatchable, in ComponentType cleanupType)
         {
-            var entities = m_query.ToEntityArray(Allocator.TempJob);
-            var lw       = latiosWorldUnmanaged;
-            foreach (var e in entities)
-            {
-                lw.AddManagedStructComponent<T>(e, default);
-            }
-            entities.Dispose();
-        }
-    }
-
-    internal partial class ManagedComponentDestroySystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : struct, IManagedStructComponent
-    {
-        private EntityQuery m_query;
-        public EntityQuery Query => m_query;
-
-        protected override void OnCreate()
-        {
-            m_query = GetEntityQuery(ComponentType.ReadOnly<ManagedComponentCleanupTag<T> >(), ComponentType.Exclude(new T().AssociatedComponentType.GetManagedType()));
+            state.EntityManager.AddComponent(dispatchable.addQuery, cleanupType);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        static void RemoveComponentFromQuery(ref SystemState state, ref ManagedStructComponentDispatchable dispatchable, in ComponentType cleanupType)
         {
-            var entities = m_query.ToEntityArray(Allocator.TempJob);
-            var lw       = latiosWorldUnmanaged;
-            foreach (var e in entities)
-            {
-                lw.RemoveManagedStructComponent<T>(e);
-            }
-            entities.Dispose();
-        }
-    }
-
-    internal partial class CollectionComponentCreateSystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : unmanaged, ICollectionComponent
-    {
-        private EntityQuery m_query;
-        public EntityQuery Query => m_query;
-
-        protected override void OnCreate()
-        {
-            m_query = GetEntityQuery(ComponentType.Exclude<CollectionComponentCleanupTag<T> >(), ComponentType.ReadOnly(new T().AssociatedComponentType.GetManagedType()));
+            state.EntityManager.RemoveComponent(dispatchable.addQuery, cleanupType);
         }
 
-        protected override void OnUpdate()
+        public void OnDestroy(ref SystemState state)
         {
-            var entities = m_query.ToEntityArray(Allocator.TempJob);
-            var lw       = latiosWorldUnmanaged;
-            foreach (var e in entities)
-            {
-                lw.AddOrSetCollectionComponentAndDisposeOld<T>(e, default);
-            }
-            entities.Dispose();
-        }
-    }
-
-    internal partial class CollectionComponentDestroySystem<T> : SubSystem, ManagedComponentsReactiveSystem where T : unmanaged, ICollectionComponent
-    {
-        private EntityQuery m_query;
-        public EntityQuery Query => m_query;
-
-        protected override void OnCreate()
-        {
-            m_query = GetEntityQuery(ComponentType.ReadOnly<CollectionComponentCleanupTag<T> >(), ComponentType.Exclude(new T().AssociatedComponentType.TypeIndex));
-        }
-
-        protected override void OnUpdate()
-        {
-            var entities = m_query.ToEntityArray(Allocator.TempJob);
-            var lw       = latiosWorldUnmanaged;
-            foreach (var e in entities)
-            {
-                lw.RemoveCollectionComponentAndDispose<T>(e);
-            }
-            entities.Dispose();
+            m_dispatchables.Dispose();
+            m_manipulatorsHandle.Free();
         }
     }
 }

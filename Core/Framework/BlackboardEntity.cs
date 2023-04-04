@@ -101,7 +101,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         /// <param name="component">The data for the managed struct component</param>
         /// <returns>False if the component was already present, true otherwise</returns>
-        public bool AddManagedStructComponent<T>(T component) where T : struct, IManagedStructComponent
+        public bool AddManagedStructComponent<T>(T component) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             return latiosWorld.AddManagedStructComponent(entity, component);
         }
@@ -111,7 +111,7 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         /// <returns>Returns true if the entity had the managed struct component, false otherwise</returns>
-        public bool RemoveManagedStructComponent<T>() where T : struct, IManagedStructComponent
+        public bool RemoveManagedStructComponent<T>() where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             return latiosWorld.RemoveManagedStructComponent<T>(entity);
         }
@@ -120,7 +120,7 @@ namespace Latios
         /// Gets the managed struct component instance from the entity
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
-        public T GetManagedStructComponent<T>() where T : struct, IManagedStructComponent
+        public T GetManagedStructComponent<T>() where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             return latiosWorld.GetManagedStructComponent<T>(entity);
         }
@@ -131,7 +131,7 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         /// <param name="component">The new managed struct component value</param>
-        public void SetManagedStructComponent<T>(T component) where T : struct, IManagedStructComponent
+        public void SetManagedStructComponent<T>(T component) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             latiosWorld.SetManagedStructComponent(entity, component);
         }
@@ -140,7 +140,7 @@ namespace Latios
         /// Returns true if the entity has the managed struct component. False otherwise.
         /// </summary>
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
-        public bool HasManagedStructComponent<T>() where T : struct, IManagedStructComponent
+        public bool HasManagedStructComponent<T>() where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             return latiosWorld.HasManagedStructComponent<T>(entity);
         }
@@ -156,7 +156,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="value">The collection component value</param>
         /// <returns>True if the component was added, false if it was set</returns>
-        public void AddOrSetCollectionComponentAndDisposeOld<T>(T value) where T : unmanaged, ICollectionComponent
+        public void AddOrSetCollectionComponentAndDisposeOld<T>(T value) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             latiosWorld.AddOrSetCollectionComponentAndDisposeOld(entity, value);
         }
@@ -169,7 +169,7 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <returns>True if the entity had the AssociatedComponentType, false otherwise</returns>
-        public void RemoveCollectionComponentAndDispose<T>() where T : unmanaged, ICollectionComponent
+        public void RemoveCollectionComponentAndDispose<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             latiosWorld.RemoveCollectionComponentAndDispose<T>(entity);
         }
@@ -183,7 +183,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="readOnly">Specifies if the collection component will only be read by the system</param>
         /// <returns>The collection component instance</returns>
-        public T GetCollectionComponent<T>(bool readOnly = false) where T : unmanaged, ICollectionComponent
+        public T GetCollectionComponent<T>(bool readOnly = false) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             return latiosWorld.GetCollectionComponent<T>(entity, readOnly);
         }
@@ -196,7 +196,7 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="value">The new collection component value</param>
-        public void SetCollectionComponentAndDisposeOld<T>(T value) where T : unmanaged, ICollectionComponent
+        public void SetCollectionComponentAndDisposeOld<T>(T value) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             latiosWorld.SetCollectionComponentAndDisposeOld(entity, value);
         }
@@ -205,7 +205,7 @@ namespace Latios
         /// Returns true if the entity has the associated component type for the collection component type
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
-        public bool HasCollectionComponent<T>() where T : unmanaged, ICollectionComponent
+        public bool HasCollectionComponent<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             return latiosWorld.HasCollectionComponent<T>(entity);
         }
@@ -219,7 +219,8 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="handle">The new dependency for the collection component</param>
         /// <param name="isReadOnlyHandle">True if the dependency to update only read the collection component</param>
-        public void UpdateJobDependency<T>(JobHandle handle, bool wasReadOnly) where T : unmanaged, ICollectionComponent
+        public void UpdateJobDependency<T>(JobHandle handle, bool wasReadOnly) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             latiosWorld.UpdateCollectionComponentDependency<T>(entity, handle, wasReadOnly);
         }

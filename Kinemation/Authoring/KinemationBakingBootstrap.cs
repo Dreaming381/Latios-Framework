@@ -27,6 +27,7 @@ namespace Latios.Kinemation.Authoring
             context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberBakingGroup));
             context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberResolverBakingGroup));
             context.bakingSystemTypesToInject.Add(typeof(AddMasksBakingSystem));
+            context.bakingSystemTypesToInject.Add(typeof(AddPostProcessMatrixSystem));
 
             context.optimizationSystemTypesToInject.Add(typeof(LatiosFrozenStaticRendererSystem));
             context.optimizationSystemTypesToDisable.Add(typeof(Unity.Rendering.FrozenStaticRendererSystem));

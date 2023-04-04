@@ -1,7 +1,11 @@
+using System;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 
 namespace Latios.Authoring.Systems
@@ -46,12 +50,20 @@ namespace Latios.Authoring.Systems
             m_resultHandle.Update(ref state);
             m_hashHandle.Update(ref state);
 
+            var blobsToDispose = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<UnsafeUntypedBlobAssetReference>(), 64, Allocator.TempJob);
+
             state.Dependency = new Job
             {
                 hashHandle         = m_hashHandle,
                 resultHandle       = m_resultHandle,
-                trackingDataHandle = m_trackingDataHandle
+                trackingDataHandle = m_trackingDataHandle,
+                blobsToDispose     = blobsToDispose
             }.ScheduleParallel(m_query, state.Dependency);
+
+            state.Dependency = new DisposeJob
+            {
+                blobsToDispose = blobsToDispose
+            }.Schedule(state.Dependency);
         }
 
         [BurstCompile]
@@ -60,6 +72,10 @@ namespace Latios.Authoring.Systems
             [ReadOnly] public ComponentTypeHandle<SmartBlobberTrackingData>       trackingDataHandle;
             public ComponentTypeHandle<SmartBlobberResult>                        resultHandle;
             [ReadOnly] public SharedComponentTypeHandle<SmartBlobberBlobTypeHash> hashHandle;
+            public UnsafeParallelBlockList                                        blobsToDispose;
+
+            [NativeSetThreadIndex]
+            int threadIndex;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -90,9 +106,58 @@ namespace Latios.Authoring.Systems
                     if (trackingDataArray[i].isNull)
                         continue;
 
-                    resultArray[i].blob.Dispose();
+                    blobsToDispose.Write(resultArray[i].blob, threadIndex);
                     resultArray[i] = default;
                 }
+            }
+        }
+
+        [BurstCompile]
+        struct DisposeJob : IJob
+        {
+            public UnsafeParallelBlockList blobsToDispose;
+
+            public unsafe void Execute()
+            {
+                var blobCount = blobsToDispose.Count();
+                if (blobCount == 0)
+                {
+                    blobsToDispose.Dispose();
+                    return;
+                }
+
+                var set = new NativeHashSet<PtrWrapper>(blobCount, Allocator.Temp);
+
+                var enumerator = blobsToDispose.GetEnumerator();
+                while (enumerator.MoveNext())
+                {
+                    var blob = enumerator.GetCurrent<UnsafeUntypedBlobAssetReference>();
+                    if (set.Contains(blob))
+                        continue;
+                    set.Add(blob);
+                    blob.Dispose();
+                }
+                blobsToDispose.Dispose();
+            }
+        }
+
+        unsafe struct PtrWrapper : IEquatable<PtrWrapper>
+        {
+            void* ptr;
+
+            public bool Equals(PtrWrapper other)
+            {
+                return ptr == other.ptr;
+            }
+
+            public override int GetHashCode()
+            {
+                return ((ulong)ptr).GetHashCode();
+            }
+
+            public static implicit operator PtrWrapper(UnsafeUntypedBlobAssetReference blob)
+            {
+                return new PtrWrapper { ptr = blob.Reinterpret<int>().GetUnsafePtr() };
             }
         }
     }

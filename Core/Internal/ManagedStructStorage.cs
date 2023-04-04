@@ -9,19 +9,6 @@ using UnityEngine.Assertions;
 
 namespace Latios
 {
-#if UNITY_EDITOR
-    internal static class InjectGenericComponentTypes
-    {
-        [UnityEditor.InitializeOnLoadMethod]
-        public static void DoInjection()
-        {
-            TypeManager.Initialize();
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentCleanupTag<>),    typeof(IManagedStructComponent));
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentCleanupTag<>), typeof(ICollectionComponent));
-        }
-    }
-#endif
-
     internal class ManagedStructComponentStorage : IDisposable
     {
         struct Key : IEquatable<Key>
@@ -45,7 +32,8 @@ namespace Latios
 
         struct RegisteredType
         {
-            public ComponentType associatedType;
+            public ComponentType existType;
+            public ComponentType cleanupType;
             public int           typedStorageIndex;
         }
 
@@ -66,14 +54,16 @@ namespace Latios
             m_registeredTypeLookup.Dispose();
         }
 
-        public ComponentType GetAssociatedType<T>() where T : struct, IManagedStructComponent
+        public ComponentType GetExistType<T>() where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var typeHash = BurstRuntime.GetHashCode64<T>();
             if (!m_registeredTypeLookup.TryGetValue(typeHash, out var element))
             {
+                var t   = new T();
                 element = new RegisteredType
                 {
-                    associatedType    = new T().AssociatedComponentType,
+                    existType         = t.componentType,
+                    cleanupType       = t.cleanupType,
                     typedStorageIndex = m_typedStorages.Count
                 };
 
@@ -82,10 +72,32 @@ namespace Latios
                 });
                 m_registeredTypeLookup.Add(typeHash, element);
             }
-            return element.associatedType;
+            return element.existType;
         }
 
-        public bool AddComponent<T>(Entity entity, T value) where T : struct, IManagedStructComponent
+        public ComponentType GetCleanupType<T>() where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
+        {
+            var typeHash = BurstRuntime.GetHashCode64<T>();
+            if (!m_registeredTypeLookup.TryGetValue(typeHash, out var element))
+            {
+                var t   = new T();
+                element = new RegisteredType
+                {
+                    existType         = t.componentType,
+                    cleanupType       = t.cleanupType,
+                    typedStorageIndex = m_typedStorages.Count
+                };
+
+                m_typedStorages.Add(new TypedManagedStructStorage<T>()
+                {
+                    typeIndex = element.typedStorageIndex
+                });
+                m_registeredTypeLookup.Add(typeHash, element);
+            }
+            return element.cleanupType;
+        }
+
+        public bool AddComponent<T>(Entity entity, T value) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var tmss = GetTypedManagedStructStorage<T>(entity, out int index);
             if (index >= 0)
@@ -108,7 +120,7 @@ namespace Latios
             return true;
         }
 
-        public T GetComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public T GetComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var tmss = GetTypedManagedStructStorage<T>(entity, out int index);
             if (index < 0)
@@ -119,7 +131,7 @@ namespace Latios
             return tmss.storage[index];
         }
 
-        public T GetOrAddDefaultComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public T GetOrAddDefaultComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var tmss = GetTypedManagedStructStorage<T>(entity, out int index);
             if (index < 0)
@@ -139,13 +151,13 @@ namespace Latios
             return tmss.storage[index];
         }
 
-        public bool HasComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public bool HasComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             GetTypedManagedStructStorage<T>(entity, out int index);
             return index >= 0;
         }
 
-        public bool RemoveComponent<T>(Entity entity) where T : struct, IManagedStructComponent
+        public bool RemoveComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var tmss = GetTypedManagedStructStorage<T>(entity, out int index);
 
@@ -157,7 +169,7 @@ namespace Latios
             return true;
         }
 
-        public void SetComponent<T>(Entity entity, T value) where T : struct, IManagedStructComponent
+        public void SetComponent<T>(Entity entity, T value) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var tmss = GetTypedManagedStructStorage<T>(entity, out int index);
             if (index < 0)
@@ -176,7 +188,8 @@ namespace Latios
             m_typedStorages[registeredType.typedStorageIndex].CopyComponent(this, src, dst);
         }
 
-        private TypedManagedStructStorage<T> GetTypedManagedStructStorage<T>(Entity entity, out int indexInTypedStorage) where T : struct, IManagedStructComponent
+        private TypedManagedStructStorage<T> GetTypedManagedStructStorage<T>(Entity entity, out int indexInTypedStorage) where T : struct, IManagedStructComponent,
+        InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             var key = new Key { typeHash = BurstRuntime.GetHashCode64<T>(), entity = entity };
             if (m_twoLevelLookup.TryGetValue(key, out var indices))
@@ -187,9 +200,11 @@ namespace Latios
 
             if (!m_registeredTypeLookup.TryGetValue(key.typeHash, out var element))
             {
+                var t   = new T();
                 element = new RegisteredType
                 {
-                    associatedType    = new T().AssociatedComponentType,
+                    existType         = t.componentType,
+                    cleanupType       = t.cleanupType,
                     typedStorageIndex = m_typedStorages.Count
                 };
 
@@ -208,7 +223,8 @@ namespace Latios
             public abstract void CopyComponent(ManagedStructComponentStorage mscs, Entity src, Entity dst);
         }
 
-        private class TypedManagedStructStorage<T> : TypedManagedStructStorageBase where T : struct, IManagedStructComponent
+        private class TypedManagedStructStorage<T> : TypedManagedStructStorageBase where T : struct, IManagedStructComponent,
+            InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
             public List<T>    storage   = new List<T>();
             public Stack<int> freeStack = new Stack<int>();

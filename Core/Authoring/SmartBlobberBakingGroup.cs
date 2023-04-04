@@ -11,7 +11,7 @@ namespace Latios.Authoring.Systems
     /// </summary>
     [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderLast = true)]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    public class SmartBlobberBakingGroup : ComponentSystemGroup
+    public partial class SmartBlobberBakingGroup : ComponentSystemGroup
     {
     }
 
@@ -23,8 +23,32 @@ namespace Latios.Authoring.Systems
     [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderLast = true)]
     [UpdateAfter(typeof(SmartBlobberBakingGroup))]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    public class SmartBlobberCleanupBakingGroup : ComponentSystemGroup
+    public partial class SmartBlobberCleanupBakingGroup : ComponentSystemGroup
     {
+        List<SystemHandle> m_systemsToAddBeforeCreate = null;
+        bool               m_created                  = false;
+
+        protected override void OnCreate()
+        {
+            base.OnCreate();
+            m_created = true;
+            foreach (var system in m_systemsToAddBeforeCreate)
+                AddSystemToUpdateList(system);
+        }
+
+        public void AddSystemToUpdateListSafe(SystemHandle system)
+        {
+            if (m_created)
+            {
+                AddSystemToUpdateList(system);
+            }
+            else
+            {
+                if (m_systemsToAddBeforeCreate == null)
+                    m_systemsToAddBeforeCreate = new List<SystemHandle>();
+                m_systemsToAddBeforeCreate.Add(system);
+            }
+        }
     }
 
     /// <summary>
@@ -34,7 +58,7 @@ namespace Latios.Authoring.Systems
     [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderLast = true)]
     [UpdateAfter(typeof(SmartBlobberCleanupBakingGroup))]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    public class SmartBakerBakingGroup : ComponentSystemGroup
+    public partial class SmartBakerBakingGroup : ComponentSystemGroup
     {
     }
 }

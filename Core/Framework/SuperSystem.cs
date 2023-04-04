@@ -14,7 +14,7 @@ namespace Latios
     /// as the root injected systems when using an explicit system ordering (explicit workflow bootstrap).
     /// Note that nearly all Latios Framework ComponentSystemGroup types already support ShouldUpdateSystem().
     /// </summary>
-    public abstract class RootSuperSystem : SuperSystem
+    public abstract partial class RootSuperSystem : SuperSystem
     {
         bool m_recursiveContext = false;
 
@@ -42,7 +42,7 @@ namespace Latios
     /// <summary>
     /// A subclass of ComponentSystemGroup which provides Latios Framework Core features.
     /// </summary>
-    public abstract class SuperSystem : ComponentSystemGroup, ILatiosSystem
+    public abstract partial class SuperSystem : ComponentSystemGroup, ILatiosSystem
     {
         /// <summary>
         /// The latiosWorld of this system

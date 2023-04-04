@@ -4,7 +4,8 @@
     "references": [
         "Latios.Core",
         "Unity.Entities",
-        "Unity.Platforms.UI.Editor"
+        "Unity.Platforms.UI.Editor",
+        "Unity.Collections"
     ],
     "includePlatforms": [
         "Editor"

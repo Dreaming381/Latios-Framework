@@ -143,8 +143,7 @@ namespace Latios.Authoring
                 baker.AddComponent(entity, typesToAdd);
                 baker.SetComponent(entity, new SmartBlobberTrackingData
                 {
-                    authoringInstanceID = baker.GetAuthoringInstancedID(),
-                    isFinalized         = false
+                    isFinalized = false
                 });
                 baker.AddSharedComponent(entity, new SmartBlobberBlobTypeHash { hash = BurstRuntime.GetHashCode64<TBlobType>() });
                 return new SmartBlobberHandle<TBlobType> { entityWithResultBlob      = entity, wasFiltered = false };
@@ -260,7 +259,7 @@ namespace Latios.Authoring
                 return;
             var system = managedWorld.GetOrCreateSystemManaged<Systems.SmartBlobberTypedPostProcessBakingSystem<TBlobType> >();
             var group  = managedWorld.GetExistingSystemManaged<Systems.SmartBlobberCleanupBakingGroup>();
-            group.AddSystemToUpdateList(system);
+            group.AddSystemToUpdateListSafe(system.SystemHandle);
         }
     }
 
@@ -269,10 +268,8 @@ namespace Latios.Authoring
     {
         public Hash128 hash;
         public Entity  thisEntity;
-        public int     authoringInstanceID;
         public bool    isFinalized;
         public bool    isNull;
-        public bool    shouldBeKept;
     }
 
     [TemporaryBakingType]

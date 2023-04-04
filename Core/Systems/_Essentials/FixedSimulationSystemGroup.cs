@@ -8,7 +8,7 @@ namespace Latios.Systems
     /// This is not created by default by any of the bootstrap templates. You must add it via BootstrapTools.
     /// </summary>
     [DisableAutoCreation, NoGroupInjection]
-    public class FixedSimulationSystemGroup : ComponentSystemGroup
+    public partial class FixedSimulationSystemGroup : ComponentSystemGroup
     {
         SystemSortingTracker m_tracker;
 

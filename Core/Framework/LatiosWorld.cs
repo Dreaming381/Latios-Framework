@@ -86,10 +86,6 @@ namespace Latios
         /// <param name="role">The role of the world. Leave at default unless this is a NetCode project.</param>
         public unsafe LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation, WorldRole role = WorldRole.Default) : base(name, flags)
         {
-            //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentTag<>),               typeof(IManagedComponent));
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(ManagedComponentCleanupTag<>),    typeof(IManagedStructComponent));
-            //BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentTag<>),            typeof(ICollectionComponent));
-            BootstrapTools.PopulateTypeManagerWithGenerics(typeof(CollectionComponentCleanupTag<>), typeof(ICollectionComponent));
             m_interfacesDispatcher = new UnmanagedExtraInterfacesDispatcher();
 
             m_latiosWorldUnmanagedSystem = this.GetOrCreateSystem<LatiosWorldUnmanagedSystem>();
@@ -223,7 +219,7 @@ namespace Systems
     /// The SimulationSystemGroup for a LatiosWorld created with WorldRole.Default
     /// </summary>
     [DisableAutoCreation, NoGroupInjection]
-    public class LatiosSimulationSystemGroup : SimulationSystemGroup
+    public partial class LatiosSimulationSystemGroup : SimulationSystemGroup
     {
         SystemSortingTracker m_tracker;
         internal bool        skipInDeferred = false;
@@ -239,7 +235,7 @@ namespace Systems
     /// The PresentationSystemGroup for a LatiosWorld created with WorldRole.Default
     /// </summary>
     [DisableAutoCreation, NoGroupInjection]
-    public class LatiosPresentationSystemGroup : PresentationSystemGroup
+    public partial class LatiosPresentationSystemGroup : PresentationSystemGroup
     {
         SystemSortingTracker m_tracker;
 

@@ -19,7 +19,7 @@ namespace Latios.Systems
     [DisableAutoCreation]
     [UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]
     [UpdateBefore(typeof(BeginInitializationEntityCommandBufferSystem))]
-    public class SyncPointPlaybackSystemDispatch : SuperSystem
+    public partial class SyncPointPlaybackSystemDispatch : SuperSystem
     {
         SystemHandle m_syncPointPlaybackSystem;
 

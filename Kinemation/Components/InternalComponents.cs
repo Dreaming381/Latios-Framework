@@ -145,16 +145,12 @@ namespace Latios.Kinemation
     #endregion
 
     #region Blackboard
-    internal struct ExposedCullingIndexManagerTag : IComponentData { }
-
-    internal struct ExposedCullingIndexManager : ICollectionComponent
+    internal partial struct ExposedCullingIndexManager : ICollectionComponent
     {
         public NativeHashMap<Entity, int>                                  skeletonToCullingIndexMap;
         public NativeReference<int>                                        maxIndex;
         public NativeList<int>                                             indexFreeList;
         public NativeHashMap<int, EntityWithBuffer<DependentSkinnedMesh> > cullingIndexToSkeletonMap;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ExposedCullingIndexManagerTag>();
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {
@@ -168,8 +164,6 @@ namespace Latios.Kinemation
             return inputDeps;
         }
     }
-
-    internal struct MeshGpuManagerTag : IComponentData { }
 
     internal struct MeshGpuUploadCommand
     {
@@ -208,7 +202,7 @@ namespace Latios.Kinemation
         public uint requiredBlendShapesUploadSize;
     }
 
-    internal struct MeshGpuManager : ICollectionComponent
+    internal partial struct MeshGpuManager : ICollectionComponent
     {
         public NativeHashMap<BlobAssetReference<MeshDeformDataBlob>, int> blobIndexMap;
 
@@ -221,8 +215,6 @@ namespace Latios.Kinemation
 
         public NativeList<MeshGpuUploadCommand>      uploadCommands;
         public NativeReference<MeshGpuRequiredSizes> requiredBufferSizes;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuManagerTag>();
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {
@@ -241,8 +233,6 @@ namespace Latios.Kinemation
             return inputDeps;
         }
     }
-
-    internal struct BoneOffsetsGpuManagerTag : IComponentData { }
 
     internal struct BoneOffsetsEntry
     {
@@ -271,7 +261,7 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct BoneOffsetsGpuManager : ICollectionComponent
+    internal partial struct BoneOffsetsGpuManager : ICollectionComponent
     {
         public NativeList<BoneOffsetsEntry> entries;
         public NativeList<short>            offsets;
@@ -281,8 +271,6 @@ namespace Latios.Kinemation
 
         public NativeHashMap<uint2, int>           hashToEntryMap;
         public NativeHashMap<PathMappingPair, int> pathPairToEntryMap;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BoneOffsetsGpuManagerTag>();
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {
@@ -300,9 +288,7 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct MeshGpuUploadBuffersTag : IComponentData { }
-
-    internal struct MeshGpuUploadBuffers : IManagedStructComponent
+    internal partial struct MeshGpuUploadBuffers : IManagedStructComponent
     {
         // Not owned by this
         public UnityEngine.GraphicsBuffer verticesBuffer;
@@ -320,13 +306,9 @@ namespace Latios.Kinemation
         public UnityEngine.GraphicsBuffer bindPosesUploadMetaBuffer;
         public UnityEngine.GraphicsBuffer blendShapesUploadMetaBuffer;
         public UnityEngine.GraphicsBuffer boneOffsetsUploadMetaBuffer;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuUploadBuffersTag>();
     }
 
-    internal struct MeshGpuUploadBuffersMappedTag : IComponentData { }
-
-    internal struct MeshGpuUploadBuffersMapped : ICollectionComponent
+    internal partial struct MeshGpuUploadBuffersMapped : ICollectionComponent
     {
         // No actual containers here, but represents the mappings of the compute buffers.
         public uint verticesUploadBufferWriteCount;
@@ -342,35 +324,26 @@ namespace Latios.Kinemation
         public bool needsMeshCommitment;
         public bool needsBoneOffsetCommitment;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MeshGpuUploadBuffersMappedTag>();
-
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
 
-    internal struct GraphicsBufferManagerTag : IComponentData { }
-
-    internal struct GraphicsBufferManager : IManagedStructComponent
+    internal partial struct GraphicsBufferManager : IManagedStructComponent
     {
         public GraphicsBufferTrackingPool pool;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<GraphicsBufferManagerTag>();
     }
 
-    internal struct BrgCullingContextTag : IComponentData { }
-
-    internal unsafe struct BrgCullingContext : ICollectionComponent
+    internal unsafe partial struct BrgCullingContext : ICollectionComponent
     {
         //public BatchCullingContext cullingContext;
         //public NativeArray<int>    internalToExternalMappingIds;
         public ThreadLocalAllocator                            cullingThreadLocalAllocator;
         public BatchCullingOutput                              batchCullingOutput;
         public NativeParallelHashMap<int, BatchFilterSettings> batchFilterSettingsByRenderFilterSettingsSharedIndex;
+        public NativeParallelHashMap<int, BRGRenderMeshArray>  brgRenderMeshArrays;
 #if UNITY_EDITOR
-        public NativeParallelHashMap<int, BatchEditorRenderData> batchEditorSharedIndexToSceneMaskMap;
         public IncludeExcludeListFilter includeExcludeListFilter;
 #endif
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<BrgCullingContextTag>();
         public JobHandle TryDispose(JobHandle inputDeps)
         {
             // We don't own this data
@@ -378,13 +351,10 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct PackedCullingSplitsTag : IComponentData { }
-
-    internal struct PackedCullingSplits : ICollectionComponent
+    internal partial struct PackedCullingSplits : ICollectionComponent
     {
         public NativeReference<CullingSplits> packedSplits;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<PackedCullingSplitsTag>();
         public JobHandle TryDispose(JobHandle inputDeps)
         {
             // The collections inside packedSplits is managed by a RewindableAllocator,
@@ -401,16 +371,13 @@ namespace Latios.Kinemation
         public uint maxRequiredDeformVertices;
     }
 
-    internal struct MaterialPropertiesUploadContextTag : IComponentData { }
-
-    internal struct MaterialPropertiesUploadContext : ICollectionComponent
+    internal partial struct MaterialPropertiesUploadContext : ICollectionComponent
     {
         public NativeList<ValueBlitDescriptor> valueBlits;
 
         public int                        hybridRenderedChunkCount;
         public NativeArray<ChunkProperty> chunkProperties;
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<MaterialPropertiesUploadContextTag>();
         public JobHandle TryDispose(JobHandle inputDeps)
         {
             // We don't own this data
@@ -418,15 +385,12 @@ namespace Latios.Kinemation
         }
     }
 
-    internal struct ExposedSkeletonBoundsArraysTag : IComponentData { }
-
-    internal struct ExposedSkeletonBoundsArrays : ICollectionComponent
+    internal partial struct ExposedSkeletonBoundsArrays : ICollectionComponent
     {
         public NativeList<AABB> allAabbs;
         public NativeList<AABB> batchedAabbs;
         public const int        kCountPerBatch = 1 << 32;  // Todo: Is there a better size?
 
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<ExposedSkeletonBoundsArraysTag>();
         public JobHandle TryDispose(JobHandle inputDeps)
         {
             if (!allAabbs.IsCreated)
@@ -466,13 +430,9 @@ namespace Latios.Kinemation
         AnyPreviousDeform = PreviousDeform | LegacyDotsDefom,
     }
 
-    internal struct DeformClassificationMapTag : IComponentData { }
-
-    internal struct DeformClassificationMap : ICollectionComponent
+    internal partial struct DeformClassificationMap : ICollectionComponent
     {
         public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
-
-        public ComponentType AssociatedComponentType => ComponentType.ReadWrite<DeformClassificationMapTag>();
 
         // The data is owned by a world or system rewindable allocator.
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;

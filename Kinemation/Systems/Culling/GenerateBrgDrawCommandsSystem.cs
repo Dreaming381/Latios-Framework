@@ -13,6 +13,8 @@ using Unity.Profiling;
 using Unity.Rendering;
 using UnityEngine.Rendering;
 
+using static Unity.Entities.SystemAPI;
+
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
@@ -24,7 +26,7 @@ namespace Latios.Kinemation.Systems
         EntityQuery          m_metaQuery;
 
         FindChunksWithVisibleJob m_findJob;
-        EmitDrawCommandsJob      m_emitDrawCommandsJob;
+        ProfilerMarker           m_profilerEmitChunk;
 
         public void OnCreate(ref SystemState state)
         {
@@ -39,23 +41,7 @@ namespace Latios.Kinemation.Systems
                 perFrameCullingMaskHandle  = state.GetComponentTypeHandle<ChunkPerFrameCullingMask>(false)
             };
 
-            m_emitDrawCommandsJob = new EmitDrawCommandsJob
-            {
-                chunkPerCameraCullingMaskHandle       = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                chunkPerCameraCullingSplitsMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(true),
-                // = visibilityItems,
-                EntitiesGraphicsChunkInfo = state.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                MaterialMeshInfo          = state.GetComponentTypeHandle<MaterialMeshInfo>(true),
-                WorldTransform            = state.GetComponentTypeHandle<WorldTransform>(true),
-                PostProcessMatrix         = state.GetComponentTypeHandle<PostProcessMatrix>(true),
-                DepthSorted               = state.GetComponentTypeHandle<DepthSorted_Tag>(true),
-                RenderFilterSettings      = state.GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                LightMaps                 = state.GetSharedComponentTypeHandle<LightMaps>(),
-#if UNITY_EDITOR
-                EditorDataComponentHandle = state.GetSharedComponentTypeHandle<EditorRenderData>(),
-#endif
-                ProfilerEmitChunk = new ProfilerMarker("EmitChunk"),
-            };
+            m_profilerEmitChunk = new ProfilerMarker("EmitChunk");
         }
 
         [BurstCompile]
@@ -79,27 +65,31 @@ namespace Latios.Kinemation.Systems
                 brgCullingContext.cullingThreadLocalAllocator,
                 brgCullingContext.batchCullingOutput);
 
-            m_emitDrawCommandsJob.chunkPerCameraCullingMaskHandle.Update(ref state);
-            m_emitDrawCommandsJob.chunkPerCameraCullingSplitsMaskHandle.Update(ref state);
-            m_emitDrawCommandsJob.EntitiesGraphicsChunkInfo.Update(ref state);
-            m_emitDrawCommandsJob.MaterialMeshInfo.Update(ref state);
-            m_emitDrawCommandsJob.WorldTransform.Update(ref state);
-            m_emitDrawCommandsJob.PostProcessMatrix.Update(ref state);
-            m_emitDrawCommandsJob.DepthSorted.Update(ref state);
-            m_emitDrawCommandsJob.RenderFilterSettings.Update(ref state);
-            m_emitDrawCommandsJob.LightMaps.Update(ref state);
+            var emitDrawCommandsJob = new EmitDrawCommandsJob
+            {
+                BRGRenderMeshArrays                   = brgCullingContext.brgRenderMeshArrays,
+                CameraPosition                        = cullingContext.lodParameters.cameraPosition,
+                chunkPerCameraCullingMaskHandle       = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                chunkPerCameraCullingSplitsMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(true),
+                chunksToProcess                       = chunkList.AsDeferredJobArray(),
+                CullingLayerMask                      = cullingContext.cullingLayerMask,
+                DepthSorted                           = GetComponentTypeHandle<DepthSorted_Tag>(true),
+                DrawCommandOutput                     = chunkDrawCommandOutput,
 #if UNITY_EDITOR
-            m_emitDrawCommandsJob.EditorDataComponentHandle.Update(ref state);
-            m_emitDrawCommandsJob.BatchEditorData = brgCullingContext.batchEditorSharedIndexToSceneMaskMap;
+                EditorDataComponentHandle = GetSharedComponentTypeHandle<EditorRenderData>(),
 #endif
-            m_emitDrawCommandsJob.CullingLayerMask  = cullingContext.cullingLayerMask;
-            m_emitDrawCommandsJob.DrawCommandOutput = chunkDrawCommandOutput;
-            m_emitDrawCommandsJob.SceneCullingMask  = cullingContext.sceneCullingMask;
-            m_emitDrawCommandsJob.CameraPosition    = cullingContext.lodParameters.cameraPosition;
-            m_emitDrawCommandsJob.LastSystemVersion = cullingContext.lastSystemVersionOfLatiosEntitiesGraphics;
-
-            m_emitDrawCommandsJob.chunksToProcess = chunkList.AsDeferredJobArray();
-            m_emitDrawCommandsJob.splitsAreValid  = cullingContext.viewType == BatchCullingViewType.Light;
+                EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                LastSystemVersion         = state.LastSystemVersion,
+                LightMaps                 = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                WorldTransform            = GetComponentTypeHandle<WorldTransform>(true),
+                PostProcessMatrix         = GetComponentTypeHandle<PostProcessMatrix>(true),
+                MaterialMeshInfo          = GetComponentTypeHandle<MaterialMeshInfo>(true),
+                ProfilerEmitChunk         = m_profilerEmitChunk,
+                RenderFilterSettings      = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                RenderMeshArray           = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
+                SceneCullingMask          = cullingContext.sceneCullingMask,
+                splitsAreValid            = cullingContext.viewType == BatchCullingViewType.Light,
+            };
 
             var allocateWorkItemsJob = new AllocateWorkItemsJob
             {
@@ -144,7 +134,7 @@ namespace Latios.Kinemation.Systems
                 FilterSettings    = brgCullingContext.batchFilterSettingsByRenderFilterSettingsSharedIndex,
             };
 
-            var emitDrawCommandsDependency = m_emitDrawCommandsJob.ScheduleByRef(chunkList, 1, state.Dependency);
+            var emitDrawCommandsDependency = emitDrawCommandsJob.ScheduleByRef(chunkList, 1, state.Dependency);
 
             var collectGlobalBinsDependency =
                 chunkDrawCommandOutput.BinCollector.ScheduleFinalize(emitDrawCommandsDependency);
@@ -245,8 +235,10 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<WorldTransform>             WorldTransform;
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
             [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag>            DepthSorted;
+            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>      RenderMeshArray;
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
             [ReadOnly] public SharedComponentTypeHandle<LightMaps>            LightMaps;
+            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray>  BRGRenderMeshArrays;
 
             public ChunkDrawCommandOutput DrawCommandOutput;
 
@@ -259,7 +251,6 @@ namespace Latios.Kinemation.Systems
 
 #if UNITY_EDITOR
             [ReadOnly] public SharedComponentTypeHandle<EditorRenderData> EditorDataComponentHandle;
-            [ReadOnly] public NativeParallelHashMap<int, BatchEditorRenderData> BatchEditorData;
 #endif
 
             public void Execute(int i)
@@ -282,6 +273,17 @@ namespace Latios.Kinemation.Systems
 
                     if (!entitiesGraphicsChunkInfo.Valid)
                         return;
+
+                    // If the chunk has a RenderMeshArray, get access to the corresponding registered
+                    // Material and Mesh IDs
+                    BRGRenderMeshArray brgRenderMeshArray = default;
+                    if (!BRGRenderMeshArrays.IsEmpty)
+                    {
+                        int  renderMeshArrayIndex = chunk.GetSharedComponentIndex(RenderMeshArray);
+                        bool hasRenderMeshArray   = renderMeshArrayIndex >= 0;
+                        if (hasRenderMeshArray)
+                            BRGRenderMeshArrays.TryGetValue(renderMeshArrayIndex, out brgRenderMeshArray);
+                    }
 
                     ref var chunkCullingData = ref entitiesGraphicsChunkInfo.CullingData;
 
@@ -346,10 +348,19 @@ namespace Latios.Kinemation.Systems
 
                             var materialMeshInfo = materialMeshInfos[entityIndex];
 
+                            BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
+                                                         materialMeshInfo.MaterialID :
+                                                         brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                            BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
+                                                 materialMeshInfo.MeshID :
+                                                 brgRenderMeshArray.GetMeshID(materialMeshInfo);
+
                             // Null materials are handled internally by Unity using the error material if available.
                             // Invalid meshes at this point will be skipped.
                             if (materialMeshInfo.Mesh <= 0)
-                                continue;
+                                if (meshID == BatchMeshID.Null)
+                                    continue;
 
                             bool flipWinding = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
 
@@ -357,8 +368,8 @@ namespace Latios.Kinemation.Systems
                             {
                                 FilterIndex  = filterIndex,
                                 BatchID      = new BatchID { value = (uint)batchIndex },
-                                MaterialID   = materialMeshInfo.MaterialID,
-                                MeshID       = materialMeshInfo.MeshID,
+                                MaterialID   = materialID,
+                                MeshID       = meshID,
                                 SplitMask    = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0,  // Todo: Should the default be 1 instead of 0?
                                 SubmeshIndex = (ushort)materialMeshInfo.Submesh,
                                 Flags        = 0
