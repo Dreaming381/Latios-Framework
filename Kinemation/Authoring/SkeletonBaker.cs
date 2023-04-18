@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
@@ -42,6 +43,10 @@ namespace Latios.Kinemation.Authoring
             }
 
             AddComponent<SkeletonRootTag>();
+
+            // For extra safety, always add the history components
+            AddComponent<RequestPrevious>();
+            AddComponent<RequestTwoAgo>();
 
             // For now we just always assume we have the whole hierarchy to fetch.
             if (authoring.hasTransformHierarchy)
@@ -115,6 +120,11 @@ namespace Latios.Kinemation.Authoring
             m_breadthQueue.Clear();
             m_skinnedMeshRenderersCache.Clear();
         }
+
+        [BakingType]
+        struct RequestPrevious : IRequestPreviousTransform { }
+        [BakingType]
+        struct RequestTwoAgo : IRequestTwoAgoTransform { }
     }
 
     public static class SkeletonBakerExtensions

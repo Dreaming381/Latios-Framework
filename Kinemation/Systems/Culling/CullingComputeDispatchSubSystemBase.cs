@@ -37,7 +37,7 @@ namespace Latios.Kinemation
         {
             terminate = m_inShutdown;
             if (m_inShutdown)
-                return false;
+                return true; // Force advance to termination.
 
             var state = worldBlackboardEntity.GetComponentData<CullingComputeDispatchActiveState>().state;
             return state == expectedPhase;

@@ -113,7 +113,7 @@ namespace Latios.Transforms
     }
 
     // Part of Motion History, used for motion vectors
-    public struct TickStartingTransform : IComponentData
+    public struct PreviousTransform : IComponentData
     {
         public TransformQvvs worldTransform;
 
@@ -127,7 +127,7 @@ namespace Latios.Transforms
     }
 
     // Part of Motion History, used for Inertial Blending
-    public struct PreviousTickStartingTransform : IComponentData
+    public struct TwoAgoTransform : IComponentData
     {
         public TransformQvvs worldTransform;
 

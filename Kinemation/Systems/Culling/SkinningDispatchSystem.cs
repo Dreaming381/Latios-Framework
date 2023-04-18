@@ -8,6 +8,7 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -106,7 +107,7 @@ namespace Latios.Kinemation.Systems
                 var perChunkPrefixSums = CollectionHelper.CreateNativeArray<PerChunkPrefixSums>(skeletonChunkCount,
                                                                                                 WorldUpdateAllocator,
                                                                                                 NativeArrayOptions.UninitializedMemory);
-                var meshChunks        = new NativeList<ArchetypeChunk>(WorldUpdateAllocator);
+                var meshChunks        = new NativeList<ArchetypeChunk>(m_skinnedMeshMetaQuery.CalculateChunkCountWithoutFiltering(), WorldUpdateAllocator);
                 var requestsBlockList =
                     new UnsafeParallelBlockList(UnsafeUtility.SizeOf<MeshSkinningRequestWithSkeletonTarget>(), 256, WorldUpdateAllocator);
                 var groupedSkinningRequestsStartsAndCounts   = new NativeList<int2>(WorldUpdateAllocator);
@@ -217,12 +218,12 @@ namespace Latios.Kinemation.Systems
                     optimizedBoneBufferHandle    = SystemAPI.GetBufferTypeHandle<OptimizedBoneTransform>(true),
                     optimizedSkeletonStateHandle = SystemAPI.GetComponentTypeHandle<OptimizedSkeletonState>(true),
                     perChunkPrefixSums           = perChunkPrefixSums,
-                    previousTransformHandle      = SystemAPI.GetComponentTypeHandle<TickStartingTransform>(true),
-                    previousTransformLookup      = SystemAPI.GetComponentLookup<TickStartingTransform>(true),
+                    previousTransformHandle      = SystemAPI.GetComponentTypeHandle<PreviousTransform>(true),
+                    previousTransformLookup      = SystemAPI.GetComponentLookup<PreviousTransform>(true),
                     skinnedMeshesBufferHandle    = SystemAPI.GetBufferTypeHandle<DependentSkinnedMesh>(true),
                     skinningStream               = skinningStream.AsReader(),
-                    twoAgoTransformHandle        = SystemAPI.GetComponentTypeHandle<PreviousTickStartingTransform>(true),
-                    twoAgoTransformLookup        = SystemAPI.GetComponentLookup<PreviousTickStartingTransform>(true),
+                    twoAgoTransformHandle        = SystemAPI.GetComponentTypeHandle<TwoAgoTransform>(true),
+                    twoAgoTransformLookup        = SystemAPI.GetComponentLookup<TwoAgoTransform>(true),
                     worldTransformHandle         = SystemAPI.GetComponentTypeHandle<WorldTransform>(true),
                     worldTransformLookup         = SystemAPI.GetComponentLookup<WorldTransform>(true)
                 }.ScheduleParallel(m_skeletonQuery, Dependency);
@@ -231,6 +232,12 @@ namespace Latios.Kinemation.Systems
 
                 if (!GetPhaseActions(CullingComputeDispatchState.Dispatch, out terminate))
                     continue;
+
+                //for (int i = 0; i < (int)layouts.requiredMetaSize; i++)
+                //{
+                //    var val = skinningMetaArray[i];
+                //    UnityEngine.Debug.Log($"Meta {i}: Op {val.x >> 16}, bones: {val.x & 0xffff}, y: {val.y}, z: {val.z}, w: {val.w}");
+                //}
 
                 skinningMetaBuffer.UnlockBufferAfterWrite<uint4>((int)layouts.requiredMetaSize);
                 boneTransformsBuffer.UnlockBufferAfterWrite<TransformQvvs>((int)layouts.requiredUploadTransforms);
@@ -241,6 +248,8 @@ namespace Latios.Kinemation.Systems
                 var requiredDeformSizes    = worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>();
                 var shaderTransformsBuffer = graphicsPool.GetSkinningTransformsBuffer(requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning);
                 var shaderDeformBuffer     = graphicsPool.GetDeformBuffer(requiredDeformSizes.maxRequiredDeformVertices);
+
+                //UnityEngine.Debug.Log($"Vertex Skinning Buffer size: {requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning}");
 
                 m_batchSkinningShader.SetBuffer(0, _dstTransforms,          shaderTransformsBuffer);
                 m_batchSkinningShader.SetBuffer(0, _dstVertices,            shaderDeformBuffer);
@@ -843,7 +852,7 @@ namespace Latios.Kinemation.Systems
                     sums[i]             = 0;
                 }
 
-                for (int i = 0; i < skeletonCount; i++)
+                for (int i = 0; i < count; i++)
                 {
                     int skeletonIndex = dstIndices[i];
                     dstIndices[i]     = startsAndCounts[skeletonIndex].x + sums[skeletonIndex];
@@ -963,7 +972,7 @@ namespace Latios.Kinemation.Systems
                     var request = requests[i];
 
                     // Validate bone count
-                    var index     = request.indexInSkeletonBufferShaderUsageHigh8 & 0x00ffffffu;
+                    var index     = request.indexInSkeletonBuffer;
                     var meshBones = meshes[(int)index].boneOffsetsCount;
                     if (meshBones > skeletonBonesCount)
                     {
@@ -992,7 +1001,7 @@ namespace Latios.Kinemation.Systems
                     ProcessChain(requests.GetSubArray(0, startOfPrevious), meshes, indexInChunk, skeletonBonesCount);
                 if (startOfTwoAgo < 0 && startOfPrevious >= 0)
                     ProcessChain(requests.GetSubArray(startOfPrevious, requests.Length - startOfPrevious), meshes, indexInChunk, skeletonBonesCount);
-                else if (startOfPrevious >= 0)
+                else if (startOfPrevious >= 0 && startOfPrevious != startOfTwoAgo)
                     ProcessChain(requests.GetSubArray(startOfPrevious, startOfTwoAgo), meshes, indexInChunk, skeletonBonesCount);
                 if (startOfTwoAgo >= 0)
                     ProcessChain(requests.GetSubArray(startOfTwoAgo, requests.Length - startOfTwoAgo), meshes, indexInChunk, skeletonBonesCount);
@@ -1867,15 +1876,15 @@ namespace Latios.Kinemation.Systems
                 PerChunkPrefixSums running = default;
                 for (int i = 0; i < perChunkPrefixSums.Length; i++)
                 {
-                    var temp                                     = perChunkPrefixSums[i];
-                    perChunkPrefixSums[i]                        = running;
-                    running.boneTransformsToUpload               = temp.boneTransformsToUpload;
-                    running.batchSkinningHeadersCount            = temp.batchSkinningHeadersCount;
-                    running.batchSkinningMeshCommandsCount       = temp.batchSkinningMeshCommandsCount;
-                    running.expansionHeadersCount                = temp.expansionHeadersCount;
-                    running.expansionMeshCommandsCount           = temp.expansionMeshCommandsCount;
-                    running.meshSkinningCommandsCount            = temp.meshSkinningCommandsCount;
-                    running.meshSkinningExtraBoneTransformsCount = temp.meshSkinningExtraBoneTransformsCount;
+                    var temp                                      = perChunkPrefixSums[i];
+                    perChunkPrefixSums[i]                         = running;
+                    running.boneTransformsToUpload               += temp.boneTransformsToUpload;
+                    running.batchSkinningHeadersCount            += temp.batchSkinningHeadersCount;
+                    running.batchSkinningMeshCommandsCount       += temp.batchSkinningMeshCommandsCount;
+                    running.expansionHeadersCount                += temp.expansionHeadersCount;
+                    running.expansionMeshCommandsCount           += temp.expansionMeshCommandsCount;
+                    running.meshSkinningCommandsCount            += temp.meshSkinningCommandsCount;
+                    running.meshSkinningExtraBoneTransformsCount += temp.meshSkinningExtraBoneTransformsCount;
                 }
 
                 var maxData          = maxRequiredDeformDataLookup.GetRefRW(worldBlackboardEntity, false);
@@ -1909,13 +1918,13 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public BufferTypeHandle<DependentSkinnedMesh> skinnedMeshesBufferHandle;
             [ReadOnly] public NativeArray<short>                     boneOffsetsBuffer;
 
-            [ReadOnly] public BufferTypeHandle<BoneReference>                    boneReferenceBufferHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>                worldTransformHandle;
-            [ReadOnly] public ComponentLookup<WorldTransform>                    worldTransformLookup;
-            [ReadOnly] public ComponentTypeHandle<TickStartingTransform>         previousTransformHandle;
-            [ReadOnly] public ComponentLookup<TickStartingTransform>             previousTransformLookup;
-            [ReadOnly] public ComponentTypeHandle<PreviousTickStartingTransform> twoAgoTransformHandle;
-            [ReadOnly] public ComponentLookup<PreviousTickStartingTransform>     twoAgoTransformLookup;
+            [ReadOnly] public BufferTypeHandle<BoneReference>        boneReferenceBufferHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>    worldTransformHandle;
+            [ReadOnly] public ComponentLookup<WorldTransform>        worldTransformLookup;
+            [ReadOnly] public ComponentTypeHandle<PreviousTransform> previousTransformHandle;
+            [ReadOnly] public ComponentLookup<PreviousTransform>     previousTransformLookup;
+            [ReadOnly] public ComponentTypeHandle<TwoAgoTransform>   twoAgoTransformHandle;
+            [ReadOnly] public ComponentLookup<TwoAgoTransform>       twoAgoTransformLookup;
 
             [ReadOnly] public BufferTypeHandle<OptimizedBoneTransform>    optimizedBoneBufferHandle;
             [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonState> optimizedSkeletonStateHandle;
@@ -1961,6 +1970,13 @@ namespace Latios.Kinemation.Systems
 
                 var layouts = bufferLayouts.Value;
 
+                if ((prefixSums.batchSkinningHeadersCount == 0 && prefixSums.batchSkinningMeshCommandsCount != 0) ||
+                    prefixSums.batchSkinningMeshCommandsCount == 0 && prefixSums.batchSkinningHeadersCount != 0)
+                {
+                    UnityEngine.Debug.LogError(
+                        $"Skinning order corruption occurred. HeaderCount: {prefixSums.batchSkinningHeadersCount}, meshCommandsCount: {prefixSums.batchSkinningMeshCommandsCount}");
+                }
+
                 for (int streamReads = 0; streamReads < streamItemsCount;)
                 {
                     var header = skinningStream.Read<SkinningStreamHeader>();
@@ -1968,7 +1984,8 @@ namespace Latios.Kinemation.Systems
 
                     var bones = bonesAccessor[header.indexInSkeletonChunk].AsNativeArray();
 
-                    // The header is identical for both batch skinning and expansion.
+                    // The header is nearly identical for both batch skinning and expansion.
+                    // The exception is the z value which is patched for expansion below.
                     uint4 headerCommand = new uint4
                     {
                         x = (ushort)header.boneTransformCount | ((uint)(header.loadOp & SkinningStreamHeader.LoadOp.OpMask) << 16),
@@ -2106,6 +2123,8 @@ namespace Latios.Kinemation.Systems
                     }
                     else
                     {
+                        headerCommand.z = prefixSums.expansionMeshCommandsCount +
+                                          layouts.expansionMeshCommandsStart;
                         metaBuffer[(int)(prefixSums.expansionHeadersCount + layouts.expansionHeadersStart)] = headerCommand;
                         prefixSums.expansionHeadersCount++;
                         ProcessMeshesExpanded(meshes, header.meshCommandCount, ref prefixSums, ref streamReads, in layouts);
@@ -2127,7 +2146,8 @@ namespace Latios.Kinemation.Systems
                     var header = skinningStream.Read<SkinningStreamHeader>();
                     streamReads++;
 
-                    // The header is identical for both batch skinning and expansion.
+                    // The header is nearly identical for both batch skinning and expansion.
+                    // The exception is the z value which is patched for expansion below.
                     uint4 headerCommand = new uint4
                     {
                         x = (ushort)header.boneTransformCount | ((uint)(header.loadOp & SkinningStreamHeader.LoadOp.OpMask) << 16),
@@ -2146,12 +2166,12 @@ namespace Latios.Kinemation.Systems
                     if (history == SkinningStreamHeader.LoadOp.Current)
                     {
                         rotation = (state & OptimizedSkeletonState.Flags.IsDirty) == OptimizedSkeletonState.Flags.IsDirty ?
-                                   OptimizedSkeletonState.CurrentFromMask[rotationMask] : OptimizedSkeletonState.TickStartingFromMask[rotationMask];
+                                   OptimizedSkeletonState.CurrentFromMask[rotationMask] : OptimizedSkeletonState.PreviousFromMask[rotationMask];
                     }
                     else if (history == SkinningStreamHeader.LoadOp.Previous)
-                        rotation = OptimizedSkeletonState.TickStartingFromMask[rotationMask];
+                        rotation = OptimizedSkeletonState.PreviousFromMask[rotationMask];
                     else
-                        rotation  = OptimizedSkeletonState.PreviousFromMask[rotationMask];
+                        rotation  = OptimizedSkeletonState.TwoAgoFromMask[rotationMask];
                     int boneCount = bonesFullBuffer.Length / 6;
                     var bones     = bonesFullBuffer.GetSubArray(rotation * boneCount * 2, boneCount);
 
@@ -2187,6 +2207,8 @@ namespace Latios.Kinemation.Systems
                     }
                     else
                     {
+                        headerCommand.z = prefixSums.expansionMeshCommandsCount +
+                                          layouts.expansionMeshCommandsStart;
                         metaBuffer[(int)(prefixSums.expansionHeadersCount + layouts.expansionHeadersStart)] = headerCommand;
                         prefixSums.expansionHeadersCount++;
                         ProcessMeshesExpanded(meshes, header.meshCommandCount, ref prefixSums, ref streamReads, in layouts);
@@ -2216,7 +2238,7 @@ namespace Latios.Kinemation.Systems
                     uint4 optionB  = new uint4(x, mesh.meshBindPosesStart + mesh.boneOffsetsCount, mesh.boneOffsetsStart, command.gpuDstStart);
                     uint4 optionC  = new uint4(x, mesh.meshVerticesStart, mesh.meshWeightsStart, command.gpuDstStart);
 
-                    uint4 finalCommand = (command.batchOp) switch
+                    uint4 finalCommand = (command.batchOp & SkinningStreamMeshCommand.BatchOp.OpMask) switch
                     {
                         SkinningStreamMeshCommand.BatchOp.CvtGsQvvsToMatReplaceGs => optionA,
                         SkinningStreamMeshCommand.BatchOp.MulGsMatWithOffsetBindposesStoreGs => optionA,

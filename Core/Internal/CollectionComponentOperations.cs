@@ -129,8 +129,9 @@ namespace Latios.InternalSourceGen
                 return;
             }
 
-            ref var storage = ref context->latiosWorld.m_impl->m_collectionComponentStorage;
-            if (!context->addQuery.IsEmptyIgnoreFilter)
+            ref var storage  = ref context->latiosWorld.m_impl->m_collectionComponentStorage;
+            bool    needsAdd = !context->addQuery.IsEmptyIgnoreFilter;
+            if (needsAdd)
             {
                 var chunks = context->addQuery.ToArchetypeChunkArray(Allocator.Temp);
 
@@ -142,12 +143,10 @@ namespace Latios.InternalSourceGen
                         storage.AddOrSetCollectionComponentAndDisposeOld<T>(entity, default, out _, out _);
                     }
                 }
-
-                var t = new T().cleanupType;
-                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.AddComponent(context->addQuery, t);
             }
 
-            if (!context->removeQuery.IsEmptyIgnoreFilter)
+            bool needsRemove = !context->removeQuery.IsEmptyIgnoreFilter;
+            if (needsRemove)
             {
                 var chunks = context->removeQuery.ToArchetypeChunkArray(Allocator.Temp);
                 var jhs    = new NativeList<JobHandle>(Allocator.Temp);
@@ -163,10 +162,13 @@ namespace Latios.InternalSourceGen
                 }
 
                 JobHandle.CompleteAll(jhs.AsArray());
-
-                var t = new T().cleanupType;
-                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(context->addQuery, t);
             }
+
+            var t = new T().cleanupType;
+            if (needsAdd)
+                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.AddComponent(context->addQuery, t);
+            if (needsRemove)
+                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(context->addQuery, t);
         }
 
         static void DisposeCollectionStorage<T>(DisposeCollectionStorageContext* context) where T : unmanaged, ICollectionComponent, StaticAPI.ICollectionComponentSourceGenerated

@@ -18,12 +18,31 @@ namespace Latios.Kinemation
 
         EntityQuery m_query;
 
+        // Shader bindings
+        int _srcVertices;
+        int _dstVertices;
+        int _blendShapeDeltas;
+        int _startOffset;
+        int _metaBuffer;
+        int _latiosDeformBuffer;
+        int _DeformedMeshData;
+        int _PreviousFrameDeformedMeshData;
+
         protected override void OnCreate()
         {
             m_query = Fluent.WithAll<DynamicMeshVertex>(true).WithAll<BlendShapeState>(true).WithAll<BoundMesh>(true)
                       .WithAll<ChunkPerCameraCullingMask>(true, true).WithAll<ChunkPerFrameCullingMask>(true, true).Build();
 
             m_dispatchShader = Resources.Load<ComputeShader>("ShapeBlending");
+
+            _srcVertices                   = Shader.PropertyToID("_srcVertice");
+            _dstVertices                   = Shader.PropertyToID("_dstVertices");
+            _blendShapeDeltas              = Shader.PropertyToID("_blendShapeDeltas");
+            _startOffset                   = Shader.PropertyToID("_startOffset");
+            _metaBuffer                    = Shader.PropertyToID("_metaBuffer");
+            _latiosDeformBuffer            = Shader.PropertyToID("_latiosDeformBuffer");
+            _DeformedMeshData              = Shader.PropertyToID("_DeformedMeshData");
+            _PreviousFrameDeformedMeshData = Shader.PropertyToID("_PreviousFrameDeformedMeshData");
         }
 
         protected override IEnumerable<bool> UpdatePhase()
@@ -112,19 +131,23 @@ namespace Latios.Kinemation
                     break;
 
                 var persistentBuffer = graphicsPool.GetDeformBuffer(worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
-                m_dispatchShader.SetBuffer(0, "_srcVertices",      graphicsPool.GetMeshVerticesBufferRO());
-                m_dispatchShader.SetBuffer(0, "_blendShapeDeltas", graphicsPool.GetMeshBlendShapesBufferRO());
-                m_dispatchShader.SetBuffer(0, "_dstVertices",      persistentBuffer);
-                m_dispatchShader.SetBuffer(0, "_metaBuffer",       metaBuffer);
+                m_dispatchShader.SetBuffer(0, _srcVertices,      graphicsPool.GetMeshVerticesBufferRO());
+                m_dispatchShader.SetBuffer(0, _blendShapeDeltas, graphicsPool.GetMeshBlendShapesBufferRO());
+                m_dispatchShader.SetBuffer(0, _dstVertices,      persistentBuffer);
+                m_dispatchShader.SetBuffer(0, _metaBuffer,       metaBuffer);
 
                 for (uint dispatchesRemaining = (uint)payloads.Length, offset = 0; dispatchesRemaining > 0;)
                 {
                     uint dispatchCount = math.min(dispatchesRemaining, 65535);
-                    m_dispatchShader.SetInt("_startOffset", (int)offset);
+                    m_dispatchShader.SetInt(_startOffset, (int)offset);
                     m_dispatchShader.Dispatch(0, (int)dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                 }
+
+                Shader.SetGlobalBuffer(_DeformedMeshData,              persistentBuffer);
+                Shader.SetGlobalBuffer(_PreviousFrameDeformedMeshData, persistentBuffer);
+                Shader.SetGlobalBuffer(_latiosDeformBuffer,            persistentBuffer);
 
                 yield return true;
             }
@@ -188,9 +211,9 @@ namespace Latios.Kinemation
                     var state              = states[i].state;
                     var mask               = state & BlendShapeState.Flags.RotationMask;
                     var currentRotation    = BlendShapeState.CurrentFromMask[(byte)mask];
-                    var previousRotation   = BlendShapeState.TickStartingFromMask[(byte)mask];
+                    var previousRotation   = BlendShapeState.PreviousFromMask[(byte)mask];
                     currentRotation        = (state & BlendShapeState.Flags.IsDirty) == BlendShapeState.Flags.IsDirty ? currentRotation : previousRotation;
-                    var twoAgoRotation     = BlendShapeState.PreviousFromMask[(byte)mask];
+                    var twoAgoRotation     = BlendShapeState.TwoAgoFromMask[(byte)mask];
                     var buffer             = weightsBuffers[i];
                     var blob               = meshes[i].meshBlob;
                     var weightsCount       = blob.Value.blendShapesData.shapes.Length;
@@ -199,19 +222,20 @@ namespace Latios.Kinemation
 
                     void* currentPtr, previousPtr, twoAgoPtr;
 
-                    if (Unity.Burst.CompilerServices.Hint.Unlikely(weightsCount != buffer.Length * 3))
+                    if (Unity.Burst.CompilerServices.Hint.Unlikely(weightsCount * 3 != buffer.Length))
                     {
                         currentPtr  = null;
                         previousPtr = currentPtr;
                         twoAgoPtr   = currentPtr;
 
-                        UnityEngine.Debug.LogError($"Entity {entities[i]} has the wrong number of weights in DynamicBuffer<BlendShapeWeight>. Uploading zero weights instead.");
+                        UnityEngine.Debug.LogError(
+                            $"Entity {entities[i]} has the wrong number of weights ({buffer.Length / 3} vs expected {weightsCount}) in DynamicBuffer<BlendShapeWeight>. Uploading zero weights instead.");
                     }
                     else
                     {
-                        currentPtr  = UnsafeUtility.AddressOf(ref buffer.ElementAt(weightsCount * currentRotation));
-                        previousPtr = UnsafeUtility.AddressOf(ref buffer.ElementAt(weightsCount * previousRotation));
-                        twoAgoPtr   = UnsafeUtility.AddressOf(ref buffer.ElementAt(weightsCount * twoAgoRotation));
+                        currentPtr  = buffer.AsNativeArray().GetSubArray(weightsCount * currentRotation, weightsCount).GetUnsafeReadOnlyPtr();
+                        previousPtr = buffer.AsNativeArray().GetSubArray(weightsCount * previousRotation, weightsCount).GetUnsafeReadOnlyPtr();
+                        twoAgoPtr   = buffer.AsNativeArray().GetSubArray(weightsCount * twoAgoRotation, weightsCount).GetUnsafeReadOnlyPtr();
                     }
 
                     if (needsCurrent)

@@ -31,6 +31,7 @@ namespace Latios.Psyshock.Authoring
         public List<UnityCollider> colliders;
     }
 
+    [TemporaryBakingType]
     public struct ColliderBakerWorker : ISmartBakeItem<ColliderAuthoring>
     {
         SmartBlobberHandle<CompoundColliderBlob> m_handle;

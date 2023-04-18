@@ -38,9 +38,16 @@ uniform ByteAddressBuffer _boneOffsets;
 // Stride of uint4
 uniform ByteAddressBuffer _metaBuffer;
 
-uniform RWStructuredBuffer <TransformUnion> _dstTransforms : register(u1);
+uniform RWByteAddressBuffer _dstTransforms : register(u1);
 
 uint _startOffset;
+
+void writeBone(uint absoluteBoneIndex, TransformUnion tu)
+{
+    _dstTransforms.Store4(absoluteBoneIndex * 48, asuint(tu.a));
+    _dstTransforms.Store4(absoluteBoneIndex * 48 + 16, asuint(tu.b));
+    _dstTransforms.Store4(absoluteBoneIndex * 48 + 32, asuint(tu.c));
+}
 
 void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
 {
@@ -233,7 +240,7 @@ void SkeletonMeshExpansion(uint threadId : SV_GroupIndex, uint3 groupIds : SV_Gr
                 Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + boneOffset];
                 float3x4 boneMat = qvvsToMatrix(boneQvvs);
                 float3x4 mat = mul3x4(boneMat, bindpose);
-                _dstTransforms[dstStart + i] = matrixToTransformUnionMatrix(mat);
+                writeBone(dstStart + i, matrixToTransformUnionMatrix(mat));
             }
         }
         else if (meshOperation == kMeshOpMats)
@@ -244,7 +251,7 @@ void SkeletonMeshExpansion(uint threadId : SV_GroupIndex, uint3 groupIds : SV_Gr
                 Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + i];
                 float3x4 boneMat = qvvsToMatrix(boneQvvs);
                 float3x4 mat = mul3x4(boneMat, bindpose);
-                _dstTransforms[dstStart + i] = matrixToTransformUnionMatrix(mat);
+                writeBone(dstStart + i, matrixToTransformUnionMatrix(mat));
             }
         }
         else if (meshOperation == kMeshOpDqsWorldWithOffsets)
@@ -258,7 +265,7 @@ void SkeletonMeshExpansion(uint threadId : SV_GroupIndex, uint3 groupIds : SV_Gr
 
                 Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + boneOffset];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
-                _dstTransforms[dstStart + i] = dqsToTransformUnionDqs(boneDqs);
+                writeBone(dstStart + i, dqsToTransformUnionDqs(boneDqs));
             }
         }
         else if (meshOperation == kMeshOpDqsWorld)
@@ -267,7 +274,7 @@ void SkeletonMeshExpansion(uint threadId : SV_GroupIndex, uint3 groupIds : SV_Gr
             {
                 Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + i];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
-                _dstTransforms[dstStart + i] = dqsToTransformUnionDqs(boneDqs);
+                writeBone(dstStart + i, dqsToTransformUnionDqs(boneDqs));
             }
         }
     }

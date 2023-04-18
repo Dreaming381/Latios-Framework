@@ -49,6 +49,23 @@ namespace Latios.Myri
         internal BlobArray<float>  passthroughVolumesPerRightChannel;
     }
 
+    // Todo: Rename this once the new design is ready.
+    public struct ListenerProfileBlobV2
+    {
+        internal struct ChannelDsp
+        {
+            public BlobArray<BlobArray<DSP.StateVariableFilter.Coefficients> > filterSequences;
+            public BlobArray<float>                                            sequenceVolumes;
+        }
+
+        internal BlobArray<ChannelDsp> channelDspsLeft;
+        internal BlobArray<ChannelDsp> channelDspsRight;
+        internal BlobArray<float4>     anglesPerLeftChannel;
+        internal BlobArray<float4>     anglesPerRightChannel;
+        internal int                   rightChannelsOffset;
+        internal int                   totalFiltersInLeftChannels;
+    }
+
     /// <summary>
     /// A frequency-based filter configuration which can be applied to audio to achieve spatialization.
     /// </summary>

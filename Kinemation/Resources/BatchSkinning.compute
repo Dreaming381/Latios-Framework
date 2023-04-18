@@ -23,7 +23,7 @@ static const uint kMeshOpMulGsMatWithOffsetBindposesStoreGs                = 1;
 static const uint kMeshOpMulGsMatWithBindposesStoreGs                      = 2;
 static const uint kMeshOpLoadQvvsMulMatWithOffsetBindposesStoreGs          = 3;
 static const uint kMeshOpLoadQvvsMulMatWithBindposesStoreGs                = 4;
-static const uint kMeshOpGsTfStoreDst                                     = 5;
+static const uint kMeshOpGsTfStoreDst                                      = 5;
 static const uint kMeshOpSkinMatVertInSrc                                  = 6;
 static const uint kMeshOpSkinMatVertInDst                                  = 7;
 static const uint kMeshOpCvtGsQvvsToDqsWithOffsetStoreDst                  = 8;
@@ -85,8 +85,8 @@ uniform ByteAddressBuffer                _boneOffsets;
 // Stride of uint4
 uniform ByteAddressBuffer _metaBuffer;
 
-uniform RWStructuredBuffer<Vertex>          _dstVertices   : register(u1);
-uniform RWStructuredBuffer <TransformUnion> _dstTransforms : register(u2);
+uniform RWStructuredBuffer<Vertex> _dstVertices   : register(u1);
+uniform RWByteAddressBuffer        _dstTransforms : register(u2);
 
 // 8184 floats is 682 float3x4 or 744 DQ + float3.
 // However, we pad out DQ + float3 to 12 floats to help GPUs
@@ -95,6 +95,13 @@ uniform RWStructuredBuffer <TransformUnion> _dstTransforms : register(u2);
 groupshared TransformUnion gs_transforms[682]; 
 
 uint _startOffset;
+
+void writeBone(uint absoluteBoneIndex, TransformUnion tu)
+{
+    _dstTransforms.Store4(absoluteBoneIndex * 48, asuint(tu.a));
+    _dstTransforms.Store4(absoluteBoneIndex * 48 + 16, asuint(tu.b));
+    _dstTransforms.Store4(absoluteBoneIndex * 48 + 32, asuint(tu.c));
+}
 
 void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
 {
@@ -452,7 +459,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             uint offset = useSkeletonCountAsGsBaseAddress ? skeletonCount : 0;
             for (uint i = threadId; i < meshBonesCount; i += THREAD_GROUP_SIZE)
             {
-                _dstTransforms[dstStart + i] = gs_transforms[offset + i];
+                writeBone(dstStart + i, gs_transforms[offset + i]);
             }
         }
         else if (meshOperation == kMeshOpSkinMatVertInSrc)
@@ -511,7 +518,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             [unroll]
             for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
             {
-                if (vertexIndexBase + threadId < meshVerticesCount)
+                if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
                 {
                     uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                     bool isEnd = false;
@@ -601,7 +608,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             [unroll]
             for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
             {
-                if (vertexIndexBase + threadId < meshVerticesCount)
+                if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
                 {
                     uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                     bool isEnd = false;
@@ -649,7 +656,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
                 // We only write the world DQS because Dual-Quaternion skinning requires separated bindposes and
                 // world DQS in our implementation.
-                _dstTransforms[dstStart + i] = dqsToTransformUnionDqs(boneDqs);
+                writeBone(dstStart + i, dqsToTransformUnionDqs(boneDqs));
             }
         }
         else if (meshOperation == kMeshOpCvtGsQvvsToDqsWithOffsetStoreGsCopyBindposeToGs)
@@ -870,7 +877,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             [unroll]
             for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
             {
-                if (vertexIndexBase + threadId < meshVerticesCount)
+                if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
                 {
                     uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                     bool isEnd = false;
@@ -1065,7 +1072,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             [unroll]
             for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
             {
-                if (vertexIndexBase + threadId < meshVerticesCount)
+                if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
                 {
                     uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                     bool isEnd = false;
@@ -1252,7 +1259,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             [unroll]
             for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
             {
-                if (vertexIndexBase + threadId < meshVerticesCount)
+                if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
                 {
                     uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                     bool isEnd = false;

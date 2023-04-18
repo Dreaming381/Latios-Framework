@@ -18,12 +18,28 @@ namespace Latios.Kinemation
 
         EntityQuery m_query;
 
+        // Shader bindings
+        int _src;
+        int _dst;
+        int _startOffset;
+        int _meta;
+        int _latiosDeformBuffer;
+        int _DeformedMeshData;
+        int _PreviousFrameDeformedMeshData;
+
         protected override void OnCreate()
         {
             m_query = Fluent.WithAll<DynamicMeshVertex>(true).WithAll<DynamicMeshState>(true).WithAll<BoundMesh>(true)
                       .WithAll<ChunkPerCameraCullingMask>(true, true).WithAll<ChunkPerFrameCullingMask>(true, true).Build();
 
-            m_uploadShader = Resources.Load<ComputeShader>("UploadVertices");
+            m_uploadShader                 = Resources.Load<ComputeShader>("UploadVertices");
+            _src                           = Shader.PropertyToID("_src");
+            _dst                           = Shader.PropertyToID("_dst");
+            _startOffset                   = Shader.PropertyToID("_startOffset");
+            _meta                          = Shader.PropertyToID("_meta");
+            _latiosDeformBuffer            = Shader.PropertyToID("_latiosDeformBuffer");
+            _DeformedMeshData              = Shader.PropertyToID("_DeformedMeshData");
+            _PreviousFrameDeformedMeshData = Shader.PropertyToID("_PreviousFrameDeformedMeshData");
         }
 
         protected override IEnumerable<bool> UpdatePhase()
@@ -38,7 +54,7 @@ namespace Latios.Kinemation
                 if (terminate)
                     break;
 
-                var streamCount       = new NativeArray<int>(1, WorldUpdateAllocator);
+                var streamCount       = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
                 streamCount[0]        = m_query.CalculateChunkCountWithoutFiltering();
                 var streamConstructJh = NativeStream.ScheduleConstruct(out var stream, streamCount, default, WorldUpdateAllocator);
                 var collectJh         = new GatherUploadOperationsJob
@@ -113,18 +129,22 @@ namespace Latios.Kinemation
                     break;
 
                 var persistentBuffer = graphicsPool.GetDeformBuffer(worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
-                m_uploadShader.SetBuffer(0, "_dst",  persistentBuffer);
-                m_uploadShader.SetBuffer(0, "_src",  uploadBuffer);
-                m_uploadShader.SetBuffer(0, "_meta", metaBuffer);
+                m_uploadShader.SetBuffer(0, _dst,  persistentBuffer);
+                m_uploadShader.SetBuffer(0, _src,  uploadBuffer);
+                m_uploadShader.SetBuffer(0, _meta, metaBuffer);
 
                 for (uint dispatchesRemaining = (uint)payloads.Length, offset = 0; dispatchesRemaining > 0;)
                 {
                     uint dispatchCount = math.min(dispatchesRemaining, 65535);
-                    m_uploadShader.SetInt("_startOffset", (int)offset);
+                    m_uploadShader.SetInt(_startOffset, (int)offset);
                     m_uploadShader.Dispatch(0, (int)dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                 }
+
+                Shader.SetGlobalBuffer(_DeformedMeshData,              persistentBuffer);
+                Shader.SetGlobalBuffer(_PreviousFrameDeformedMeshData, persistentBuffer);
+                Shader.SetGlobalBuffer(_latiosDeformBuffer,            persistentBuffer);
 
                 yield return true;
             }
@@ -154,7 +174,7 @@ namespace Latios.Kinemation
             [ReadOnly] public ComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>      legacyDotsDeformShaderIndexHandle;
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
 
-            public NativeStream.Writer streamWriter;
+            [NativeDisableParallelForRestriction] public NativeStream.Writer streamWriter;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -186,27 +206,28 @@ namespace Latios.Kinemation
                     var state            = states[i].state;
                     var mask             = state & DynamicMeshState.Flags.RotationMask;
                     var currentRotation  = DynamicMeshState.CurrentFromMask[(byte)mask];
-                    var previousRotation = DynamicMeshState.TickStartingFromMask[(byte)mask];
+                    var previousRotation = DynamicMeshState.PreviousFromMask[(byte)mask];
                     currentRotation      = (state & DynamicMeshState.Flags.IsDirty) == DynamicMeshState.Flags.IsDirty ? currentRotation : previousRotation;
-                    var twoAgoRotation   = DynamicMeshState.PreviousFromMask[(byte)mask];
+                    var twoAgoRotation   = DynamicMeshState.TwoAgoFromMask[(byte)mask];
                     var buffer           = verticesBuffers[i];
                     var verticesCount    = blobs[i].meshBlob.Value.undeformedVertices.Length;
 
                     void* currentPtr, previousPtr, twoAgoPtr;
 
-                    if (Unity.Burst.CompilerServices.Hint.Unlikely(verticesCount != buffer.Length * 3))
+                    if (Unity.Burst.CompilerServices.Hint.Unlikely(verticesCount * 3 != buffer.Length))
                     {
                         currentPtr  = blobs[i].meshBlob.Value.undeformedVertices.GetUnsafePtr();
                         previousPtr = currentPtr;
                         twoAgoPtr   = currentPtr;
 
-                        UnityEngine.Debug.LogError($"Entity {entities[i]} has the wrong number of vertices in DynamicBuffer<DynamicMeshVertex>. Uploading default mesh instead.");
+                        UnityEngine.Debug.LogError(
+                            $"Entity {entities[i]} has the wrong number of vertices ({buffer.Length / 3} vs expected {verticesCount}) in DynamicBuffer<DynamicMeshVertex>. Uploading default mesh instead.");
                     }
                     else
                     {
-                        currentPtr  = UnsafeUtility.AddressOf(ref buffer.ElementAt(verticesCount * currentRotation));
-                        previousPtr = UnsafeUtility.AddressOf(ref buffer.ElementAt(verticesCount * previousRotation));
-                        twoAgoPtr   = UnsafeUtility.AddressOf(ref buffer.ElementAt(verticesCount * twoAgoRotation));
+                        currentPtr  = buffer.AsNativeArray().GetSubArray(verticesCount * currentRotation, verticesCount).GetUnsafeReadOnlyPtr();
+                        previousPtr = buffer.AsNativeArray().GetSubArray(verticesCount * previousRotation, verticesCount).GetUnsafeReadOnlyPtr();
+                        twoAgoPtr   = buffer.AsNativeArray().GetSubArray(verticesCount * twoAgoRotation, verticesCount).GetUnsafeReadOnlyPtr();
                     }
 
                     if (needsCurrent)

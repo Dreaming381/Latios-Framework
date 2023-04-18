@@ -20,7 +20,7 @@ namespace Latios.Kinemation
                 if (t.TypeIndex == TypeManager.GetTypeIndex<Unity.Transforms.LocalToWorld>())
                     newTypes.Add(ComponentType.ReadWrite<Latios.Transforms.WorldTransform>());
                 else if (t.TypeIndex == TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>())
-                    newTypes.Add(ComponentType.ReadWrite<Latios.Transforms.TickStartingTransform>());
+                    newTypes.Add(ComponentType.ReadWrite<Latios.Transforms.PreviousTransform>());
                 else
                     newTypes.Add(t);
             }

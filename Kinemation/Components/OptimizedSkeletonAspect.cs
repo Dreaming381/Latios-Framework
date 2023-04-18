@@ -66,14 +66,14 @@ namespace Latios.Kinemation
         /// <summary>
         /// Retrieves a read-only NativeArray containing the current frame's root-space transforms.
         /// If isDirty is false, the contents of this array are undefined.
-        /// To ensure the contents are valid, call CopyFromTickStarting() if isDirty is false.
+        /// To ensure the contents are valid, call CopyFromPrevious() if isDirty is false.
         /// </summary>
         public NativeArray<TransformQvvs>.ReadOnly rawRootTransforms => m_boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray().GetSubArray(m_currentBaseRootIndexWrite,
                                                                                                                                                   boneCount).AsReadOnly();
         /// <summary>
         /// Retrieves a read-only NativeArray containing the current frame's local-space transforms.
         /// If isDirty is false, the contents of this array are undefined.
-        /// To ensure the contents are valid, call CopyFromTickStarting() if isDirty is false.
+        /// To ensure the contents are valid, call CopyFromPrevious() if isDirty is false.
         /// </summary>
         public NativeArray<TransformQvvs>.ReadOnly rawLocalTransformsRO => m_boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray().GetSubArray(
             m_currentBaseRootIndexWrite + boneCount,
@@ -84,7 +84,7 @@ namespace Latios.Kinemation
         /// <summary>
         /// Retrieves write access to the NativeArray containing the current frame's local-space transforms.
         /// If isDirty is false prior to calling this method, the contents of this array are undefined.
-        /// To ensure the contents are valid, call CopyFromTickStarting() if isDirty was false.
+        /// To ensure the contents are valid, call CopyFromPrevious() if isDirty was false.
         /// This method sets isDirty and needsSync to true. Root-space transforms are not automatically synced
         /// when you make changes to this array. You must call EndSamplingAndSync() when you are done making changes.
         /// If you want the hierarchy to remain in sync at all times, iterate through the bones property instead.
@@ -159,10 +159,10 @@ namespace Latios.Kinemation
         /// <summary>
         /// Copies the tick's initial transforms into the current pose buffer.
         /// </summary>
-        public void CopyFromTickStarting()
+        public void CopyFromPrevious()
         {
             var array = m_boneTransforms.AsNativeArray();
-            array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).CopyFrom(array.GetSubArray(m_tickStartingBaseRootIndex, boneCount * 2));
+            array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).CopyFrom(array.GetSubArray(m_previousBaseRootIndex, boneCount * 2));
             ref var state  = ref m_skeletonState.ValueRW.state;
             state         |= OptimizedSkeletonState.Flags.IsDirty;
             state         &= ~(OptimizedSkeletonState.Flags.NeedsSync | OptimizedSkeletonState.Flags.NextSampleShouldAdd);
@@ -488,10 +488,10 @@ namespace Latios.Kinemation
         // Todo: Modification Methods and ReadOnly Transformation Methods
 
         #region ReadOnly Properties
-        public TransformQvvs tickStartingRootTransform => m_boneTransforms[m_tickStartingRootIndex].boneTransform;
-        public TransformQvvs tickStartingLocalTransform => m_boneTransforms[m_tickStartingRootIndex + m_boneCount].boneTransform;
-        public TransformQvvs previousTickStartingRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
-        public TransformQvvs previousickStartingLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
+        public TransformQvvs previousRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        public TransformQvvs previousLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
+        public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
         #endregion
     }
 

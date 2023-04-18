@@ -10,25 +10,23 @@ namespace Latios
         /// <summary>
         /// Starts the construction of an EntityQuery
         /// </summary>
-        internal static FluentQuery Fluent(this ILatiosSystem system)
+        internal static unsafe FluentQuery Fluent(this ILatiosSystem system)
         {
+            var                b        = system as SystemBase;
+            fixed(SystemState* statePtr = &b.CheckedStateRef)
             return new FluentQuery
             {
-                m_all                    = new NativeList<ComponentType>(Allocator.TempJob),
-                m_any                    = new NativeList<ComponentType>(Allocator.TempJob),
-                m_none                   = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcluded       = new NativeList<ComponentType>(Allocator.TempJob),
-                m_allWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
-                m_targetSystem           = system,
-                m_targetState            = default,
-                m_targetManager          = default,
-                m_anyIsSatisfiedByAll    = false,
-                m_sharedComponentFilterA = null,
-                m_sharedComponentFilterB = null,
-                m_changeFilters          = new NativeList<ComponentType>(Allocator.TempJob),
-                m_options                = EntityQueryOptions.Default
+                m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
+                m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
+                m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
+                m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
+                m_targetState          = statePtr,
+                m_targetManager        = default,
+                m_anyIsSatisfiedByAll  = false,
+                m_options              = EntityQueryOptions.Default
             };
         }
 
@@ -39,21 +37,17 @@ namespace Latios
         {
             return new FluentQuery
             {
-                m_all                    = new NativeList<ComponentType>(Allocator.TempJob),
-                m_any                    = new NativeList<ComponentType>(Allocator.TempJob),
-                m_none                   = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcluded       = new NativeList<ComponentType>(Allocator.TempJob),
-                m_allWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
-                m_targetSystem           = null,
-                m_targetState            = default,
-                m_targetManager          = em,
-                m_anyIsSatisfiedByAll    = false,
-                m_sharedComponentFilterA = null,
-                m_sharedComponentFilterB = null,
-                m_changeFilters          = new NativeList<ComponentType>(Allocator.TempJob),
-                m_options                = EntityQueryOptions.Default
+                m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
+                m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
+                m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
+                m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
+                m_targetState          = default,
+                m_targetManager        = em,
+                m_anyIsSatisfiedByAll  = false,
+                m_options              = EntityQueryOptions.Default
             };
         }
 
@@ -66,21 +60,17 @@ namespace Latios
             {
                 return new FluentQuery
                 {
-                    m_all                    = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_any                    = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_none                   = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyIfNotExcluded       = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_allWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyWeak                = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyIfNotExcludedWeak   = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_targetSystem           = null,
-                    m_targetState            = statePtr,
-                    m_targetManager          = default,
-                    m_anyIsSatisfiedByAll    = false,
-                    m_sharedComponentFilterA = null,
-                    m_sharedComponentFilterB = null,
-                    m_changeFilters          = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_options                = EntityQueryOptions.Default
+                    m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_targetState          = statePtr,
+                    m_targetManager        = default,
+                    m_anyIsSatisfiedByAll  = false,
+                    m_options              = EntityQueryOptions.Default
                 };
             }
         }
@@ -99,37 +89,12 @@ namespace Latios
         internal NativeList<ComponentType> m_anyWeak;
         internal NativeList<ComponentType> m_anyIfNotExcludedWeak;
 
-        internal ILatiosSystem m_targetSystem;
         internal SystemState*  m_targetState;
         internal EntityManager m_targetManager;
 
         internal bool m_anyIsSatisfiedByAll;
 
-        internal SharedComponentFilterBase m_sharedComponentFilterA;
-        internal SharedComponentFilterBase m_sharedComponentFilterB;
-
-        internal NativeList<ComponentType> m_changeFilters;
-
         internal EntityQueryOptions m_options;
-
-        abstract internal class SharedComponentFilterBase
-        {
-            public abstract void ApplyFilter(EntityQuery query);
-        }
-
-        internal class SharedComponentFilter<T> : SharedComponentFilterBase where T : unmanaged, ISharedComponentData
-        {
-            private T m_scd;
-            public SharedComponentFilter(T scd)
-            {
-                m_scd = scd;
-            }
-
-            public override void ApplyFilter(EntityQuery query)
-            {
-                query.AddSharedComponentFilter(m_scd);
-            }
-        }
 
         /// <summary>
         /// Adds a required component to the query with the specified access
@@ -264,38 +229,6 @@ namespace Latios
         }
 
         /// <summary>
-        /// Adds a shared component value as a filter to the query.
-        /// </summary>
-        /// <param name="value">The ISharedComponentData value that entities in the query are required to match</param>
-        public FluentQuery WithSharedComponent<T>(T value) where T : unmanaged, ISharedComponentData
-        {
-            var em = m_targetManager;
-            if (em == default)
-                em = m_targetSystem.latiosWorld.EntityManager;
-            if (em == default)
-                throw new System.InvalidOperationException("Missing a system or entity manager reference to build an EntityQuery.");
-            var scf = new SharedComponentFilter<T>(value);
-            if (m_sharedComponentFilterA == null)
-                m_sharedComponentFilterA = scf;
-            else if (m_sharedComponentFilterB == null)
-                m_sharedComponentFilterB = scf;
-            else
-                throw new System.InvalidOperationException("Only up to two Shared Components can be added to the EntityQuery");
-            return this;
-        }
-
-        /// <summary>
-        /// Applies a change filter to the component in the query
-        /// </summary>
-        /// <typeparam name="T">The type of component to match the query only if it might have changed</typeparam>
-        /// <returns></returns>
-        public FluentQuery WithChangeFilter<T>()
-        {
-            m_changeFilters.Add(ComponentType.ReadOnly<T>());
-            return this;
-        }
-
-        /// <summary>
         /// Allows disabled entities to be included in the query
         /// </summary>
         /// <returns></returns>
@@ -373,8 +306,6 @@ namespace Latios
             RemoveDuplicates(m_any);
             RemoveDuplicates(m_allWeak);
             RemoveDuplicates(m_anyWeak);
-
-            RemoveDuplicates(m_changeFilters);
 
             //throw cases:
             //any is in all and access mismatch
@@ -485,12 +416,7 @@ namespace Latios
 
             DisposeArrays();
             EntityQuery query;
-            if (m_targetSystem != null)
-            {
-                //query = m_targetSystem.GetEntityQuery(desc);
-                query = builder.Build(m_targetSystem as SystemBase);
-            }
-            else if (m_targetState != null)
+            if (m_targetState != null)
             {
                 //query = m_targetState->GetEntityQuery(desc);
                 query = builder.Build(ref *m_targetState);
@@ -502,11 +428,7 @@ namespace Latios
             }
             else
                 throw new System.InvalidOperationException("Missing a system or entity manager reference to build an EntityQuery.");
-            m_sharedComponentFilterA?.ApplyFilter(query);
-            m_sharedComponentFilterB?.ApplyFilter(query);
-            for (int i = 0; i < m_changeFilters.Length; i++)
-                query.AddChangedVersionFilter(m_changeFilters[i]);
-            m_changeFilters.Dispose();
+
             return query;
         }
 

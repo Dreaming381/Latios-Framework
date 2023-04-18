@@ -55,14 +55,23 @@ struct Dqs
 uniform ByteAddressBuffer                _boneWeights;
 uniform StructuredBuffer<Vertex>         _srcVertices;
 uniform StructuredBuffer<TransformUnion> _bindPoses;
-uniform StructuredBuffer<TransformUnion> _boneTransforms;
+uniform ByteAddressBuffer                _latiosBoneTransforms;
 
 // Stride of uint4
 uniform ByteAddressBuffer _metaBuffer;
 
-uniform RWStructuredBuffer<Vertex>          _dstVertices   : register(u1);
+uniform RWStructuredBuffer<Vertex> _dstVertices : register(u1);
 
 uint _startOffset;
+
+TransformUnion readBone(uint absoluteBoneIndex)
+{
+    TransformUnion result = (TransformUnion)0;
+    result.a = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48));
+    result.b = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 16));
+    result.c = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 32));
+    return result;
+}
 
 void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
 {
@@ -225,7 +234,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(readBone(boneIndex + bonesStartIndex));
 
                     deform += skinMatrix * weight;
                 } while (!isEnd);
@@ -246,7 +255,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         [unroll]
         for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
         {
-            if (vertexIndexBase + threadId < meshVerticesCount)
+            if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
             {
                 uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                 bool isEnd = false;
@@ -265,7 +274,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(readBone(boneIndex + bonesStartIndex));
 
                     deform += skinMatrix * weight;
                 } while (!isEnd);
@@ -313,7 +322,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(readBone(boneIndex + bonesStartIndex));
 
                     deform += skinMatrix * weight;
                 } while (!isEnd);
@@ -334,7 +343,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         [unroll]
         for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
         {
-            if (vertexIndexBase + threadId < meshVerticesCount)
+            if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
             {
                 uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                 bool isEnd = false;
@@ -353,7 +362,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    float3x4 skinMatrix = transformUnionMatrixToMatrix(_boneTransforms[boneIndex + bonesStartIndex]);
+                    float3x4 skinMatrix = transformUnionMatrixToMatrix(readBone(boneIndex + bonesStartIndex));
 
                     deform += skinMatrix * weight;
                 } while (!isEnd);
@@ -474,7 +483,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         [unroll]
         for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
         {
-            if (vertexIndexBase + threadId < meshVerticesCount)
+            if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
             {
                 uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                 bool isEnd = false;
@@ -665,7 +674,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         [unroll]
         for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
         {
-            if (vertexIndexBase + threadId < meshVerticesCount)
+            if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
             {
                 uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                 bool isEnd = false;
@@ -791,7 +800,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     worldReal += dqs.r * weight;
                     worldDual += dqs.d * weight;
@@ -811,7 +820,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
                         dqs.r.w = -dqs.r.w;
@@ -852,7 +861,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         [unroll]
         for (uint inner = 0; inner < THREAD_GROUP_DIVISOR; inner++)
         {
-            if (vertexIndexBase + threadId < meshVerticesCount)
+            if (vertexIndexBase + threadId + inner * THREAD_GROUP_SIZE < meshVerticesCount)
             {
                 uint nextWeightIndex = currentWeightBatchStart + threadId + inner * THREAD_GROUP_SIZE;
                 bool isEnd = false;
@@ -876,7 +885,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     worldReal += dqs.r * weight;
                     worldDual += dqs.d * weight;
@@ -896,7 +905,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex += boneWeight.packed >> 22;
                     nextWeightIndex++;
 
-                    Dqs dqs = transformUnionDqsToDqs(_boneTransforms[bonesStartIndex + boneIndex]);
+                    Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
                         dqs.r.w = -dqs.r.w;
