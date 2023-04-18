@@ -55,9 +55,9 @@ namespace Latios.Kinemation
             m_copyByteAddressShader     = Resources.Load<ComputeShader>("CopyBytes");
 
             // Unity's LBS node uses ByteAddressBuffer
-            m_skinningTransformsBufferPool = new PersistentPool(1024,
-                                                                3 * 4 * 4,
-                                                                GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.Raw,
+            m_skinningTransformsBufferPool = new PersistentPool(3 * 4 * 1024,
+                                                                4,
+                                                                GraphicsBuffer.Target.Raw,
                                                                 m_copyTransformUnionsShader,
                                                                 m_destructionQueue);
             m_deformBufferPool    = new PersistentPool(256 * 1024, 3 * 3 * 4, GraphicsBuffer.Target.Structured, m_copyVerticesShader, m_destructionQueue);
@@ -126,7 +126,7 @@ namespace Latios.Kinemation
 
         public GraphicsBuffer GetSkinningTransformsBuffer(uint requiredSize)
         {
-            return m_skinningTransformsBufferPool.GetBuffer(requiredSize, m_fencePool.CurrentFrameId);
+            return m_skinningTransformsBufferPool.GetBuffer(requiredSize * 3 * 4, m_fencePool.CurrentFrameId);
         }
 
         public GraphicsBuffer GetDeformBuffer(uint requiredSize)

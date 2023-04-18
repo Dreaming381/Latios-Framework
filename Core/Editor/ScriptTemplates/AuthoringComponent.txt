@@ -11,7 +11,7 @@ using UnityEngine;
 
     public class #SCRIPTNAME#Baker : Baker<#SCRIPTNAME#>
     {
-        public override void Bake(#SCRIPTNAME authoring)
+        public override void Bake(#SCRIPTNAME# authoring)
         {
             #NOTRIM#
         }

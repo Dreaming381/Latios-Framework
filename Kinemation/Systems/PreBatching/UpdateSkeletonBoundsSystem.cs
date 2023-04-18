@@ -213,7 +213,7 @@ namespace Latios.Kinemation.Systems
                 var boneTransformsArrayFull = boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray();
                 var mask                    = state.state & OptimizedSkeletonState.Flags.RotationMask;
                 var currentRotation         = OptimizedSkeletonState.CurrentFromMask[(byte)mask];
-                var previousRotation        = OptimizedSkeletonState.TickStartingFromMask[(byte)mask];
+                var previousRotation        = OptimizedSkeletonState.PreviousFromMask[(byte)mask];
                 currentRotation             = (state.state & OptimizedSkeletonState.Flags.IsDirty) == OptimizedSkeletonState.Flags.IsDirty ? currentRotation : previousRotation;
                 var boneTransformsArray     = boneTransformsArrayFull.GetSubArray(boundsArray.Length * 2 * currentRotation, boundsArray.Length);
 

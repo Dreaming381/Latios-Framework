@@ -1,3 +1,5 @@
+using Latios.Transforms;
+using Latios.Transforms.Authoring;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -21,10 +23,28 @@ namespace Latios.Kinemation.Authoring.Systems
         {
         }
 
+        [BakingType]
+        struct RequestPreviousTransform : IRequestPreviousTransform { }
+        [BakingType]
+        struct RequestTwoAgoTransform : IRequestTwoAgoTransform { }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            ComponentTypeSet exposedBoneTypes = CullingUtilities.GetBoneCullingComponentTypes();
+            var exposedBoneTypes = new FixedList128Bytes<ComponentType>();
+            exposedBoneTypes.Add(ComponentType.ReadWrite<BoneOwningSkeletonReference>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<BoneIndex>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<BoneCullingIndex>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<BoneBounds>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<BoneWorldBounds>());
+            exposedBoneTypes.Add(ComponentType.ChunkComponent<ChunkBoneWorldBounds>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<ExposedBoneInertialBlendState>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<RequestPreviousTransform>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<RequestTwoAgoTransform>());
+            ComponentTypeSet exposedBoneTypesToRemove = new ComponentTypeSet(in exposedBoneTypes);
+            exposedBoneTypes.Add(ComponentType.ReadWrite<PreviousTransform>());
+            exposedBoneTypes.Add(ComponentType.ReadWrite<TwoAgoTransform>());
+            ComponentTypeSet exposedBoneTypesToAdd = new ComponentTypeSet(in exposedBoneTypes);
 
             new ClearJob().ScheduleParallel();
 
@@ -34,7 +54,7 @@ namespace Latios.Kinemation.Authoring.Systems
             var boneIndexLookup         = GetComponentLookup<BoneIndex>(false);
             new ApplySkeletonsToBonesJob
             {
-                componentTypesToAdd     = exposedBoneTypes,
+                componentTypesToAdd     = exposedBoneTypesToAdd,
                 ecb                     = ecbAdd.AsParallelWriter(),
                 cullingIndexLookup      = cullingIndexLookup,
                 skeletonReferenceLookup = skeletonReferenceLookup,
@@ -42,7 +62,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }.ScheduleParallel();
 
             var ecbRemove                        = new EntityCommandBuffer(Allocator.TempJob);
-            new RemoveDisconnectedBonesJob { ecb = ecbRemove.AsParallelWriter(), componentTypesToRemove = exposedBoneTypes }.ScheduleParallel();
+            new RemoveDisconnectedBonesJob { ecb = ecbRemove.AsParallelWriter(), componentTypesToRemove = exposedBoneTypesToRemove }.ScheduleParallel();
 
             state.CompleteDependency();
 
@@ -86,8 +106,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     }
                     else
                     {
-                        ecb.AddComponent<ExposedBoneInertialBlendState>(chunkIndexInQuery, bone.bone);
-                        ecb.AddComponent(                               chunkIndexInQuery, bone.bone, componentTypesToAdd);
+                        ecb.AddComponent( chunkIndexInQuery, bone.bone, componentTypesToAdd);
                         ecb.SetComponent(chunkIndexInQuery, bone.bone, new BoneOwningSkeletonReference { skeletonRoot = entity });
                         ecb.SetComponent(chunkIndexInQuery, bone.bone, new BoneIndex { index                          = (short)i });
                     }
@@ -108,8 +127,7 @@ namespace Latios.Kinemation.Authoring.Systems
             {
                 if (boneReference.skeletonRoot == Entity.Null)
                 {
-                    ecb.RemoveComponent(                               chunkIndexInQuery, entity, componentTypesToRemove);
-                    ecb.RemoveComponent<ExposedBoneInertialBlendState>(chunkIndexInQuery, entity);
+                    ecb.RemoveComponent( chunkIndexInQuery, entity, componentTypesToRemove);
                 }
             }
         }

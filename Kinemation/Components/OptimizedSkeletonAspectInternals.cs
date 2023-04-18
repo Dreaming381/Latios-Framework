@@ -29,16 +29,16 @@ namespace Latios.Kinemation
             }
         }
 
-        int m_tickStartingBaseRootIndex
+        int m_previousBaseRootIndex
         {
             get
             {
                 var mask = (byte)(m_skeletonState.ValueRO.state & OptimizedSkeletonState.Flags.RotationMask);
-                return OptimizedSkeletonState.TickStartingFromMask[mask] * boneCount * 2;
+                return OptimizedSkeletonState.PreviousFromMask[mask] * boneCount * 2;
             }
         }
 
-        int m_previousTickStartingBaseRootIndex
+        int m_twoAgoBaseRootIndex
         {
             get
             {
@@ -50,8 +50,8 @@ namespace Latios.Kinemation
         unsafe void StartInertialBlendInternal(float previousDeltaTime, float maxBlendDuration)
         {
             var bufferAsArray  = m_boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray();
-            var previousLocals = bufferAsArray.GetSubArray(m_tickStartingBaseRootIndex + boneCount, boneCount);
-            var twoAgoLocals   = bufferAsArray.GetSubArray(m_previousTickStartingBaseRootIndex + boneCount, boneCount);
+            var previousLocals = bufferAsArray.GetSubArray(m_previousBaseRootIndex + boneCount, boneCount);
+            var twoAgoLocals   = bufferAsArray.GetSubArray(m_twoAgoBaseRootIndex + boneCount, boneCount);
             var currentLocals  = isDirty ? bufferAsArray.GetSubArray(m_currentBaseRootIndexWrite + boneCount, boneCount) : previousLocals;
 
             // We go unsafe here to avoid copying as these are large
@@ -96,7 +96,7 @@ namespace Latios.Kinemation
             }
             else
             {
-                var previousLocals = bufferAsArray.GetSubArray(m_tickStartingBaseRootIndex + boneCount, boneCount);
+                var previousLocals = bufferAsArray.GetSubArray(m_previousBaseRootIndex + boneCount, boneCount);
                 for (int i = 0; i < currentLocals.Length; i++)
                 {
                     var transform = previousLocals[i];
@@ -159,12 +159,12 @@ namespace Latios.Kinemation
                 var mask = m_rotationMask;
                 if (Hint.Unlikely(!m_isDirty))
                 {
-                    // To avoid only having some bones written to at the current index, we copy the tickStarting bone transforms over.
-                    var setSize          = m_boneCount * 2;
-                    var currentBase      = OptimizedSkeletonState.CurrentFromMask[mask] * setSize;
-                    var tickStartingBase = OptimizedSkeletonState.TickStartingFromMask[mask] * setSize;
-                    var array            = m_boneTransforms.AsNativeArray();
-                    array.GetSubArray(currentBase, setSize).CopyFrom(array.GetSubArray(tickStartingBase, setSize));
+                    // To avoid only having some bones written to at the current index, we copy the previous bone transforms over.
+                    var setSize      = m_boneCount * 2;
+                    var currentBase  = OptimizedSkeletonState.CurrentFromMask[mask] * setSize;
+                    var previousBase = OptimizedSkeletonState.PreviousFromMask[mask] * setSize;
+                    var array        = m_boneTransforms.AsNativeArray();
+                    array.GetSubArray(currentBase, setSize).CopyFrom(array.GetSubArray(previousBase, setSize));
                     m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.IsDirty;
                 }
 
@@ -181,9 +181,9 @@ namespace Latios.Kinemation
             }
         }
 
-        int m_tickStartingRootIndex => OptimizedSkeletonState.TickStartingFromMask[m_rotationMask] * m_boneCount * 2 + m_index;
-
         int m_previousRootIndex => OptimizedSkeletonState.PreviousFromMask[m_rotationMask] * m_boneCount * 2 + m_index;
+
+        int m_twoAgoRootIndex => OptimizedSkeletonState.TwoAgoFromMask[m_rotationMask] * m_boneCount * 2 + m_index;
 
         ref BlobArray<BlobArray<short> > m_allChildrenIndices => ref m_skeletonHierarchyBlobRef.ValueRO.blob.Value.childrenIndices;
         ref readonly TransformQvvs m_skeletonWorldQvvs => ref m_skeletonWorldTransform.ValueRO.worldTransform;

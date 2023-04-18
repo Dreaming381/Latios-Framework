@@ -32,6 +32,9 @@ namespace Latios.Authoring.Systems
         {
             base.OnCreate();
             m_created = true;
+            if (m_systemsToAddBeforeCreate == null)
+                return;
+
             foreach (var system in m_systemsToAddBeforeCreate)
                 AddSystemToUpdateList(system);
         }

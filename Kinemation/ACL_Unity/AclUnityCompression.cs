@@ -165,7 +165,7 @@ namespace AclUnity
                 header = new ClipHeader
                 {
                     clipType                          = needsScales ? ClipHeader.ClipType.SkeletonWithUniformScales : ClipHeader.ClipType.Skeleton,
-                    duration                          = sampleRate * ((aosClipData.Length / parentIndices.Length) - 1),
+                    duration                          = math.rcp(sampleRate) * ((aosClipData.Length / parentIndices.Length) - 1),
                     sampleRate                        = sampleRate,
                     trackCount                        = (short)parentIndices.Length,
                     offsetToUniformScalesStartInBytes = (uint)(needsScales ? CollectionHelper.Align(resultArray.Length, 16) : 0)
@@ -221,7 +221,7 @@ namespace AclUnity
                 header = new ClipHeader
                 {
                     clipType                          = ClipHeader.ClipType.Scalars,
-                    duration                          = sampleRate * ((clipData.Length / maxErrorsByTrack.Length) - 1),
+                    duration                          = math.rcp(sampleRate) * ((clipData.Length / maxErrorsByTrack.Length) - 1),
                     sampleRate                        = sampleRate,
                     trackCount                        = (short)maxErrorsByTrack.Length,
                     offsetToUniformScalesStartInBytes = 0

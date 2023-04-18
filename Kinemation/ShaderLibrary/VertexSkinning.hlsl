@@ -26,7 +26,17 @@ struct Dqs
 
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
 uniform StructuredBuffer<TransformUnion> _latiosBindPoses;
-uniform StructuredBuffer<TransformUnion> _latiosBoneTransforms;
+uniform ByteAddressBuffer                _latiosBoneTransforms;
+
+
+TransformUnion readBone(uint absoluteBoneIndex)
+{
+    TransformUnion result = (TransformUnion)0;
+    result.a = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48));
+    result.b = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 16));
+    result.c = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 32));
+    return result;
+}
 #endif
 
 void fromQuaternion(float4 v, out float3 c0, out float3 c1, out float3 c2)
@@ -144,19 +154,19 @@ float3x4 mul3x4(float3x4 a, float3x4 b)
 void vertexSkinMatrix(uint4 boneIndices, float4 boneWeights, uint skeletonBase, inout float3 position, inout float3 normal, inout float3 tangent)
 {
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
-    float3x4 mat = transformUnionMatrixToMatrix(_latiosBoneTransforms[skeletonBase + boneIndices.x]) * boneWeights.x;
+    float3x4 mat = transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.x)) * boneWeights.x;
 
     if (boneWeights.y > 0.0)
     {
-        mat += transformUnionMatrixToMatrix(_latiosBoneTransforms[skeletonBase + boneIndices.y]) * boneWeights.y;
+        mat += transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.y)) * boneWeights.y;
     }
     if (boneWeights.z > 0.0)
     {
-        mat += transformUnionMatrixToMatrix(_latiosBoneTransforms[skeletonBase + boneIndices.z]) * boneWeights.z;
+        mat += transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.z)) * boneWeights.z;
     }
     if (boneWeights.w > 0.0)
     {
-        mat += transformUnionMatrixToMatrix(_latiosBoneTransforms[skeletonBase + boneIndices.w]) * boneWeights.w;
+        mat += transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.w)) * boneWeights.w;
     }
     
     position = mul(mat, float4(position, 1)).xyz;
@@ -231,7 +241,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
     }
 
     {
-        Dqs dqs = transformUnionDqsToDqs(_latiosBoneTransforms[skeletonBase.x + boneIndices.x]);
+        Dqs dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.x));
         float4 worldReal = dqs.r * boneWeights.x;
         float4 worldDual = dqs.d * boneWeights.x;
         float3 localScale = dqs.scale;
@@ -239,7 +249,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
 
         if (boneWeights.y > 0.0)
         {
-            dqs = transformUnionDqsToDqs(_latiosBoneTransforms[skeletonBase.x + boneIndices.y]);
+            dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.y));
             if (dot(dqs.r, firstBoneRot) < 0)
                 dqs.r.w = -dqs.r.w;
             worldReal += dqs.r * boneWeights.y;
@@ -248,7 +258,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         }
         if (boneWeights.z > 0.0)
         {
-            dqs = transformUnionDqsToDqs(_latiosBoneTransforms[skeletonBase.x + boneIndices.z]);
+            dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.z));
             if (dot(dqs.r, firstBoneRot) < 0)
                 dqs.r.w = -dqs.r.w;
             worldReal += dqs.r * boneWeights.z;
@@ -257,7 +267,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         }
         if (boneWeights.w > 0.0)
         {
-            dqs = transformUnionDqsToDqs(_latiosBoneTransforms[skeletonBase.x + boneIndices.w]);
+            dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.w));
             if (dot(dqs.r, firstBoneRot) < 0)
                 dqs.r.w = -dqs.r.w;
             worldReal += dqs.r * boneWeights.w;

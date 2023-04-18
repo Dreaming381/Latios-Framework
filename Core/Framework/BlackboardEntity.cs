@@ -36,6 +36,11 @@ namespace Latios
             return em.AddComponent<T>(entity);
         }
 
+        public bool RemoveComponent<T>() where T : unmanaged, IComponentData
+        {
+            return em.RemoveComponent<T>(entity);
+        }
+
         public bool AddComponentData<T>(T data) where T : unmanaged, IComponentData
         {
             return em.AddComponentData(entity, data);

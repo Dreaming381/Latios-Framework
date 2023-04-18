@@ -78,7 +78,7 @@ namespace Latios.Kinemation.Systems
                 var mappedBindPoses = newBuffers.bindPosesUploadBuffer.LockBufferForWrite<float3x4>(0,
                                                                                                     (int)requiredSizes.requiredBindPoseUploadSize);
                 var mappedBlendShapes = newBuffers.blendShapesUploadBuffer.LockBufferForWrite<BlendShapeVertexDisplacement>(0,
-                                                                                                                            (int)requiredSizes.requiredBindPoseUploadSize);
+                                                                                                                            (int)requiredSizes.requiredBlendShapesUploadSize);
                 var mappedVerticesMeta               = newBuffers.verticesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
                 var mappedWeightsMeta                = newBuffers.weightsUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
                 var mappedBindPosesMeta              = newBuffers.bindPosesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);

@@ -97,6 +97,7 @@ namespace Latios.Systems
                 if (!component.addQuery.IsEmptyIgnoreFilter || !component.removeQuery.IsEmptyIgnoreFilter)
                 {
                     InternalSourceGen.CollectionComponentOperations.SyncQueries(component.functionPtr, latiosWorld, entityHandle, component.addQuery, component.removeQuery);
+                    entityHandle.Update(ref state);
                 }
             }
         }

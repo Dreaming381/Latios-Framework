@@ -331,7 +331,7 @@ namespace Latios.Kinemation.Systems
 #if SRP_10_0_0_OR_NEWER
             RegisterMaterialPropertyType<WorldTransform>(       "unity_ObjectToWorld",   4 * 4 * 3);
             RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
-            RegisterMaterialPropertyType<TickStartingTransform>("unity_MatrixPreviousM", 4 * 4 * 3);
+            RegisterMaterialPropertyType<PreviousTransform>("unity_MatrixPreviousM", 4 * 4 * 3);
 #else
             RegisterMaterialPropertyType<LocalToWorld>(         "unity_ObjectToWorld",   4 * 4 * 4);
             RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   4 * 4 * 4);

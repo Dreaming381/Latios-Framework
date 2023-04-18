@@ -16,39 +16,39 @@ namespace Latios.Transforms.Authoring.Systems
     [BurstCompile]
     public partial struct ExtraTransformComponentsBakingSystem : ISystem
     {
-        EntityQuery m_addTickStartingQuery;
-        EntityQuery m_removeTickStartingQuery;
-        EntityQuery m_addPreviousTickStartingQuery;
-        EntityQuery m_removePreviousTickStartingQuery;
+        EntityQuery m_addPreviousQuery;
+        EntityQuery m_removePreviousQuery;
+        EntityQuery m_addTwoAgoQuery;
+        EntityQuery m_removeTwoAgoQuery;
         EntityQuery m_addIdentityQuery;
         EntityQuery m_removeIdentityQuery;
 
-        static List<ComponentType> s_tickStartingRequestTypes         = null;
-        static List<ComponentType> s_previousTickStartingRequestTypes = null;
-        static List<ComponentType> s_identityRequestTypes             = null;
+        static List<ComponentType> s_previousRequestTypes = null;
+        static List<ComponentType> s_twoAgoRequestTypes   = null;
+        static List<ComponentType> s_identityRequestTypes = null;
 
         public void OnCreate(ref SystemState state)
         {
-            if (s_tickStartingRequestTypes == null)
+            if (s_previousRequestTypes == null)
             {
-                var tickStartingType               = typeof(IRequestTickStartingTransform);
-                var previousTickStartingType       = typeof(IRequestPreviousTickStartingTransform);
-                var identityType                   = typeof(IRequestCopyParentTransform);
-                s_tickStartingRequestTypes         = new List<ComponentType>();
-                s_previousTickStartingRequestTypes = new List<ComponentType>();
-                s_identityRequestTypes             = new List<ComponentType>();
+                var previousType       = typeof(IRequestPreviousTransform);
+                var twoAgoType         = typeof(IRequestTwoAgoTransform);
+                var identityType       = typeof(IRequestCopyParentTransform);
+                s_previousRequestTypes = new List<ComponentType>();
+                s_twoAgoRequestTypes   = new List<ComponentType>();
+                s_identityRequestTypes = new List<ComponentType>();
 
                 foreach (var type in TypeManager.AllTypes)
                 {
                     if (!type.BakingOnlyType)
                         continue;
-                    if (tickStartingType.IsAssignableFrom(type.Type))
+                    if (previousType.IsAssignableFrom(type.Type))
                     {
-                        s_tickStartingRequestTypes.Add(ComponentType.ReadOnly(type.TypeIndex));
+                        s_previousRequestTypes.Add(ComponentType.ReadOnly(type.TypeIndex));
                     }
-                    else if (previousTickStartingType.IsAssignableFrom(type.Type))
+                    else if (twoAgoType.IsAssignableFrom(type.Type))
                     {
-                        s_previousTickStartingRequestTypes.Add(ComponentType.ReadOnly(type.TypeIndex));
+                        s_twoAgoRequestTypes.Add(ComponentType.ReadOnly(type.TypeIndex));
                     }
                     else if (identityType.IsAssignableFrom(type.Type))
                     {
@@ -57,18 +57,22 @@ namespace Latios.Transforms.Authoring.Systems
                 }
             }
 
-            var ssrt  = s_tickStartingRequestTypes.ToNativeList(Allocator.Temp);
-            var pssrt = s_previousTickStartingRequestTypes.ToNativeList(Allocator.Temp);
+            var ssrt  = s_previousRequestTypes.ToNativeList(Allocator.Temp);
+            var pssrt = s_twoAgoRequestTypes.ToNativeList(Allocator.Temp);
             var irt   = s_identityRequestTypes.ToNativeList(Allocator.Temp);
 
-            m_addTickStartingQuery            = new EntityQueryBuilder(Allocator.Temp).WithAny(ref ssrt).WithNone<TickStartingTransform>().Build(ref state);
-            m_removeTickStartingQuery         = new EntityQueryBuilder(Allocator.Temp).WithAll<TickStartingTransform>().WithNone(ref ssrt).Build(ref state);
-            m_addPreviousTickStartingQuery    = new EntityQueryBuilder(Allocator.Temp).WithAny(ref pssrt).WithNone<PreviousTickStartingTransform>().Build(ref state);
-            m_removePreviousTickStartingQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<PreviousTickStartingTransform>().WithNone(ref pssrt).Build(ref state);
-            m_addIdentityQuery                =
-                new EntityQueryBuilder(Allocator.Temp).WithAny(ref irt).WithNone<CopyParentWorldTransformTag>().Build(ref state);
-            m_removeIdentityQuery =
-                new EntityQueryBuilder(Allocator.Temp).WithAll<CopyParentWorldTransformTag>().WithNone(ref irt).Build(ref state);
+            m_addPreviousQuery = new EntityQueryBuilder(Allocator.Temp).WithAny(ref ssrt).WithNone<PreviousTransform>().WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
+            m_removePreviousQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<PreviousTransform>().WithNone(ref ssrt).WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
+            m_addTwoAgoQuery = new EntityQueryBuilder(Allocator.Temp).WithAny(ref pssrt).WithNone<TwoAgoTransform>().WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
+            m_removeTwoAgoQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<TwoAgoTransform>().WithNone(ref pssrt).WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
+            m_addIdentityQuery = new EntityQueryBuilder(Allocator.Temp).WithAny(ref irt).WithNone<CopyParentWorldTransformTag>().WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
+            m_removeIdentityQuery = new EntityQueryBuilder(Allocator.Temp).WithAll<CopyParentWorldTransformTag>().WithNone(ref irt).WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build(ref state);
         }
 
         [BurstCompile]
@@ -76,10 +80,10 @@ namespace Latios.Transforms.Authoring.Systems
         {
             state.CompleteDependency();
 
-            state.EntityManager.AddComponent<TickStartingTransform>(m_addTickStartingQuery);
-            state.EntityManager.RemoveComponent<TickStartingTransform>(m_removeTickStartingQuery);
-            state.EntityManager.AddComponent<PreviousTickStartingTransform>(m_addPreviousTickStartingQuery);
-            state.EntityManager.RemoveComponent<PreviousTickStartingTransform>(m_removePreviousTickStartingQuery);
+            state.EntityManager.AddComponent<PreviousTransform>(m_addPreviousQuery);
+            state.EntityManager.RemoveComponent<PreviousTransform>(m_removePreviousQuery);
+            state.EntityManager.AddComponent<TwoAgoTransform>(m_addTwoAgoQuery);
+            state.EntityManager.RemoveComponent<TwoAgoTransform>(m_removeTwoAgoQuery);
             state.EntityManager.AddComponent<CopyParentWorldTransformTag>(m_addIdentityQuery);
             state.EntityManager.RemoveComponent<CopyParentWorldTransformTag>(m_removeIdentityQuery);
         }

@@ -126,8 +126,8 @@ namespace Latios.Kinemation.Systems
                     EntitiesGraphicsChunkInfo         = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                     WorldTransformType                = TypeManager.GetTypeIndex<WorldTransform>(),
                     NumGpuUploadOperations            = numGpuUploadOperations,
-                    TickStartingTransformType         = TypeManager.GetTypeIndex<TickStartingTransform>(),
-                    TickStartingTransformPreviousType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+                    PreviousTransformType         = TypeManager.GetTypeIndex<PreviousTransform>(),
+                    PreviousTransformPreviousType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
                     WorldTransformInverseType         = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
                     postProcessMatrixHandle           = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
                     previousPostProcessMatrixHandle   = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true)
@@ -221,8 +221,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public NativeArray<ChunkProperty> ChunkProperties;
             public int                                   WorldTransformType;
             public int                                   WorldTransformInverseType;
-            public int                                   TickStartingTransformType;
-            public int                                   TickStartingTransformPreviousType;
+            public int                                   PreviousTransformType;
+            public int                                   PreviousTransformPreviousType;
 
             [NativeDisableParallelForRestriction] public NativeArray<GpuUploadOperation> GpuUploadOperations;
             [NativeDisableParallelForRestriction] public NativeReference<int>            NumGpuUploadOperations;
@@ -270,7 +270,7 @@ namespace Latios.Kinemation.Systems
                         var type          = chunkProperty.ComponentTypeIndex;
                         if (type == WorldTransformInverseType)
                             dstOffsetWorldToLocal = chunkProperty.GPUDataBegin;
-                        else if (type == TickStartingTransformPreviousType)
+                        else if (type == PreviousTransformPreviousType)
                             dstOffsetPrevWorldToLocal = chunkProperty.GPUDataBegin;
                     }
 
@@ -282,7 +282,7 @@ namespace Latios.Kinemation.Systems
 
                         var chunkType          = chunkProperty.ComponentTypeIndex;
                         var isLocalToWorld     = chunkType == WorldTransformType;
-                        var isPrevLocalToWorld = chunkType == TickStartingTransformType;
+                        var isPrevLocalToWorld = chunkType == PreviousTransformType;
 
                         bool copyComponentData = typeIndex >= 64 ? dirtyMask.upper.IsSet(typeIndex - 64) : dirtyMask.lower.IsSet(typeIndex);
 

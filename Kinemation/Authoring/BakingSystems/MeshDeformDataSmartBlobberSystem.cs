@@ -44,12 +44,6 @@ namespace Latios.Kinemation.Authoring
                 return false;
             }
             baker.DependsOn(mesh);
-            if (mesh.bindposeCount <= 0)
-            {
-                Debug.LogError(
-                    $"Kinemation failed to bake a mesh skinning blob for {baker.GetName()}. The mesh does not have skinning info. If you are trying to bake a mesh with only blend shapes, this is not currently supported.");
-                return false;
-            }
 
             baker.AddComponent(blobBakingEntity, new MeshReference
             {
@@ -122,6 +116,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 builder.name       = mesh.name;
                 builder.resultBlob = default;
                 builder.reference  = pair.Key;
+                builder.meshBounds = mesh.bounds;
 
                 if (mesh.bindposeCount > 0)
                 {
@@ -249,6 +244,7 @@ namespace Latios.Kinemation.Authoring.Systems
             public UnsafeList<FixedString128Bytes>          blendShapeNames;
             public BlobAssetReference<MeshDeformDataBlob>   resultBlob;
             public MeshReference                            reference;
+            public Bounds                                   meshBounds;
 
             public unsafe void BuildBlob(int meshIndex, ref MeshDeformDataContext context)
             {
@@ -292,13 +288,13 @@ namespace Latios.Kinemation.Authoring.Systems
                 var bindposesDq   = builder.Allocate(ref blobRoot.skinningData.bindPosesDQ, bindPoses.Length);
                 for (int i = 0; i < bindPoses.Length; i++)
                 {
-                    float4x4 mat4x4    = bindPoses[i];
-                    bindposesMats[i]   = new float3x4(mat4x4.c0.xyz, mat4x4.c1.xyz, mat4x4.c2.xyz, mat4x4.c3.xyz);
-                    Matrix4x4 inverse  = math.inverse(mat4x4);
-                    var       scale    = 1f / (float3)inverse.lossyScale;
-                    var       rotation = math.inverse(inverse.rotation);
-                    var       position = mat4x4.c3.xyz;
-                    bindposesDq[i]     = new BindPoseDqs
+                    float4x4 mat4x4  = bindPoses[i];
+                    bindposesMats[i] = new float3x4(mat4x4.c0.xyz, mat4x4.c1.xyz, mat4x4.c2.xyz, mat4x4.c3.xyz);
+                    var inverse      = math.inverse(mat4x4);
+                    var scale        = 1f / Unity.Transforms.Helpers.Scale(in inverse);
+                    var rotation     = math.inverse(Unity.Transforms.Helpers.Rotation(in inverse));
+                    var position     = mat4x4.c3.xyz;
+                    bindposesDq[i]   = new BindPoseDqs
                     {
                         real  = rotation,
                         dual  = new quaternion(0.5f * math.mul(new quaternion(new float4(position, 0f)), rotation).value),
@@ -316,6 +312,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 int boneWeightBatches = mesh.vertexCount / 1024;
                 if (mesh.vertexCount % 1024 != 0)
                     boneWeightBatches++;
+                boneWeightBatches    = math.select(boneWeightBatches, 0, boneWeights.IsEmpty);
                 var boneWeightStarts = builder.Allocate(ref blobRoot.skinningData.boneWeightBatchStarts, boneWeightBatches);
 
                 var boneWeightsDst = builder.Allocate(ref blobRoot.skinningData.boneWeights, boneWeights.Length + boneWeightBatches);
@@ -401,6 +398,8 @@ namespace Latios.Kinemation.Authoring.Systems
                     boneWeightStarts[batchIndex] = (uint)batchHeaderIndex;
                 }
                 blobRoot.undeformedAabb = aabb;
+                if (boneWeights.IsEmpty)
+                    blobRoot.undeformedAabb = new Aabb(meshBounds.min, meshBounds.max);
 
                 // Blend Shapes
                 var shapeMetas  = builder.Allocate(ref blobRoot.blendShapesData.shapes, blendShapeRanges.Length);

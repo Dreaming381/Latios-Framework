@@ -91,6 +91,7 @@ namespace Latios.Psyshock.Authoring.Systems
         }
     }
 
+    [TemporaryBakingType]
     public struct LegacyConvexColliderBakerWorker : ISmartBakeItem<UnityEngine.MeshCollider>
     {
         SmartBlobberHandle<ConvexColliderBlob> m_handle;
@@ -129,6 +130,7 @@ namespace Latios.Psyshock.Authoring.Systems
         }
     }
 
+    [TemporaryBakingType]
     public struct LegacyCompoundColliderBakerWorker : ISmartBakeItem<UnityEngine.Collider>
     {
         SmartBlobberHandle<CompoundColliderBlob> m_handle;

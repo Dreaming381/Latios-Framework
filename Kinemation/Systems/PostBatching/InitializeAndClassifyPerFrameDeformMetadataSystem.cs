@@ -36,7 +36,7 @@ namespace Latios.Kinemation.Systems
         {
             MaxRequiredDeformData maxes     = default;
             maxes.maxRequiredDeformVertices = 1;  // LegacyDotsDeformation treats index 0 as "no previous pose".
-            latiosWorld.worldBlackboardEntity.SetComponentData(new MaxRequiredDeformData());
+            latiosWorld.worldBlackboardEntity.SetComponentData(maxes);
 
             var map = new NativeParallelHashMap<ArchetypeChunk, DeformClassification>(m_query.CalculateEntityCountWithoutFiltering() * 2,
                                                                                       state.WorldUpdateAllocator);
@@ -110,26 +110,24 @@ namespace Latios.Kinemation.Systems
                     bool hasSkeleton    = chunk.Has(ref skeletonDependentHandle);
                     bool hasBlendShapes = chunk.Has(ref blendShapeStateHandle) && chunk.Has(ref blendShapeWeightHandle);
                     bool hasDynamicMesh = chunk.Has(ref dynamicMeshStateHandle) && chunk.Has(ref dynamicMeshVertexHandle);
-                    bool hasAnyDeform   = hasSkeleton || hasBlendShapes || hasDynamicMesh;
 
-                    if (hasSkeleton && chunk.Has(ref legacyLbsHandle))
+                    if (chunk.Has(ref legacyLbsHandle))
                         classification |= DeformClassification.LegacyLbs;
-                    // Legacy buffers are not accessible, so some deform attribute is required
-                    if (hasAnyDeform && chunk.Has(ref legacyComputeDeformHandle))
+                    if (chunk.Has(ref legacyComputeDeformHandle))
                         classification |= DeformClassification.LegacyCompute;
-                    if (hasAnyDeform && chunk.Has(ref legacyDotsDeformHandle))
+                    if (chunk.Has(ref legacyDotsDeformHandle))
                         classification |= DeformClassification.LegacyDotsDefom;
-                    if (hasSkeleton && chunk.Has(ref currentMatrixVertexHandle))
+                    if (chunk.Has(ref currentMatrixVertexHandle))
                         classification |= DeformClassification.CurrentVertexMatrix;
-                    if (hasSkeleton && chunk.Has(ref previousMatrixVertexHandle))
+                    if (chunk.Has(ref previousMatrixVertexHandle))
                         classification |= DeformClassification.PreviousVertexMatrix;
-                    if (hasSkeleton && chunk.Has(ref twoAgoMatrixVertexHandle))
+                    if (chunk.Has(ref twoAgoMatrixVertexHandle))
                         classification |= DeformClassification.TwoAgoVertexMatrix;
-                    if (hasSkeleton && chunk.Has(ref currentDqsVertexHandle))
+                    if (chunk.Has(ref currentDqsVertexHandle))
                         classification |= DeformClassification.CurrentVertexDqs;
-                    if (hasSkeleton && chunk.Has(ref previousDqsVertexHandle))
+                    if (chunk.Has(ref previousDqsVertexHandle))
                         classification |= DeformClassification.PreviousVertexDqs;
-                    if (hasSkeleton && chunk.Has(ref twoAgoDqsVertexHandle))
+                    if (chunk.Has(ref twoAgoDqsVertexHandle))
                         classification |= DeformClassification.TwoAgoVertexDqs;
                     if (chunk.Has(ref currentDeformHandle))
                         classification |= DeformClassification.CurrentDeform;

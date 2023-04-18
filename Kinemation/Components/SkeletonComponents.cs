@@ -227,9 +227,9 @@ namespace Latios.Kinemation
         // mask & 3 == current write set
         // mask & 4 == wasPreviousDirty
         // mask != 3
-        internal static readonly int[] CurrentFromMask      = { 0, 1, 2, 0, 0, 1, 2 };
-        internal static readonly int[] TickStartingFromMask = { 2, 0, 1, 2, 2, 0, 1};
-        internal static readonly int[] PreviousFromMask     = { 2, 0, 1, 1, 1, 2, 0};
+        internal static readonly int[] CurrentFromMask  = { 0, 1, 2, 0, 0, 1, 2 };
+        internal static readonly int[] PreviousFromMask = { 2, 0, 1, 2, 2, 0, 1};
+        internal static readonly int[] TwoAgoFromMask   = { 2, 0, 1, 1, 1, 2, 0};
     }
 
     /// <summary>

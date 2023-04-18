@@ -11,6 +11,7 @@ namespace Latios.Authoring
     /// Implement this interface to specify a type that can "remember" SmartBlobberHandles or
     /// other data (like additional entities) and applying them to entities later inside of a generated Baking System.
     /// You must also subclass SmartBaker for this to do anything. The SmartBaker will create instances of this type for you.
+    /// Lastly, you must add the TemporaryBakingType attribute to your type implementing this interface.
     /// </summary>
     /// <typeparam name="TAuthoring"></typeparam>
     [TemporaryBakingType]
