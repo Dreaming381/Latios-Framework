@@ -1,7 +1,7 @@
 ![](
 https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.0-Alpha.3]
+# Latios Framework for Unity ECS – [0.7.0-Alpha.4]
 
 **This is a prerelease version of the Latios Framework version 0.7 which is
 still under development. Changelogs and Documentation, including the remainder
