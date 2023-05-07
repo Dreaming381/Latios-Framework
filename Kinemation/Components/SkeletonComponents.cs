@@ -54,6 +54,10 @@ namespace Latios.Kinemation
         [FieldOffset(0)] public fixed ulong ulongMasks[16];  // Ensures 8 byte alignment which is helpful (16 would be better)
     }
 
+    /// <summary>
+    /// A blob asset which contains bone path "strings" in reverse path order,
+    /// that is from leaf bone to root bone, for each bone in the skeleton.
+    /// </summary>
     public struct SkeletonBindingPathsBlob
     {
         // Todo: Make this a BlobArray<BlobString> once supported in Burst
@@ -120,7 +124,7 @@ namespace Latios.Kinemation
     /// <summary>
     /// A buffer containing the bone entities in the exposed skeleton
     /// Usage: Typically Read Only (Add/Write for procedural skeletons)
-    /// Lives on the Skeleton Root. All LocalToWorld values will be used as
+    /// Lives on the Skeleton Root. All WorldTransform values will be used as
     /// bone matrices for skinning purposes. The first bone is the reference
     /// space for deformations and should be the skeleton root entity.
     /// If creating bones from scratch, you also should call

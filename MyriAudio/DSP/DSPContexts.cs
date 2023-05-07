@@ -8,7 +8,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public unsafe struct EffectContext
+    // Make these public on release
+    internal unsafe struct EffectContext
     {
         public Entity                           effectEntity;
         public AllocatorManager.AllocatorHandle persistentAllocator;
@@ -20,13 +21,13 @@ namespace Latios.Myri.DSP
         internal SampleFramePool* sampleFramePool;
     }
 
-    public enum StackType : byte
+    internal enum StackType : byte
     {
         Source,
         Listener
     }
 
-    public unsafe struct UpdateContext
+    internal unsafe struct UpdateContext
     {
         public Entity stackEntity;
         public TransformQvvs stackTransform => *stackTransformPtr;
@@ -50,7 +51,7 @@ namespace Latios.Myri.DSP
         }
     }
 
-    public unsafe struct SpatialCullingContext
+    internal unsafe struct SpatialCullingContext
     {
         internal UnsafeList<Interop.ListenerStackMetadata.Ptr> listeners;
         internal Interop.SourceStackMetadata*                  sourcePtr;
@@ -81,7 +82,7 @@ namespace Latios.Myri.DSP
         }
     }
 
-    public struct CullArray
+    internal struct CullArray
     {
         internal NativeArray<bool> cullArray;
 
@@ -90,7 +91,7 @@ namespace Latios.Myri.DSP
         public bool IsCulled(int index) => cullArray[index] == false;
     }
 
-    public unsafe struct SpatialUpdateContext
+    internal unsafe struct SpatialUpdateContext
     {
         public Entity sourceEntity => sourcePtr->sourceEntity;
         public Entity listenerEntity => listenerPtr->listenerEntity;
@@ -135,7 +136,7 @@ namespace Latios.Myri.DSP
         }
     }
 
-    public unsafe readonly ref struct DSPRef<T> where T : unmanaged
+    internal unsafe readonly ref struct DSPRef<T> where T : unmanaged
     {
         readonly T* m_t;
 
@@ -147,6 +148,7 @@ namespace Latios.Myri.DSP
         public ref readonly T Value => ref *m_t;
     }
 
+    // Keep internal
     internal struct SampleFramePool : IDisposable
     {
         AllocatorManager.AllocatorHandle m_allocator;

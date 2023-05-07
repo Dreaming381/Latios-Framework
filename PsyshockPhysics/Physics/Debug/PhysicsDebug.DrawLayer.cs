@@ -55,7 +55,7 @@ namespace Latios.Psyshock
                     colors     = colors,
                     crossColor = crossColor
                 };
-                for (int i = 0; i < layer.BucketCount; i++)
+                for (int i = 0; i < layer.bucketCount; i++)
                 {
                     job.Execute(i);
                 }
@@ -71,7 +71,7 @@ namespace Latios.Psyshock
                     layer      = layer,
                     colors     = colors,
                     crossColor = crossColor
-                }.Run(layer.BucketCount);
+                }.Run(layer.bucketCount);
             }
 
             /// <summary>
@@ -101,7 +101,7 @@ namespace Latios.Psyshock
                     layer      = layer,
                     colors     = colors,
                     crossColor = crossColor
-                }.Schedule(layer.BucketCount, 1, inputDeps);
+                }.Schedule(layer.bucketCount, 1, inputDeps);
             }
         }
 
@@ -174,8 +174,8 @@ namespace Latios.Psyshock
             {
                 if (isLayerLayer)
                 {
-                    var hitArrayA = new NativeBitArray(layerA.Count, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                    var hitArrayB = new NativeBitArray(layerB.Count, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                    var hitArrayA = new NativeBitArray(layerA.count, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                    var hitArrayB = new NativeBitArray(layerB.count, Allocator.Temp, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerLayerProcessor { hitArrayA = hitArrayA, hitArrayB = hitArrayB };
                     Physics.FindPairs(layerA, layerB, processor).RunImmediate();
                     var job = new DebugFindPairsDrawJob
@@ -186,20 +186,20 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    for (int i = 0; i < layerA.Count; i++)
+                    for (int i = 0; i < layerA.count; i++)
                     {
                         job.Execute(i);
                     }
                     job.hitArray = hitArrayB;
                     job.layer    = layerB;
-                    for (int i = 0; i < layerB.Count; i++)
+                    for (int i = 0; i < layerB.count; i++)
                     {
                         job.Execute(i);
                     }
                 }
                 else
                 {
-                    var hitArray  = new NativeBitArray(layerA.Count, Allocator.Temp, NativeArrayOptions.ClearMemory);
+                    var hitArray  = new NativeBitArray(layerA.count, Allocator.Temp, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerSelfProcessor { hitArray = hitArray };
                     Physics.FindPairs(layerA, processor).RunImmediate();
                     var job = new DebugFindPairsDrawJob
@@ -210,7 +210,7 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    for (int i = 0; i < layerA.Count; i++)
+                    for (int i = 0; i < layerA.count; i++)
                     {
                         job.Execute(i);
                     }
@@ -224,8 +224,8 @@ namespace Latios.Psyshock
             {
                 if (isLayerLayer)
                 {
-                    var hitArrayA = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
-                    var hitArrayB = new NativeBitArray(layerB.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayA = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayB = new NativeBitArray(layerB.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerLayerProcessor { hitArrayA = hitArrayA, hitArrayB = hitArrayB };
                     Physics.FindPairs(layerA, layerB, processor).Run();
                     var job = new DebugFindPairsDrawJob
@@ -236,16 +236,16 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    job.Run(layerA.Count);
+                    job.Run(layerA.count);
                     job.hitArray = hitArrayB;
                     job.layer    = layerB;
-                    job.Run(layerB.Count);
+                    job.Run(layerB.count);
                     hitArrayA.Dispose();
                     hitArrayB.Dispose();
                 }
                 else
                 {
-                    var hitArray  = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArray  = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerSelfProcessor { hitArray = hitArray };
                     Physics.FindPairs(layerA, processor).Run();
                     new DebugFindPairsDrawJob
@@ -255,7 +255,7 @@ namespace Latios.Psyshock
                         hitColor   = hitColor,
                         missColor  = missColor,
                         drawMisses = drawMisses
-                    }.Run(layerA.Count);
+                    }.Run(layerA.count);
                     hitArray.Dispose();
                 }
             }
@@ -269,8 +269,8 @@ namespace Latios.Psyshock
             {
                 if (isLayerLayer)
                 {
-                    var hitArrayA = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
-                    var hitArrayB = new NativeBitArray(layerB.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayA = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayB = new NativeBitArray(layerB.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerLayerProcessor { hitArrayA = hitArrayA, hitArrayB = hitArrayB };
                     var jh        = Physics.FindPairs(layerA, layerB, processor).ScheduleSingle(inputDeps);
                     var job       = new DebugFindPairsDrawJob
@@ -290,7 +290,7 @@ namespace Latios.Psyshock
                 }
                 else
                 {
-                    var hitArray  = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArray  = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerSelfProcessor { hitArray = hitArray };
                     var jh        = Physics.FindPairs(layerA, processor).ScheduleSingle(inputDeps);
                     jh            = new DebugFindPairsDrawJob
@@ -314,8 +314,8 @@ namespace Latios.Psyshock
             {
                 if (isLayerLayer)
                 {
-                    var hitArrayA = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
-                    var hitArrayB = new NativeBitArray(layerB.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayA = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArrayB = new NativeBitArray(layerB.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerLayerProcessor { hitArrayA = hitArrayA, hitArrayB = hitArrayB };
                     var jh        = Physics.FindPairs(layerA, layerB, processor).ScheduleSingle(inputDeps);
                     var job       = new DebugFindPairsDrawJob
@@ -326,16 +326,16 @@ namespace Latios.Psyshock
                         missColor  = missColor,
                         drawMisses = drawMisses
                     };
-                    jh           = job.Schedule(layerA.Count, 64, jh);
+                    jh           = job.Schedule(layerA.count, 64, jh);
                     job.hitArray = hitArrayB;
                     job.layer    = layerB;
-                    jh           = job.Schedule(layerB.Count, 64, jh);
+                    jh           = job.Schedule(layerB.count, 64, jh);
                     jh           = hitArrayA.Dispose(jh);
                     return hitArrayB.Dispose(jh);
                 }
                 else
                 {
-                    var hitArray  = new NativeBitArray(layerA.Count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+                    var hitArray  = new NativeBitArray(layerA.count, Allocator.TempJob, NativeArrayOptions.ClearMemory);
                     var processor = new DebugFindPairsLayerSelfProcessor { hitArray = hitArray };
                     var jh        = Physics.FindPairs(layerA, processor).ScheduleSingle(inputDeps);
                     jh            = new DebugFindPairsDrawJob
@@ -345,7 +345,7 @@ namespace Latios.Psyshock
                         hitColor   = hitColor,
                         missColor  = missColor,
                         drawMisses = drawMisses
-                    }.Schedule(layerA.Count, 64, jh);
+                    }.Schedule(layerA.count, 64, jh);
                     return hitArray.Dispose(jh);
                 }
             }
@@ -393,13 +393,13 @@ namespace Latios.Psyshock
 
             public void Execute()
             {
-                for (int i = 0; i < layer.BucketCount; i++)
+                for (int i = 0; i < layer.bucketCount; i++)
                     Execute(i);
             }
 
             public void Execute(int index)
             {
-                if (index < layer.BucketCount - 1)
+                if (index < layer.bucketCount - 1)
                 {
                     Color color  = colors[index % colors.Length];
                     var   slices = layer.GetBucketSlices(index);
@@ -458,7 +458,7 @@ namespace Latios.Psyshock
 
             public void Execute()
             {
-                for (int i = 0; i < layer.Count; i++)
+                for (int i = 0; i < layer.count; i++)
                     Execute(i);
             }
 

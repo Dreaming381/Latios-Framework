@@ -5,7 +5,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public struct BrickwallLimiter : IDisposable
+    // Make public on release
+    internal struct BrickwallLimiter : IDisposable
     {
         /// <summary>
         /// At 48000 Hz, this works out to 7.8 DB per second.

@@ -350,7 +350,7 @@ namespace Latios
             freeStack.Sort();
             for (int i = freeStack.Length - 1; i >= 0; i--)
             {
-                collectionComponents.RemoveAtSwapBack(freeStack[i]);  // Buggy
+                collectionComponents.RemoveAtSwapBack(freeStack[i]);  // Buggy?
             }
             foreach (var collectionComponent in collectionComponents)
             {

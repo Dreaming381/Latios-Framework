@@ -1,12 +1,11 @@
-![](
-https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
+![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.0-Alpha.4]
+# Latios Framework for Unity ECS – [0.7.0-Alpha.5]
 
 **This is a prerelease version of the Latios Framework version 0.7 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, have not been updated to reflect the new features and changes in
-0.7. Git hashes may not be preserved after official release.**
+still under development. Changelogs and Documentation are still being updated to
+reflect the new features and changes in 0.7. Git hashes may not be preserved
+after official release.**
 
 **You are still welcome to submit bug reports and PRs for this and future
 prerelease versions!**
@@ -25,8 +24,9 @@ your vision.
 The Latios Framework does not replace Unity’s ECS, but rather complements it
 with additional APIs and tools. In some cases, the Latios Framework may override
 Unity ECS’s underlying mechanisms to provide more features. Desktop platforms
-are supported out-of-the-box. Other platforms may require additional effort to
-achieve functionality and performance benefits.
+are supported out-of-the-box. Other platforms may require additional effort
+(i.e. compiling native plugins) to achieve functionality and performance
+benefits.
 
 Originally, this framework was for my own personal hobbyist game development,
 and in a sense, still is. However, after several years of development, it has
@@ -44,36 +44,34 @@ The Latios Framework is best-known in the community for Kinemation, a module
 which provides extremely high-performance CPU animation and GPU skinned mesh
 rendering features.
 
-This version targets Entities 1.0.0 prerelease 15. If you are still using
-Entities 0.51.1, please use the framework version 0.5.8 instead.
+This version targets Entities 1.0.0. If you are still using Entities 0.51.1,
+please use the framework version 0.5.8 instead.
 
-**Note: This release is not compatible with Entities Prerelease 47 due to
-instability issues with that release.** An experimental compatible version can
-be obtained on request.
+**Note: This release is not compatible with Unity Transforms.** Compatibility
+may be added in the future via a community effort.
 
-The 0.6.x series uses Transforms V1, which can be enabled in your project via
-the Scripting Define Symbol ENABLE_TRANSFORM_V1. If you are using Transforms V2,
-please wait for a newer version of the Latios Framework.
-
-*[0.5.x] users, please read the* [*Upgrade
-Guide*](Documentation~/Upgrade%20Guide.md)*!*
+*[0.6.x] users, please read the* [*Upgrade
+Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
 survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLXyV7BeCdCOsqfPWeWY_Ww/viewform?usp=sf_link)**!**
 
 ## Modules
 
--   [Core](Documentation~/Core/README.md) – General-purpose utilities and
-    bootstrap
--   [Psyshock Physics](Documentation~/Psyshock%20Physics/README.md) – Collision
-    and Physics building blocks controlled by user-defined EntityQueries
--   [Myri Audio](Documentation~/Myri%20Audio/README.md) – Simple, scalable,
-    spatialized sounds and music streaming
--   [Kinemation](Documentation~/Kinemation%20Animation%20and%20Rendering/README.md)
+-   [Core](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Core/README.md)
+    – General-purpose utilities and bootstrap
+-   [Psyshock
+    Physics](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Psyshock%20Physics/README.md)
+    – Collision and Physics building blocks controlled by user-defined
+    EntityQueries
+-   [Myri
+    Audio](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Myri%20Audio/README.md)
+    – Simple, scalable, spatialized sounds and music streaming
+-   [Kinemation](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Kinemation%20Animation%20and%20Rendering/README.md)
     – Authored animation, simulated animation, and everything in between, plus
     an overhauled Entities Graphics render engine
 -   Latios Transforms – A novel QVVS transform system designed to be fast,
-    intuitive, and flexible (Coming in 0.7)
+    intuitive, and flexible
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
     throughput (No public release)
 -   Unika – A high-performance scripting solution including support for
@@ -98,9 +96,9 @@ toolkit and stay out of the way. A developer using it should always feel in
 control. If not, there’s likely an issue worth bringing to attention.
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
-in DOTS such as audio and animation. Current Phase III development focuses on
-gameplay technologies such as spatial and hierarchical queries, simulation, and
-AI tools.
+in Unity ECS such as audio and animation. Current Phase III development focuses
+on gameplay technologies such as spatial and hierarchical queries, simulation,
+and AI tools.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.
@@ -108,7 +106,7 @@ development effort required to make highly artistic 3D games and short films.
 ## Getting Started
 
 There are three methods to install the framework package (contains all publicly
-released packages).
+released modules).
 
 -   Clone or submodule this repository into your project’s Packages folder
     (recommended for contributors or those wanting faster bugfixes and updates)
@@ -116,9 +114,10 @@ released packages).
 -   Add via [OpenUPM](https://openupm.com/packages/com.latios.latiosframework/)
 
 After installing the framework package, follow the instructions in the first
-section [here](Documentation~/Core/Getting%20Started.md). You may also want to
-look through the [compatibility
-guide](Documentation~/Installation%20and%20Compatibility%20Guide.md).
+section
+[here](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Core/Getting%20Started.md).
+You may also want to look through the [compatibility
+guide](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Installation%20and%20Compatibility%20Guide.md).
 
 Getting Started pages and documentation are provided with each module.
 
@@ -130,37 +129,8 @@ Getting Started pages and documentation are provided with each module.
 -   Videos
     -   [Intro Tour Video
         Playlist](https://www.youtube.com/watch?v=UGKtIZOolEo&list=PLFME_M84NcPylGB41xAzh2bbbT8nhb_a0)
--   Official How-To Guides
-    -   [How To Make an N – 1 Render
-        Loop](Documentation~/How-To%20Guides/How%20To%20Make%20an%20N%20-%201%20Render%20Loop.md)
-    -   [How To Spawn an Entity at a Position in a
-        Job](Documentation~/How-To%20Guides/How%20To%20Spawn%20an%20Entity%20at%20a%20Position%20in%20a%20Job.md)
-    -   [How To Make Parallel Deterministic
-        RNG](Documentation~/Core/Rng%20and%20RngToolkit.md)
-    -   [How To Find All Tagged Neighbors Within a
-        Radius](Documentation~/How-To%20Guides/How%20To%20Find%20All%20Tagged%20Neighbors%20Within%20a%20Radius.md)
--   FAQ
-    -   [Can I use Core and Myri with Unity or Havok
-        Physics?](Documentation~/FAQ/FAQ%20-%20Can%20I%20Use%20Core%20and%20Myri%20with%20Unity%20or%20Havok%20Physics.md)
-    -   [How Do I Choose Between Hybrid, Shared, and Managed Components for My
-        Data?](Documentation~/FAQ/FAQ%20-%20Component%20Types.md)
--   Optimization Adventures
-    -   [Find Pairs
-        1](Documentation~/Optimization%20Adventures/Part%201%20-%20Find%20Pairs%201.md)
-    -   [Build Collision Layer
-        1](Documentation~/Optimization%20Adventures/Part%202%20-%20Build%20Collision%20Layer%201.md)
-    -   [Space Sky
-        1](Documentation~/Optimization%20Adventures/Part%203%20-%20Space%20Sky%201.md)
-    -   [Command Buffers
-        1](Documentation~/Optimization%20Adventures/Part%204%20-%20Command%20Buffers%201.md)
-    -   [Find Pairs
-        2](Documentation~/Optimization%20Adventures/Part%205%20-%20Find%20Pairs%202.md)
-    -   [Collider Cast
-        1](Documentation~/Optimization%20Adventures/Part%206%20-%20ColliderCast%201.md)
-    -   [Frustum Culling
-        1](Documentation~/Optimization%20Adventures/Part%207%20-%20Frustum%20Culling%201.md)
-    -   [Find Pairs
-        3](Documentation~/Optimization%20Adventures/Part%208%20-%20Find%20Pairs%203.md)
+-   [Documentation (Click on any .md
+    file)](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)
 
 ## Proud Users of Latios Framework
 
@@ -222,7 +192,8 @@ I develop this framework separately from this repository scattered across
 various projects. I will provide the current snapshot from any of those projects
 upon request. I promise the code may be terrible. This may be useful to you if
 you desire to contribute in an area I am actively developing. See
-[Contributing](Documentation~/Contributing.md) for more information.
+[Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
+for more information.
 
 If you are developing your own packages on top of this framework, commercial or
 open source, feel free to reach out to me for suggestions, guidance, or to
@@ -245,7 +216,8 @@ publish patch releases for older versions.
 ## Special Thanks To These Awesome Contributors
 
 If you would like to be added to this list, see
-[Contributing](Documentation~/Contributing.md) for how to get started.
+[Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
+for how to get started.
 
 -   Dechichi01 – various fixes and improvements for Core, Psyshock, and
     Kinemation

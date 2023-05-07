@@ -39,17 +39,6 @@ namespace Latios.Psyshock
                                                          new RigidTransform(targetTransform.rotation, targetTransform.position),
                                                          out result);
         }
-
-        // Todo: Legacy, remove
-        public static bool ColliderCast(in Collider colliderToCast,
-                                        in RigidTransform castStart,
-                                        float3 castEnd,
-                                        in Collider targetCollider,
-                                        in RigidTransform targetTransform,
-                                        out ColliderCastResult result)
-        {
-            return ColliderColliderDispatch.ColliderCast(in colliderToCast, in castStart, castEnd, in targetCollider, in targetTransform, out result);
-        }
         #endregion
 
         #region Collider vs Layer

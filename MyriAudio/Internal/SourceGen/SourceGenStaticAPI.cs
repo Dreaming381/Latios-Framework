@@ -4,7 +4,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.InternalSourceGen
 {
-    public static unsafe class StaticAPI
+    // Make public on release
+    internal static unsafe class StaticAPI
     {
         public interface IEffectSourceGenerated
         {

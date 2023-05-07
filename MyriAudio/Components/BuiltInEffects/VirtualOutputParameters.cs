@@ -4,7 +4,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri
 {
-    public struct VirtualOutputParameters : IEffectParameters<DSP.VirtualOutputEffect, VirtualOutputParameters>
+    // Make public on release
+    internal struct VirtualOutputParameters : IEffectParameters<DSP.VirtualOutputEffect, VirtualOutputParameters>
     {
         public float volume;
     }

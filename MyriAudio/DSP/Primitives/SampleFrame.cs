@@ -3,7 +3,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public struct SampleFrame
+    // Make public on release
+    internal struct SampleFrame
     {
         public NativeArray<float> left { get; internal set; }
         public NativeArray<float> right { get; internal set; }

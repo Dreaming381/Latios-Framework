@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -18,9 +19,19 @@ namespace Latios.Transforms.Systems
         {
             EnableSystemSorting = false;
 
+            var flags = worldBlackboardEntity.GetComponentData<RuntimeFeatureFlags>();
+
             GetOrCreateAndAddManagedSystem<PreTransformSuperSystem>();
             GetOrCreateAndAddUnmanagedSystem<ParentChangeSystem>();
-            GetOrCreateAndAddUnmanagedSystem<TransformHierarchyUpdateSystem>();
+            if ((flags.flags & RuntimeFeatureFlags.Flags.ExtremeTransforms) != RuntimeFeatureFlags.Flags.None)
+            {
+                GetOrCreateAndAddUnmanagedSystem<ExtremeChildDepthsSystem>();
+                GetOrCreateAndAddUnmanagedSystem<ExtremeTransformHierarchyUpdateSystem>();
+            }
+            else
+            {
+                GetOrCreateAndAddUnmanagedSystem<TransformHierarchyUpdateSystem>();
+            }
             GetOrCreateAndAddManagedSystem<PostTransformSuperSystem>();
         }
     }
@@ -59,10 +70,8 @@ namespace Latios.Transforms.Systems
 
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
-    [UpdateBefore(typeof(FixedStepSimulationSystemGroup))]
-    [UpdateBefore(typeof(VariableRateSimulationSystemGroup))]
-    [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
+    [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]
+    [UpdateAfter(typeof(EndInitializationEntityCommandBufferSystem))]
     public partial class MotionHistoryUpdateSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
@@ -73,4 +82,5 @@ namespace Latios.Transforms.Systems
         }
     }
 }
+#endif
 

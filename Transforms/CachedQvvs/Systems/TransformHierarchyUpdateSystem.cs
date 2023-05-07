@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -15,11 +16,12 @@ namespace Latios.Transforms.Systems
     [BurstCompile]
     public partial struct TransformHierarchyUpdateSystem : ISystem
     {
-        LatiosWorldUnmanaged latiosWorld;
+        EntityQuery m_query;
 
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            latiosWorld = state.GetLatiosWorldUnmanaged();
+            m_query = state.Fluent().WithAll<WorldTransform>(true).WithAll<Child>(true).Without<PreviousParent>().Build();
         }
 
         [BurstCompile]
@@ -30,8 +32,6 @@ namespace Latios.Transforms.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var query = QueryBuilder().WithAll<WorldTransform, Child>().WithNone<PreviousParent>().Build();
-
             var job = new Job
             {
                 worldTransformHandle = GetComponentTypeHandle<WorldTransform>(true),
@@ -43,7 +43,7 @@ namespace Latios.Transforms.Systems
                 worldTransformLookup = GetComponentLookup<WorldTransform>(false),
                 lastSystemVersion    = state.LastSystemVersion
             };
-            state.Dependency = job.ScheduleParallelByRef(query, state.Dependency);
+            state.Dependency = job.ScheduleParallelByRef(m_query, state.Dependency);
         }
 
         [BurstCompile]
@@ -133,4 +133,5 @@ namespace Latios.Transforms.Systems
         }
     }
 }
+#endif
 

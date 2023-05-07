@@ -1,5 +1,5 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Transforms;
-using static Unity.Entities.SystemAPI;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
@@ -11,6 +11,8 @@ using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine;
 using UnityEngine.Rendering;
+
+using static Unity.Entities.SystemAPI;
 
 // Originally, this was supposed to be just a copy and paste with the WorldTransform
 // instead of LocalToWorld, but I noticed that Unity's version (pre 15 at the time of writing)
@@ -201,4 +203,5 @@ namespace Latios.Kinemation
         }
     }
 }
+#endif
 

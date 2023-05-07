@@ -7,7 +7,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-//Todo: Stream types, single schedulers, scratchlists, and inflations
+//Todo: FilteredCache playback and inflations
 namespace Latios.Psyshock
 {
     public partial struct FindPairsLayerSelfConfig<T> where T : struct, IFindPairsProcessor
@@ -23,7 +23,7 @@ namespace Latios.Psyshock
 
                 public void Execute()
                 {
-                    RunImmediate(layer, processor);
+                    RunImmediate(layer, ref processor, true);
                 }
             }
 
@@ -35,8 +35,11 @@ namespace Latios.Psyshock
 
                 public void Execute(int index)
                 {
-                    var bucket = layer.GetBucketSlices(index);
+                    var bucket  = layer.GetBucketSlices(index);
+                    var context = new FindPairsBucketContext(in layer, in layer, bucket.bucketGlobalStart, bucket.count, bucket.bucketGlobalStart, bucket.count, index, true);
+                    //processor.BeginBucket(in context);
                     FindPairsSweepMethods.SelfSweep(layer, bucket, index, ref processor);
+                    //processor.EndBucket(in context);
                 }
             }
 
@@ -48,11 +51,21 @@ namespace Latios.Psyshock
 
                 public void Execute()
                 {
-                    var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
-                    for (int i = 0; i < layer.BucketCount - 1; i++)
+                    var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
+                    for (int i = 0; i < layer.bucketCount - 1; i++)
                     {
-                        var bucket = layer.GetBucketSlices(i);
-                        FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, layer.BucketCount + i, ref processor);
+                        var bucket  = layer.GetBucketSlices(i);
+                        var context = new FindPairsBucketContext(in layer,
+                                                                 in layer,
+                                                                 bucket.bucketGlobalStart,
+                                                                 bucket.count,
+                                                                 crossBucket.bucketGlobalStart,
+                                                                 crossBucket.count,
+                                                                 layer.bucketCount + i,
+                                                                 true);
+                        //processor.BeginBucket(in context);
+                        FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, layer.bucketCount + i, ref processor);
+                        //processor.EndBucket(in context);
                     }
                 }
             }
@@ -65,37 +78,72 @@ namespace Latios.Psyshock
 
                 public void Execute(int i)
                 {
-                    if (i < layer.BucketCount)
+                    if (i < layer.bucketCount)
                     {
-                        var bucket = layer.GetBucketSlices(i);
+                        var bucket  = layer.GetBucketSlices(i);
+                        var context = new FindPairsBucketContext(in layer, in layer, bucket.bucketGlobalStart, bucket.count, bucket.bucketGlobalStart, bucket.count, i, true);
+                        //processor.BeginBucket(in context);
                         FindPairsSweepMethods.SelfSweep(layer, bucket, i, ref processor);
+                        //processor.EndBucket(in context);
                     }
                     else
                     {
-                        i               -= layer.BucketCount;
+                        i               -= layer.bucketCount;
                         var bucket       = layer.GetBucketSlices(i);
-                        var crossBucket  = layer.GetBucketSlices(layer.BucketCount - 1);
-                        FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, i + layer.BucketCount, ref processor);
+                        var crossBucket  = layer.GetBucketSlices(layer.bucketCount - 1);
+                        var context      = new FindPairsBucketContext(in layer,
+                                                                      in layer,
+                                                                      bucket.bucketGlobalStart,
+                                                                      bucket.count,
+                                                                      crossBucket.bucketGlobalStart,
+                                                                      crossBucket.count,
+                                                                      layer.bucketCount + i,
+                                                                      true);
+                        //processor.BeginBucket(in context);
+                        FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, i + layer.bucketCount, ref processor);
+                        //processor.EndBucket(in context);
                     }
                 }
             }
             #endregion
 
             #region ImmediateMethods
-            public static void RunImmediate(CollisionLayer layer, T processor)
+            public static void RunImmediate(in CollisionLayer layer, ref T processor, bool isThreadSafe)
             {
                 int jobIndex = 0;
-                for (int i = 0; i < layer.BucketCount; i++)
+                for (int i = 0; i < layer.bucketCount; i++)
                 {
-                    var bucket = layer.GetBucketSlices(i);
-                    FindPairsSweepMethods.SelfSweep(layer, bucket, jobIndex++, ref processor, false);
+                    var bucket  = layer.GetBucketSlices(i);
+                    var context = new FindPairsBucketContext(in layer,
+                                                             in layer,
+                                                             bucket.bucketGlobalStart,
+                                                             bucket.count,
+                                                             bucket.bucketGlobalStart,
+                                                             bucket.count,
+                                                             jobIndex,
+                                                             isThreadSafe);
+                    //processor.BeginBucket(in context);
+                    FindPairsSweepMethods.SelfSweep(layer, bucket, jobIndex, ref processor, isThreadSafe);
+                    //processor.EndBucket(in context);
+                    jobIndex++;
                 }
 
-                var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
-                for (int i = 0; i < layer.BucketCount - 1; i++)
+                var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
+                for (int i = 0; i < layer.bucketCount - 1; i++)
                 {
-                    var bucket = layer.GetBucketSlices(i);
-                    FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, jobIndex++, ref processor, false);
+                    var bucket  = layer.GetBucketSlices(i);
+                    var context = new FindPairsBucketContext(in layer,
+                                                             in layer,
+                                                             bucket.bucketGlobalStart,
+                                                             bucket.count,
+                                                             crossBucket.bucketGlobalStart,
+                                                             crossBucket.count,
+                                                             jobIndex,
+                                                             isThreadSafe);
+                    //processor.BeginBucket(in context);
+                    FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, jobIndex, ref processor, isThreadSafe);
+                    //processor.EndBucket(in context);
+                    jobIndex++;
                 }
             }
             #endregion
@@ -114,11 +162,21 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
-                        for (int i = 0; i < layer.BucketCount - 1; i++)
+                        var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
+                        for (int i = 0; i < layer.bucketCount - 1; i++)
                         {
-                            var bucket = layer.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, layer.BucketCount + i, ref processor);
+                            var bucket  = layer.GetBucketSlices(i);
+                            var context = new FindPairsBucketContext(in layer,
+                                                                     in layer,
+                                                                     bucket.bucketGlobalStart,
+                                                                     bucket.count,
+                                                                     crossBucket.bucketGlobalStart,
+                                                                     crossBucket.count,
+                                                                     layer.bucketCount + i,
+                                                                     true);
+                            //processor.BeginBucket(in context);
+                            FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, layer.bucketCount + i, ref processor);
+                            //processor.EndBucket(in context);
                         }
                     }
                     else
@@ -131,8 +189,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layer)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layer.Count, Allocator.Temp);
-                for (int i = 0; i < layer.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layer.count, Allocator.Temp);
+                for (int i = 0; i < layer.count; i++)
                 {
                     if (!hashSet.Add(layer.bodies[i].entity))
                     {
@@ -154,7 +212,7 @@ namespace Latios.Psyshock
         {
             #region Jobs
 
-            // Schedule for (2 * layer.BucketCount - 1) iterations
+            // Schedule for (2 * layer.bucketCount - 1) iterations
             [BurstCompile]
             public struct LayerSelfPart1 : IJobParallelFor, IFindPairsProcessor
             {
@@ -164,17 +222,20 @@ namespace Latios.Psyshock
 
                 public void Execute(int index)
                 {
-                    if (index < layer.BucketCount)
+                    if (index < layer.bucketCount)
                     {
-                        var bucket = layer.GetBucketSlices(index);
+                        var bucket  = layer.GetBucketSlices(index);
+                        var context = new FindPairsBucketContext(in layer, in layer, bucket.bucketGlobalStart, bucket.count, bucket.bucketGlobalStart, bucket.count, index, true);
+                        //processor.BeginBucket(in context);
                         FindPairsSweepMethods.SelfSweep(layer, bucket, index, ref processor);
+                        //processor.EndBucket(in context);
                     }
                     else
                     {
-                        var bucket      = layer.GetBucketSlices(index - layer.BucketCount);
-                        var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
+                        var bucket      = layer.GetBucketSlices(index - layer.bucketCount);
+                        var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
 
-                        cache.BeginForEachIndex(index - layer.BucketCount);
+                        cache.BeginForEachIndex(index - layer.bucketCount);
                         FindPairsSweepMethods.BipartiteSweep(layer, layer, bucket, crossBucket, index, ref this);
                         cache.EndForEachIndex();
                     }
@@ -196,9 +257,20 @@ namespace Latios.Psyshock
 
                 public void Execute()
                 {
-                    for (int i = 0; i < layer.BucketCount - 1; i++)
+                    for (int i = 0; i < layer.bucketCount - 1; i++)
                     {
-                        var result = FindPairsResult.CreateGlobalResult(layer, layer, layer.BucketCount + i, true);
+                        var result      = FindPairsResult.CreateGlobalResult(layer, layer, layer.bucketCount + i, true);
+                        var bucket      = layer.bucketStartsAndCounts[i];
+                        var crossBucket = layer.bucketStartsAndCounts[layer.bucketCount - 1];
+                        var context     = new FindPairsBucketContext(in layer,
+                                                                     in layer,
+                                                                     bucket.x,
+                                                                     bucket.y,
+                                                                     crossBucket.x,
+                                                                     crossBucket.y,
+                                                                     layer.bucketCount + i,
+                                                                     true);
+                        //processor.BeginBucket(in context);
 
                         var count = cache.BeginForEachIndex(i);
                         for (; count > 0; count--)
@@ -208,6 +280,8 @@ namespace Latios.Psyshock
                             processor.Execute(in result);
                         }
                         cache.EndForEachIndex();
+
+                        //processor.EndBucket(in context);
                     }
                 }
             }
@@ -230,9 +304,20 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        for (int i = 0; i < layer.BucketCount - 1; i++)
+                        for (int i = 0; i < layer.bucketCount - 1; i++)
                         {
-                            var result = FindPairsResult.CreateGlobalResult(layer, layer, layer.BucketCount + i, true);
+                            var result      = FindPairsResult.CreateGlobalResult(layer, layer, layer.bucketCount + i, true);
+                            var bucket      = layer.bucketStartsAndCounts[i];
+                            var crossBucket = layer.bucketStartsAndCounts[layer.bucketCount - 1];
+                            var context     = new FindPairsBucketContext(in layer,
+                                                                         in layer,
+                                                                         bucket.x,
+                                                                         bucket.y,
+                                                                         crossBucket.x,
+                                                                         crossBucket.y,
+                                                                         layer.bucketCount + i,
+                                                                         true);
+                            //processor.BeginBucket(in context);
 
                             var count = cache.BeginForEachIndex(i);
                             for (; count > 0; count--)
@@ -242,6 +327,8 @@ namespace Latios.Psyshock
                                 processor.Execute(in result);
                             }
                             cache.EndForEachIndex();
+
+                            //processor.EndBucket(in context);
                         }
                     }
                     else
@@ -254,8 +341,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layer)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layer.Count, Allocator.Temp);
-                for (int i = 0; i < layer.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layer.count, Allocator.Temp);
+                for (int i = 0; i < layer.count; i++)
                 {
                     if (!hashSet.Add(layer.bodies[i].entity))
                     {
@@ -285,7 +372,7 @@ namespace Latios.Psyshock
 
                 public void Execute()
                 {
-                    RunImmediate(layerA, layerB, processor);
+                    RunImmediate(in layerA, in layerB, ref processor, true);
                 }
             }
 
@@ -300,7 +387,10 @@ namespace Latios.Psyshock
                 {
                     var bucketA = layerA.GetBucketSlices(index);
                     var bucketB = layerB.GetBucketSlices(index);
+                    var context = new FindPairsBucketContext(in layerA, in layerB, bucketA.bucketGlobalStart, bucketA.count, bucketB.bucketGlobalStart, bucketB.count, index, true);
+                    //processor.BeginBucket(in context);
                     FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucketA, bucketB, index, ref processor);
+                    //processor.EndBucket(in context);
                 }
             }
 
@@ -316,26 +406,46 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        var crossBucket = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        var crossBucket = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
-                            var bucket = layerB.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, layerA.BucketCount + i, ref processor);
+                            var bucket  = layerB.GetBucketSlices(i);
+                            var context = new FindPairsBucketContext(in layerA,
+                                                                     in layerB,
+                                                                     crossBucket.bucketGlobalStart,
+                                                                     crossBucket.count,
+                                                                     bucket.bucketGlobalStart,
+                                                                     bucket.count,
+                                                                     layerA.bucketCount + i,
+                                                                     true);
+                            //processor.BeginBucket(in context);
+                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, layerA.bucketCount + i, ref processor);
+                            //processor.EndBucket(in context);
                         }
                     }
                     else if (index == 1)
                     {
-                        var crossBucket = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        var crossBucket = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
-                            var bucket = layerA.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, layerA.BucketCount + layerB.BucketCount - 1 + i, ref processor);
+                            var bucket  = layerA.GetBucketSlices(i);
+                            var context = new FindPairsBucketContext(in layerA,
+                                                                     in layerB,
+                                                                     bucket.bucketGlobalStart,
+                                                                     bucket.count,
+                                                                     crossBucket.bucketGlobalStart,
+                                                                     crossBucket.count,
+                                                                     layerA.bucketCount + layerB.bucketCount - 1 + i,
+                                                                     true);
+                            //processor.BeginBucket(in context);
+                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, layerA.bucketCount + layerB.bucketCount - 1 + i, ref processor);
+                            //processor.EndBucket(in context);
                         }
                     }
                 }
             }
 
-            // Schedule for (3 * layer.BucketCount - 2) iterations
+            // Schedule for (3 * layer.bucketCount - 2) iterations
             [BurstCompile]
             public struct LayerLayerParallelUnsafe : IJobFor
             {
@@ -345,26 +455,49 @@ namespace Latios.Psyshock
 
                 public void Execute(int i)
                 {
-                    if (i < layerA.BucketCount)
+                    if (i < layerA.bucketCount)
                     {
                         var bucketA = layerA.GetBucketSlices(i);
                         var bucketB = layerB.GetBucketSlices(i);
+                        var context = new FindPairsBucketContext(in layerA, in layerB, bucketA.bucketGlobalStart, bucketA.count, bucketB.bucketGlobalStart, bucketB.count, i, true);
+                        //processor.BeginBucket(in context);
                         FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucketA, bucketB, i, ref processor);
+                        //processor.EndBucket(in context);
                     }
-                    else if (i < 2 * layerB.BucketCount - 1)
+                    else if (i < 2 * layerB.bucketCount - 1)
                     {
-                        i               -= layerB.BucketCount;
+                        i               -= layerB.bucketCount;
                         var bucket       = layerB.GetBucketSlices(i);
-                        var crossBucket  = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, i + layerB.BucketCount, ref processor);
+                        var crossBucket  = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        var context      = new FindPairsBucketContext(in layerA,
+                                                                      in layerB,
+                                                                      crossBucket.bucketGlobalStart,
+                                                                      crossBucket.count,
+                                                                      bucket.bucketGlobalStart,
+                                                                      bucket.count,
+                                                                      layerA.bucketCount + i,
+                                                                      true);
+                        //processor.BeginBucket(in context);
+                        FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, i + layerB.bucketCount, ref processor);
+                        //processor.EndBucket(in context);
                     }
                     else
                     {
                         var jobIndex     = i;
-                        i               -= (2 * layerB.BucketCount - 1);
+                        i               -= (2 * layerB.bucketCount - 1);
                         var bucket       = layerA.GetBucketSlices(i);
-                        var crossBucket  = layerB.GetBucketSlices(layerB.BucketCount - 1);
+                        var crossBucket  = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        var context      = new FindPairsBucketContext(in layerA,
+                                                                      in layerB,
+                                                                      bucket.bucketGlobalStart,
+                                                                      bucket.count,
+                                                                      crossBucket.bucketGlobalStart,
+                                                                      crossBucket.count,
+                                                                      jobIndex,
+                                                                      true);
+                        //processor.BeginBucket(in context);
                         FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, jobIndex, ref processor);
+                        //processor.EndBucket(in context);
                     }
                 }
             }
@@ -372,28 +505,61 @@ namespace Latios.Psyshock
 
             #region ImmediateMethods
 
-            public static void RunImmediate(CollisionLayer layerA, CollisionLayer layerB, T processor)
+            public static void RunImmediate(in CollisionLayer layerA, in CollisionLayer layerB, ref T processor, bool isThreadSafe)
             {
                 int jobIndex = 0;
-                for (int i = 0; i < layerA.BucketCount; i++)
+                for (int i = 0; i < layerA.bucketCount; i++)
                 {
                     var bucketA = layerA.GetBucketSlices(i);
                     var bucketB = layerB.GetBucketSlices(i);
-                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucketA, bucketB, jobIndex++, ref processor, false);
+                    var context = new FindPairsBucketContext(in layerA,
+                                                             in layerB,
+                                                             bucketA.bucketGlobalStart,
+                                                             bucketA.count,
+                                                             bucketB.bucketGlobalStart,
+                                                             bucketB.count,
+                                                             jobIndex,
+                                                             true);
+                    //processor.BeginBucket(in context);
+                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucketA, bucketB, jobIndex, ref processor, isThreadSafe);
+                    //processor.EndBucket(in context);
+                    jobIndex++;
                 }
 
-                var crossBucketA = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                for (int i = 0; i < layerA.BucketCount - 1; i++)
+                var crossBucketA = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                for (int i = 0; i < layerA.bucketCount - 1; i++)
                 {
-                    var bucket = layerB.GetBucketSlices(i);
-                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucketA, bucket, jobIndex++, ref processor, false);
+                    var bucket  = layerB.GetBucketSlices(i);
+                    var context = new FindPairsBucketContext(in layerA,
+                                                             in layerB,
+                                                             crossBucketA.bucketGlobalStart,
+                                                             crossBucketA.count,
+                                                             bucket.bucketGlobalStart,
+                                                             bucket.count,
+                                                             jobIndex,
+                                                             true);
+                    //processor.BeginBucket(in context);
+                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucketA, bucket, jobIndex, ref processor, isThreadSafe);
+                    //processor.EndBucket(in context);
+                    jobIndex++;
                 }
 
-                var crossBucketB = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                for (int i = 0; i < layerA.BucketCount - 1; i++)
+                var crossBucketB = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                for (int i = 0; i < layerA.bucketCount - 1; i++)
                 {
-                    var bucket = layerA.GetBucketSlices(i);
-                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucketB, jobIndex++, ref processor, false);
+                    var bucket  = layerA.GetBucketSlices(i);
+                    var context = new FindPairsBucketContext(in layerA,
+                                                             in layerB,
+                                                             bucket.bucketGlobalStart,
+                                                             bucket.count,
+                                                             crossBucketB.bucketGlobalStart,
+                                                             crossBucketB.count,
+                                                             jobIndex,
+                                                             true);
+                    //processor.BeginBucket(in context);
+                    FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucketB, jobIndex, ref processor, isThreadSafe);
+                    //processor.EndBucket(in context);
+                    jobIndex++;
                 }
             }
             #endregion
@@ -414,23 +580,40 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        var crossBucket = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        var crossBucket = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
-                            var bucket = layerB.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, layerA.BucketCount + i, ref processor);
+                            var bucket  = layerB.GetBucketSlices(i);
+                            var context = new FindPairsBucketContext(in layerA,
+                                                                     in layerB,
+                                                                     crossBucket.bucketGlobalStart,
+                                                                     crossBucket.count,
+                                                                     bucket.bucketGlobalStart,
+                                                                     bucket.count,
+                                                                     layerA.bucketCount + i,
+                                                                     true);
+                            //processor.BeginBucket(in context);
+                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, layerA.bucketCount + i, ref processor);
+                            //processor.EndBucket(in context);
                         }
                     }
                     else if (index == 1)
                     {
-                        var crossBucket = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        var crossBucket = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
-                            var bucket = layerA.GetBucketSlices(i);
-                            //var marker = new Unity.Profiling.ProfilerMarker($"Cross B {crossBucket.count} - {bucket.count}");
-                            //marker.Begin();
-                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, layerA.BucketCount + layerB.BucketCount - 1 + i, ref processor);
-                            //marker.End();
+                            var bucket  = layerA.GetBucketSlices(i);
+                            var context = new FindPairsBucketContext(in layerA,
+                                                                     in layerB,
+                                                                     bucket.bucketGlobalStart,
+                                                                     bucket.count,
+                                                                     crossBucket.bucketGlobalStart,
+                                                                     crossBucket.count,
+                                                                     layerA.bucketCount + layerB.bucketCount - 1 + i,
+                                                                     true);
+                            //processor.BeginBucket(in context);
+                            FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, layerA.bucketCount + layerB.bucketCount - 1 + i, ref processor);
+                            //processor.EndBucket(in context);
                         }
                     }
                     else
@@ -443,8 +626,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layerA, CollisionLayer layerB)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layerA.Count + layerB.Count, Allocator.Temp);
-                for (int i = 0; i < layerA.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layerA.count + layerB.count, Allocator.Temp);
+                for (int i = 0; i < layerA.count; i++)
                 {
                     if (!hashSet.Add(layerA.bodies[i].entity))
                     {
@@ -454,7 +637,7 @@ namespace Latios.Psyshock
                             $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {entity}");
                     }
                 }
-                for (int i = 0; i < layerB.Count; i++)
+                for (int i = 0; i < layerB.count; i++)
                 {
                     if (!hashSet.Add(layerB.bodies[i].entity))
                     {
@@ -477,7 +660,7 @@ namespace Latios.Psyshock
         {
             #region Jobs
 
-            // Schedule for (3 * layer.BucketCount - 2) iterations
+            // Schedule for (3 * layer.bucketCount - 2) iterations
             [BurstCompile]
             public struct LayerLayerPart1 : IJobParallelFor, IFindPairsProcessor
             {
@@ -488,28 +671,31 @@ namespace Latios.Psyshock
 
                 public void Execute(int i)
                 {
-                    if (i < layerA.BucketCount)
+                    if (i < layerA.bucketCount)
                     {
                         var bucketA = layerA.GetBucketSlices(i);
                         var bucketB = layerB.GetBucketSlices(i);
+                        var context = new FindPairsBucketContext(in layerA, in layerB, bucketA.bucketGlobalStart, bucketA.count, bucketB.bucketGlobalStart, bucketB.count, i, true);
+                        //processor.BeginBucket(in context);
                         FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucketA, bucketB, i, ref processor);
+                        //processor.EndBucket(in context);
                     }
-                    else if (i < 2 * layerB.BucketCount - 1)
+                    else if (i < 2 * layerB.bucketCount - 1)
                     {
-                        i               -= layerB.BucketCount;
+                        i               -= layerB.bucketCount;
                         var bucket       = layerB.GetBucketSlices(i);
-                        var crossBucket  = layerA.GetBucketSlices(layerA.BucketCount - 1);
+                        var crossBucket  = layerA.GetBucketSlices(layerA.bucketCount - 1);
                         cache.BeginForEachIndex(i);
-                        FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, i + layerB.BucketCount, ref this);
+                        FindPairsSweepMethods.BipartiteSweep(layerA, layerB, crossBucket, bucket, i + layerB.bucketCount, ref this);
                         cache.EndForEachIndex();
                     }
                     else
                     {
                         var jobIndex     = i;
-                        i               -= (2 * layerB.BucketCount - 1);
+                        i               -= (2 * layerB.bucketCount - 1);
                         var bucket       = layerA.GetBucketSlices(i);
-                        var crossBucket  = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                        cache.BeginForEachIndex(i + layerB.BucketCount - 1);
+                        var crossBucket  = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        cache.BeginForEachIndex(i + layerB.bucketCount - 1);
                         FindPairsSweepMethods.BipartiteSweep(layerA, layerB, bucket, crossBucket, jobIndex, ref this);
                         cache.EndForEachIndex();
                     }
@@ -535,9 +721,20 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
-                            var result = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.BucketCount + i, true);
+                            var result      = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.bucketCount + i, true);
+                            var bucket      = layerB.bucketStartsAndCounts[i];
+                            var crossBucket = layerA.bucketStartsAndCounts[layerA.bucketCount - 1];
+                            var context     = new FindPairsBucketContext(in layerA,
+                                                                         in layerB,
+                                                                         crossBucket.x,
+                                                                         crossBucket.y,
+                                                                         bucket.x,
+                                                                         bucket.y,
+                                                                         layerA.bucketCount + i,
+                                                                         true);
+                            //processor.BeginBucket(in context);
 
                             var count = cache.BeginForEachIndex(i);
                             for (; count > 0; count--)
@@ -547,15 +744,29 @@ namespace Latios.Psyshock
                                 processor.Execute(in result);
                             }
                             cache.EndForEachIndex();
+
+                            //processor.EndBucket(in context);
                         }
                     }
                     else if (index == 1)
                     {
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
-                            var result = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.BucketCount + layerB.BucketCount - 1 + i, true);
+                            var result = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.bucketCount + layerB.bucketCount - 1 + i, true);
 
-                            var count = cache.BeginForEachIndex(i + layerA.BucketCount - 1);
+                            var bucket      = layerA.bucketStartsAndCounts[i];
+                            var crossBucket = layerB.bucketStartsAndCounts[layerB.bucketCount - 1];
+                            var context     = new FindPairsBucketContext(in layerA,
+                                                                         in layerB,
+                                                                         bucket.x,
+                                                                         bucket.y,
+                                                                         crossBucket.x,
+                                                                         crossBucket.y,
+                                                                         layerA.bucketCount + layerB.bucketCount - 1 + i,
+                                                                         true);
+                            //processor.BeginBucket(in context);
+
+                            var count = cache.BeginForEachIndex(i + layerA.bucketCount - 1);
                             for (; count > 0; count--)
                             {
                                 var pair = cache.Read<int2>();
@@ -563,6 +774,8 @@ namespace Latios.Psyshock
                                 processor.Execute(in result);
                             }
                             cache.EndForEachIndex();
+
+                            //processor.EndBucket(in context);
                         }
                     }
                 }
@@ -587,9 +800,20 @@ namespace Latios.Psyshock
                 {
                     if (index == 0)
                     {
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
-                            var result = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.BucketCount + i, true);
+                            var result      = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.bucketCount + i, true);
+                            var bucket      = layerB.bucketStartsAndCounts[i];
+                            var crossBucket = layerA.bucketStartsAndCounts[layerA.bucketCount - 1];
+                            var context     = new FindPairsBucketContext(in layerA,
+                                                                         in layerB,
+                                                                         crossBucket.x,
+                                                                         crossBucket.y,
+                                                                         bucket.x,
+                                                                         bucket.y,
+                                                                         layerA.bucketCount + i,
+                                                                         true);
+                            //processor.BeginBucket(in context);
 
                             var count = cache.BeginForEachIndex(i);
                             for (; count > 0; count--)
@@ -603,11 +827,22 @@ namespace Latios.Psyshock
                     }
                     else if (index == 1)
                     {
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
-                            var result = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.BucketCount + layerB.BucketCount - 1 + i, true);
+                            var result      = FindPairsResult.CreateGlobalResult(layerA, layerB, layerA.bucketCount + layerB.bucketCount - 1 + i, true);
+                            var bucket      = layerA.bucketStartsAndCounts[i];
+                            var crossBucket = layerB.bucketStartsAndCounts[layerB.bucketCount - 1];
+                            var context     = new FindPairsBucketContext(in layerA,
+                                                                         in layerB,
+                                                                         bucket.x,
+                                                                         bucket.y,
+                                                                         crossBucket.x,
+                                                                         crossBucket.y,
+                                                                         layerA.bucketCount + layerB.bucketCount - 1 + i,
+                                                                         true);
+                            //processor.BeginBucket(in context);
 
-                            var count = cache.BeginForEachIndex(i + layerA.BucketCount - 1);
+                            var count = cache.BeginForEachIndex(i + layerA.bucketCount - 1);
                             for (; count > 0; count--)
                             {
                                 var pair = cache.Read<int2>();
@@ -615,6 +850,8 @@ namespace Latios.Psyshock
                                 processor.Execute(in result);
                             }
                             cache.EndForEachIndex();
+
+                            //processor.EndBucket(in context);
                         }
                     }
                     else
@@ -627,8 +864,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layerA, CollisionLayer layerB)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layerA.Count + layerB.Count, Allocator.Temp);
-                for (int i = 0; i < layerA.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layerA.count + layerB.count, Allocator.Temp);
+                for (int i = 0; i < layerA.count; i++)
                 {
                     if (!hashSet.Add(layerA.bodies[i].entity))
                     {
@@ -638,7 +875,7 @@ namespace Latios.Psyshock
                             $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {entity}");
                     }
                 }
-                for (int i = 0; i < layerB.Count; i++)
+                for (int i = 0; i < layerB.count; i++)
                 {
                     if (!hashSet.Add(layerB.bodies[i].entity))
                     {
@@ -696,14 +933,14 @@ namespace Latios.Psyshock
 
                 public void Execute()
                 {
-                    var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
+                    var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
                     var drain       = new FindPairsSweepMethods.FindPairsProcessorDrain<T>();
                     //drain.drainBuffer1024 = new NativeArray<ulong>(1024, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     drain.processor = processor;
-                    for (int i = 0; i < layer.BucketCount - 1; i++)
+                    for (int i = 0; i < layer.bucketCount - 1; i++)
                     {
                         var bucket = layer.GetBucketSlices(i);
-                        FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, layer.BucketCount + i, ref drain);
+                        FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, layer.bucketCount + i, ref drain);
                     }
                 }
             }
@@ -720,17 +957,17 @@ namespace Latios.Psyshock
                     //drain.drainBuffer1024 = new NativeArray<ulong>(1024, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     drain.processor = processor;
 
-                    if (i < layer.BucketCount)
+                    if (i < layer.bucketCount)
                     {
                         var bucket = layer.GetBucketSlices(i);
                         FindPairsSweepMethods.SelfSweepUnrolled(layer, bucket, i, ref drain);
                     }
                     else
                     {
-                        i               -= layer.BucketCount;
+                        i               -= layer.bucketCount;
                         var bucket       = layer.GetBucketSlices(i);
-                        var crossBucket  = layer.GetBucketSlices(layer.BucketCount - 1);
-                        FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, i + layer.BucketCount, ref drain);
+                        var crossBucket  = layer.GetBucketSlices(layer.bucketCount - 1);
+                        FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, i + layer.bucketCount, ref drain);
                     }
                 }
             }
@@ -744,14 +981,14 @@ namespace Latios.Psyshock
                 drain.processor = processor;
 
                 int jobIndex = 0;
-                for (int i = 0; i < layer.BucketCount; i++)
+                for (int i = 0; i < layer.bucketCount; i++)
                 {
                     var bucket = layer.GetBucketSlices(i);
                     FindPairsSweepMethods.SelfSweepUnrolled(layer, bucket, jobIndex++, ref drain, false);
                 }
 
-                var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
-                for (int i = 0; i < layer.BucketCount - 1; i++)
+                var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
+                for (int i = 0; i < layer.bucketCount - 1; i++)
                 {
                     var bucket = layer.GetBucketSlices(i);
                     FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, jobIndex++, ref drain, false);
@@ -776,11 +1013,11 @@ namespace Latios.Psyshock
                         //drain.drainBuffer1024 = new NativeArray<ulong>(1024, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                         drain.processor = processor;
 
-                        var crossBucket = layer.GetBucketSlices(layer.BucketCount - 1);
-                        for (int i = 0; i < layer.BucketCount - 1; i++)
+                        var crossBucket = layer.GetBucketSlices(layer.bucketCount - 1);
+                        for (int i = 0; i < layer.bucketCount - 1; i++)
                         {
                             var bucket = layer.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, layer.BucketCount + i, ref drain);
+                            FindPairsSweepMethods.BipartiteSweepUnrolled(layer, layer, bucket, crossBucket, layer.bucketCount + i, ref drain);
                         }
                     }
                     else
@@ -793,8 +1030,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layer)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layer.Count, Allocator.Temp);
-                for (int i = 0; i < layer.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layer.count, Allocator.Temp);
+                for (int i = 0; i < layer.count; i++)
                 {
                     if (!hashSet.Add(layer.bodies[i].entity))
                     {
@@ -867,20 +1104,20 @@ namespace Latios.Psyshock
 
                     if (index == 0)
                     {
-                        var crossBucket = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        var crossBucket = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
                             var bucket = layerB.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, layerA.BucketCount + i, ref drain);
+                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, layerA.bucketCount + i, ref drain);
                         }
                     }
                     else if (index == 1)
                     {
-                        var crossBucket = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        var crossBucket = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
                             var bucket = layerA.GetBucketSlices(i);
-                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucket, layerA.BucketCount + layerB.BucketCount + i, ref drain);
+                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucket, layerA.bucketCount + layerB.bucketCount + i, ref drain);
                         }
                     }
                 }
@@ -899,25 +1136,25 @@ namespace Latios.Psyshock
                     //drain.drainBuffer1024 = new NativeArray<ulong>(1024, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     drain.processor = processor;
 
-                    if (i < layerA.BucketCount)
+                    if (i < layerA.bucketCount)
                     {
                         var bucketA = layerA.GetBucketSlices(i);
                         var bucketB = layerB.GetBucketSlices(i);
                         FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucketA, bucketB, i, ref drain);
                     }
-                    else if (i < 2 * layerB.BucketCount - 1)
+                    else if (i < 2 * layerB.bucketCount - 1)
                     {
-                        i               -= layerB.BucketCount;
+                        i               -= layerB.bucketCount;
                         var bucket       = layerB.GetBucketSlices(i);
-                        var crossBucket  = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, i + layerB.BucketCount, ref drain);
+                        var crossBucket  = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, i + layerB.bucketCount, ref drain);
                     }
                     else
                     {
                         var jobIndex     = i;
-                        i               -= (2 * layerB.BucketCount - 1);
+                        i               -= (2 * layerB.bucketCount - 1);
                         var bucket       = layerA.GetBucketSlices(i);
-                        var crossBucket  = layerB.GetBucketSlices(layerB.BucketCount - 1);
+                        var crossBucket  = layerB.GetBucketSlices(layerB.bucketCount - 1);
                         FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucket, jobIndex, ref drain);
                     }
                 }
@@ -933,22 +1170,22 @@ namespace Latios.Psyshock
                 drain.processor = processor;
 
                 int jobIndex = 0;
-                for (int i = 0; i < layerA.BucketCount; i++)
+                for (int i = 0; i < layerA.bucketCount; i++)
                 {
                     var bucketA = layerA.GetBucketSlices(i);
                     var bucketB = layerB.GetBucketSlices(i);
                     FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucketA, bucketB, jobIndex++, ref drain, false);
                 }
 
-                var crossBucketA = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                for (int i = 0; i < layerA.BucketCount - 1; i++)
+                var crossBucketA = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                for (int i = 0; i < layerA.bucketCount - 1; i++)
                 {
                     var bucket = layerB.GetBucketSlices(i);
                     FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucketA, bucket, jobIndex++, ref drain, false);
                 }
 
-                var crossBucketB = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                for (int i = 0; i < layerA.BucketCount - 1; i++)
+                var crossBucketB = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                for (int i = 0; i < layerA.bucketCount - 1; i++)
                 {
                     var bucket = layerA.GetBucketSlices(i);
                     FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucketB, jobIndex++, ref drain, false);
@@ -978,25 +1215,25 @@ namespace Latios.Psyshock
 
                     if (index == 0)
                     {
-                        var crossBucket = layerA.GetBucketSlices(layerA.BucketCount - 1);
-                        for (int i = 0; i < layerB.BucketCount - 1; i++)
+                        var crossBucket = layerA.GetBucketSlices(layerA.bucketCount - 1);
+                        for (int i = 0; i < layerB.bucketCount - 1; i++)
                         {
                             var bucket = layerB.GetBucketSlices(i);
                             //marker0.Begin();
-                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, layerA.BucketCount + i, ref drain);
+                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, crossBucket, bucket, layerA.bucketCount + i, ref drain);
                             //marker0.End();
                         }
                     }
                     else if (index == 1)
                     {
-                        var crossBucket = layerB.GetBucketSlices(layerB.BucketCount - 1);
-                        for (int i = 0; i < layerA.BucketCount - 1; i++)
+                        var crossBucket = layerB.GetBucketSlices(layerB.bucketCount - 1);
+                        for (int i = 0; i < layerA.bucketCount - 1; i++)
                         {
                             var bucket = layerA.GetBucketSlices(i);
                             //var marker1Detailed = new Unity.Profiling.ProfilerMarker($"Cross B Unrolled {crossBucket.count} - {bucket.count}");
                             //marker1Detailed.Begin();
                             //marker1.Begin();
-                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucket, layerA.BucketCount + layerB.BucketCount + i, ref drain);
+                            FindPairsSweepMethods.BipartiteSweepUnrolled(layerA, layerB, bucket, crossBucket, layerA.bucketCount + layerB.bucketCount + i, ref drain);
                             //marker1.End();
                             //marker1Detailed.End();
                         }
@@ -1014,8 +1251,8 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             private static void EntityAliasCheck(CollisionLayer layerA, CollisionLayer layerB)
             {
-                var hashSet = new NativeParallelHashSet<Entity>(layerA.Count + layerB.Count, Allocator.Temp);
-                for (int i = 0; i < layerA.Count; i++)
+                var hashSet = new NativeParallelHashSet<Entity>(layerA.count + layerB.count, Allocator.Temp);
+                for (int i = 0; i < layerA.count; i++)
                 {
                     if (!hashSet.Add(layerA.bodies[i].entity))
                     {
@@ -1025,7 +1262,7 @@ namespace Latios.Psyshock
                             $"A parallel FindPairs job was scheduled using a layer containing more than one instance of Entity {entity}");
                     }
                 }
-                for (int i = 0; i < layerB.Count; i++)
+                for (int i = 0; i < layerB.count; i++)
                 {
                     if (!hashSet.Add(layerB.bodies[i].entity))
                     {

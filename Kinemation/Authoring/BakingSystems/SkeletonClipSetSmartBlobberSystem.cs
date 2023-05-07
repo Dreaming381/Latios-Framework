@@ -178,12 +178,6 @@ namespace Latios.Kinemation.Authoring
     }
 
     [TemporaryBakingType]
-    internal struct ClipEventToBake : IBufferElementData
-    {
-        public ClipEvent clipEvent;
-    }
-
-    [TemporaryBakingType]
     internal struct SampledBoneTransform : IBufferElementData
     {
         public TransformQvvs boneTransform;
@@ -363,9 +357,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 {
                     short index = (short)parents[i];
                     if (index < 0)
-                        index = i;
-                    //if (hasParentScaleInverses[i])
-                    //    index *= -1;
+                        index        = i;
                     parentIndices[i] = index;
                 }
 

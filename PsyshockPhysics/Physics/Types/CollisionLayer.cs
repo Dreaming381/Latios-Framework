@@ -150,11 +150,11 @@ namespace Latios.Psyshock
         /// <summary>
         /// The number of elements in the layer
         /// </summary>
-        public int Count => xmins.Length;
+        public int count => xmins.Length;
         /// <summary>
         /// The number of cells in the layer, including the "catch-all" cell but ignoring the NaN cell
         /// </summary>
-        public int BucketCount => bucketStartsAndCounts.Length - 1;  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
+        public int bucketCount => bucketStartsAndCounts.Length - 1;  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
         /// <summary>
         /// True if the CollisionLayer has been created
         /// </summary>
@@ -169,6 +169,16 @@ namespace Latios.Psyshock
         /// each body in an EntityQuery or NativeArray of ColliderBody.
         /// </summary>
         public NativeArray<int>.ReadOnly sourceIndices => srcIndices.AsReadOnly();
+        /// <summary>
+        /// Gets an Aabb for an associated index in the collision layer ordered by bodyIndex
+        /// </summary>
+        public Aabb GetAabb(int index)
+        {
+            var yzminmax = yzminmaxs[index];
+            var xmin     = xmins[index];
+            var xmax     = xmaxs[index];
+            return new Aabb(new float3(xmin, yzminmax.xy), new float3(xmax, -yzminmax.zw));
+        }
 
         internal BucketSlices GetBucketSlices(int bucketIndex)
         {

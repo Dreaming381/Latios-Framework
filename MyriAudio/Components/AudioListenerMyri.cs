@@ -50,7 +50,7 @@ namespace Latios.Myri
     }
 
     // Todo: Rename this once the new design is ready.
-    public struct ListenerProfileBlobV2
+    internal struct ListenerProfileBlobV2
     {
         internal struct ChannelDsp
         {

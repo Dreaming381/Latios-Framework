@@ -64,8 +64,13 @@ namespace Latios.Psyshock.Authoring
                 }
             }
             var transform = smartBaker.GetComponent<Transform>();
-            m_handle      = smartBaker.RequestCreateBlobAsset(smartBaker.m_compoundList, transform);
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+            m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_compoundList, transform);
             return true;
+#else
+            UnityEngine.Debug.LogWarning("The current transform system in use does not support baking compound colliders.");
+            return false;
+#endif
         }
 
         public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)

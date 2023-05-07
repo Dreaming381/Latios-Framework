@@ -1,5 +1,4 @@
-﻿using System;
-using Unity.Entities;
+﻿using Unity.Entities;
 using Unity.Jobs;
 
 namespace Latios
@@ -10,6 +9,13 @@ namespace Latios
     /// </summary>
     public interface IManagedStructComponent
     {
+        /// <summary>
+        /// This method is only called on removal. It is not called when setting the managed struct with a new value.
+        /// It's primary purpose is to act as a user callback when then entity holding it is destroyed.
+        /// </summary>
+        void Dispose()
+        {
+        }
     }
 
     /// <summary>

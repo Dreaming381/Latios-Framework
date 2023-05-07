@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -90,4 +91,5 @@ namespace Latios.Transforms.Authoring
         }
     }
 }
+#endif
 

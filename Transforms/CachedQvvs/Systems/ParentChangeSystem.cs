@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using Latios.Unsafe;
 using Unity.Burst;
@@ -18,6 +19,8 @@ namespace Latios.Transforms.Systems
     [BurstCompile]
     public partial struct ParentChangeSystem : ISystem
     {
+        LatiosWorldUnmanaged latiosWorld;
+
         EntityQuery m_newChildrenIdentityQuery;
         EntityQuery m_newChildrenNotCopyParentQuery;
         EntityQuery m_deadChildrenQuery;
@@ -25,9 +28,16 @@ namespace Latios.Transforms.Systems
         EntityQuery m_deadParentsQuery;
         EntityQuery m_copyParentCorrectionQuery;
         EntityQuery m_parentlessCorrectionQuery;
+        EntityQuery m_removeAllFromChildTagQuery;
 
+        struct RemoveAllFromChildTag : IComponentData
+        { }
+
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
             m_newChildrenIdentityQuery      = QueryBuilder().WithAll<Parent, CopyParentWorldTransformTag>().WithNone<PreviousParent>().Build();
             m_newChildrenNotCopyParentQuery = QueryBuilder().WithAll<Parent>().WithNone<PreviousParent, CopyParentWorldTransformTag>().Build();
             m_deadChildrenQuery             = QueryBuilder().WithAll<PreviousParent>().WithNone<Parent>().Build();
@@ -36,6 +46,7 @@ namespace Latios.Transforms.Systems
             m_copyParentCorrectionQuery     = QueryBuilder().WithAll<CopyParentWorldTransformTag>().WithAny<LocalTransform, ParentToWorldTransform>().Build();
             m_parentlessCorrectionQuery     = QueryBuilder().WithNone<Parent, PreviousParent>().WithAny<LocalTransform, ParentToWorldTransform,
                                                                                                         CopyParentWorldTransformTag>().Build();
+            m_removeAllFromChildTagQuery = QueryBuilder().WithAll<RemoveAllFromChildTag>().Build();
         }
 
         [BurstCompile]
@@ -104,33 +115,89 @@ namespace Latios.Transforms.Systems
 
             JobHandle.ScheduleBatchedJobs();
 
+            var flags = latiosWorld.worldBlackboardEntity.GetComponentData<RuntimeFeatureFlags>().flags;
+
+            ComponentTypeSet removeDeadChildrenSet;
+            ComponentTypeSet addNewChildrenNotCopyParentSet;
+            ComponentTypeSet addNewChildrenCopyParentExtremeSet = default;
+            ComponentTypeSet removeParentlessCorrectionSet;
+            ComponentTypeSet removeCopyParentCorrectionSet;
+            ComponentTypeSet removeChildrenWithNullSet;
+            if ((flags & RuntimeFeatureFlags.Flags.ExtremeTransforms) != RuntimeFeatureFlags.Flags.None)
+            {
+                var typeList = new FixedList128Bytes<ComponentType>();
+                typeList.Add(ComponentType.ReadWrite<PreviousParent>());
+                typeList.Add(ComponentType.ReadWrite<LocalTransform>());
+                typeList.Add(ComponentType.ReadWrite<ParentToWorldTransform>());
+                typeList.Add(ComponentType.ReadWrite<CopyParentWorldTransformTag>());
+                typeList.Add(ComponentType.ReadWrite<Depth>());
+                typeList.Add(ComponentType.ChunkComponent<ChunkDepthMask>());
+                removeDeadChildrenSet          = new ComponentTypeSet(typeList);
+                addNewChildrenNotCopyParentSet = new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
+                                                                      ComponentType.ReadWrite<LocalTransform>(),
+                                                                      ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                      ComponentType.ReadWrite<Depth>(),
+                                                                      ComponentType.ChunkComponent<ChunkDepthMask>());
+                addNewChildrenCopyParentExtremeSet = new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
+                                                                          ComponentType.ReadWrite<Depth>(),
+                                                                          ComponentType.ChunkComponent<ChunkDepthMask>());
+                removeParentlessCorrectionSet = new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
+                                                                     ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                     ComponentType.ReadWrite<CopyParentWorldTransformTag>(),
+                                                                     ComponentType.ReadWrite<Depth>(),
+                                                                     ComponentType.ChunkComponent<ChunkDepthMask>());
+                removeCopyParentCorrectionSet = new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
+                                                                     ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                     ComponentType.ReadWrite<Depth>(),
+                                                                     ComponentType.ChunkComponent<ChunkDepthMask>());
+                typeList.Add(ComponentType.ReadWrite<Parent>());
+                typeList.Add(ComponentType.ReadOnly<RemoveAllFromChildTag>());
+                removeChildrenWithNullSet = new ComponentTypeSet(typeList);
+            }
+            else
+            {
+                removeDeadChildrenSet = new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
+                                                             ComponentType.ReadWrite<LocalTransform>(),
+                                                             ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                             ComponentType.ReadWrite<CopyParentWorldTransformTag>());
+                addNewChildrenNotCopyParentSet = new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
+                                                                      ComponentType.ReadWrite<LocalTransform>(),
+                                                                      ComponentType.ReadWrite<ParentToWorldTransform>());
+                removeParentlessCorrectionSet = new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
+                                                                     ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                     ComponentType.ReadWrite<CopyParentWorldTransformTag>());
+                removeCopyParentCorrectionSet = new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
+                                                                     ComponentType.ReadWrite<ParentToWorldTransform>());
+                removeChildrenWithNullSet = new ComponentTypeSet(ComponentType.ReadWrite<Parent>(),
+                                                                 ComponentType.ReadWrite<PreviousParent>(),
+                                                                 ComponentType.ReadWrite<LocalTransform>(),
+                                                                 ComponentType.ReadWrite<ParentToWorldTransform>(),
+                                                                 ComponentType.ReadWrite<CopyParentWorldTransformTag>());
+            }
+
             state.CompleteDependency();
 
             state.EntityManager.RemoveComponent<Child>(m_deadParentsQuery);
-            state.EntityManager.RemoveComponent(       m_deadChildrenQuery, new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
-                                                                                                 ComponentType.ReadWrite<LocalTransform>(),
-                                                                                                 ComponentType.ReadWrite<ParentToWorldTransform>(),
-                                                                                                 ComponentType.ReadWrite<CopyParentWorldTransformTag>()));
-            state.EntityManager.AddComponent(                m_newChildrenNotCopyParentQuery, new ComponentTypeSet(ComponentType.ReadWrite<PreviousParent>(),
-                                                                                                                   ComponentType.ReadWrite<LocalTransform>(),
-                                                                                                                   ComponentType.ReadWrite<ParentToWorldTransform>()));
-            state.EntityManager.AddComponent<PreviousParent>(m_newChildrenIdentityQuery);
-            state.EntityManager.RemoveComponent(m_parentlessCorrectionQuery, new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
-                                                                                                  ComponentType.ReadWrite<ParentToWorldTransform>(),
-                                                                                                  ComponentType.ReadWrite<CopyParentWorldTransformTag>()));
-            state.EntityManager.RemoveComponent(m_copyParentCorrectionQuery, new ComponentTypeSet(ComponentType.ReadWrite<LocalTransform>(),
-                                                                                                  ComponentType.ReadWrite<ParentToWorldTransform>()));
+            state.EntityManager.RemoveComponent(       m_deadChildrenQuery, removeDeadChildrenSet);
+            state.EntityManager.AddComponent( m_newChildrenNotCopyParentQuery, addNewChildrenNotCopyParentSet);
+            if ((flags & RuntimeFeatureFlags.Flags.ExtremeTransforms) != RuntimeFeatureFlags.Flags.None)
+                state.EntityManager.AddComponent(m_newChildrenIdentityQuery, addNewChildrenCopyParentExtremeSet);
+            else
+                state.EntityManager.AddComponent<PreviousParent>(m_newChildrenIdentityQuery);
+            state.EntityManager.RemoveComponent(m_parentlessCorrectionQuery, removeParentlessCorrectionSet);
+            state.EntityManager.RemoveComponent(m_copyParentCorrectionQuery, removeCopyParentCorrectionSet);
 
             parentsWithoutChildBufferJH.Complete();
             state.EntityManager.AddComponent<Child>(parentsWithoutChildBufferList.AsArray());
 
             childrenWithNullParentsJH.Complete();
-            state.EntityManager.RemoveComponent(childrenWithNullParentsList.AsArray(),
-                                                new ComponentTypeSet(ComponentType.ReadWrite<Parent>(),
-                                                                     ComponentType.ReadWrite<PreviousParent>(),
-                                                                     ComponentType.ReadWrite<LocalTransform>(),
-                                                                     ComponentType.ReadWrite<ParentToWorldTransform>(),
-                                                                     ComponentType.ReadWrite<CopyParentWorldTransformTag>()));
+            if ((flags & RuntimeFeatureFlags.Flags.ExtremeTransforms) != RuntimeFeatureFlags.Flags.None)
+            {
+                state.EntityManager.AddComponent<RemoveAllFromChildTag>(childrenWithNullParentsList.AsArray());
+                state.EntityManager.RemoveComponent(m_removeAllFromChildTagQuery, removeChildrenWithNullSet);
+            }
+            else
+                state.EntityManager.RemoveComponent(childrenWithNullParentsList.AsArray(), removeChildrenWithNullSet);
             sortChangeOpsJH.Complete();
             state.EntityManager.RemoveComponent<Child>(parentsWithEmptyChildBuffers.AsArray());
 
@@ -487,4 +554,5 @@ namespace Latios.Transforms.Systems
         }
     }
 }
+#endif
 

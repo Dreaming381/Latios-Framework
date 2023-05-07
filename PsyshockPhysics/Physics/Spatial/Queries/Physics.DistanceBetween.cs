@@ -132,17 +132,6 @@ namespace Latios.Psyshock
                                                             maxDistance,
                                                             out result);
         }
-
-        // Todo: Legacy, remove
-        public static bool DistanceBetween(Collider colliderA,
-                                           in RigidTransform transformA,
-                                           Collider colliderB,
-                                           in RigidTransform transformB,
-                                           float maxDistance,
-                                           out ColliderDistanceResult result)
-        {
-            return ColliderColliderDispatch.DistanceBetween(in colliderA, in transformA, in colliderB, in transformB, maxDistance, out result);
-        }
         #endregion
 
         #region Collider vs Layer

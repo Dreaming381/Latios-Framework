@@ -75,5 +75,11 @@ namespace Latios.Kinemation.Authoring
     {
         public SmartBlobberHandle<MeshDeformDataBlob> blobHandle;
     }
+
+    [TemporaryBakingType]
+    internal struct ClipEventToBake : IBufferElementData
+    {
+        public ClipEvent clipEvent;
+    }
 }
 

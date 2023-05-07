@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Transforms;
 using Unity.Audio;
 using Unity.Burst;
@@ -438,4 +438,5 @@ namespace Latios.Myri.Systems
         }
     }
 }
+#endif
 

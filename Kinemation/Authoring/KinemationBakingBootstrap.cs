@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Authoring;
 using Latios.Kinemation.Authoring.Systems;
 using Unity.Entities;
@@ -24,6 +25,7 @@ namespace Latios.Kinemation.Authoring
             context.filteredBakerTypes.Add(typeof(DefaultMeshRendererBaker));
             context.filteredBakerTypes.Remove(typeof(Unity.Rendering.MeshRendererBaker));
 
+            context.bakingSystemTypesToInject.Add(typeof(KinemationPreTransformsBakingGroup));
             context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberBakingGroup));
             context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberResolverBakingGroup));
             context.bakingSystemTypesToInject.Add(typeof(AddMasksBakingSystem));
@@ -37,4 +39,5 @@ namespace Latios.Kinemation.Authoring
         }
     }
 }
+#endif
 

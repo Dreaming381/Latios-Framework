@@ -261,6 +261,14 @@ namespace Latios.Kinemation
             return AclUnity.Decompression.SampleFloat(compressedClipDataAligned16.GetUnsafePtr(), parameterIndex, time, mode);
         }
 
+        /// <summary>
+        /// Samples the animation clip for all parameters at the given time at once
+        /// </summary>
+        /// <param name="destination">The array of floats where the parameters should be stored. If the array is not large enough, a safety exception is thrown.</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
         public unsafe void SampleAllParameters(NativeArray<float>        destination,
                                                float time,
                                                KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)

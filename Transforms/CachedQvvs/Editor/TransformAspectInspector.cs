@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Entities.Editor;
 using Unity.Entities.UI;
 using UnityEditor;
@@ -89,4 +90,5 @@ namespace Latios.Transforms.Editor
         }
     }
 }
+#endif
 

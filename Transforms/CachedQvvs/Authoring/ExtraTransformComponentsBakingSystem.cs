@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using Latios;
 using Unity.Burst;
@@ -12,6 +13,7 @@ namespace Latios.Transforms.Authoring.Systems
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(TransformBakingSystemGroup))]
     [UpdateBefore(typeof(TransformBakingSystem))]
+    [UpdateAfter(typeof(UserPreTransformsBakingSystemGroup))]
     [RequireMatchingQueriesForUpdate]
     [BurstCompile]
     public partial struct ExtraTransformComponentsBakingSystem : ISystem
@@ -94,4 +96,5 @@ namespace Latios.Transforms.Authoring.Systems
         }
     }
 }
+#endif
 

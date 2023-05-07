@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Entities;
 using Unity.Rendering;
 
@@ -128,4 +129,5 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
+#endif
 

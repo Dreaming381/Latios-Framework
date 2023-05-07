@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
 using Latios.Psyshock;
 using Latios.Transforms;
@@ -112,4 +113,5 @@ namespace Latios.Kinemation
         }
     }
 }
+#endif
 

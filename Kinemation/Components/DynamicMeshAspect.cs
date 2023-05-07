@@ -4,13 +4,28 @@ using Unity.Mathematics;
 
 namespace Latios.Kinemation
 {
+    /// <summary>
+    /// An aspect for working with dynamic meshes that abstracts away the rotation mechanisms
+    /// </summary>
     public readonly partial struct DynamicMeshAspect : IAspect
     {
         readonly RefRW<DynamicMeshState>          m_state;
         readonly DynamicBuffer<DynamicMeshVertex> m_vertices;
 
+        /// <summary>
+        /// The number of vertices in this dynamic mesh
+        /// </summary>
         public int vertexCount => m_vertices.Length / 3;
 
+        /// <summary>
+        /// If true, the blend shapes have been acquired with write access already this frame.
+        /// </summary>
+        public bool isDirty => (m_state.ValueRO.state & DynamicMeshState.Flags.IsDirty) == DynamicMeshState.Flags.IsDirty;
+
+        /// <summary>
+        /// Provides the writable array of vertices for the current frame and sets isDirty to true.
+        /// If isDirty is false prior to access, the existing values are undefined.
+        /// </summary>
         public NativeArray<DynamicMeshVertex> verticesRW
         {
             get
@@ -22,6 +37,10 @@ namespace Latios.Kinemation
             }
         }
 
+        /// <summary>
+        /// Provides the readonly array of vertices for the current frame.
+        /// If isDirty is false, the values are undefined.
+        /// </summary>
         public NativeArray<DynamicMeshVertex>.ReadOnly verticesRO
         {
             get
@@ -32,6 +51,9 @@ namespace Latios.Kinemation
             }
         }
 
+        /// <summary>
+        /// Provides the readonly array of blend vertices for the previous frame.
+        /// </summary>
         public NativeArray<DynamicMeshVertex>.ReadOnly previousVertices
         {
             get
@@ -42,6 +64,9 @@ namespace Latios.Kinemation
             }
         }
 
+        /// <summary>
+        /// Provides the readonly array of vertices from two frames ago.
+        /// </summary>
         public NativeArray<DynamicMeshVertex>.ReadOnly twoAgoVertices
         {
             get

@@ -6,7 +6,6 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Entities.Exposed;
 using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;

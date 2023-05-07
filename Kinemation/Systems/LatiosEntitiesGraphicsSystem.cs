@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 #region Header
 // This define fails tests due to the extra log spam. Don't check this in enabled
 // #define DEBUG_LOG_HYBRID_RENDERER
@@ -329,12 +330,12 @@ namespace Latios.Kinemation.Systems
 
             // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS (*cough Latios Transforms)
 #if SRP_10_0_0_OR_NEWER
-            RegisterMaterialPropertyType<WorldTransform>(       "unity_ObjectToWorld",   4 * 4 * 3);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
+            RegisterMaterialPropertyType<WorldTransform>(   "unity_ObjectToWorld",   4 * 4 * 3);
+            RegisterMaterialPropertyType<WorldToLocal_Tag>( "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
             RegisterMaterialPropertyType<PreviousTransform>("unity_MatrixPreviousM", 4 * 4 * 3);
 #else
-            RegisterMaterialPropertyType<LocalToWorld>(         "unity_ObjectToWorld",   4 * 4 * 4);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>(     "unity_WorldToObject",   4 * 4 * 4);
+            RegisterMaterialPropertyType<LocalToWorld>(     "unity_ObjectToWorld",   4 * 4 * 4);
+            RegisterMaterialPropertyType<WorldToLocal_Tag>( "unity_WorldToObject",   4 * 4 * 4);
 #endif
 
 #if ENABLE_PICKING
@@ -1923,4 +1924,5 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
+#endif
 

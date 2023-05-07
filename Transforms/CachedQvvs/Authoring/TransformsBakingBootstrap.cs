@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Authoring;
 using Unity.Collections;
 using Unity.Entities;
@@ -19,9 +20,25 @@ namespace Latios.Transforms.Authoring
                     break;
                 }
             }
-            context.bakingSystemTypesToInject.Add(typeof(Systems.TransformBakingSystem));
             context.bakingSystemTypesToInject.Add(typeof(Systems.ExtraTransformComponentsBakingSystem));
+            context.bakingSystemTypesToInject.Add(typeof(Systems.TransformBakingSystem));
+            context.bakingSystemTypesToInject.Add(typeof(Systems.TransformHierarchySyncBakingSystem));
         }
     }
 }
+
+namespace Latios.Transforms.Authoring.Systems
+{
+    /// <summary>
+    /// Updates before all other Transform Systems.
+    /// This provides an opportune time for baking systems to request extra transforms components
+    /// or manually set up hierarchies that will have the WorldTransform automatically synced afterwards.
+    /// </summary>
+    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
+    [UpdateInGroup(typeof(TransformBakingSystemGroup))]
+    public partial class UserPreTransformsBakingSystemGroup : ComponentSystemGroup
+    {
+    }
+}
+#endif
 

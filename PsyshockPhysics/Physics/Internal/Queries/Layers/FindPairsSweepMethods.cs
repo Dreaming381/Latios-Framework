@@ -15,7 +15,7 @@ namespace Latios.Psyshock
             Hint.Assume(bucket.xmins.Length == bucket.yzminmaxs.Length);
             Hint.Assume(bucket.xmins.Length == bucket.bodies.Length);
 
-            var result = new FindPairsResult(layer, layer, bucket, bucket, jobIndex, isThreadSafe);
+            var result = new FindPairsResult(in layer, in layer, in bucket, in bucket, jobIndex, isThreadSafe);
 
             int count = bucket.xmins.Length;
             for (int i = 0; i < count - 1; i++)
@@ -54,7 +54,7 @@ namespace Latios.Psyshock
             Hint.Assume(bucketB.xmins.Length == bucketB.yzminmaxs.Length);
             Hint.Assume(bucketB.xmins.Length == bucketB.bodies.Length);
 
-            var result = new FindPairsResult(layerA, layerB, bucketA, bucketB, jobIndex, isThreadSafe);
+            var result = new FindPairsResult(in layerA, in layerB, in bucketA, in bucketB, jobIndex, isThreadSafe);
 
             //var outer0Marker = new Unity.Profiling.ProfilerMarker("Outer0");
             //var outer1Marker = new Unity.Profiling.ProfilerMarker("Outer1");

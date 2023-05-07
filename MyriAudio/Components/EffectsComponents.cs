@@ -5,19 +5,20 @@ using Unity.Mathematics;
 
 namespace Latios.Myri
 {
-    public interface IEffectParameters<TEffect, TParameters> : IComponentData
+    // Make these public on release
+    internal interface IEffectParameters<TEffect, TParameters> : IComponentData
         where TEffect : unmanaged, DSP.IEffect<TEffect, TParameters>
         where TParameters : unmanaged, IEffectParameters<TEffect, TParameters>
     {
     }
 
-    public interface ISpatialEffectParamaters<TEffect, TParameters> : IComponentData
+    internal interface ISpatialEffectParamaters<TEffect, TParameters> : IComponentData
         where TEffect : unmanaged, DSP.ISpatialEffect<TEffect, TParameters>
         where TParameters : unmanaged, ISpatialEffectParamaters<TEffect, TParameters>
     {
     }
 
-    public interface IListenerProperty : IComponentData
+    internal interface IListenerProperty : IComponentData
     {
     }
 }

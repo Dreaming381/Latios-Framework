@@ -182,8 +182,13 @@ namespace Latios.Psyshock.Authoring.Systems
             if (smartBaker.m_colliderCache.Count < 2)
                 return false;
 
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_colliderCache, transform);
             return true;
+#else
+            UnityEngine.Debug.LogWarning("The current transform system in use does not support baking compound colliders.");
+            return false;
+#endif
         }
 
         public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
