@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Transforms;
 using Latios.Transforms.Authoring;
 using Unity.Burst;
@@ -42,9 +43,7 @@ namespace Latios.Kinemation.Authoring.Systems
             exposedBoneTypes.Add(ComponentType.ReadWrite<RequestPreviousTransform>());
             exposedBoneTypes.Add(ComponentType.ReadWrite<RequestTwoAgoTransform>());
             ComponentTypeSet exposedBoneTypesToRemove = new ComponentTypeSet(in exposedBoneTypes);
-            exposedBoneTypes.Add(ComponentType.ReadWrite<PreviousTransform>());
-            exposedBoneTypes.Add(ComponentType.ReadWrite<TwoAgoTransform>());
-            ComponentTypeSet exposedBoneTypesToAdd = new ComponentTypeSet(in exposedBoneTypes);
+            ComponentTypeSet exposedBoneTypesToAdd    = new ComponentTypeSet(in exposedBoneTypes);
 
             new ClearJob().ScheduleParallel();
 
@@ -133,4 +132,5 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
+#endif
 

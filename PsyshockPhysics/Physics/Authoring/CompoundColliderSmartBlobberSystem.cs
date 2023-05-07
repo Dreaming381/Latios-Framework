@@ -1,4 +1,4 @@
-﻿using System;
+﻿#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
@@ -167,4 +167,5 @@ namespace Latios.Psyshock.Authoring.Systems
         }
     }
 }
+#endif
 

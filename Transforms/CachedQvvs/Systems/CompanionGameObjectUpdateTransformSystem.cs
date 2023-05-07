@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 #if !UNITY_DISABLE_MANAGED_COMPONENTS
 using Unity.Burst;
 using Unity.Collections;
@@ -200,5 +201,6 @@ namespace Latios.Transforms.Systems
         }
     }
 }
+#endif
 #endif
 

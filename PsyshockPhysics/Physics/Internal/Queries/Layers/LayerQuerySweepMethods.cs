@@ -31,7 +31,7 @@ namespace Latios.Psyshock
                 }
             }
 
-            AabbSweepBucket(in aabb, in layer, layer.GetBucketSlices(layer.BucketCount - 1), ref processor);
+            AabbSweepBucket(in aabb, in layer, layer.GetBucketSlices(layer.bucketCount - 1), ref processor);
         }
 
         private static void AabbSweepBucket<T>(in Aabb aabb, in CollisionLayer layer, in BucketSlices bucket, ref T processor) where T : struct, IFindObjectsProcessor
@@ -51,14 +51,14 @@ namespace Latios.Psyshock
 
             for (int indexInBucket = linearSweepStartIndex; indexInBucket < bucket.count && bucket.xmins[indexInBucket] <= qxmax; indexInBucket++)
             {
-                if (math.bitmask(context.qyzMinMax < bucket.yzminmaxs[indexInBucket]) == 0)
+                if (Hint.Unlikely(math.bitmask(context.qyzMinMax < bucket.yzminmaxs[indexInBucket]) == 0))
                 {
                     context.result.SetBucketRelativeIndex(indexInBucket);
                     processor.Execute(in context.result);
                 }
             }
 
-            SearchTree(0, ref context, ref processor);
+            SearchTreeLooped(0, ref context, ref processor);
         }
 
         private static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
@@ -131,7 +131,7 @@ namespace Latios.Psyshock
 
             if (context.qxmin > node.xmin && context.qxmin <= node.xmax)
             {
-                if (math.bitmask(context.qyzMinMax < context.bucket.yzminmaxs[node.bucketRelativeBodyIndex]) == 0)
+                if (Hint.Unlikely(math.bitmask(context.qyzMinMax < context.bucket.yzminmaxs[node.bucketRelativeBodyIndex]) == 0))
                 {
                     context.result.SetBucketRelativeIndex(node.bucketRelativeBodyIndex);
                     processor.Execute(in context.result);
@@ -141,9 +141,79 @@ namespace Latios.Psyshock
             SearchTree(GetRightChildIndex(currentIndex), ref context, ref processor);
         }
 
-        public static uint GetLeftChildIndex(uint currentIndex) => 2 * currentIndex + 1;
-        public static uint GetRightChildIndex(uint currentIndex) => 2 * currentIndex + 2;
-        public static uint GetParentIndex(uint currentIndex) => (currentIndex - 1) / 2;
+        private static uint GetLeftChildIndex(uint currentIndex) => 2 * currentIndex + 1;
+        private static uint GetRightChildIndex(uint currentIndex) => 2 * currentIndex + 2;
+        private static uint GetParentIndex(uint currentIndex) => (currentIndex - 1) / 2;
+
+        struct StackFrame
+        {
+            public uint currentIndex;
+            public uint checkpoint;
+        }
+
+        [SkipLocalsInit]
+        private static unsafe void SearchTreeLooped<T>(uint _currentIndex, ref AabbSweepRecursiveContext context, ref T processor) where T : struct, IFindObjectsProcessor
+        {
+            uint        currentFrameIndex = 0;
+            StackFrame* stack             = stackalloc StackFrame[32];
+            stack[0]                      = new StackFrame { currentIndex = _currentIndex, checkpoint = 0 };
+
+            while (currentFrameIndex < 32)
+            {
+                var currentFrame = stack[currentFrameIndex];
+                if (currentFrame.checkpoint == 0)
+                {
+                    if (currentFrame.currentIndex >= context.bucket.count)
+                    {
+                        currentFrameIndex--;
+                        continue;
+                    }
+
+                    var node = context.bucket.intervalTree[(int)currentFrame.currentIndex];
+                    if (context.qxmin >= node.subtreeXmax)
+                    {
+                        currentFrameIndex--;
+                        continue;
+                    }
+
+                    currentFrame.checkpoint  = 1;
+                    stack[currentFrameIndex] = currentFrame;
+                    currentFrameIndex++;
+                    stack[currentFrameIndex].currentIndex = GetLeftChildIndex(currentFrame.currentIndex);
+                    stack[currentFrameIndex].checkpoint   = 0;
+                    continue;
+                }
+                else if (currentFrame.checkpoint == 1)
+                {
+                    var node = context.bucket.intervalTree[(int)currentFrame.currentIndex];
+                    if (context.qxmin < node.xmin)
+                    {
+                        currentFrameIndex--;
+                        continue;
+                    }
+
+                    if (context.qxmin > node.xmin && context.qxmin <= node.xmax)
+                    {
+                        if (Hint.Unlikely(math.bitmask(context.qyzMinMax < context.bucket.yzminmaxs[node.bucketRelativeBodyIndex]) == 0))
+                        {
+                            context.result.SetBucketRelativeIndex(node.bucketRelativeBodyIndex);
+                            processor.Execute(in context.result);
+                        }
+                    }
+
+                    currentFrame.checkpoint  = 2;
+                    stack[currentFrameIndex] = currentFrame;
+                    currentFrameIndex++;
+                    stack[currentFrameIndex].currentIndex = GetRightChildIndex(currentFrame.currentIndex);
+                    stack[currentFrameIndex].checkpoint   = 0;
+                    continue;
+                }
+                else
+                {
+                    currentFrameIndex--;
+                }
+            }
+        }
     }
 }
 

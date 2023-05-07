@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -69,7 +70,9 @@ namespace Latios.Transforms
         public float3 downDirection => math.rotate(rotation, new float3(0f, -1f, 0f));
     }
 
-    // Typically read-only by user code
+    /// <summary>
+    /// A cached copy of the parent's WorldTransform used internally by TransformAspect.
+    /// </summary>
     public struct ParentToWorldTransform : IComponentData
     {
         public TransformQvvs parentToWorldTransform;
@@ -83,36 +86,64 @@ namespace Latios.Transforms
     }
 
     // Local space transform relative to the parent, only valid if parent exists
+    /// <summary>
+    /// A local space transform (excluding stretch) relative to the parent. It should only exist if the entity has a parent.
+    /// </summary>
     public struct LocalTransform : IComponentData
     {
-        // Stretch comes from the WorldTransform and is not duplicated here so-as to improve chunk occupancy
+        /// <summary>
+        /// The actual TransformQvs of the local transform. Stretch is omitted here as it is owned by WorldTransform.
+        /// </summary>
         public TransformQvs localTransform;
 
+        /// <summary>
+        /// The local-space position of the entity
+        /// </summary>
         public float3 position => localTransform.position;
+        /// <summary>
+        /// The local-space rotation of the entity
+        /// </summary>
         public quaternion rotation => localTransform.rotation;
+        /// <summary>
+        /// The local-space uniform scale of the entity prior to inherited scale values from ancestors
+        /// </summary>
         public float scale => localTransform.scale;
     }
 
-    // Can replace LocalTransform and ParentToWorldTransform to improve chunk occupancy if the entity copies the parent's transform exactly
+    /// <summary>
+    /// A tag that specifies the parent's WorldTransform should be copied onto this Entity's WorldTransform exactly.
+    /// With this component, an Entity does not need LocalTransform nor ParentToWorldTransform, saving memory.
+    /// </summary>
     public struct CopyParentWorldTransformTag : IComponentData { }
 
+    /// <summary>
+    /// The desired Parent of the entity. Modify this to change the entity's parent.
+    /// </summary>
     public struct Parent : IComponentData
     {
         public Entity parent;
     }
-    // Usually doesn't need to be touched by user code
+
+    /// <summary>
+    /// The actual parent of the entity as last seen by the Transform System. Do not modify.
+    /// </summary>
     public struct PreviousParent : ICleanupComponentData
     {
         public Entity previousParent;
     }
 
+    /// <summary>
+    /// The list of children of this entity as last seen by the Transform System. Do not modify.
+    /// </summary>
     [InternalBufferCapacity(0)]
     public struct Child : ICleanupBufferElementData
     {
         public EntityWith<Parent> child;
     }
 
-    // Part of Motion History, used for motion vectors
+    /// <summary>
+    /// The WorldTransform from the previous frame. This gets used for motion vectors, but may also be read for gameplay purposes.
+    /// </summary>
     public struct PreviousTransform : IComponentData
     {
         public TransformQvvs worldTransform;
@@ -126,7 +157,9 @@ namespace Latios.Transforms
         public bool isInitialized => version != 0;
     }
 
-    // Part of Motion History, used for Inertial Blending
+    /// <summary>
+    /// The WorldTransform from two frames ago. This may be read for gameplay purposes.
+    /// </summary>
     public struct TwoAgoTransform : IComponentData
     {
         public TransformQvvs worldTransform;
@@ -139,5 +172,26 @@ namespace Latios.Transforms
         public int version => worldTransform.worldIndex;
         public bool isInitialized => version != 0;
     }
+
+    internal struct Depth : IComponentData
+    {
+        public byte depth;
+    }
+
+    internal struct ChunkDepthMask : IComponentData
+    {
+        public BitField32 chunkDepthMask;
+    }
+
+    internal struct RuntimeFeatureFlags : IComponentData
+    {
+        public enum Flags : byte
+        {
+            None = 0,
+            ExtremeTransforms = 1
+        }
+        public Flags flags;
+    }
 }
+#endif
 

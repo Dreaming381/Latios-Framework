@@ -423,13 +423,17 @@ namespace Latios
         #region TypeManager
         public static bool IsAssemblyReferencingLatios(Assembly assembly)
         {
-            const string entitiesAssemblyName = "Latios";
-            if (assembly.GetName().Name.Contains(entitiesAssemblyName))
+            return IsAssemblyReferencingSubstring(assembly, "Latios");
+        }
+
+        public static bool IsAssemblyReferencingSubstring(Assembly assembly, string nameSubstring)
+        {
+            if (assembly.GetName().Name.Contains(nameSubstring))
                 return true;
 
             var referencedAssemblies = assembly.GetReferencedAssemblies();
             foreach (var referenced in referencedAssemblies)
-                if (referenced.Name.Contains(entitiesAssemblyName))
+                if (referenced.Name.Contains(nameSubstring))
                     return true;
             return false;
         }

@@ -4,7 +4,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri
 {
-    public struct BrickwallLimiterSettings
+    // Make public on release
+    internal struct BrickwallLimiterSettings
     {
         public float preGain;
         public float limitDB;

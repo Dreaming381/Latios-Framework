@@ -488,9 +488,21 @@ namespace Latios.Kinemation
         // Todo: Modification Methods and ReadOnly Transformation Methods
 
         #region ReadOnly Properties
+        /// <summary>
+        /// The root-space transform of the bone from the previous frame
+        /// </summary>
         public TransformQvvs previousRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        /// <summary>
+        /// The local-space transform of the bone from the previous frame
+        /// </summary>
         public TransformQvvs previousLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
+        /// <summary>
+        /// The root-space transform of the bone from two frames ago
+        /// </summary>
         public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        /// <summary>
+        /// The local-space transform of the bone from two frames ago
+        /// </summary>
         public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
         #endregion
     }

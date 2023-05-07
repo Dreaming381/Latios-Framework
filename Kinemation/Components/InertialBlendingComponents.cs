@@ -70,7 +70,6 @@ namespace Latios.Kinemation
         internal float4 coeffF;
         internal float4 durations;  // Needed in-case something is not finite, in which F/E becomes 0/0
 
-        // Todo: Cache duration to improve alignment?
         internal float3 rotationAxis;  // rotation
         internal float3 direction;  // position
         internal float3 expansion;  // stretch

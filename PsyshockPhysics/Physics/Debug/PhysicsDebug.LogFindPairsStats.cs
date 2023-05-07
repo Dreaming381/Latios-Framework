@@ -71,7 +71,7 @@ namespace Latios.Psyshock
             {
                 layer     = layer,
                 layerName = layerName
-            }.ScheduleParallel(layer.BucketCount * 2 - 1, 1, inputDeps);
+            }.ScheduleParallel(layer.bucketCount * 2 - 1, 1, inputDeps);
         }
 
         internal static JobHandle LogFindPairsStats(CollisionLayer layerA,
@@ -86,7 +86,7 @@ namespace Latios.Psyshock
                 layerNameA = layerNameA,
                 layerB     = layerB,
                 layerNameB = layerNameB
-            }.ScheduleParallel(3 * layerA.BucketCount - 2, 1, inputDeps);
+            }.ScheduleParallel(3 * layerA.bucketCount - 2, 1, inputDeps);
         }
 
         [BurstCompile]
@@ -100,7 +100,7 @@ namespace Latios.Psyshock
                 FixedString4096Bytes countsAsString = default;
                 for (int i = 0; i < layer.bucketStartsAndCounts.Length; i++)
                 {
-                    if (i == layer.BucketCount - 1)
+                    if (i == layer.bucketCount - 1)
                     {
                         //countsAsString.Append("cross: ");
                         countsAsString.Append('c');
@@ -111,7 +111,7 @@ namespace Latios.Psyshock
                         countsAsString.Append(':');
                         countsAsString.Append(' ');
                     }
-                    else if (i == layer.BucketCount)
+                    else if (i == layer.bucketCount)
                     {
                         //countsAsString.Append("NaN: ");
                         countsAsString.Append('N');
@@ -136,16 +136,16 @@ namespace Latios.Psyshock
 
             public void Execute(int index)
             {
-                if (index < layer.BucketCount)
+                if (index < layer.bucketCount)
                 {
                     var bucket = layer.GetBucketSlices(index);
                     FindPairsSweepMethods.SelfSweepStats(bucket, in layerName);
                 }
                 else
                 {
-                    index           -= layer.BucketCount;
+                    index           -= layer.bucketCount;
                     var bucket       = layer.GetBucketSlices(index);
-                    var crossBucket  = layer.GetBucketSlices(layer.BucketCount - 1);
+                    var crossBucket  = layer.GetBucketSlices(layer.bucketCount - 1);
                     FindPairsSweepMethods.BipartiteSweepStats(bucket, in layerName, crossBucket, in layerName);
                 }
             }
@@ -161,25 +161,25 @@ namespace Latios.Psyshock
 
             public void Execute(int i)
             {
-                if (i < layerA.BucketCount)
+                if (i < layerA.bucketCount)
                 {
                     var bucketA = layerA.GetBucketSlices(i);
                     var bucketB = layerB.GetBucketSlices(i);
                     FindPairsSweepMethods.BipartiteSweepStats(bucketA, layerNameA, bucketB, layerNameB);
                 }
-                else if (i < 2 * layerB.BucketCount - 1)
+                else if (i < 2 * layerB.bucketCount - 1)
                 {
-                    i               -= layerB.BucketCount;
+                    i               -= layerB.bucketCount;
                     var bucket       = layerB.GetBucketSlices(i);
-                    var crossBucket  = layerA.GetBucketSlices(layerA.BucketCount - 1);
+                    var crossBucket  = layerA.GetBucketSlices(layerA.bucketCount - 1);
                     FindPairsSweepMethods.BipartiteSweepStats(crossBucket, layerNameA, bucket, layerNameB);
                 }
                 else
                 {
                     var jobIndex     = i;
-                    i               -= (2 * layerB.BucketCount - 1);
+                    i               -= (2 * layerB.bucketCount - 1);
                     var bucket       = layerA.GetBucketSlices(i);
-                    var crossBucket  = layerB.GetBucketSlices(layerB.BucketCount - 1);
+                    var crossBucket  = layerB.GetBucketSlices(layerB.bucketCount - 1);
                     FindPairsSweepMethods.BipartiteSweepStats(bucket, layerNameA, crossBucket, layerNameB);
                 }
             }

@@ -4,7 +4,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public struct StateVariableFilter
+    // Make public on release
+    internal struct StateVariableFilter
     {
         public enum FilterType
         {

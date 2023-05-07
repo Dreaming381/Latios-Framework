@@ -145,7 +145,7 @@ namespace Latios.Kinemation
     /// Usage: Add to an entity to make it use Dual Quaternion Skinning. Remove to return
     /// to matrix skinning.
     /// </summary>
-    public struct DualQuaternionSkinningDeformTag : IComponentData { }
+    internal struct DualQuaternionSkinningDeformTag : IComponentData { }
 
     #endregion
 
@@ -301,13 +301,14 @@ namespace Latios.Kinemation
     /// Because of this, a single threadgroup is responsible for an entire mesh.
     /// Vertices are packed in batches of 1024. At the start of each batch is
     /// a "fake" header bone weight that specifies the offset to the next batch.
-    /// Then follows the first bone weight of the 1024 vertices in the batch.
+    /// The header also includes the number of vertices in the mesh.
+    /// Then follows the first bone weight for each of the 1024 vertices in the batch.
     /// Each bone weight contains the weight and and a packed integer.
     /// The last two bytes of the packed integer contain the bone index.
     /// The first 10 bits of the packed integer contain the offset to the next
     /// bone weight for that index. If the weight is negative, then the bone
     /// weight is the last for the vertex. For debugging and possibly other purposes,
-    /// the MeshSkinningBlob has boneweightBatchStarts which contain the indices
+    /// the MeshSkinningBlob has boneWeightBatchStarts which contain the indices
     /// of the header bone weights. The array is not uploaded or used by the GPU.
     /// This algorithm is 50% faster and uses less buffers and mememory compared to
     /// more traditional bone compute skinning algorithms that use a start and count

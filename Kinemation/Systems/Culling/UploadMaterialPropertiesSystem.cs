@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using Latios;
 using Latios.Kinemation.SparseUpload;
@@ -117,20 +118,20 @@ namespace Latios.Kinemation.Systems
                 m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
                 var collectJh = new ComputeOperationsJob
                 {
-                    ChunkHeader                       = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
-                    ChunkProperties                   = context.chunkProperties,
-                    chunkPropertyDirtyMaskHandle      = SystemAPI.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                    chunkPerCameraCullingMaskHandle   = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                    ComponentTypes                    = m_burstCompatibleTypeArray,
-                    GpuUploadOperations               = gpuUploadOperations,
-                    EntitiesGraphicsChunkInfo         = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                    WorldTransformType                = TypeManager.GetTypeIndex<WorldTransform>(),
-                    NumGpuUploadOperations            = numGpuUploadOperations,
-                    PreviousTransformType         = TypeManager.GetTypeIndex<PreviousTransform>(),
-                    PreviousTransformPreviousType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
-                    WorldTransformInverseType         = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
-                    postProcessMatrixHandle           = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
-                    previousPostProcessMatrixHandle   = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true)
+                    ChunkHeader                     = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
+                    ChunkProperties                 = context.chunkProperties,
+                    chunkPropertyDirtyMaskHandle    = SystemAPI.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                    chunkPerCameraCullingMaskHandle = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                    ComponentTypes                  = m_burstCompatibleTypeArray,
+                    GpuUploadOperations             = gpuUploadOperations,
+                    EntitiesGraphicsChunkInfo       = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                    WorldTransformType              = TypeManager.GetTypeIndex<WorldTransform>(),
+                    NumGpuUploadOperations          = numGpuUploadOperations,
+                    PreviousTransformType           = TypeManager.GetTypeIndex<PreviousTransform>(),
+                    PreviousTransformPreviousType   = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+                    WorldTransformInverseType       = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
+                    postProcessMatrixHandle         = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
+                    previousPostProcessMatrixHandle = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true)
                 }.ScheduleParallel(m_metaQuery, Dependency);
 
                 var uploadSizeRequirements = new NativeReference<UploadSizeRequirements>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
@@ -771,4 +772,5 @@ namespace Latios.Kinemation
         }
     }
 }
+#endif
 

@@ -50,6 +50,11 @@ namespace Latios
 
         public void Dispose()
         {
+            var stackCache = new NativeList<int>(Allocator.Temp);
+            foreach (var storage in m_typedStorages)
+            {
+                storage.Dispose(stackCache);
+            }
             m_twoLevelLookup.Dispose();
             m_registeredTypeLookup.Dispose();
         }
@@ -163,6 +168,8 @@ namespace Latios
 
             if (index < 0)
                 return false;
+            tmss.storage[index].Dispose();
+            tmss.storage[index] = default;  // Unreference things to help GC.
             tmss.freeStack.Push(index);
             var key = new Key { typeHash = BurstRuntime.GetHashCode64<T>(), entity = entity };
             m_twoLevelLookup.Remove(key);
@@ -221,6 +228,7 @@ namespace Latios
         private abstract class TypedManagedStructStorageBase
         {
             public abstract void CopyComponent(ManagedStructComponentStorage mscs, Entity src, Entity dst);
+            public abstract void Dispose(NativeList<int> stackCache);
         }
 
         private class TypedManagedStructStorage<T> : TypedManagedStructStorageBase where T : struct, IManagedStructComponent,
@@ -234,6 +242,22 @@ namespace Latios
             {
                 var srcValue = mscs.GetComponent<T>(src);
                 mscs.AddComponent(dst, srcValue);
+            }
+
+            public override void Dispose(NativeList<int> stackCache)
+            {
+                stackCache.Clear();
+                while (freeStack.TryPop(out var index))
+                {
+                    stackCache.Add(index);
+                }
+                stackCache.Sort();
+                for (int i = stackCache.Length - 1; i >= 0; i--)
+                {
+                    storage.RemoveAtSwapBack(i);
+                }
+                foreach (var msc in storage)
+                    msc.Dispose();
             }
         }
     }

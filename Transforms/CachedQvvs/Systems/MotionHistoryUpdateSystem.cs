@@ -1,10 +1,12 @@
-using static Unity.Entities.SystemAPI;
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
+
+using static Unity.Entities.SystemAPI;
 
 // Todo: Need to skip for multiple updates per frame.
 namespace Latios.Transforms.Systems
@@ -106,4 +108,5 @@ namespace Latios.Transforms.Systems
         }
     }
 }
+#endif
 

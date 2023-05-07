@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -1895,4 +1896,5 @@ namespace Latios.Kinemation.Systems
         #endregion
     }
 }
+#endif
 

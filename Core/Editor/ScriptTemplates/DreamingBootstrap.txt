@@ -9,6 +9,7 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
 {
     public void InitializeBakingForAllWorlds(ref CustomBakingBootstrapContext context)
     {
+        Latios.Transforms.Authoring.TransformsBakingBootstrap.InstallLatiosTransformsBakers(ref context);
         Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallLegacyColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemationBakersAndSystems(ref context);
     }
@@ -25,7 +26,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
         var systems = new List<Type>(DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default, true));
         BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
-        Latios.CoreBootstrap.InstallExtremeTransforms(world);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
 
         return world;
@@ -45,11 +46,13 @@ public class LatiosBootstrap : ICustomBootstrap
         var systems = new List<Type>(DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
 
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
-        BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
-        CoreBootstrap.InstallExtremeTransforms(world);
+        CoreBootstrap.InstallSceneManager(world);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+
+        BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();

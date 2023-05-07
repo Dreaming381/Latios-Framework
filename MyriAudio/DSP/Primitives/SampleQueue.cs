@@ -5,7 +5,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public struct SampleQueue : IDisposable
+    // Make public on release
+    internal struct SampleQueue : IDisposable
     {
         NativeArray<float> m_buffer;
         int                m_nextEnqueueIndex;

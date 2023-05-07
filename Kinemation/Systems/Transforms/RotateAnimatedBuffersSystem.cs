@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
 using Latios.Transforms;
 using Latios.Transforms.Systems;
@@ -346,4 +347,5 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
+#endif
 

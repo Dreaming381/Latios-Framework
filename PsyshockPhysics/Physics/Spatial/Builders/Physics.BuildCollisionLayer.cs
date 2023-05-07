@@ -15,6 +15,7 @@ namespace Latios.Psyshock
     /// </summary>
     public struct BuildCollisionLayerTypeHandles
     {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         [ReadOnly] public ComponentTypeHandle<Collider>       collider;
         [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransform;
         [ReadOnly] public EntityTypeHandle                    entity;
@@ -58,6 +59,7 @@ namespace Latios.Psyshock
             worldTransform.Update(ref system);
             entity.Update(ref system);
         }
+#endif
     }
 
     /// <summary>
@@ -92,6 +94,7 @@ namespace Latios.Psyshock
 
     public static partial class Physics
     {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         /// <summary>
         /// Adds the necessary components to an EntityQuery to ensure proper building of a CollisionLayer
         /// </summary>
@@ -99,8 +102,10 @@ namespace Latios.Psyshock
         {
             return fluent.WithAllWeak<Collider>().WithAllWeak<WorldTransform>();
         }
+#endif
 
         #region Starters
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         /// <summary>
         /// Creates a new CollisionLayer by extracting collider and transform data from the entities in an EntityQuery.
         /// This is a start of a fluent chain.
@@ -151,6 +156,7 @@ namespace Latios.Psyshock
             config.count        = query.CalculateEntityCount();
             return config;
         }
+#endif
 
         /// <summary>
         /// Creates a new CollisionLayer using the collider and transform data provided by the bodies array
@@ -307,6 +313,7 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.count;
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -342,13 +349,14 @@ namespace Latios.Psyshock
                     unsortedSrcIndices   = layer.srcIndices,
                     trees                = layer.intervalTrees,
                     xMinMaxs             = xMinMaxs
-                }.Run(layer.BucketCount);
+                }.Run(layer.bucketCount);
 
                 new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
                     colliderAoS = aos,
                     layer       = layer,
                 }.Run(count);
+#endif
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
@@ -393,6 +401,7 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.count;
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -437,6 +446,9 @@ namespace Latios.Psyshock
                 }.Schedule(jh);
 
                 return jh;
+#else
+                return inputDeps;
+#endif
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
@@ -485,6 +497,7 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.query.CalculateEntityCount();
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -520,7 +533,7 @@ namespace Latios.Psyshock
                     xMinMaxs             = xMinMaxs,
                     trees                = layer.intervalTrees,
                     bucketStartAndCounts = layer.bucketStartsAndCounts
-                }.Schedule(layer.BucketCount, 1, jh);
+                }.Schedule(layer.bucketCount, 1, jh);
 
                 jh = new BuildCollisionLayerInternal.Part5FromQueryJob
                 {
@@ -529,6 +542,9 @@ namespace Latios.Psyshock
                 }.Schedule(count, 128, jh);
 
                 return jh;
+#else
+                return inputDeps;
+#endif
             }
             else if (config.hasBodiesArray)
             {
@@ -579,7 +595,7 @@ namespace Latios.Psyshock
                     unsortedSrcIndices   = layer.srcIndices,
                     trees                = layer.intervalTrees,
                     xMinMaxs             = xMinMaxs
-                }.Schedule(layer.BucketCount, 1, jh);
+                }.Schedule(layer.bucketCount, 1, jh);
 
                 jh = new BuildCollisionLayerInternal.Part5FromArraysJob
                 {
@@ -614,14 +630,6 @@ namespace Latios.Psyshock
             if (aabbs.Length != count)
                 throw new InvalidOperationException(
                     $"The number of elements in overrideAbbs does not match the { (query ? "number of entities in the query" : "number of bodies in the bodies array")}");
-        }
-
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void ValidateRemapArrayIsRightLength(NativeArray<int> remap, int count, bool query)
-        {
-            if (remap.Length != count)
-                throw new InvalidOperationException(
-                    $"The number of elements in remapSrcArray does not match the { (query ? "number of entities in the query" : "number of bodies in the bodies array")}");
         }
         #endregion
     }

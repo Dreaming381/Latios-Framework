@@ -7,7 +7,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-//Todo: Stream types, caches, scratchlists, and inflations
+//Todo: FilteredCache playback and inflations
 namespace Latios.Psyshock
 {
     /// <summary>
@@ -15,7 +15,22 @@ namespace Latios.Psyshock
     /// </summary>
     public interface IFindPairsProcessor
     {
+        /// <summary>
+        /// The main pair processing callback.
+        /// </summary>
         void Execute(in FindPairsResult result);
+        /// <summary>
+        /// An optional callback prior to processing a bucket (single layer) or bucket combination (two layers).
+        /// Each invocation of this callback will have a different jobIndex.
+        /// </summary>
+        //void BeginBucket(in FindPairsBucketContext context) {
+        //}
+        /// <summary>
+        /// An optional callback following processing a bucket (single layer) or bucket combination (two layers).
+        /// Each invocation of this callback will have a different jobIndex.
+        /// </summary>
+        //void EndBucket(in FindPairsBucketContext context) {
+        //}
     }
 
     /// <summary>
@@ -150,7 +165,7 @@ namespace Latios.Psyshock
             }
         }
 
-        internal FindPairsResult(CollisionLayer layerA, CollisionLayer layerB, BucketSlices bucketA, BucketSlices bucketB, int jobIndex, bool isThreadSafe)
+        internal FindPairsResult(in CollisionLayer layerA, in CollisionLayer layerB, in BucketSlices bucketA, in BucketSlices bucketB, int jobIndex, bool isThreadSafe)
         {
             m_layerA       = layerA;
             m_layerB       = layerB;
@@ -162,7 +177,7 @@ namespace Latios.Psyshock
             m_bodyBIndex   = 0;
         }
 
-        internal static FindPairsResult CreateGlobalResult(CollisionLayer layerA, CollisionLayer layerB, int jobIndex, bool isThreadSafe)
+        internal static FindPairsResult CreateGlobalResult(in CollisionLayer layerA, in CollisionLayer layerB, int jobIndex, bool isThreadSafe)
         {
             return new FindPairsResult
             {
@@ -183,6 +198,124 @@ namespace Latios.Psyshock
             m_bodyBIndex = bIndex + m_bucketStartB;
         }
         //Todo: Shorthands for calling narrow phase distance and manifold queries
+    }
+
+    /// <summary>
+    /// A context struct passed into BeginBucket and EndBucket of an IFindPairsProcessor which provides
+    /// additional information about the buckets being processed.
+    /// </summary>
+    [NativeContainer]
+    public struct FindPairsBucketContext
+    {
+        /// <summary>
+        /// The CollisionLayer the first collider in any pair belongs to. Can be used for additional
+        /// immediate queries inside the processor.
+        /// </summary>
+        public CollisionLayer layerA => m_layerA;
+        /// <summary>
+        /// The CollisionLayer the second collider in any pair belongs to. Can be used for additional
+        /// immediate queries inside the processor. If the FindPairs operation only uses a single
+        /// CollisionLayer, this value is the same as layerA.
+        /// </summary>
+        public CollisionLayer layerB => m_layerB;
+        /// <summary>
+        /// The first collider index in layerA that is processed with this jobIndex.
+        /// </summary>
+        public int bucketStartA => m_bucketStartA;
+        /// <summary>
+        /// The first collider index in layerB that is processed with this jobIndex.
+        /// </summary>
+        public int bucketStartB => m_bucketStartB;
+        /// <summary>
+        /// The number of colliders in layerA that is processed with this jobIndex.
+        /// </summary>
+        public int bucketCountA => m_bucketCountA;
+        /// <summary>
+        /// The number of colliders in layerB that is processed with this jobIndex.
+        /// </summary>
+        public int bucketCountB => m_bucketCountB;
+        /// <summary>
+        /// An index that is guaranteed to be deterministic and unique between threads for a given FindPairs operation,
+        /// and can be used as the sortKey for command buffers or as an index in a NativeStream.
+        /// </summary>
+        public int jobIndex => m_jobIndex;
+
+        /// <summary>
+        /// Obtains a safe entity handle that can be used inside of PhysicsComponentLookup or PhysicsBufferLookup and corresponds to the
+        /// owning entity of the first collider in any pair in this bucket for layerA. It can also be implicitly casted and used as a normal
+        /// entity reference.
+        /// </summary>
+        public SafeEntity GetSafeEntityInA(int aIndex)
+        {
+            CheckSafeEntityInRange(aIndex, bucketStartA, bucketCountA);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            var entity = layerA.bodies[aIndex].entity;
+            return new SafeEntity
+            {
+                entity = new Entity
+                {
+                    Index   = math.select(-entity.Index - 1, entity.Index, m_isThreadSafe),
+                    Version = entity.Version
+                }
+            };
+#else
+            return new SafeEntity {
+                entity = layerA.bodies[aIndex].entity;
+#endif
+        }
+
+        /// <summary>
+        /// Obtains a safe entity handle that can be used inside of PhysicsComponentLookup or PhysicsBufferLookup and corresponds to the
+        /// owning entity of the first collider in any pair in this bucket for layerB. It can also be implicitly casted and used as a normal
+        /// entity reference.
+        /// </summary>
+        public SafeEntity GetSafeEntityInB(int bIndex)
+        {
+            CheckSafeEntityInRange(bIndex, bucketStartB, bucketCountB);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            var entity = layerB.bodies[bIndex].entity;
+            return new SafeEntity
+            {
+                entity = new Entity
+                {
+                    Index   = math.select(-entity.Index - 1, entity.Index, m_isThreadSafe),
+                    Version = entity.Version
+                }
+            };
+#else
+            return new SafeEntity {
+                entity = layerB.bodies[bIndex].entity;
+#endif
+        }
+
+        private CollisionLayer m_layerA;
+        private CollisionLayer m_layerB;
+        private int            m_bucketStartA;
+        private int            m_bucketStartB;
+        private int            m_bucketCountA;
+        private int            m_bucketCountB;
+        private int            m_jobIndex;
+        private bool           m_isThreadSafe;
+
+        internal FindPairsBucketContext(in CollisionLayer layerA, in CollisionLayer layerB, int startA, int countA, int startB, int countB, int jobIndex, bool isThreadSafe)
+        {
+            m_layerA       = layerA;
+            m_layerB       = layerB;
+            m_bucketStartA = startA;
+            m_bucketCountA = countA;
+            m_bucketStartB = startB;
+            m_bucketCountB = countB;
+            m_jobIndex     = jobIndex;
+            m_isThreadSafe = isThreadSafe;
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckSafeEntityInRange(int index, int start, int count)
+        {
+            var clampedIndex = math.clamp(index, start, start + count);
+            if (clampedIndex != index)
+                throw new ArgumentOutOfRangeException($"Index {index} is outside the bucket range of [{start}, {start + count - 1}].");
+        }
     }
 
     public static partial class Physics
@@ -318,7 +451,7 @@ namespace Latios.Psyshock
         /// </summary>
         public void RunImmediate()
         {
-            FindPairsInternal.RunImmediate(layer, processor);
+            FindPairsInternal.RunImmediate(layer, ref processor, false);
         }
 
         /// <summary>
@@ -358,7 +491,7 @@ namespace Latios.Psyshock
             {
                 layer     = layer,
                 processor = processor
-            }.Schedule(layer.BucketCount, 1, inputDeps);
+            }.Schedule(layer.bucketCount, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -397,7 +530,7 @@ namespace Latios.Psyshock
             {
                 layer     = layer,
                 processor = processor
-            }.ScheduleParallel(2 * layer.BucketCount - 1, 1, inputDeps);
+            }.ScheduleParallel(2 * layer.bucketCount - 1, 1, inputDeps);
         }
         #endregion Schedulers
     }
@@ -431,13 +564,13 @@ namespace Latios.Psyshock
         /// <returns>The final JobHandle for the scheduled jobs</returns>
         public JobHandle ScheduleParallel(JobHandle inputDeps = default)
         {
-            var       cache = new NativeStream(layer.BucketCount - 1, allocator);
+            var       cache = new NativeStream(layer.bucketCount - 1, allocator);
             JobHandle jh    = new FindPairsInternal.LayerSelfPart1
             {
                 layer     = layer,
                 processor = processor,
                 cache     = cache.AsWriter()
-            }.Schedule(2 * layer.BucketCount - 1, 1, inputDeps);
+            }.Schedule(2 * layer.bucketCount - 1, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -515,7 +648,7 @@ namespace Latios.Psyshock
         /// </summary>
         public void RunImmediate()
         {
-            FindPairsInternal.RunImmediate(layerA, layerB, processor);
+            FindPairsInternal.RunImmediate(in layerA, in layerB, ref processor, false);
         }
 
         /// <summary>
@@ -558,7 +691,7 @@ namespace Latios.Psyshock
                 layerA    = layerA,
                 layerB    = layerB,
                 processor = processor
-            }.Schedule(layerB.BucketCount, 1, inputDeps);
+            }.Schedule(layerB.bucketCount, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -601,7 +734,7 @@ namespace Latios.Psyshock
                 layerA    = layerA,
                 layerB    = layerB,
                 processor = processor
-            }.ScheduleParallel(3 * layerA.BucketCount - 2, 1, inputDeps);
+            }.ScheduleParallel(3 * layerA.bucketCount - 2, 1, inputDeps);
         }
         #endregion Schedulers
     }
@@ -636,7 +769,7 @@ namespace Latios.Psyshock
         /// <returns>The final JobHandle for the scheduled jobs</returns>
         public JobHandle ScheduleParallel(JobHandle inputDeps = default)
         {
-            var cache = new NativeStream(layerA.BucketCount * 2 - 2, allocator);
+            var cache = new NativeStream(layerA.bucketCount * 2 - 2, allocator);
 
             JobHandle jh = new FindPairsInternal.LayerLayerPart1
             {
@@ -644,7 +777,7 @@ namespace Latios.Psyshock
                 layerB    = layerB,
                 processor = processor,
                 cache     = cache.AsWriter()
-            }.Schedule(3 * layerB.BucketCount - 2, 1, inputDeps);
+            }.Schedule(3 * layerB.bucketCount - 2, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -746,7 +879,7 @@ namespace Latios.Psyshock
             {
                 layer     = layer,
                 processor = processor
-            }.Schedule(layer.BucketCount, 1, inputDeps);
+            }.Schedule(layer.bucketCount, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -785,7 +918,7 @@ namespace Latios.Psyshock
             {
                 layer     = layer,
                 processor = processor
-            }.ScheduleParallel(2 * layer.BucketCount - 1, 1, inputDeps);
+            }.ScheduleParallel(2 * layer.bucketCount - 1, 1, inputDeps);
         }
         #endregion Schedulers
     }
@@ -859,7 +992,7 @@ namespace Latios.Psyshock
                 layerA    = layerA,
                 layerB    = layerB,
                 processor = processor
-            }.Schedule(layerB.BucketCount, 1, inputDeps);
+            }.Schedule(layerB.bucketCount, 1, inputDeps);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (disableEntityAliasChecks)
             {
@@ -902,7 +1035,7 @@ namespace Latios.Psyshock
                 layerA    = layerA,
                 layerB    = layerB,
                 processor = processor
-            }.ScheduleParallel(3 * layerA.BucketCount - 2, 1, inputDeps);
+            }.ScheduleParallel(3 * layerA.bucketCount - 2, 1, inputDeps);
         }
         #endregion Schedulers
     }

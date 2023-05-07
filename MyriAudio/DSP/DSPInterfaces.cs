@@ -4,7 +4,8 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
-    public interface IEffect<TEffect, TParameters>
+    // Make these public on release
+    internal interface IEffect<TEffect, TParameters>
         where TEffect : unmanaged, IEffect<TEffect, TParameters>
         where TParameters : unmanaged, IEffectParameters<TEffect, TParameters>
     {
@@ -16,7 +17,7 @@ namespace Latios.Myri.DSP
         public bool RequireUpdateWhenInputFrameDisconnected => false;
     }
 
-    public interface ISpatialEffect<TEffect, TParameters>
+    internal interface ISpatialEffect<TEffect, TParameters>
         where TEffect : unmanaged, ISpatialEffect<TEffect, TParameters>
         where TParameters : unmanaged, ISpatialEffectParamaters<TEffect, TParameters>
     {

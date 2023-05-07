@@ -158,9 +158,9 @@ namespace Latios.Psyshock
         /// <summary>
         /// Runs the operation immediately without creating a job struct. Use this inside a job or another FindObjects or FindPairs processor.
         /// </summary>
-        public void RunImmediate()
+        public T RunImmediate()
         {
-            FindObjectsInternal.RunImmediate(in aabb, in layer, processor);
+            return FindObjectsInternal.RunImmediate(in aabb, in layer, processor);
         }
 
         /// <summary>

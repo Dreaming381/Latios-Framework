@@ -30,9 +30,10 @@ namespace Latios.Psyshock
             #endregion
 
             #region ImmediateMethods
-            public static void RunImmediate(in Aabb aabb, in CollisionLayer layer, T processor)
+            public static T RunImmediate(in Aabb aabb, in CollisionLayer layer, T processor)
             {
                 LayerQuerySweepMethods.AabbSweep(in aabb, in layer, ref processor);
+                return processor;
             }
             #endregion
         }

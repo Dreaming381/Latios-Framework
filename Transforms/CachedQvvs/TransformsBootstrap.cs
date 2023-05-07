@@ -1,3 +1,5 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -6,7 +8,7 @@ namespace Latios.Transforms
 {
     public static class TransformsBootstrap
     {
-        public static void InstallTransforms(World world, ComponentSystemGroup defaultComponentSystemGroup)
+        public static void InstallTransforms(LatiosWorld world, ComponentSystemGroup defaultComponentSystemGroup, bool extreme = false)
         {
             foreach (var system in world.Systems)
             {
@@ -21,8 +23,14 @@ namespace Latios.Transforms
                 }
             }
 
+            if (extreme)
+                world.worldBlackboardEntity.AddComponentData(new RuntimeFeatureFlags { flags = RuntimeFeatureFlags.Flags.ExtremeTransforms });
+            else
+                world.worldBlackboardEntity.AddComponent<RuntimeFeatureFlags>();
+
             BootstrapTools.InjectSystem(typeof(Systems.TransformSuperSystem), world, defaultComponentSystemGroup);
         }
     }
 }
+#endif
 

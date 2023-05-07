@@ -1,3 +1,5 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
@@ -675,4 +677,5 @@ namespace Latios.Transforms
         }
     }
 }
+#endif
 

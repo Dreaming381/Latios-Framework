@@ -31,21 +31,43 @@ namespace Latios
             return entity.entity;
         }
 
+        /// <summary>
+        /// Adds a component to the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of component to add</typeparam>
+        /// <returns>True if the blackboard entity did not have the component prior to this call, false otherwise.</returns>
         public bool AddComponent<T>() where T : unmanaged, IComponentData
         {
             return em.AddComponent<T>(entity);
         }
 
+        /// <summary>
+        /// Removes a component from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of component to remove</typeparam>
+        /// <returns>True if the blackboard entity had the component prior to this call, false otherwise.</returns>
         public bool RemoveComponent<T>() where T : unmanaged, IComponentData
         {
             return em.RemoveComponent<T>(entity);
         }
 
+        /// <summary>
+        /// Adds or sets the component on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of component to add or set</typeparam>
+        /// <param name="data">The value of the component to add or set</param>
+        /// <returns>True if the blackboard entity did not have the component prior to this call, false otherwise.</returns>
         public bool AddComponentData<T>(T data) where T : unmanaged, IComponentData
         {
             return em.AddComponentData(entity, data);
         }
 
+        /// <summary>
+        /// Adds the component with the value on the blackboard entity only if a component of that type does not already exist
+        /// </summary>
+        /// <typeparam name="T">The type of component to add</typeparam>
+        /// <param name="data">The value of the component to add</param>
+        /// <returns>True if the component was added, false otherwise</returns>
         public bool AddComponentDataIfMissing<T>(T data) where T : unmanaged, IComponentData
         {
             if (em.HasComponent<T>(entity))
@@ -54,46 +76,89 @@ namespace Latios
             return true;
         }
 
+        /// <summary>
+        /// Sets the component's value on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of component to set</typeparam>
+        /// <param name="data">The value to set</param>
         public void SetComponentData<T>(T data) where T : unmanaged, IComponentData
         {
             em.SetComponentData(entity, data);
         }
 
+        /// <summary>
+        /// Retrieves the component's value from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of component to retrieve</typeparam>
+        /// <returns>The retrieved value</returns>
         public T GetComponentData<T>() where T : unmanaged, IComponentData
         {
             return em.GetComponentData<T>(entity);
         }
 
+        /// <summary>
+        /// Returns true if the blackboard entity has a component of the specified type
+        /// </summary>
         public bool HasComponent<T>() where T : unmanaged, IComponentData
         {
             return em.HasComponent<T>(entity);
         }
 
+        /// <summary>
+        /// Returns true if the blackboard entity has a component of the specified ComponentType
+        /// </summary>
         public bool HasComponent(ComponentType componentType)
         {
             return em.HasComponent(entity, componentType);
         }
 
+        /// <summary>
+        /// Adds or sets a shared component to the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to add or set</typeparam>
+        /// <param name="data">The value of the shared component to add or set</param>
+        /// <returns>True if the blackboard entity did not have the type of shared component prior to this call, false otherwise</returns>
         public bool AddSharedComponentData<T>(T data) where T : unmanaged, ISharedComponentData
         {
             return em.AddSharedComponent(entity, data);
         }
 
+        /// <summary>
+        /// Sets the shared component on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to set</typeparam>
+        /// <param name="data"The value of the shared component to set></param>
         public void SetSharedComponentData<T>(T data) where T : unmanaged, ISharedComponentData
         {
             em.SetSharedComponent(entity, data);
         }
 
+        /// <summary>
+        /// Retrieves the value of the shared component from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to retrieve</typeparam>
+        /// <returns>The retrieved shared component value</returns>
         public T GetSharedComponentData<T>() where T : unmanaged, ISharedComponentData
         {
             return em.GetSharedComponent<T>(entity);
         }
 
+        /// <summary>
+        /// Adds or replaces a DynamicBuffer on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of element in the DynamicBuffer to add or replace</typeparam>
+        /// <returns>The new DynamicBuffer which can be resized and populated</returns>
         public DynamicBuffer<T> AddBuffer<T>() where T : unmanaged, IBufferElementData
         {
             return em.AddBuffer<T>(entity);
         }
 
+        /// <summary>
+        /// Retrieves the DynamicBuffer from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of element in the DynamicBuffer to retrieve</typeparam>
+        /// <param name="readOnly">If true, the DynamicBuffer will be retrieved in ReadOnly mode</param>
+        /// <returns>The retrieved DynamicBuffer</returns>
         public DynamicBuffer<T> GetBuffer<T>(bool readOnly = false) where T : unmanaged, IBufferElementData
         {
             return em.GetBuffer<T>(entity, readOnly);

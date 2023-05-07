@@ -22,9 +22,6 @@ namespace Latios.Authoring.Systems
         ComponentTypeHandle<SmartBlobberTrackingData> m_trackingDataHandle;
         EntityTypeHandle                              m_entityHandle;
 
-        ComponentLookup<SmartBlobberResult>       m_resultLookup;
-        ComponentLookup<SmartBlobberTrackingData> m_trackingDataLookup;
-
         protected override void OnCreate()
         {
             m_query = new EntityQueryBuilder(Allocator.Temp)

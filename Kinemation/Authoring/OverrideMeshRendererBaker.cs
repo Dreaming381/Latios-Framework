@@ -7,12 +7,21 @@ using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
 {
+    /// <summary>
+    /// Override this class and attach to a GameObject to disable normal Mesh Renderer or Skinned Mesh Renderer baking
+    /// </summary>
     public class OverrideMeshRendererBase : MonoBehaviour
     {
     }
 
     public static class OverrideMeshRendererBakerExtensions
     {
+        /// <summary>
+        /// Bake a Mesh Renderer using the provided mesh and materials
+        /// </summary>
+        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
+        /// <param name="mesh">The mesh to use</param>
+        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
         public static void BakeMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials)
         {
             MeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, true, out var additionalEntities);
@@ -26,6 +35,13 @@ namespace Latios.Kinemation.Authoring
             }
         }
 
+        /// <summary>
+        /// Bake a Skinned Mesh Renderer using the provided mesh and materials.
+        /// This does not bake the MeshDeformDataBlob.
+        /// </summary>
+        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
+        /// <param name="mesh">The mesh to use</param>
+        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
         public static void BakeDeformMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials)
         {
             var sharedMesh = mesh;
@@ -92,6 +108,11 @@ namespace Latios.Kinemation.Authoring
         }
     }
 
+    /// <summary>
+    /// This is the default Mesh Renderer baker in Kinemation.
+    /// Kinemation replaces Unity's version to accomodate QVVS transforms
+    /// and allow overrides. But it is otherwise identical.
+    /// </summary>
     [DisableAutoCreation]
     public class DefaultMeshRendererBaker : Baker<MeshRenderer>
     {
