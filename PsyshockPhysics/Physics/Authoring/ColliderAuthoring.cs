@@ -15,7 +15,7 @@ namespace Latios.Psyshock.Authoring
     }
 
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Physics (Psyshock)/Collider")]
+    [AddComponentMenu("Latios/Physics (Psyshock)/Custom Collider")]
     public class ColliderAuthoring : MonoBehaviour
     {
         private void OnEnable()
@@ -64,6 +64,8 @@ namespace Latios.Psyshock.Authoring
                 }
             }
             var transform = smartBaker.GetComponent<Transform>();
+            var entity    = baker.GetEntity(TransformUsageFlags.Renderable);
+            baker.AddComponent<Collider>(entity);
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_compoundList, transform);
             return true;
@@ -82,7 +84,7 @@ namespace Latios.Psyshock.Authoring
                 stretch              = 1f,
                 stretchMode          = CompoundCollider.StretchMode.RotateStretchLocally
             };
-            entityManager.AddComponentData(entity, collider);
+            entityManager.SetComponentData(entity, collider);
         }
     }
 

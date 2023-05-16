@@ -136,14 +136,22 @@ namespace Latios.Transforms.Authoring.Systems
 
                         TransformBakeUtils.GetScaleAndStretch(transformAuthoring.LocalScale, out var scale, out var stretch);
 
-                        TransformQvvs worldTransform = new TransformQvvs
+                        TransformQvvs worldTransform;
+                        if (transformAuthoring.AuthoringParent != Entity.Null)
                         {
-                            position   = transformAuthoring.LocalPosition,
-                            rotation   = transformAuthoring.LocalRotation,
-                            scale      = scale,
-                            stretch    = stretch,
-                            worldIndex = 0
-                        };
+                            worldTransform = GetWorldTransform(in transformAuthoring, true);
+                        }
+                        else
+                        {
+                            worldTransform = new TransformQvvs
+                            {
+                                position   = transformAuthoring.LocalPosition,
+                                rotation   = transformAuthoring.LocalRotation,
+                                scale      = scale,
+                                stretch    = stretch,
+                                worldIndex = 0
+                            };
+                        }
 
                         if (hasWorldTransform)
                             worldTransformArray[i] = new WorldTransform { worldTransform = worldTransform };
@@ -208,9 +216,9 @@ namespace Latios.Transforms.Authoring.Systems
                 }
             }
 
-            TransformQvvs GetWorldTransform(in TransformAuthoring transformAuthoring)
+            TransformQvvs GetWorldTransform(in TransformAuthoring transformAuthoring, bool useAuthoringParent = false)
             {
-                if (transformAuthoring.RuntimeParent == Entity.Null)
+                if (transformAuthoring.RuntimeParent == Entity.Null && !(useAuthoringParent && transformAuthoring.AuthoringParent != Entity.Null))
                 {
                     TransformBakeUtils.GetScaleAndStretch(transformAuthoring.LocalScale, out var scale, out var stretch);
 
@@ -225,7 +233,9 @@ namespace Latios.Transforms.Authoring.Systems
                 }
                 else
                 {
-                    var parentWorldTransform = GetWorldTransform(transformAuthoringLookup[transformAuthoring.RuntimeParent]);
+                    var targetParent = transformAuthoring.RuntimeParent == Entity.Null &&
+                                       useAuthoringParent ? transformAuthoring.AuthoringParent : transformAuthoring.RuntimeParent;
+                    var parentWorldTransform = GetWorldTransform(transformAuthoringLookup[targetParent], useAuthoringParent);
                     TransformBakeUtils.GetScaleAndStretch(transformAuthoring.LocalScale, out var scale, out var stretch);
                     var worldTransform = new TransformQvvs
                     {

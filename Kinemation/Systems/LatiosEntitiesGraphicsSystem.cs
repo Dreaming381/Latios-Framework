@@ -84,6 +84,7 @@ namespace Latios.Kinemation.Systems
     [UpdateAfter(typeof(UpdatePresentationSystemGroup))]
     [UpdateAfter(typeof(EntitiesGraphicsSystem))]
     [DisableAutoCreation]
+    [BurstCompile]
     public unsafe partial class LatiosEntitiesGraphicsSystem : SubSystem
     {
         #region Variables
@@ -117,6 +118,7 @@ namespace Latios.Kinemation.Systems
         // already sees the new value and we want to check against
         // the value that was seen by OnUpdate.
         private uint m_LastSystemVersionAtLastUpdate;
+        private uint m_globalSystemVersionAtLastUpdate;
 
         private EntityQuery m_EntitiesGraphicsRenderedQuery;
         private EntityQuery m_LodSelectGroup;
@@ -441,7 +443,8 @@ namespace Latios.Kinemation.Systems
             m_ThreadLocalAllocators.Rewind();
             m_cullPassIndexThisFrame = 0;
 
-            m_LastSystemVersionAtLastUpdate = LastSystemVersion;
+            m_LastSystemVersionAtLastUpdate   = LastSystemVersion;
+            m_globalSystemVersionAtLastUpdate = GlobalSystemVersion;
 
             if (m_FirstFrameAfterInit)
             {
@@ -508,17 +511,18 @@ namespace Latios.Kinemation.Systems
 
             worldBlackboardEntity.SetComponentData(new CullingContext
             {
-                cullIndexThisFrame                        = m_cullPassIndexThisFrame,
-                lastSystemVersionOfLatiosEntitiesGraphics = m_LastSystemVersionAtLastUpdate,
-                cullingLayerMask                          = batchCullingContext.cullingLayerMask,
-                localToWorldMatrix                        = batchCullingContext.localToWorldMatrix,
-                lodParameters                             = batchCullingContext.lodParameters,
-                projectionType                            = batchCullingContext.projectionType,
-                receiverPlaneCount                        = batchCullingContext.receiverPlaneCount,
-                receiverPlaneOffset                       = batchCullingContext.receiverPlaneOffset,
-                sceneCullingMask                          = batchCullingContext.sceneCullingMask,
-                viewID                                    = batchCullingContext.viewID,
-                viewType                                  = batchCullingContext.viewType
+                cullIndexThisFrame                          = m_cullPassIndexThisFrame,
+                globalSystemVersionOfLatiosEntitiesGraphics = m_globalSystemVersionAtLastUpdate,
+                lastSystemVersionOfLatiosEntitiesGraphics   = m_LastSystemVersionAtLastUpdate,
+                cullingLayerMask                            = batchCullingContext.cullingLayerMask,
+                localToWorldMatrix                          = batchCullingContext.localToWorldMatrix,
+                lodParameters                               = batchCullingContext.lodParameters,
+                projectionType                              = batchCullingContext.projectionType,
+                receiverPlaneCount                          = batchCullingContext.receiverPlaneCount,
+                receiverPlaneOffset                         = batchCullingContext.receiverPlaneOffset,
+                sceneCullingMask                            = batchCullingContext.sceneCullingMask,
+                viewID                                      = batchCullingContext.viewID,
+                viewType                                    = batchCullingContext.viewType
             });
 
             var cullingPlanesBuffer = worldBlackboardEntity.GetBuffer<CullingPlane>(false);

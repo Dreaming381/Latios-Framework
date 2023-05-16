@@ -55,7 +55,7 @@ struct Dqs
 uniform ByteAddressBuffer                _boneWeights;
 uniform StructuredBuffer<Vertex>         _srcVertices;
 uniform StructuredBuffer<TransformUnion> _bindPoses;
-uniform ByteAddressBuffer                _latiosBoneTransforms;
+uniform ByteAddressBuffer                _boneTransforms;
 
 // Stride of uint4
 uniform ByteAddressBuffer _metaBuffer;
@@ -67,9 +67,9 @@ uint _startOffset;
 TransformUnion readBone(uint absoluteBoneIndex)
 {
     TransformUnion result = (TransformUnion)0;
-    result.a = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48));
-    result.b = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 16));
-    result.c = asfloat(_latiosBoneTransforms.Load4(absoluteBoneIndex * 48 + 32));
+    result.a = asfloat(_boneTransforms.Load4(absoluteBoneIndex * 48));
+    result.b = asfloat(_boneTransforms.Load4(absoluteBoneIndex * 48 + 16));
+    result.c = asfloat(_boneTransforms.Load4(absoluteBoneIndex * 48 + 32));
     return result;
 }
 

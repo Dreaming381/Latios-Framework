@@ -430,7 +430,7 @@ namespace Latios.Transforms.Systems
                     if (hasMutableLocalTransform)
                     {
                         parentToWorldLookup[entity] = new ParentToWorldTransform { parentToWorldTransform = parentWorldTransform };
-                        ref var worldTransform                                                            = ref worldTransformLookup.GetRefRW(entity, false).ValueRW;
+                        ref var worldTransform                                                            = ref worldTransformLookup.GetRefRW(entity).ValueRW;
                         qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, localTransformLookup[entity].localTransform);
                         worldTransformToPropagate = worldTransform.worldTransform;
                     }

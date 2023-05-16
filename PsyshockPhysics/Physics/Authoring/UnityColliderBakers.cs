@@ -7,11 +7,11 @@ using Unity.Mathematics;
 namespace Latios.Psyshock.Authoring.Systems
 {
     [DisableAutoCreation]
-    public class LegacySphereColliderBaker : Baker<UnityEngine.SphereCollider>
+    public class SphereColliderBaker : Baker<UnityEngine.SphereCollider>
     {
         ColliderBakerHelper m_helper;
 
-        public LegacySphereColliderBaker()
+        public SphereColliderBaker()
         {
             m_helper = new ColliderBakerHelper(this);
         }
@@ -21,7 +21,8 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!m_helper.ShouldBake(authoring))
                 return;
 
-            AddComponent((Collider) new SphereCollider
+            var entity = GetEntity(TransformUsageFlags.Renderable);
+            AddComponent(entity, (Collider) new SphereCollider
             {
                 center      = authoring.center,
                 radius      = authoring.radius,
@@ -31,11 +32,11 @@ namespace Latios.Psyshock.Authoring.Systems
     }
 
     [DisableAutoCreation]
-    public class LegacyCapsuleColliderBaker : Baker<UnityEngine.CapsuleCollider>
+    public class CapsuleColliderBaker : Baker<UnityEngine.CapsuleCollider>
     {
         ColliderBakerHelper m_helper;
 
-        public LegacyCapsuleColliderBaker()
+        public CapsuleColliderBaker()
         {
             m_helper = new ColliderBakerHelper(this);
         }
@@ -58,7 +59,8 @@ namespace Latios.Psyshock.Authoring.Systems
             {
                 dir = new float3(0f, 0f, 1f);
             }
-            AddComponent((Collider) new CapsuleCollider
+            var entity = GetEntity(TransformUsageFlags.Renderable);
+            AddComponent(entity, (Collider) new CapsuleCollider
             {
                 pointB      = (float3)authoring.center + ((authoring.height / 2f - authoring.radius) * dir),
                 pointA      = (float3)authoring.center - ((authoring.height / 2f - authoring.radius) * dir),
@@ -69,11 +71,11 @@ namespace Latios.Psyshock.Authoring.Systems
     }
 
     [DisableAutoCreation]
-    public class LegacyBoxColliderBaker : Baker<UnityEngine.BoxCollider>
+    public class BoxColliderBaker : Baker<UnityEngine.BoxCollider>
     {
         ColliderBakerHelper m_helper;
 
-        public LegacyBoxColliderBaker()
+        public BoxColliderBaker()
         {
             m_helper = new ColliderBakerHelper(this);
         }
@@ -83,7 +85,8 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!m_helper.ShouldBake(authoring))
                 return;
 
-            AddComponent((Collider) new BoxCollider
+            var entity = GetEntity(TransformUsageFlags.Renderable);
+            AddComponent(entity, (Collider) new BoxCollider
             {
                 center   = authoring.center,
                 halfSize = authoring.size / 2f
@@ -92,7 +95,7 @@ namespace Latios.Psyshock.Authoring.Systems
     }
 
     [TemporaryBakingType]
-    public struct LegacyConvexColliderBakerWorker : ISmartBakeItem<UnityEngine.MeshCollider>
+    public struct ConvexColliderBakerWorker : ISmartBakeItem<UnityEngine.MeshCollider>
     {
         SmartBlobberHandle<ConvexColliderBlob> m_handle;
 
@@ -101,9 +104,11 @@ namespace Latios.Psyshock.Authoring.Systems
             if (!authoring.convex)
                 return false;
 
-            if (!(baker as LegacyConvexColliderBaker).m_helper.ShouldBake(authoring))
+            if (!(baker as ConvexColliderBaker).m_helper.ShouldBake(authoring))
                 return false;
 
+            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
+            baker.AddComponent<Collider>(entity);
             m_handle = baker.RequestCreateBlobAsset(authoring.sharedMesh);
             return m_handle.IsValid;
         }
@@ -115,30 +120,29 @@ namespace Latios.Psyshock.Authoring.Systems
                 convexColliderBlob = m_handle.Resolve(entityManager),
                 scale              = 1f
             };
-            entityManager.AddComponentData(entity, collider);
+            entityManager.SetComponentData(entity, collider);
         }
     }
 
     [DisableAutoCreation]
-    public class LegacyConvexColliderBaker : SmartBaker<UnityEngine.MeshCollider, LegacyConvexColliderBakerWorker>
+    public class ConvexColliderBaker : SmartBaker<UnityEngine.MeshCollider, ConvexColliderBakerWorker>
     {
         internal ColliderBakerHelper m_helper;
 
-        public LegacyConvexColliderBaker()
+        public ConvexColliderBaker()
         {
             m_helper = new ColliderBakerHelper(this);
         }
     }
 
     [TemporaryBakingType]
-    public struct LegacyCompoundColliderBakerWorker : ISmartBakeItem<UnityEngine.Collider>
+    public struct CompoundColliderBakerWorker : ISmartBakeItem<UnityEngine.Collider>
     {
         SmartBlobberHandle<CompoundColliderBlob> m_handle;
-        float                                    m_scale;
 
         public bool Bake(UnityEngine.Collider authoring, IBaker baker)
         {
-            var smartBaker = baker as LegacyCompoundColliderBaker;
+            var smartBaker = baker as CompoundColliderBaker;
             smartBaker.m_colliderCache.Clear();
             smartBaker.GetComponents(smartBaker.m_colliderCache);
             if (smartBaker.m_colliderCache.Count < 2)
@@ -182,6 +186,8 @@ namespace Latios.Psyshock.Authoring.Systems
             if (smartBaker.m_colliderCache.Count < 2)
                 return false;
 
+            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
+            baker.AddComponent<Collider>(entity);
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_colliderCache, transform);
             return true;
@@ -199,13 +205,13 @@ namespace Latios.Psyshock.Authoring.Systems
                 scale                = 1f,
                 stretch              = 1f
             };
-            entityManager.AddComponentData(entity, collider);
+            entityManager.SetComponentData(entity, collider);
         }
     }
 
     [BakeDerivedTypes]
     [DisableAutoCreation]
-    public class LegacyCompoundColliderBaker : SmartBaker<UnityEngine.Collider, LegacyCompoundColliderBakerWorker>
+    public class CompoundColliderBaker : SmartBaker<UnityEngine.Collider, CompoundColliderBakerWorker>
     {
         internal List<UnityEngine.Collider> m_colliderCache = new List<UnityEngine.Collider>();
         internal List<ColliderAuthoring>    m_compoundCache = new List<ColliderAuthoring>();

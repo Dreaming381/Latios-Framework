@@ -68,6 +68,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             GetOrCreateAndAddSystem<SetupExportedBonesSystem>();  // async -> sync
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
+            GetOrCreateAndAddSystem<Latios.Transforms.Authoring.Systems.TransformHierarchySyncBakingSystem>();  // async | Needed for correcting children of exported bones.
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync
         }
     }

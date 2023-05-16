@@ -54,7 +54,8 @@ namespace Latios.Kinemation.Systems
                 lastSystemVersion = state.LastSystemVersion,
                 blobHandle        = GetComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference>(true),
                 bonesReadHandle   = GetBufferTypeHandle<OptimizedBoneTransform>(true),
-                bonesWriteHandle  = GetBufferTypeHandle<OptimizedBoneTransform>(false)
+                bonesWriteHandle  = GetBufferTypeHandle<OptimizedBoneTransform>(false),
+                stateHandle       = GetComponentTypeHandle<OptimizedSkeletonState>(false),
             }.ScheduleParallel(m_initSkeletonsQuery, state.Dependency);
             skeletonJh = new SkeletonJob { stateHandle = GetComponentTypeHandle<OptimizedSkeletonState>() }.ScheduleParallel(m_skeletonsQuery, skeletonJh);
 

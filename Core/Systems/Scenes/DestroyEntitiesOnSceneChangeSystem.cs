@@ -12,7 +12,7 @@ namespace Latios.Systems
     /// This system is not installed by default.
     /// </summary>
     [DisableAutoCreation]
-    [UpdateInGroup(typeof(LatiosInitializationSystemGroup), OrderLast = true)]  //Doesn't matter, but good for visualization
+    [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]  //Doesn't matter, but good for visualization
     public partial class DestroyEntitiesOnSceneChangeSystem : SubSystem
     {
         private EntityQuery m_destroyQuery = default;

@@ -291,8 +291,8 @@ namespace Latios.Kinemation.Authoring.Systems
                     float4x4 mat4x4  = bindPoses[i];
                     bindposesMats[i] = new float3x4(mat4x4.c0.xyz, mat4x4.c1.xyz, mat4x4.c2.xyz, mat4x4.c3.xyz);
                     var inverse      = math.inverse(mat4x4);
-                    var scale        = 1f / Unity.Transforms.Helpers.Scale(in inverse);
-                    var rotation     = math.inverse(Unity.Transforms.Helpers.Rotation(in inverse));
+                    var scale        = 1f / Unity.Transforms.TransformHelpers.Scale(in inverse);
+                    var rotation     = math.inverse(Unity.Transforms.TransformHelpers.Rotation(in inverse));
                     var position     = mat4x4.c3.xyz;
                     bindposesDq[i]   = new BindPoseDqs
                     {

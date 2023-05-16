@@ -87,6 +87,7 @@ namespace Latios.Kinemation
         public uint                       cullingLayerMask;
         public int                        receiverPlaneOffset;
         public int                        receiverPlaneCount;
+        public uint                       globalSystemVersionOfLatiosEntitiesGraphics;
         public uint                       lastSystemVersionOfLatiosEntitiesGraphics;
         public int                        cullIndexThisFrame;
     }

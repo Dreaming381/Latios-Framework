@@ -17,7 +17,8 @@ namespace Latios.Authoring
     {
         public override void Bake(BlackboardEntityDataAuthoring authoring)
         {
-            AddComponent(new BlackboardEntityData
+            var entity = GetEntity(TransformUsageFlags.None);
+            AddComponent(entity, new BlackboardEntityData
             {
                 blackboardScope = authoring.blackboardScope,
                 mergeMethod     = authoring.mergeMethod

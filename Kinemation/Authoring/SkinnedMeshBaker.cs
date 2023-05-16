@@ -66,6 +66,8 @@ namespace Latios.Kinemation.Authoring
                 Debug.LogWarning($"Some materials on Skinned Mesh Renderer {authoring.gameObject.name} were not assigned. Rendering results may be incorrect.");
             }
 
+            var entity = GetEntity(TransformUsageFlags.Renderable);
+
             var settings = GetComponent<SkinnedMeshSettingsAuthoring>();
             if (sharedMesh.bindposeCount > 0)
             {
@@ -82,11 +84,11 @@ namespace Latios.Kinemation.Authoring
                         }
                         else
                         {
-                            AddComponent(new PendingMeshBindingPathsBlob
+                            AddComponent(entity, new PendingMeshBindingPathsBlob
                             {
                                 blobHandle = this.RequestCreateBlobAsset(animator, authoring)
                             });
-                            AddComponent<MeshBindingPathsBlobReference>();
+                            AddComponent<MeshBindingPathsBlobReference>(entity);
                         }
                     }
                     else
@@ -125,11 +127,11 @@ namespace Latios.Kinemation.Authoring
                                 index++;
                             }
 
-                            AddComponent(new PendingMeshBindingPathsBlob
+                            AddComponent(entity, new PendingMeshBindingPathsBlob
                             {
                                 blobHandle = this.RequestCreateBlobAsset(pathsPacked, offsets)
                             });
-                            AddComponent<MeshBindingPathsBlobReference>();
+                            AddComponent<MeshBindingPathsBlobReference>(entity);
                         }
                     }
                 }
@@ -142,18 +144,18 @@ namespace Latios.Kinemation.Authoring
                     }
                     else
                     {
-                        AddComponent(new PendingMeshBindingPathsBlob
+                        AddComponent(entity, new PendingMeshBindingPathsBlob
                         {
                             blobHandle = this.RequestCreateBlobAsset(settings.customBonePathsReversed)
                         });
-                        AddComponent<MeshBindingPathsBlobReference>();
+                        AddComponent<MeshBindingPathsBlobReference>(entity);
                     }
                 }
             }
             if (sharedMesh.blendShapeCount > 0)
             {
-                AddComponent<BlendShapeState>();
-                var weightsBuffer = AddBuffer<BlendShapeWeight>();
+                AddComponent<BlendShapeState>(entity);
+                var weightsBuffer = AddBuffer<BlendShapeWeight>(entity);
                 weightsBuffer.ResizeUninitialized(sharedMesh.blendShapeCount);
                 var weights = weightsBuffer.AsNativeArray().Reinterpret<float>();
                 for (int i = 0; i < sharedMesh.blendShapeCount; i++)
@@ -162,20 +164,20 @@ namespace Latios.Kinemation.Authoring
                 }
             }
 
-            AddComponent(new PendingMeshDeformDataBlob
+            AddComponent(entity, new PendingMeshDeformDataBlob
             {
                 blobHandle = this.RequestCreateBlobAsset(sharedMesh)
             });
-            AddComponent<MeshDeformDataBlobReference>();
+            AddComponent<MeshDeformDataBlobReference>(entity);
 
             var additionalEntities = new NativeList<Entity>(Allocator.Temp);
             LatiosDeformMeshRendererBakingUtility.Convert(this, authoring, sharedMesh, m_materialsCache, additionalEntities, knownValidMaterialIndex);
 
-            AddComponent(new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = authoring });
+            AddComponent(entity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = authoring });
 
-            foreach (var entity in additionalEntities)
+            foreach (var submeshEntity in additionalEntities)
             {
-                AddComponent(entity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = authoring });
+                AddComponent(submeshEntity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = authoring });
             }
 
             m_materialsCache.Clear();

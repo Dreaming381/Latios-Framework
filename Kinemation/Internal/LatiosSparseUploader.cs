@@ -116,6 +116,11 @@ namespace Latios.Kinemation.SparseUpload
         // TODO: safety handle?
         [NativeDisableUnsafePtrRestriction] internal ThreadedSparseUploaderData* m_Data;
 
+        /// <summary>
+        /// Indicates whether the SparseUploader is valid and can be used.
+        /// </summary>
+        public bool IsValid => m_Data != null;
+
         private bool TryAlloc(int operationSize, int dataSize, out byte* ptr, out int operationOffset, out int dataOffset)
         {
             // Fetch current buffer and ensure we are not already out of GPU buffers to allocate from;
@@ -443,10 +448,31 @@ namespace Latios.Kinemation.SparseUpload
         }
     }
 
+    internal struct NativeStack<T> : IDisposable where T : unmanaged
+    {
+        NativeList<T> m_buffer;
+
+        public NativeStack(AllocatorManager.AllocatorHandle allocator)
+        {
+            m_buffer = new NativeList<T>(allocator);
+        }
+
+        public void Dispose() => m_buffer.Dispose();
+
+        public bool IsEmpty => m_buffer.IsEmpty;
+        public void Push(in T item) => m_buffer.Add(in item);
+        public T Pop()
+        {
+            var result = m_buffer[m_buffer.Length - 1];
+            m_buffer.RemoveAt(m_buffer.Length - 1);
+            return result;
+        }
+    }
+
     internal class BufferPool : IDisposable
     {
         private List<GraphicsBuffer> m_Buffers;
-        private Stack<int>           m_FreeBufferIds;
+        private NativeStack<int>     m_FreeBufferIds;
 
         private int                       m_Count;
         private int                       m_Stride;
@@ -456,7 +482,7 @@ namespace Latios.Kinemation.SparseUpload
         public BufferPool(int count, int stride, GraphicsBuffer.Target target, GraphicsBuffer.UsageFlags usageFlags)
         {
             m_Buffers       = new List<GraphicsBuffer>();
-            m_FreeBufferIds = new Stack<int>();
+            m_FreeBufferIds = new NativeStack<int>(Allocator.Persistent);
 
             m_Count      = count;
             m_Stride     = stride;
@@ -470,6 +496,7 @@ namespace Latios.Kinemation.SparseUpload
             {
                 m_Buffers[i].Dispose();
             }
+            m_FreeBufferIds.Dispose();
         }
 
         private int AllocateBuffer()
@@ -482,7 +509,7 @@ namespace Latios.Kinemation.SparseUpload
 
         public int GetBufferId()
         {
-            if (m_FreeBufferIds.Count == 0)
+            if (m_FreeBufferIds.IsEmpty)
                 return AllocateBuffer();
 
             return m_FreeBufferIds.Pop();
@@ -549,18 +576,20 @@ namespace Latios.Kinemation.SparseUpload
         private long m_CurrentFrameUploadSize;
         private long m_MaxUploadSize;
 
-        class FrameData
+        struct FrameData : IDisposable
         {
-            public Stack<int> m_Buffers;
+            public NativeStack<int> m_Buffers;
 
-            public FrameData()
+            public FrameData(AllocatorManager.AllocatorHandle allocator)
             {
-                m_Buffers = new Stack<int>();
+                m_Buffers = new NativeStack<int>(allocator);
             }
+
+            public void Dispose() => m_Buffers.Dispose();
         }
 
-        Stack<FrameData> m_FreeFrameData;
-        List<FrameData>  m_FrameData;
+        NativeStack<FrameData> m_FreeFrameData;
+        NativeList<FrameData>  m_FrameData;
 
         ThreadedSparseUploaderData* m_ThreadData;
 
@@ -572,6 +601,10 @@ namespace Latios.Kinemation.SparseUpload
         int m_DstBufferID;
         int m_OperationsBaseID;
         int m_ReplaceOperationSize;
+
+        uint m_frameIndex;
+        bool m_firstUpdate;
+        bool m_firstUpdateThisFrame;
 
         /// <summary>
         /// Constructs a new sparse uploader with the specified buffer as the target.
@@ -586,11 +619,11 @@ namespace Latios.Kinemation.SparseUpload
 
             m_UploadBufferPool = new BufferPool(m_BufferChunkSize / 4, 4, GraphicsBuffer.Target.Raw, GraphicsBuffer.UsageFlags.LockBufferForWrite);
             m_MappedBuffers    = new NativeArray<MappedBuffer>();
-            m_FreeFrameData    = new Stack<FrameData>();
-            m_FrameData        = new List<FrameData>();
+            m_FreeFrameData    = new NativeStack<FrameData>(Allocator.Persistent);
+            m_FrameData        = new NativeList<FrameData>(Allocator.Persistent);
 
-            m_ThreadData = (ThreadedSparseUploaderData*)UnsafeUtility.Malloc(sizeof(ThreadedSparseUploaderData),
-                                                                             UnsafeUtility.AlignOf<ThreadedSparseUploaderData>(), Allocator.Persistent);
+            m_ThreadData = (ThreadedSparseUploaderData*)UnsafeUtility.MallocTracked(sizeof(ThreadedSparseUploaderData),
+                                                                                    UnsafeUtility.AlignOf<ThreadedSparseUploaderData>(), Allocator.Persistent, 0);
             m_ThreadData->m_Buffers    = null;
             m_ThreadData->m_NumBuffers = 0;
             m_ThreadData->m_CurrBuffer = 0;
@@ -606,6 +639,10 @@ namespace Latios.Kinemation.SparseUpload
 
             m_CurrentFrameUploadSize = 0;
             m_MaxUploadSize          = 0;
+
+            m_frameIndex           = 0;
+            m_firstUpdate          = true;
+            m_firstUpdateThisFrame = false;
         }
 
         /// <summary>
@@ -614,7 +651,13 @@ namespace Latios.Kinemation.SparseUpload
         public void Dispose()
         {
             m_UploadBufferPool.Dispose();
-            UnsafeUtility.Free(m_ThreadData, Allocator.Persistent);
+            foreach (var f in m_FrameData)
+                f.Dispose();
+            while (!m_FreeFrameData.IsEmpty)
+                m_FreeFrameData.Pop().Dispose();
+            m_FreeFrameData.Dispose();
+            m_FrameData.Dispose();
+            UnsafeUtility.FreeTracked(m_ThreadData, Allocator.Persistent);
         }
 
         /// <summary>
@@ -692,19 +735,22 @@ namespace Latios.Kinemation.SparseUpload
 
         private void RecoverBuffers()
         {
-            var numFree = 0;
+            int numFree = 0;
 
             // Count frames instead of using async readback to determine completion, because
             // using async readback prevents Unity from letting the device idle, which is really
             // bad for power usage.
             // Add 1 to the device frame count to account for two frames overlapping on
             // CPU side before reaching the GPU.
-            if (m_FrameData.Count > (NumFramesInFlight + 1))
-                numFree = 1;
+            int maxBufferedFrames = NumFramesInFlight + 1;
+
+            // If we have more buffered frames than the maximum, free all the excess
+            if (m_FrameData.Length > maxBufferedFrames)
+                numFree = m_FrameData.Length - maxBufferedFrames;
 
             for (int i = 0; i < numFree; ++i)
             {
-                while (m_FrameData[i].m_Buffers.Count > 0)
+                while (!m_FrameData[i].m_Buffers.IsEmpty)
                 {
                     var buffer = m_FrameData[i].m_Buffers.Pop();
                     m_UploadBufferPool.PutBufferId(buffer);
@@ -729,11 +775,22 @@ namespace Latios.Kinemation.SparseUpload
         /// <param name="maxDataSizeInBytes">An upper bound of total data size that you want to upload this frame.</param>
         /// <param name="biggestDataUpload">The size of the largest upload operation that will occur.</param>
         /// <param name="maxOperationCount">An upper bound of the total number of upload operations that will occur this frame.</param>
+        /// <param name="frameID">An ID that should be unique each frame but identical for uploads which occur during the same frame.</param>
         /// <returns>Returns a new ThreadedSparseUploader that must be passed to SparseUploader.EndAndCommit later.</returns>
-        public LatiosThreadedSparseUploader Begin(int maxDataSizeInBytes, int biggestDataUpload, int maxOperationCount)
+        public LatiosThreadedSparseUploader Begin(int maxDataSizeInBytes, int biggestDataUpload, int maxOperationCount, uint frameID)
         {
+            // If we forgot to finish the previous update, finish it now.
+            if (m_ThreadData->m_Buffers != null)
+                FrameCleanup();
+
             // First: recover all buffers from the previous frames (if any)
-            RecoverBuffers();
+            if (m_firstUpdate || frameID != m_frameIndex)
+            {
+                RecoverBuffers();
+                m_firstUpdateThisFrame = true;
+            }
+            m_firstUpdate = false;
+            m_frameIndex  = frameID;
 
             // Second: calculate total size needed this frame, allocate buffers and map what is needed
             var operationSize                   = UnsafeUtility.SizeOf<Operation>();
@@ -803,14 +860,26 @@ namespace Latios.Kinemation.SparseUpload
         /// Ends an upload frame and dispatches any upload operations added to the passed in ThreadedSparseUploader.
         /// </summary>
         /// <param name="tsu">The ThreadedSparseUploader to consume and process upload dispatches for. You must have created this with a call to SparseUploader.Begin.</param>
-        public void EndAndCommit(LatiosThreadedSparseUploader tsu, bool firstTimeThisFrame)
+        public void EndAndCommit(LatiosThreadedSparseUploader tsu)
         {
-            var       numBuffers = m_ThreadData->m_NumBuffers;
-            FrameData frameData  = default;
-            if (firstTimeThisFrame)
-                frameData = m_FreeFrameData.Count > 0 ? m_FreeFrameData.Pop() : new FrameData();
+            // Enforce that EndAndCommit is only called with a valid ThreadedSparseUploader
+            if (!tsu.IsValid)
+            {
+                Debug.LogError("Invalid LatiosThreadedSparseUploader passed to EndAndCommit");
+                return;
+            }
+
+            int numBuffers = m_ThreadData->m_NumBuffers;
+
+            // If there is no work for us to do, early out so we don't add empty entries into m_FrameData
+            if (numBuffers == 0 && !m_MappedBuffers.IsCreated)
+                return;
+
+            FrameData frameData = default;
+            if (m_firstUpdateThisFrame)
+                frameData = (!m_FreeFrameData.IsEmpty) ? m_FreeFrameData.Pop() : new FrameData(Allocator.Persistent);
             else
-                frameData = m_FrameData[^ 1];
+                frameData = m_FrameData[m_FrameData.Length - 1];
             for (int iBuf = 0; iBuf < numBuffers; ++iBuf)
             {
                 var mappedBuffer = m_MappedBuffers[iBuf];
@@ -834,7 +903,7 @@ namespace Latios.Kinemation.SparseUpload
                 }
             }
 
-            if (firstTimeThisFrame)
+            if (m_firstUpdateThisFrame)
                 m_FrameData.Add(frameData);
 
             if (m_MappedBuffers.IsCreated)

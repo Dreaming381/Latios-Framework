@@ -1888,7 +1888,7 @@ namespace Latios.Kinemation.Systems
                     running.meshSkinningExtraBoneTransformsCount += temp.meshSkinningExtraBoneTransformsCount;
                 }
 
-                var maxData          = maxRequiredDeformDataLookup.GetRefRW(worldBlackboardEntity, false);
+                var maxData          = maxRequiredDeformDataLookup.GetRefRW(worldBlackboardEntity);
                 var shaderTransforms = maxData.ValueRW.maxRequiredBoneTransformsForVertexSkinning;
                 bufferLayouts.Value  = new BufferLayouts
                 {

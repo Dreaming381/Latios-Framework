@@ -141,6 +141,14 @@ namespace Latios.Systems
             m_commandBufferAllocator.Allocator.Dispose();
             m_commandBufferAllocator.Dispose();
 
+            m_playbackInstances.Dispose();
+            m_entityCommandBuffers.Dispose();
+            m_enableCommandBuffers.Dispose();
+            m_disableCommandBuffers.Dispose();
+            m_destroyCommandBuffers.Dispose();
+            m_instantiateCommandBuffersWithoutData.Dispose();
+            m_instantiateCommandBuffersUntyped.Dispose();
+
             m_externalSourceText.Dispose();
         }
 

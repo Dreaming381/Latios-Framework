@@ -234,8 +234,8 @@ namespace Latios.Kinemation
                 foreach (var newAabb in meshAabbs)
                     aabb = Physics.CombineAabb(aabb, newAabb);
                 foreach (var newAabb in postProcessAabbs)
-                    aabb                                                          = Physics.CombineAabb(aabb, newAabb);
-                brgAabbLookup.GetRefRW(worldBlackboardEntity, false).ValueRW.aabb = aabb;
+                    aabb                                                   = Physics.CombineAabb(aabb, newAabb);
+                brgAabbLookup.GetRefRW(worldBlackboardEntity).ValueRW.aabb = aabb;
             }
         }
     }

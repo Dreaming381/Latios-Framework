@@ -57,6 +57,8 @@ namespace Latios.Myri
             public ComponentLookup<EntityOutputGraphState>   listenerOutputGraphStateLookup;
             public EntityCommandBuffer                       ecb;
 
+            public NativeList<ListenerGraphState> statesToDisposeThisFrame;
+
             [ReadOnly] public ComponentLookup<AudioSettings> audioSettingsLookup;
             public Entity                                    worldBlackboardEntity;
 
@@ -124,6 +126,8 @@ namespace Latios.Myri
                     ecb.RemoveComponent<ListenerGraphState>(    entity);
                     ecb.RemoveComponent<EntityOutputGraphState>(entity);
                 }
+
+                statesToDisposeThisFrame.Clear();
 
                 //Process new and changed listeners
                 for (int i = 0; i < listenerEntities.Length; i++)
@@ -233,6 +237,7 @@ namespace Latios.Myri
                             listenerOutputGraphStateLookup[entity] = listenerOutputGraphState;
                         }
                         existingEntities.Add(entity);
+                        statesToDisposeThisFrame.Add(in listenerGraphState);
 
                         //Compute parameters and megabuffer allocation
                         int numChannels             = profile.passthroughFractionsPerLeftChannel.Length + profile.passthroughFractionsPerRightChannel.Length;
@@ -343,6 +348,7 @@ namespace Latios.Myri
                     ecb.AddComponent(newEntities[i], newListenerGraphStates[i]);
                     ecb.AddComponent(newEntities[i], newOutputGraphStates[i]);
                 }
+                statesToDisposeThisFrame.AddRange(newListenerGraphStates.AsArray());
 
                 //Resize megaBuffer and populate offsets
                 outputSamplesMegaBuffer.Resize(megaBufferSampleCount, NativeArrayOptions.ClearMemory);

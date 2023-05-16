@@ -19,23 +19,26 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct CopyTransformFromBoneSystem : ISystem
     {
-        EntityQuery m_query;
+        EntityQuery                m_query;
+        TransformAspect.TypeHandle m_transformHandle;
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<LocalTransform>(false).WithAll<CopyLocalToParentFromBone>(true).WithAll<BoneOwningSkeletonReference>(true).Build();
+            m_query           = state.Fluent().WithAll<LocalTransform>(false).WithAll<CopyLocalToParentFromBone>(true).WithAll<BoneOwningSkeletonReference>(true).Build();
+            m_transformHandle = new TransformAspect.TypeHandle(ref state);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            m_transformHandle.Update(ref state);
             state.Dependency = new CopyFromBoneJob
             {
                 fromBoneHandle    = GetComponentTypeHandle<CopyLocalToParentFromBone>(true),
                 skeletonHandle    = GetComponentTypeHandle<BoneOwningSkeletonReference>(true),
                 obtLookup         = GetBufferLookup<OptimizedBoneTransform>(true),
                 stateLookup       = GetComponentLookup<OptimizedSkeletonState>(true),
-                ltHandle          = GetComponentTypeHandle<LocalTransform>(false),
+                transformHandle   = m_transformHandle,
                 lastSystemVersion = state.LastSystemVersion
             }.ScheduleParallel(m_query, state.Dependency);
         }
@@ -51,7 +54,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<BoneOwningSkeletonReference> skeletonHandle;
             [ReadOnly] public BufferLookup<OptimizedBoneTransform>             obtLookup;
             [ReadOnly] public ComponentLookup<OptimizedSkeletonState>          stateLookup;
-            public ComponentTypeHandle<LocalTransform>                         ltHandle;
+            public TransformAspect.TypeHandle                                  transformHandle;
 
             public uint lastSystemVersion;
 
@@ -75,8 +78,8 @@ namespace Latios.Kinemation.Systems
                         return;
                 }
 
-                var bones = chunk.GetNativeArray(ref fromBoneHandle);
-                var lts   = chunk.GetNativeArray(ref ltHandle).Reinterpret<TransformQvvs>();
+                var bones      = chunk.GetNativeArray(ref fromBoneHandle);
+                var transforms = transformHandle.Resolve(chunk);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -84,7 +87,7 @@ namespace Latios.Kinemation.Systems
                     var state     = stateLookup[skeletons[i].skeletonRoot].state;
                     var boneCount = buffer.Length / 6;
                     var mask      = (byte)(state & OptimizedSkeletonState.Flags.RotationMask);
-                    var root      = 0;
+                    int root;
                     if ((state & OptimizedSkeletonState.Flags.IsDirty) == OptimizedSkeletonState.Flags.IsDirty)
                     {
                         root = OptimizedSkeletonState.CurrentFromMask[mask];
@@ -93,7 +96,8 @@ namespace Latios.Kinemation.Systems
                     {
                         root = OptimizedSkeletonState.PreviousFromMask[mask];
                     }
-                    lts[i] = buffer[bones[i].boneIndex + root * boneCount * 2].boneTransform;
+                    var transform                = transforms[i];
+                    transform.localTransformQvvs = buffer[bones[i].boneIndex + root * boneCount * 2].boneTransform;
                 }
             }
         }

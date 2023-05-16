@@ -42,7 +42,7 @@ namespace Latios.Kinemation.Authoring
             // LODGroup
             lodState                = new LODState();
             lodState.LodGroup       = baker.GetComponentInParent<LODGroup>();
-            lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup);
+            lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup, TransformUsageFlags.Renderable);
             lodState.LodGroupIndex  = FindInLODs(lodState.LodGroup, authoringSource);
         }
 
@@ -156,7 +156,7 @@ namespace Latios.Kinemation.Authoring
         {
             CreateLODState(baker, renderer, out var lodState);
 
-            var entity = baker.GetEntity(renderer);
+            var entity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
 
             AddRendererComponents(entity, baker, renderMeshDescription, renderMesh);
 
@@ -225,7 +225,7 @@ namespace Latios.Kinemation.Authoring
                 Entity meshEntity;
                 if (m == firstValidMaterialIndex)
                 {
-                    meshEntity = baker.GetEntity(renderer);
+                    meshEntity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
 
                     worldTransform = baker.GetComponent<Transform>(renderer).GetWorldSpaceQvvs();
 
@@ -238,10 +238,8 @@ namespace Latios.Kinemation.Authoring
                 }
                 else
                 {
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.ManualOverride, false, $"{baker.GetName()}-CopySkinSubMeshEntity{m}");
+                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-CopySkinSubMeshEntity{m}");
 
-                    baker.AddComponent(                      meshEntity, new WorldTransform { worldTransform = worldTransform });
-                    baker.AddComponent(                      meshEntity, new Parent { parent                 = referenceEntity });
                     baker.AddComponent<CopyParentRequestTag>(meshEntity);
                     baker.AddComponent(                      meshEntity, new CopyDeformFromEntity { sourceDeformedEntity = referenceEntity });
 

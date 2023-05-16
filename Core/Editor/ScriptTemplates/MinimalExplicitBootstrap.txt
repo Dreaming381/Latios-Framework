@@ -13,7 +13,7 @@ public class LatiosBootstrap : ICustomBootstrap
         World.DefaultGameObjectInjectionWorld = world;
         world.useExplicitSystemOrdering       = true;
 
-        var systems = new List<Type>(DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default));
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default);
 
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);

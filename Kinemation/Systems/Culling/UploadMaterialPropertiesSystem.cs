@@ -33,8 +33,6 @@ namespace Latios.Kinemation.Systems
 
         internal ComponentTypeCache.BurstCompatibleTypeArray m_burstCompatibleTypeArray;
 
-        bool m_firstTimeThisFrame = false;
-
 #if DEBUG_LOG_MEMORY_USAGE
         private static ulong PrevUsedSpace = 0;
 #endif
@@ -52,14 +50,6 @@ namespace Latios.Kinemation.Systems
                 4);
             m_GPUPersistentInstanceBufferHandle = m_GPUPersistentInstanceData.bufferHandle;
             m_GPUUploader                       = new LatiosSparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
-        }
-
-        public override bool ShouldUpdateSystem()
-        {
-            // Todo: We need a more consistent way to check that this is the first time.
-            if (worldBlackboardEntity.GetComponentData<CullingContext>().cullIndexThisFrame == 0)
-                m_firstTimeThisFrame = true;
-            return base.ShouldUpdateSystem();
         }
 
         // Todo: Get rid of the hard system dependencies.
@@ -161,7 +151,10 @@ namespace Latios.Kinemation.Systems
 
                 // Todo: Once blits are removed in newer Entities versions, we can add early-out checks here.
                 var sizeRequirements  = uploadSizeRequirements.Value;
-                m_ThreadedGPUUploader = m_GPUUploader.Begin(sizeRequirements.totalUploadBytes, sizeRequirements.biggestUploadBytes, sizeRequirements.numOperations);
+                m_ThreadedGPUUploader = m_GPUUploader.Begin(sizeRequirements.totalUploadBytes,
+                                                            sizeRequirements.biggestUploadBytes,
+                                                            sizeRequirements.numOperations,
+                                                            culling.globalSystemVersionOfLatiosEntitiesGraphics);
 
                 // This is a different update, so we need to resecure this collection component.
                 // Also, this time we write to it.
@@ -189,8 +182,7 @@ namespace Latios.Kinemation.Systems
 
                 try
                 {
-                    m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader, m_firstTimeThisFrame);
-                    m_firstTimeThisFrame = false;
+                    m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader);
                 }
                 finally
                 {

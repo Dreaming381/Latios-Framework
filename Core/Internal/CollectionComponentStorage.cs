@@ -82,6 +82,9 @@ namespace Latios
                 }
                 DispatchDisposeToSourceGen(functionPtr, (CollectionComponentStorage*)UnsafeUtility.AddressOf(ref this), registeredType.typedStorageIndex);
             }
+            m_twoLevelLookup.Dispose();
+            m_registeredTypeLookup.Dispose();
+            m_storagePtrs.Dispose();
         }
 
         [BurstCompile]
@@ -275,6 +278,7 @@ namespace Latios
         ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             m_storagePtrs[storagePtrIndex].As<T>().Dispose();
+            AllocatorManager.Free(m_allocator, (TypedCollectionComponentStorage<T>*)m_storagePtrs[storagePtrIndex].ptr);
         }
 
         private ref TypedCollectionComponentStorage<T> GetTypedCollectionStorage<T>(Entity entity, out int indexInTypedStorage) where T : unmanaged, ICollectionComponent,

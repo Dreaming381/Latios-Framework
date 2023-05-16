@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Latios.Systems;
 using Unity.Entities;
 using UnityEngine;
 
@@ -7,8 +8,9 @@ namespace Latios
 {
     internal class DeferredSimulationEndFrameController : MonoBehaviour
     {
-        internal bool                                done = false;
-        internal Systems.LatiosSimulationSystemGroup simGroup;
+        internal bool                               done = false;
+        internal SimulationSystemGroup              simGroup;
+        internal LatiosSimulationSystemGroupManager simManager;
 
         IEnumerator Start()
         {
@@ -16,9 +18,9 @@ namespace Latios
 
             while (!done)
             {
-                simGroup.skipInDeferred = false;
+                simManager.skipInDeferred = false;
                 simGroup.Update();
-                simGroup.skipInDeferred = true;
+                simManager.skipInDeferred = true;
                 yield return endOfFrame;
             }
         }
@@ -34,11 +36,12 @@ namespace Latios
         {
             if (m_controllerObject == null)
             {
-                m_controllerObject                 = new GameObject();
-                var controller                     = m_controllerObject.AddComponent<DeferredSimulationEndFrameController>();
-                controller.simGroup                = World.GetExistingSystemManaged<Systems.LatiosSimulationSystemGroup>();
-                controller.simGroup.skipInDeferred = true;
-                m_controllerObject.hideFlags       = HideFlags.HideAndDontSave;
+                m_controllerObject                   = new GameObject();
+                var controller                       = m_controllerObject.AddComponent<DeferredSimulationEndFrameController>();
+                controller.simGroup                  = World.GetExistingSystemManaged<SimulationSystemGroup>();
+                controller.simManager                = controller.simGroup.RateManager as LatiosSimulationSystemGroupManager;
+                controller.simManager.skipInDeferred = true;
+                m_controllerObject.hideFlags         = HideFlags.HideAndDontSave;
             }
         }
 

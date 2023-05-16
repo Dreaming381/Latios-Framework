@@ -81,7 +81,10 @@ namespace AclUnity
             var alignedClipData = (float*)aosClipData.GetUnsafeReadOnlyPtr();
             if (!CollectionHelper.IsAligned(alignedClipData, 16))
             {
-                alignedClipData = (float*)UnsafeUtility.Malloc(UnsafeUtility.SizeOf<Qvvs>() * aosClipData.Length, math.max(UnsafeUtility.AlignOf<Qvvs>(), 16), Allocator.TempJob);
+                alignedClipData = (float*)UnsafeUtility.MallocTracked(UnsafeUtility.SizeOf<Qvvs>() * aosClipData.Length,
+                                                                      math.max(UnsafeUtility.AlignOf<Qvvs>(), 16),
+                                                                      Allocator.TempJob,
+                                                                      0);
                 UnsafeUtility.MemCpy(alignedClipData, aosClipData.GetUnsafeReadOnlyPtr(), UnsafeUtility.SizeOf<Qvvs>() * aosClipData.Length);
             }
 

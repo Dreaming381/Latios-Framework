@@ -27,7 +27,7 @@ namespace Latios.Kinemation.Authoring
             MeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, true, out var additionalEntities);
 
             if (additionalEntities.Count == 0)
-                baker.AddComponent(new MeshRendererBakingData { MeshRenderer = renderer });
+                baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
 
             foreach (var entity in additionalEntities)
             {
@@ -87,9 +87,10 @@ namespace Latios.Kinemation.Authoring
             var additionalEntities = new NativeList<Entity>(Allocator.Temp);
             LatiosDeformMeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, additionalEntities, knownValidMaterialIndex);
 
+            var primaryEntity = baker.GetEntity(TransformUsageFlags.Renderable);
             if (renderer is SkinnedMeshRenderer smr)
             {
-                baker.AddComponent(new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = smr });
+                baker.AddComponent(primaryEntity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = smr });
 
                 foreach (var entity in additionalEntities)
                 {
@@ -98,7 +99,7 @@ namespace Latios.Kinemation.Authoring
             }
             else
             {
-                baker.AddComponent(new MeshRendererBakingData { MeshRenderer = renderer });
+                baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
 
                 foreach (var entity in additionalEntities)
                 {

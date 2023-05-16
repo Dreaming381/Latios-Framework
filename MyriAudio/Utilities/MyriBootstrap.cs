@@ -17,7 +17,7 @@ namespace Latios.Myri
             if (world.Flags.HasFlag(WorldFlags.Conversion))
                 throw new System.InvalidOperationException("Cannot install Myri runtime in a conversion world.");
 
-            BootstrapTools.InjectSystem(typeof(Systems.AudioSystem), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.AudioSystem>(), world);
         }
     }
 }

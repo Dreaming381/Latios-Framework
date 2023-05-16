@@ -111,9 +111,15 @@ namespace Latios.Systems
         {
             m_impl->m_worldUnmanaged.EntityManager.CompleteAllTrackedJobs();
 
+            if (m_impl->m_unmanagedSystemInterfacesDispatcher.IsAllocated)
+            {
+                (m_impl->m_unmanagedSystemInterfacesDispatcher.Target as UnmanagedExtraInterfacesDispatcher)?.Dispose();
+                m_impl->m_unmanagedSystemInterfacesDispatcher.Free();
+            }
             if (m_impl->m_managedStructStorage.IsAllocated)
             {
                 (m_impl->m_managedStructStorage.Target as ManagedStructComponentStorage)?.Dispose();
+                m_impl->m_managedStructStorage.Free();
             }
             m_impl->m_collectionComponentStorage.Dispose();
             m_impl->m_collectionDependencies.Dispose();
