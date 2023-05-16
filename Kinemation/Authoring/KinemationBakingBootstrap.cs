@@ -25,17 +25,17 @@ namespace Latios.Kinemation.Authoring
             context.filteredBakerTypes.Add(typeof(DefaultMeshRendererBaker));
             context.filteredBakerTypes.Remove(typeof(Unity.Rendering.MeshRendererBaker));
 
-            context.bakingSystemTypesToInject.Add(typeof(KinemationPreTransformsBakingGroup));
-            context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberBakingGroup));
-            context.bakingSystemTypesToInject.Add(typeof(KinemationSmartBlobberResolverBakingGroup));
-            context.bakingSystemTypesToInject.Add(typeof(AddMasksBakingSystem));
-            context.bakingSystemTypesToInject.Add(typeof(AddPostProcessMatrixSystem));
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationPreTransformsBakingGroup>());
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberBakingGroup>());
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberResolverBakingGroup>());
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddMasksBakingSystem>());
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddPostProcessMatrixSystem>());
 
-            context.optimizationSystemTypesToInject.Add(typeof(LatiosFrozenStaticRendererSystem));
-            context.optimizationSystemTypesToDisable.Add(typeof(Unity.Rendering.FrozenStaticRendererSystem));
-            context.optimizationSystemTypesToInject.Add(typeof(LatiosLODRequirementsUpdateSystem));
-            context.optimizationSystemTypesToInject.Add(typeof(LatiosAddWorldAndChunkRenderBoundsSystem));
-            context.optimizationSystemTypesToInject.Add(typeof(LatiosRenderBoundsUpdateSystem));
+            context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosFrozenStaticRendererSystem>());
+            context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.FrozenStaticRendererSystem>());
+            context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosLODRequirementsUpdateSystem>());
+            context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosAddWorldAndChunkRenderBoundsSystem>());
+            context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosRenderBoundsUpdateSystem>());
         }
     }
 }

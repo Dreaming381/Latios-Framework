@@ -17,11 +17,9 @@ namespace Latios
         {
             DisallowNetCode("Scene Manager");
 
-            BootstrapTools.InjectSystem(typeof(SceneManagerSystem),                 world);
-            BootstrapTools.InjectSystem(typeof(DestroyEntitiesOnSceneChangeSystem), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<SceneManagerSystem>(),                 world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<DestroyEntitiesOnSceneChangeSystem>(), world);
         }
-
-        
 
         [System.Diagnostics.Conditional("NETCODE_PROJECT")]
         private static void DisallowNetCode(string feature)

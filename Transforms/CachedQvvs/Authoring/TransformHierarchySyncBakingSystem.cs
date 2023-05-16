@@ -144,7 +144,7 @@ namespace Latios.Transforms.Authoring.Systems
 
                     if (hasMutableLocalTransform)
                     {
-                        ref var worldTransform = ref worldTransformLookup.GetRefRW(entity, false).ValueRW;
+                        ref var worldTransform = ref worldTransformLookup.GetRefRW(entity).ValueRW;
                         qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, localTransformLookup[entity].localTransform);
                         worldTransformToPropagate = worldTransform.worldTransform;
                     }

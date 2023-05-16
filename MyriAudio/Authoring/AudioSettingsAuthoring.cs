@@ -22,7 +22,8 @@ namespace Latios.Myri.Authoring
     {
         public override void Bake(AudioSettingsAuthoring authoring)
         {
-            AddComponent(new AudioSettings
+            var entity = GetEntity(TransformUsageFlags.None);
+            AddComponent(entity, new AudioSettings
             {
                 safetyAudioFrames             = authoring.safetyAudioFrames,
                 audioFramesPerUpdate          = authoring.audioFramesPerUpdate,

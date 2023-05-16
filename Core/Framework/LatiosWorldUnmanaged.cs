@@ -529,6 +529,7 @@ namespace Latios
     {
         public BlackboardEntity                 m_worldBlackboardEntity;
         public BlackboardEntity                 m_sceneBlackboardEntity;
+        public GCHandle                         m_unmanagedSystemInterfacesDispatcher;
         public GCHandle                         m_managedStructStorage;
         public CollectionComponentStorage       m_collectionComponentStorage;
         public WorldUnmanaged                   m_worldUnmanaged;

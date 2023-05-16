@@ -41,6 +41,7 @@ namespace Latios.Myri.Systems
         private int                                         m_currentBufferId;
         private NativeList<OwnedIldBuffer>                  m_buffersInFlight;
         private NativeQueue<AudioFrameBufferHistoryElement> m_audioFrameHistory;
+        private NativeList<ListenerGraphState>              m_listenerGraphStatesToDispose;
 
         private JobHandle   m_lastUpdateJobHandle;
         private EntityQuery m_aliveListenersQuery;
@@ -63,15 +64,16 @@ namespace Latios.Myri.Systems
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
             //Initialize containers first
-            m_mixNodePortFreelist        = new NativeList<int>(Allocator.Persistent);
-            m_mixNodePortCount           = new NativeReference<int>(Allocator.Persistent);
-            m_ildNodePortCount           = new NativeReference<int>(Allocator.Persistent);
-            m_packedFrameCounterBufferId = new NativeReference<long>(Allocator.Persistent);
-            m_audioFrame                 = new NativeReference<int>(Allocator.Persistent);
-            m_lastPlayedAudioFrame       = new NativeReference<int>(Allocator.Persistent);
-            m_lastReadBufferId           = new NativeReference<int>(Allocator.Persistent);
-            m_buffersInFlight            = new NativeList<OwnedIldBuffer>(Allocator.Persistent);
-            m_audioFrameHistory          = new NativeQueue<AudioFrameBufferHistoryElement>(Allocator.Persistent);
+            m_mixNodePortFreelist          = new NativeList<int>(Allocator.Persistent);
+            m_mixNodePortCount             = new NativeReference<int>(Allocator.Persistent);
+            m_ildNodePortCount             = new NativeReference<int>(Allocator.Persistent);
+            m_packedFrameCounterBufferId   = new NativeReference<long>(Allocator.Persistent);
+            m_audioFrame                   = new NativeReference<int>(Allocator.Persistent);
+            m_lastPlayedAudioFrame         = new NativeReference<int>(Allocator.Persistent);
+            m_lastReadBufferId             = new NativeReference<int>(Allocator.Persistent);
+            m_buffersInFlight              = new NativeList<OwnedIldBuffer>(Allocator.Persistent);
+            m_audioFrameHistory            = new NativeQueue<AudioFrameBufferHistoryElement>(Allocator.Persistent);
+            m_listenerGraphStatesToDispose = new NativeList<ListenerGraphState>(Allocator.Persistent);
 
             latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new AudioSettings
             {
@@ -226,6 +228,7 @@ namespace Latios.Myri.Systems
                 listenerGraphStateLookup            = listenerGraphStateLookup,
                 listenerOutputGraphStateLookup      = entityOutputGraphStateLookup,
                 ecb                                 = entityCommandBuffer,
+                statesToDisposeThisFrame            = m_listenerGraphStatesToDispose,
                 audioSettingsLookup                 = audioSettingsLookup,
                 worldBlackboardEntity               = latiosWorld.worldBlackboardEntity,
                 audioFrame                          = m_audioFrame,
@@ -402,7 +405,21 @@ namespace Latios.Myri.Systems
         public void OnDestroy(ref SystemState state)
         {
             //UnityEngine.Debug.Log("AudioSystem.OnDestroy");
+            m_lastUpdateJobHandle.Complete();
+            state.CompleteDependency();
             var commandBlock = m_graph.CreateCommandBlock();
+            foreach (var s in m_listenerGraphStatesToDispose)
+            {
+                foreach (var c in s.ildConnections)
+                    commandBlock.Disconnect(c.connection);
+                foreach (var c in s.connections)
+                    commandBlock.Disconnect(c);
+                foreach (var n in s.nodes)
+                    commandBlock.ReleaseDSPNode(n);
+                s.nodes.Dispose();
+                s.ildConnections.Dispose();
+                s.connections.Dispose();
+            }
             commandBlock.Disconnect(m_mixToLimiterMasterConnection);
             commandBlock.Disconnect(m_limiterMasterToOutputConnection);
             commandBlock.ReleaseDSPNode(m_ildNode);
@@ -421,6 +438,7 @@ namespace Latios.Myri.Systems
             m_lastPlayedAudioFrame.Dispose();
             m_lastReadBufferId.Dispose();
             m_audioFrameHistory.Dispose();
+            m_listenerGraphStatesToDispose.Dispose();
 
             foreach (var buffer in m_buffersInFlight)
             {

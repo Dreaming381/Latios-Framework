@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Exposed;
 
@@ -29,36 +31,39 @@ namespace Latios.Authoring
         /// </summary>
         public List<System.Type> filteredBakerTypes;
         /// <summary>
-        /// Initially empty, specify a list of system types to disable while baking. Use cases for this are rare.
+        /// Initially allocated but empty, specify a list of system types to disable while baking. Use cases for this are rare.
         /// </summary>
-        public List<System.Type> bakingSystemTypesToDisable;
+        public NativeList<SystemTypeIndex> bakingSystemTypesToDisable;
         /// <summary>
-        /// Initially empty, specify a list of system types to disable while optimizing a subscene. Use cases for this are rare.
+        /// Initially allocated but empty, specify a list of system types to disable while optimizing a subscene. Use cases for this are rare.
         /// </summary>
-        public List<System.Type> optimizationSystemTypesToDisable;
+        public NativeList<SystemTypeIndex> optimizationSystemTypesToDisable;
         /// <summary>
-        /// Initially empty, specify a list of system types to be auto-created and injected into the baking world.
+        /// Initially allocated but empty, specify a list of system types to be auto-created and injected into the baking world.
         /// The new systems will ignore [DisableAutoCreation] and will be created after the original default list
         /// of systems are created.
         /// </summary>
-        public List<System.Type> bakingSystemTypesToInject;
+        public NativeList<SystemTypeIndex> bakingSystemTypesToInject;
         /// <summary>
-        /// Initially empty, specify a list of system types to be auto-created and injected into the baking world
+        /// Initially allocated but empty, specify a list of system types to be auto-created and injected into the baking world
         /// when scene optimizations are running (they run twice before writing the subscene to disk).
         /// The new systems will ignore [DisableAutoCreation] and will be created after the original default list
         /// of optimization systems are created.
         /// </summary>
-        public List<System.Type> optimizationSystemTypesToInject;
+        public NativeList<SystemTypeIndex> optimizationSystemTypesToInject;
     }
 
     internal class BakingOverride
     {
         OverrideBakers                       m_overrideBakers;
         public List<ICreateSmartBakerSystem> m_smartBakerSystemCreators;
-        public List<System.Type>             m_bakingSystemTypesToDisable;
-        public List<System.Type>             m_bakingSystemTypesToInject;
-        public List<System.Type>             m_optimizationSystemTypesToDisable;
-        public List<System.Type>             m_optimizationSystemTypesToInject;
+        public NativeList<SystemTypeIndex>   m_bakingSystemTypesToDisable;
+        public NativeList<SystemTypeIndex>   m_bakingSystemTypesToInject;
+        public NativeList<SystemTypeIndex>   m_optimizationSystemTypesToDisable;
+        public NativeList<SystemTypeIndex>   m_optimizationSystemTypesToInject;
+
+        static bool s_appDomainUnloadRegistered;
+        static bool s_initialized;
 
         public BakingOverride()
         {
@@ -104,23 +109,47 @@ namespace Latios.Authoring
             var context = new CustomBakingBootstrapContext
             {
                 filteredBakerTypes               = candidateBakers,
-                bakingSystemTypesToDisable       = new List<System.Type>(),
-                bakingSystemTypesToInject        = new List<System.Type>(),
-                optimizationSystemTypesToDisable = new List<System.Type>(),
-                optimizationSystemTypesToInject  = new List<System.Type>(),
+                bakingSystemTypesToDisable       = new NativeList<SystemTypeIndex>(Allocator.Temp),
+                bakingSystemTypesToInject        = new NativeList<SystemTypeIndex>(Allocator.Temp),
+                optimizationSystemTypesToDisable = new NativeList<SystemTypeIndex>(Allocator.Temp),
+                optimizationSystemTypesToInject  = new NativeList<SystemTypeIndex>(Allocator.Temp),
             };
             bootstrap.InitializeBakingForAllWorlds(ref context);
 
             m_overrideBakers = new OverrideBakers(true, context.filteredBakerTypes.ToArray());
 
-            m_bakingSystemTypesToDisable       = context.bakingSystemTypesToDisable;
-            m_bakingSystemTypesToInject        = context.bakingSystemTypesToInject;
-            m_optimizationSystemTypesToDisable = context.optimizationSystemTypesToDisable;
-            m_optimizationSystemTypesToInject  = context.optimizationSystemTypesToInject;
+            m_bakingSystemTypesToDisable       = new NativeList<SystemTypeIndex>(context.bakingSystemTypesToDisable.Length, Allocator.Persistent);
+            m_bakingSystemTypesToInject        = new NativeList<SystemTypeIndex>(context.bakingSystemTypesToInject.Length, Allocator.Persistent);
+            m_optimizationSystemTypesToDisable = new NativeList<SystemTypeIndex>(context.optimizationSystemTypesToDisable.Length, Allocator.Persistent);
+            m_optimizationSystemTypesToInject  = new NativeList<SystemTypeIndex>(context.optimizationSystemTypesToInject.Length, Allocator.Persistent);
+            m_bakingSystemTypesToDisable.AddRange(context.bakingSystemTypesToDisable.AsArray());
+            m_bakingSystemTypesToInject.AddRange(context.bakingSystemTypesToInject.AsArray());
+            m_optimizationSystemTypesToDisable.AddRange(context.optimizationSystemTypesToDisable.AsArray());
+            m_optimizationSystemTypesToInject.AddRange(context.optimizationSystemTypesToInject.AsArray());
+
+            if (!s_appDomainUnloadRegistered)
+            {
+                // important: this will always be called from a special unload thread (main thread will be blocking on this)
+                AppDomain.CurrentDomain.DomainUnload += (_, __) =>
+                {
+                    if (s_initialized)
+                        Shutdown();
+                };
+
+                s_appDomainUnloadRegistered = true;
+            }
+            s_initialized = true;
 #endif
         }
 
-        public void Shutdown() => m_overrideBakers.Dispose();
+        public void Shutdown()
+        {
+            m_overrideBakers.Dispose();
+            m_bakingSystemTypesToDisable.Dispose();
+            m_bakingSystemTypesToInject.Dispose();
+            m_optimizationSystemTypesToDisable.Dispose();
+            m_optimizationSystemTypesToInject.Dispose();
+        }
     }
 
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
@@ -156,7 +185,7 @@ namespace Latios.Authoring
                 foreach (var creator in s_bakingOverride.m_smartBakerSystemCreators)
                     creator.Create(World, smartBakingSystemGroup);
 
-                if (s_bakingOverride.m_bakingSystemTypesToDisable != null)
+                if (s_bakingOverride.m_bakingSystemTypesToDisable.IsCreated)
                 {
                     foreach (var disableType in s_bakingOverride.m_bakingSystemTypesToDisable)
                     {
@@ -168,7 +197,7 @@ namespace Latios.Authoring
                     }
                 }
 
-                if (s_bakingOverride.m_bakingSystemTypesToInject != null)
+                if (s_bakingOverride.m_bakingSystemTypesToInject.IsCreated)
                     BootstrapTools.InjectSystems(s_bakingOverride.m_bakingSystemTypesToInject, World, World.GetExistingSystemManaged<BakingSystemGroup>());
 
                 m_initialized = true;
@@ -222,7 +251,7 @@ namespace Latios.Authoring
         {
             if (!m_initialized)
             {
-                if (s_bakingOverride.m_optimizationSystemTypesToDisable != null)
+                if (s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
                 {
                     foreach (var disableType in s_bakingOverride.m_optimizationSystemTypesToDisable)
                     {
@@ -234,7 +263,7 @@ namespace Latios.Authoring
                     }
                 }
 
-                if (s_bakingOverride.m_optimizationSystemTypesToInject != null)
+                if (s_bakingOverride.m_optimizationSystemTypesToInject.IsCreated)
                     BootstrapTools.InjectSystems(s_bakingOverride.m_optimizationSystemTypesToInject, World, World.GetExistingSystemManaged<BakingSystemGroup>());
 
                 m_initialized = true;

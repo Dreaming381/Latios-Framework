@@ -31,7 +31,8 @@ namespace Latios.Myri.Authoring
             else
                 blob = this.BuildAndRegisterListenerProfileBlob(authoring.listenerResponseProfile);
 
-            AddComponent(new AudioListener
+            var entity = GetEntity(TransformUsageFlags.Renderable);
+            AddComponent(entity, new AudioListener
             {
                 ildProfile    = blob,
                 itdResolution = authoring.interauralTimeDifferenceResolution,

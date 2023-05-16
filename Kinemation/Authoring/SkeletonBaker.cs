@@ -27,9 +27,11 @@ namespace Latios.Kinemation.Authoring
                     return;
             }
 
+            var entity = GetEntity(TransformUsageFlags.Dynamic);
+
             m_skinnedMeshRenderersCache.Clear();
             GetComponentsInChildren(m_skinnedMeshRenderersCache);
-            var skinnedMeshesToBind = AddBuffer<AutoBindSkinnedMeshToSkeleton>().Reinterpret<Entity>();
+            var skinnedMeshesToBind = AddBuffer<AutoBindSkinnedMeshToSkeleton>(entity).Reinterpret<Entity>();
             foreach (var skinnedMesh in m_skinnedMeshRenderersCache)
             {
                 var skinnedMeshSettings = GetComponent<SkinnedMeshSettingsAuthoring>(skinnedMesh);
@@ -40,21 +42,21 @@ namespace Latios.Kinemation.Authoring
                 if (GetComponentInParent<Animator>(skinnedMesh) != authoring)
                     continue;
 
-                skinnedMeshesToBind.Add(GetEntity(skinnedMesh));
+                skinnedMeshesToBind.Add(GetEntity(skinnedMesh, TransformUsageFlags.Dynamic));
             }
 
-            AddComponent<SkeletonRootTag>();
+            AddComponent<SkeletonRootTag>(entity);
 
             // For extra safety, always add the history components
-            AddComponent<RequestPrevious>();
-            AddComponent<RequestTwoAgo>();
+            AddComponent<RequestPrevious>(entity);
+            AddComponent<RequestTwoAgo>(  entity);
 
             // For now we just always assume we have the whole hierarchy to fetch.
             if (authoring.hasTransformHierarchy)
             {
                 // Analyze the hierarchy and build the BoneReference buffer here.
                 // A baking system will add the culling components.
-                var boneBuffer = AddBuffer<BoneReference>().Reinterpret<Entity>();
+                var boneBuffer = AddBuffer<BoneReference>(entity).Reinterpret<Entity>();
                 var boneNames  = new NativeList<SkeletonBoneNameInHierarchy>(Allocator.Temp);
 
                 m_breadthQueue.Clear();
@@ -65,7 +67,7 @@ namespace Latios.Kinemation.Authoring
                 {
                     var (bone, parentIndex) = m_breadthQueue.Dequeue();
                     int currentIndex        = boneNames.Length;
-                    boneBuffer.Add(GetEntity(bone));
+                    boneBuffer.Add(GetEntity(bone, TransformUsageFlags.Dynamic));
                     boneNames.Add(new SkeletonBoneNameInHierarchy
                     {
                         boneName    = GetName(bone),
@@ -82,28 +84,28 @@ namespace Latios.Kinemation.Authoring
 
                 if (boneNames.Length > 0)
                 {
-                    AddComponent(new PendingSkeletonBindingPathsBlob
+                    AddComponent(entity, new PendingSkeletonBindingPathsBlob
                     {
                         blobHandle = this.RequestCreateBlobAsset(boneNames.AsArray())
                     });
-                    AddComponent<SkeletonBindingPathsBlobReference>();
+                    AddComponent<SkeletonBindingPathsBlobReference>(entity);
                 }
             }
             else
             {
-                AddComponent(new PendingSkeletonBindingPathsBlob
+                AddComponent(entity, new PendingSkeletonBindingPathsBlob
                 {
                     blobHandle = this.RequestCreateBlobAsset(authoring, GetName())
                 });
-                AddComponent<SkeletonBindingPathsBlobReference>();
-                AddComponent(new PendingOptimizedSkeletonHierarchyBlob
+                AddComponent<SkeletonBindingPathsBlobReference>(entity);
+                AddComponent(                                   entity, new PendingOptimizedSkeletonHierarchyBlob
                 {
                     blobHandle = this.RequestCreateBlobAsset(authoring)
                 });
-                AddComponent<OptimizedSkeletonHierarchyBlobReference>();
+                AddComponent<OptimizedSkeletonHierarchyBlobReference>(entity);
 
-                var boneEntityBuffer = AddBuffer<OptimizedSkeletonExportedBone>();
-                var boneGoBuffer     = AddBuffer<ExportedBoneGameObjectRef>();
+                var boneEntityBuffer = AddBuffer<OptimizedSkeletonExportedBone>(entity);
+                var boneGoBuffer     = AddBuffer<ExportedBoneGameObjectRef>(entity);
                 for (int i = 0; i < GetChildCount(); i++)
                 {
                     var child = GetChild(i);
@@ -111,11 +113,11 @@ namespace Latios.Kinemation.Authoring
                         continue;
 
                     boneGoBuffer.Add(new ExportedBoneGameObjectRef { authoringGameObjectForBone = child });
-                    boneEntityBuffer.Add(new OptimizedSkeletonExportedBone { boneEntity         = GetEntity(child) });
+                    boneEntityBuffer.Add(new OptimizedSkeletonExportedBone { boneEntity         = GetEntity(child, TransformUsageFlags.Dynamic) });
                 }
 
-                AddBuffer<OptimizedBoneInertialBlendState>();
-                this.RequestAddAndPopulateOptimizedBoneTransformsForAnimator(GetEntity(), authoring);
+                AddBuffer<OptimizedBoneInertialBlendState>(entity);
+                this.RequestAddAndPopulateOptimizedBoneTransformsForAnimator(entity, authoring);
             }
 
             m_breadthQueue.Clear();

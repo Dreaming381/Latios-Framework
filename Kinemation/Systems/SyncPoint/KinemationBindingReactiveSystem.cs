@@ -1639,7 +1639,7 @@ namespace Latios.Kinemation.Systems
 
                 for (int j = 0; j < depsBuffer.Length; j++)
                 {
-                    var skinningState                                         = skeletonDependentLookup.GetRefRW(depsBuffer[j].skinnedMesh, false);
+                    var skinningState                                         = skeletonDependentLookup.GetRefRW(depsBuffer[j].skinnedMesh);
                     skinningState.ValueRW.indexInDependentSkinnedMeshesBuffer = j;
                 }
             }

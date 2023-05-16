@@ -13,15 +13,13 @@ namespace Latios
             this.entity = entity;
         }
 
-        public T this[ComponentLookup<T> cdfe]
-        {
-            get => cdfe[entity];
-            set => cdfe[entity] = value;
-        }
+        public T RO(ref ComponentLookup<T> lookup) => lookup[entity];
+        public RefRO<T> RefRO(ref ComponentLookup<T> lookup) => lookup.GetRefRO(entity);
+        public RefRW<T> RefRW(ref ComponentLookup<T> lookup) => lookup.GetRefRW(entity);
 
-        public bool IsValid(ComponentLookup<T> cdfe) => cdfe.HasComponent(entity);
+        public bool IsValid(ref ComponentLookup<T> cdfe) => cdfe.HasComponent(entity);
 
-        public bool DidChange(ComponentLookup<T> cdfe, uint version) => cdfe.DidChange(entity, version);
+        public bool DidChange(ref ComponentLookup<T> cdfe, uint version) => cdfe.DidChange(entity, version);
 
         public static implicit operator Entity(EntityWith<T> entityWith) => entityWith.entity;
 
@@ -37,7 +35,7 @@ namespace Latios
             this.entity = entity;
         }
 
-        public DynamicBuffer<T> this[BufferLookup<T> bfe] => bfe[entity];
+        public DynamicBuffer<T> Buffer(ref BufferLookup<T> lookup) => lookup[entity];
 
         public bool IsValid(BufferLookup<T> bfe) => bfe.HasBuffer(entity);
 

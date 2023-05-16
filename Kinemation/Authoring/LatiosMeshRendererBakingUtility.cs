@@ -28,7 +28,7 @@ namespace Latios.Kinemation.Authoring
             // LODGroup
             lodState                = new LODState();
             lodState.LodGroup       = baker.GetComponentInParent<LODGroup>();
-            lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup);
+            lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup, TransformUsageFlags.Renderable);
             lodState.LodGroupIndex  = FindInLODs(lodState.LodGroup, authoringSource);
         }
 
@@ -88,10 +88,9 @@ namespace Latios.Kinemation.Authoring
         internal static void Convert(IBaker baker,
                                      Renderer authoring,
                                      Mesh mesh,
-                                     List<Material>        sharedMaterials,
+                                     List<Material>   sharedMaterials,
                                      bool attachToPrimaryEntityForSingleMaterial,
-                                     out List<Entity>      additionalEntities,
-                                     UnityEngine.Transform root = null)
+                                     out List<Entity> additionalEntities)
         {
             additionalEntities = new List<Entity>();
 
@@ -139,7 +138,6 @@ namespace Latios.Kinemation.Authoring
                     renderMesh,
                     authoring,
                     sharedMaterials,
-                    root,
                     out additionalEntities);
             }
         }
@@ -154,7 +152,7 @@ namespace Latios.Kinemation.Authoring
         {
             CreateLODState(baker, renderer, out var lodState);
 
-            var entity = baker.GetEntity(renderer);
+            var entity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
 
             AddRendererComponents(entity, baker, renderMeshDescription, renderMesh);
 
@@ -171,7 +169,6 @@ namespace Latios.Kinemation.Authoring
             RenderMesh renderMesh,
             Renderer renderer,
             List<Material>        sharedMaterials,
-            UnityEngine.Transform root,
             out List<Entity>      additionalEntities)
         {
             CreateLODState(baker, renderer, out var lodState);
@@ -179,36 +176,15 @@ namespace Latios.Kinemation.Authoring
             int materialCount  = sharedMaterials.Count;
             additionalEntities = new List<Entity>();
 
-            var rootQvvs = Latios.Transforms.TransformQvvs.identity;
-            if (root != null)
-                rootQvvs = root.GetWorldSpaceQvvs();
-
             for (var m = 0; m != materialCount; m++)
             {
                 Entity meshEntity;
-                if (root == null)
-                {
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
+                meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
 
-                    // Update Transform components:
-                    baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
-                    if (!baker.IsStatic())
-                        baker.AddComponent<CopyParentRequestTag>(meshEntity);
-                }
-                else
-                {
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.ManualOverride, false, $"{baker.GetName()}-MeshRendererEntity");
-
-                    baker.AddComponent(meshEntity, new Latios.Transforms.WorldTransform { worldTransform = rootQvvs });
-
-                    if (!baker.IsStatic())
-                    {
-                        var rootEntity = baker.GetEntity(
-                            root);
-                        baker.AddComponent(                      meshEntity, new Latios.Transforms.Parent { parent = rootEntity });
-                        baker.AddComponent<CopyParentRequestTag>(meshEntity);
-                    }
-                }
+                // Update Transform components:
+                baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
+                if (!baker.IsStatic())
+                    baker.AddComponent<CopyParentRequestTag>(meshEntity);
 
                 additionalEntities.Add(meshEntity);
 

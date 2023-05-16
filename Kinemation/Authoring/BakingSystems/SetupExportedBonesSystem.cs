@@ -45,7 +45,8 @@ namespace Latios.Kinemation.Authoring.Systems
                 skeletonReferenceLookup         = skeletonReferenceLookup,
                 copyLocalToParentFromBoneLookup = copyLocalToParentFromBoneLookup,
                 parentLookup                    = parentLookup,
-                transformAuthoringLookup        = GetComponentLookup<TransformAuthoring>(true)
+                transformAuthoringLookup        = GetComponentLookup<TransformAuthoring>(true),
+                localTransformLookup            = GetComponentLookup<LocalTransform>(false)
             }.ScheduleParallel();
 
             var ecbRemove                        = new EntityCommandBuffer(Allocator.TempJob);
@@ -75,7 +76,6 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         partial struct ApplySkeletonsToBonesJob : IJobEntity
         {
-            [NativeDisableParallelForRestriction] public ComponentLookup<WorldTransform>              worldTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<LocalTransform>              localTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<CopyLocalToParentFromBone>   copyLocalToParentFromBoneLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<BoneOwningSkeletonReference> skeletonReferenceLookup;
@@ -100,15 +100,10 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 foreach (var bone in bones)
                 {
-                    var parentQvvs                        = worldTransformLookup[parentLookup[bone.boneEntity].parent].worldTransform;
                     var root                              = ComputeRootTransformOfBone(bone.boneIndex, in boneTransforms);
                     localTransformLookup[bone.boneEntity] = new LocalTransform
                     {
                         localTransform = new TransformQvs(root.position, root.rotation, root.scale)
-                    };
-                    worldTransformLookup[bone.boneEntity] = new WorldTransform
-                    {
-                        worldTransform = qvvs.mul(parentQvvs, root)
                     };
 
                     if (copyLocalToParentFromBoneLookup.HasComponent(bone.boneEntity))

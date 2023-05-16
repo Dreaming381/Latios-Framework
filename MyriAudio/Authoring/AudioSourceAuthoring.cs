@@ -50,10 +50,12 @@ namespace Latios.Myri.Authoring
 
         public bool Bake(AudioSourceAuthoring authoring, IBaker baker)
         {
+            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
+
             m_looped = authoring.looping;
             if (!authoring.looping)
             {
-                baker.AddComponent(new AudioSourceOneShot
+                baker.AddComponent(entity, new AudioSourceOneShot
                 {
                     innerRange      = authoring.innerRange,
                     outerRange      = authoring.outerRange,
@@ -62,12 +64,12 @@ namespace Latios.Myri.Authoring
                 });
                 if (authoring.autoDestroyOnFinish)
                 {
-                    baker.AddComponent<AudioSourceDestroyOneShotWhenFinished>();
+                    baker.AddComponent<AudioSourceDestroyOneShotWhenFinished>(entity);
                 }
             }
             else
             {
-                baker.AddComponent(new AudioSourceLooped
+                baker.AddComponent(entity, new AudioSourceLooped
                 {
                     innerRange           = authoring.innerRange,
                     outerRange           = authoring.outerRange,
@@ -78,7 +80,7 @@ namespace Latios.Myri.Authoring
             }
             if (authoring.useCone)
             {
-                baker.AddComponent(new AudioSourceEmitterCone
+                baker.AddComponent(entity, new AudioSourceEmitterCone
                 {
                     cosInnerAngle         = math.cos(math.radians(authoring.innerAngle)),
                     cosOuterAngle         = math.cos(math.radians(authoring.outerAngle)),

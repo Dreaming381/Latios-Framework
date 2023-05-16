@@ -130,7 +130,7 @@ namespace Latios.Kinemation
                 rootTransforms[0]    = local;
             }
             m_skeletonState.ValueRW.state &= ~(OptimizedSkeletonState.Flags.NeedsSync | OptimizedSkeletonState.Flags.NextSampleShouldAdd);
-            m_skeletonState.ValueRW.state |= ~OptimizedSkeletonState.Flags.IsDirty;
+            m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.IsDirty;
             SyncHistory();
         }
     }

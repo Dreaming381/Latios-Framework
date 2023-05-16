@@ -27,7 +27,7 @@ namespace Latios
     {
         #region SystemManipulation
         /// <summary>
-        /// Injects all systems in which contain 'namespaceSubstring within their namespaces.
+        /// Injects all systems from the systems list in which contain namespaceSubstring within their namespaces.
         /// Automatically creates parent ComponentSystemGroups if necessary.
         /// Use this for libraries which use traditional injection to inject into the default world.
         /// </summary>
@@ -35,10 +35,11 @@ namespace Latios
         /// <param name="namespaceSubstring">The namespace substring to query the systems' namespace against</param>
         /// <param name="world">The world to inject the systems into</param>
         /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
-        public static void InjectSystemsFromNamespace(List<Type> systems, string namespaceSubstring, World world, ComponentSystemGroup defaultGroup = null)
+        public static void InjectSystemsFromNamespace(NativeList<SystemTypeIndex> systems, string namespaceSubstring, World world, ComponentSystemGroup defaultGroup = null)
         {
-            foreach (var type in systems)
+            foreach (var system in systems)
             {
+                var type = system.GetManagedType();
                 if (type.Namespace == null)
                 {
                     Debug.LogWarning("No namespace for " + type.ToString());
@@ -47,23 +48,24 @@ namespace Latios
                 else if (!type.Namespace.Contains(namespaceSubstring))
                     continue;
 
-                InjectSystem(type, world, defaultGroup);
+                InjectSystem(system, world, defaultGroup);
             }
         }
 
         /// <summary>
-        /// Injects all systems made by Unity (or systems that use "Unity" in their namespace or assembly).
+        /// Injects all systems made by Unity (or systems that use "Unity" in their namespace or assembly) from the systems list.
         /// Automatically creates parent ComponentSystemGroups if necessary.
         /// Use this instead of InjectSystemsFromNamespace because Unity sometimes forgets to put namespaces on things.
         /// </summary>
         /// <param name="systems"></param>
         /// <param name="world"></param>
         /// <param name="defaultGroup"></param>
-        public static void InjectUnitySystems(List<Type> systems, World world, ComponentSystemGroup defaultGroup = null, bool silenceWarnings = true)
+        public static void InjectUnitySystems(NativeList<SystemTypeIndex> systems, World world, ComponentSystemGroup defaultGroup = null, bool silenceWarnings = true)
         {
-            var sysList = new List<Type>();
-            foreach (var type in systems)
+            var sysList = new NativeList<SystemTypeIndex>(Allocator.Temp);
+            foreach (var system in systems)
             {
+                var type = system.GetManagedType();
                 if (type.Namespace == null)
                 {
                     if (type.Assembly.FullName.Contains("Unity") && !silenceWarnings)
@@ -76,7 +78,7 @@ namespace Latios
                 else if (!type.Namespace.Contains("Unity"))
                     continue;
 
-                sysList.Add(type);
+                sysList.Add(system);
             }
 
             InjectSystems(sysList, world, defaultGroup);
@@ -89,12 +91,13 @@ namespace Latios
         /// <param name="systems">List of systems containing the RootSuperSystems to inject using world.GetOrCreateSystem</param>
         /// <param name="world">The world to inject the systems into</param>
         /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
-        public static void InjectRootSuperSystems(List<Type> systems, World world, ComponentSystemGroup defaultGroup = null)
+        public static void InjectRootSuperSystems(NativeList<SystemTypeIndex> systems, World world, ComponentSystemGroup defaultGroup = null)
         {
-            foreach (var type in systems)
+            foreach (var system in systems)
             {
+                var type = system.GetManagedType();
                 if (typeof(RootSuperSystem).IsAssignableFrom(type))
-                    InjectSystem(type, world, defaultGroup);
+                    InjectSystem(system, world, defaultGroup);
             }
         }
 
@@ -116,22 +119,13 @@ namespace Latios
         /// <param name="world">The world to inject the system into</param>
         /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
         /// <param name="groupRemap">If a type in an UpdateInGroupAttribute matches a key in this dictionary, it will be swapped with the value</param>
-        public static ComponentSystemBaseSystemHandleUnion InjectSystem(Type type,
+        public static ComponentSystemBaseSystemHandleUnion InjectSystem(SystemTypeIndex type,
                                                                         World world,
-                                                                        ComponentSystemGroup defaultGroup          = null,
-                                                                        IReadOnlyDictionary<Type, Type> groupRemap = null)
+                                                                        ComponentSystemGroup defaultGroup                          = null,
+                                                                        NativeHashMap<SystemTypeIndex, SystemTypeIndex> groupRemap = default)
         {
-            bool isManaged = false;
-            if (typeof(ComponentSystemBase).IsAssignableFrom(type))
-            {
-                isManaged = true;
-            }
-            else if (!typeof(ISystem).IsAssignableFrom(type))
-            {
-                return default;
-            }
-
-            var groups = TypeManager.GetSystemAttributes(type, typeof(UpdateInGroupAttribute));
+            bool isManaged = type.IsManaged;
+            var  groups    = type.GetUpdateInGroupTargets();
 
             ComponentSystemBaseSystemHandleUnion newSystem = default;
             if (isManaged)
@@ -177,12 +171,12 @@ namespace Latios
         /// <param name="world">The world to inject the system into</param>
         /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
         /// <param name="groupRemap">If a type in an UpdateInGroupAttribute matches a key in this dictionary, it will be swapped with the value</param>
-        public static ComponentSystemBaseSystemHandleUnion[] InjectSystems(IReadOnlyList<Type> types,
+        public static ComponentSystemBaseSystemHandleUnion[] InjectSystems(NativeList<SystemTypeIndex> types,
                                                                            World world,
-                                                                           ComponentSystemGroup defaultGroup          = null,
-                                                                           IReadOnlyDictionary<Type, Type> groupRemap = null)
+                                                                           ComponentSystemGroup defaultGroup                          = null,
+                                                                           NativeHashMap<SystemTypeIndex, SystemTypeIndex> groupRemap = default)
         {
-            var systems = world.GetOrCreateSystemsAndLogException(types.ToArray(), Allocator.Temp);
+            var systems = world.GetOrCreateSystemsAndLogException(types, Allocator.Temp);
 
             // Add systems to their groups, based on the [UpdateInGroup] attribute.
             int typesIndex = -1;
@@ -195,7 +189,7 @@ namespace Latios
                 // Skip the built-in root-level system groups
                 var type = types[typesIndex];
 
-                if (type.IsClass)
+                if (type.IsManaged)
                 {
                     var managedSystem             = world.AsManagedSystem(system);
                     var noUpdateInGroupAttributes = TypeManager.GetSystemAttributes(managedSystem.GetType(), typeof(NoGroupInjectionAttribute));
@@ -203,10 +197,11 @@ namespace Latios
                         continue;
                 }
 
-                var updateInGroupAttributes = TypeManager.GetSystemAttributes(type, typeof(UpdateInGroupAttribute));
+                var updateInGroupAttributes = type.GetUpdateInGroupTargets();
                 if (updateInGroupAttributes.Length == 0)
                 {
-                    defaultGroup.AddSystemToUpdateList(system);
+                    if (defaultGroup.SystemHandle != system)
+                        defaultGroup.AddSystemToUpdateList(system);
                 }
 
                 foreach (var attr in updateInGroupAttributes)
@@ -222,8 +217,7 @@ namespace Latios
             var result = new ComponentSystemBaseSystemHandleUnion[systems.Length];
             for (int i = 0; i < systems.Length; i++)
             {
-                var isManaged = typeof(ComponentSystemBase).IsAssignableFrom(types[i]);
-                if (isManaged)
+                if (types[i].IsManaged)
                 {
                     result[i] = new ComponentSystemBaseSystemHandleUnion
                     {
@@ -244,33 +238,30 @@ namespace Latios
             return result;
         }
 
-        private static ComponentSystemGroup FindOrCreateGroup(World world, Type systemType, Attribute attr, ComponentSystemGroup defaultGroup, IReadOnlyDictionary<Type,
-                                                                                                                                                                   Type> remap)
+        private static ComponentSystemGroup FindOrCreateGroup(World world,
+                                                              SystemTypeIndex systemType,
+                                                              SystemTypeIndex targetGroup,
+                                                              ComponentSystemGroup defaultGroup,
+                                                              NativeHashMap<SystemTypeIndex,
+                                                                            SystemTypeIndex> remap)
         {
-            var uga = attr as UpdateInGroupAttribute;
-
-            if (uga == null)
+            if (targetGroup == SystemTypeIndex.Null)
                 return null;
 
-            var groupType = uga.GroupType;
-            if (remap != null && remap.TryGetValue(uga.GroupType, out var remapType))
-                groupType = remapType;
-            if (groupType == null)
+            if (remap.IsCreated && remap.TryGetValue(targetGroup, out var remapType))
+                targetGroup = remapType;
+            if (targetGroup == SystemTypeIndex.Null)
                 return null;
 
-            if (!TypeManager.IsSystemAGroup(groupType))
+            if (!targetGroup.IsGroup)
             {
-                throw new InvalidOperationException($"Invalid [UpdateInGroup] attribute for {systemType}: {uga.GroupType} must be derived from ComponentSystemGroup.");
-            }
-            if (uga.OrderFirst && uga.OrderLast)
-            {
-                throw new InvalidOperationException($"The system {systemType} can not specify both OrderFirst=true and OrderLast=true in its [UpdateInGroup] attribute.");
+                throw new InvalidOperationException($"Invalid [UpdateInGroup] attribute for {systemType}: {targetGroup} must be derived from ComponentSystemGroup.");
             }
 
-            var groupSys = world.GetExistingSystemManaged(groupType);
+            var groupSys = world.GetExistingSystemManaged(targetGroup);
             if (groupSys == null)
             {
-                groupSys = InjectSystem(groupType, world, defaultGroup, remap);
+                groupSys = InjectSystem(targetGroup, world, defaultGroup, remap);
             }
 
             return groupSys as ComponentSystemGroup;
@@ -408,7 +399,7 @@ namespace Latios
 
             if (world != null)
             {
-                InjectSystem(typeof(DeferredSimulationEndFrameControllerSystem), world);
+                InjectSystem(TypeManager.GetSystemTypeIndex<DeferredSimulationEndFrameControllerSystem>(), world);
 
                 ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<InitializationSystemGroup>(), ref playerLoop, typeof(Initialization));
                 // We add it here for visibility in tools. But really we don't update until EndOfFrame

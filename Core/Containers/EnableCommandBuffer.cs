@@ -118,6 +118,7 @@ namespace Latios
             ran                    = true;
             entities               = new NativeList<Entity>(0, Allocator.TempJob);
             new PrepJob { linkedFE = linkedFE, eocb = m_entityOperationCommandBuffer, entities = entities }.Run();
+            entities.Dispose();
         }
 
         [BurstCompile]

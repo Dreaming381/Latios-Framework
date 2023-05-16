@@ -443,7 +443,7 @@ namespace Latios
             void CheckWriteAccess()
             {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                AtomicSafetyHandle.CheckWriteAndBumpSecondaryVersion(m_Safety);
+                AtomicSafetyHandle.CheckWriteAndThrow(m_Safety);
 #endif
             }
         }

@@ -99,6 +99,8 @@ namespace Latios.Kinemation.Authoring.Systems
                 for (int i = 0; i < parentIndices.Length; i++)
                 {
                     indices[i] = (short)parentIndices[i].parentIndex;
+                    if (parentIndices[i].parentIndex < 0)
+                        continue;
 
                     if (!childBuffers[parentIndices[i].parentIndex].IsCreated)
                         childBuffers[parentIndices[i].parentIndex] = new UnsafeList<short>(4, Allocator.Temp);
