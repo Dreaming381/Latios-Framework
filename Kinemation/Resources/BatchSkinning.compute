@@ -1,7 +1,12 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel BatchSkinning
+#pragma kernel BatchSkinning THREAD_GROUP_512
 
+#ifdef THREAD_GROUP_512
+#define THREAD_GROUP_SIZE 512
+#else
 #define THREAD_GROUP_SIZE 1024
+#endif
 #define THREAD_GROUP_DIVISOR 1024/THREAD_GROUP_SIZE
 
 // We disable this warning because it assumes that we only get 16 VGPRs per thread with a threadgroup size of 1024.

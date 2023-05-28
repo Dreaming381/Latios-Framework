@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Hybrid.Baking;
 using Unity.Rendering;
 using UnityEngine;
 
@@ -122,6 +123,9 @@ namespace Latios.Kinemation.Authoring
         public override void Bake(MeshRenderer authoring)
         {
             if (GetComponent<OverrideMeshRendererBase>() != null)
+                return;
+
+            if (GetComponent<BakingOnlyEntityAuthoring>() != null)
                 return;
 
             // TextMeshes don't need MeshFilters, early out

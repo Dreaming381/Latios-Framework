@@ -339,8 +339,7 @@ namespace Latios.Kinemation.Systems
                 state.EntityManager.RemoveComponent(m_deadSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
                                                                                                    ComponentType.ReadWrite<SkeletonDependent>(),
                                                                                                    ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>(),
-                                                                                                   ComponentType.ChunkComponent<ChunkDeformPrefixSums>(),
-                                                                                                   ComponentType.ChunkComponent<ChunkDeformExtraRadialBounds>()));
+                                                                                                   ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
                 // If CopyLocalToParentFromBone somehow gets added by accident, we might as well remove it.
                 // Also, we remove the LocalTransform and ParentToWorldTransform now to possibly prevent a structural change later.
@@ -354,16 +353,13 @@ namespace Latios.Kinemation.Systems
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<Parent>());
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>());
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformPrefixSums>());
-                skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformExtraRadialBounds>());
 
                 state.EntityManager.AddComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(in skinnedMeshAddTypes));
 
                 state.EntityManager.RemoveComponent(m_deadDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
-                                                                                                  ComponentType.ChunkComponent<ChunkDeformPrefixSums>(),
-                                                                                                  ComponentType.ChunkComponent<ChunkDeformExtraRadialBounds>()));
-                state.EntityManager.AddComponent( m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
-                                                                                               ComponentType.ChunkComponent<ChunkDeformPrefixSums>(),
-                                                                                               ComponentType.ChunkComponent<ChunkDeformExtraRadialBounds>()));
+                                                                                                  ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
+                state.EntityManager.AddComponent(                           m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
+                                                                                                                         ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
                 state.EntityManager.AddComponent<PreviousPostProcessMatrix>(m_newPreviousPostProcessMatrixQuery);
 
