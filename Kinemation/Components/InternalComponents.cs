@@ -64,11 +64,6 @@ namespace Latios.Kinemation
         // Legacy are aliases/combinations of these
     }
 
-    internal struct ChunkDeformExtraRadialBounds : IComponentData
-    {
-        public float radialBounds;
-    }
-
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     internal struct ChunkCopyDeformTag : IComponentData { }
     #endregion

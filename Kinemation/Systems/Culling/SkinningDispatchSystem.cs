@@ -28,6 +28,7 @@ namespace Latios.Kinemation.Systems
         UnityEngine.ComputeShader m_batchSkinningShader;
         UnityEngine.ComputeShader m_expansionShader;
         UnityEngine.ComputeShader m_meshSkinningShader;
+        int                       m_batchSkinningKernelIndex;
 
         // Compute bindings
         int _dstTransforms;
@@ -60,12 +61,10 @@ namespace Latios.Kinemation.Systems
             RequireForUpdate(m_skeletonQuery);
             RequireForUpdate(m_skinnedMeshQuery);
 
-            if (UnityEngine.SystemInfo.maxComputeWorkGroupSizeX < 1024)
-                m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning512");
-            else
-                m_batchSkinningShader = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
-            m_expansionShader         = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("SkeletonMeshExpansion");
-            m_meshSkinningShader      = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("MeshSkinning");
+            m_batchSkinningKernelIndex = UnityEngine.SystemInfo.maxComputeWorkGroupSizeX < 1024 ? 1 : 0;
+            m_batchSkinningShader      = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("BatchSkinning");
+            m_expansionShader          = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("SkeletonMeshExpansion");
+            m_meshSkinningShader       = UnityEngine.Resources.Load<UnityEngine.ComputeShader>("MeshSkinning");
 
             // Compute
             _dstTransforms          = UnityEngine.Shader.PropertyToID("_dstTransforms");
@@ -265,7 +264,7 @@ namespace Latios.Kinemation.Systems
                 {
                     int dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_batchSkinningShader.SetInt(_startOffset, offset);
-                    m_batchSkinningShader.Dispatch(0, dispatchCount, 1, 1);
+                    m_batchSkinningShader.Dispatch(m_batchSkinningKernelIndex, dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
                 }
@@ -307,7 +306,6 @@ namespace Latios.Kinemation.Systems
                 UnityEngine.Shader.SetGlobalBuffer(_latiosBindPoses,               graphicsPool.GetMeshBindPosesBufferRO());
                 UnityEngine.Shader.SetGlobalBuffer(_latiosBoneTransforms,          shaderTransformsBuffer);
                 UnityEngine.Shader.SetGlobalBuffer(_latiosDeformBuffer,            shaderDeformBuffer);
-                Profiler.EndSample();
             }
         }
 

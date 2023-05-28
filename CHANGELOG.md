@@ -9,6 +9,23 @@ Versioning](http://semver.org/spec/v2.0.0.html).
 You can find changelogs for the individual modules inside the Documentation\~
 directory.
 
+## [0.7.0] – 2023-5-29
+
+Officially supports Entities [1.0.10]
+
+### Added
+
+-   QVVS Transforms
+
+### Changed
+
+-   Moved Documentation to
+    <https://github.com/Dreaming381/Latios-Framework-Documentation>
+-   Updated Core to v0.7.0
+-   Updated Psyshock to v0.7.0
+-   Updated Myri to v0.7.0
+-   Updated Kinemation to v0.7.0
+
 ## [0.6.6] – 2023-3-13
 
 Officially supports Entities [1.0.0 prerelease 15]

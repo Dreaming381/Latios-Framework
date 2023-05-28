@@ -46,7 +46,6 @@ namespace Latios.Psyshock
         /// be guaranteed.
         /// </summary>
         /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
-        /// <returns></returns>
         public T this[SafeEntity safeEntity]
         {
             get
@@ -87,6 +86,33 @@ namespace Latios.Psyshock
         /// Note that neither method is deterministic and both can be prone to race conditions.
         /// </summary>
         public bool DidChange(SafeEntity safeEntity, uint version) => lookup.DidChange(safeEntity, version);
+
+        /// <summary>
+        /// Fetches the enabled bit of the component on the entity represented by SafeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot be guaranteed.
+        /// The component must be of type IEnableableComponent.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <returns>The enabled state as a boolean</returns>
+        public bool IsEnabled(SafeEntity safeEntity)
+        {
+            ValidateSafeEntityIsSafe(safeEntity);
+            return lookup.IsComponentEnabled(safeEntity);
+        }
+
+        /// <summary>
+        /// Sets the enabled bit of the component on the entity represented by SafeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot be guaranteed.
+        /// The component must be of type IEnableableComponent.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <param name="enabled">The new enabled state of the component</param>
+        /// <remarks>This method performs an atomic operation which may suffer from worse performance than setting a normal bool field.</remarks>
+        public void SetEnabled(SafeEntity safeEntity, bool enabled)
+        {
+            ValidateSafeEntityIsSafe(safeEntity);
+            lookup.SetComponentEnabled(safeEntity, enabled);
+        }
 
         public static implicit operator PhysicsComponentLookup<T>(ComponentLookup<T> componentDataFromEntity)
         {
@@ -170,6 +196,33 @@ namespace Latios.Psyshock
         /// Note that neither method is deterministic and both can be prone to race conditions.
         /// </summary>
         public bool DidChange(SafeEntity safeEntity, uint version) => lookup.DidChange(safeEntity, version);
+
+        /// <summary>
+        /// Fetches the enabled bit of the buffer on the entity represented by SafeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot be guaranteed.
+        /// The buffer must be of type IEnableableComponent.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <returns>The enabled state as a boolean</returns>
+        public bool IsEnabled(SafeEntity safeEntity)
+        {
+            ValidateSafeEntityIsSafe(safeEntity);
+            return lookup.IsBufferEnabled(safeEntity);
+        }
+
+        /// <summary>
+        /// Sets the enabled bit of the buffer on the entity represented by SafeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot be guaranteed.
+        /// The buffer must be of type IEnableableComponent.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <param name="enabled">The new enabled state of the buffer</param>
+        /// <remarks>This method performs an atomic operation which may suffer from worse performance than setting a normal bool field.</remarks>
+        public void SetEnabled(SafeEntity safeEntity, bool enabled)
+        {
+            ValidateSafeEntityIsSafe(safeEntity);
+            lookup.SetBufferEnabled(safeEntity, enabled);
+        }
 
         public static implicit operator PhysicsBufferLookup<T>(BufferLookup<T> bufferFromEntity)
         {

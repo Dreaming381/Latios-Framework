@@ -1,18 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.0-Beta.1]
-
-**This is a prerelease version of the Latios Framework version 0.7 which is
-still under development. Changelogs and Documentation are still being updated to
-reflect the new features and changes in 0.7. Git hashes may not be preserved
-after official release.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**You can find work-in-progress documentation**
-[**here**](https://github.com/Dreaming381/Latios-Framework-Documentation)**.
-This version of the beta uses Unity 2022.2.19 with Entities 1.0.8.**
+# Latios Framework for Unity ECS – [0.7.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -44,7 +32,7 @@ The Latios Framework is best-known in the community for Kinemation, a module
 which provides extremely high-performance CPU animation and GPU skinned mesh
 rendering features.
 
-This version targets Entities 1.0.0. If you are still using Entities 0.51.1,
+This version targets Entities 1.0.10. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
 
 **Note: This release is not compatible with Unity Transforms.** Compatibility
@@ -54,7 +42,7 @@ may be added in the future via a community effort.
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
-survey**](https://docs.google.com/forms/d/e/1FAIpQLSfxgFumJvhwjzi-r7L7rGssPoeSLXyV7BeCdCOsqfPWeWY_Ww/viewform?usp=sf_link)**!**
+survey**](https://forms.gle/kW1nGSqYkCEQFyjb8)**!**
 
 ## Modules
 
@@ -115,7 +103,7 @@ configurations. It includes utilities for inertial blending. And for animation
 clips it leverages ACL, a powerful high quality animation compression solution
 used in AAA titles such as Rise of the Tomb Raider and Valorant.
 
-### Other Modules
+### Future Modules
 
 -   Mach-Axle AI – An infinite axis utility evaluator designed for high
     throughput

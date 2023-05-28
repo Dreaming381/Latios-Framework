@@ -260,7 +260,8 @@ namespace Latios.Psyshock
             };
 #else
             return new SafeEntity {
-                entity = layerA.bodies[aIndex].entity;
+                entity = layerA.bodies[aIndex].entity
+            };
 #endif
         }
 
@@ -284,7 +285,8 @@ namespace Latios.Psyshock
             };
 #else
             return new SafeEntity {
-                entity = layerB.bodies[bIndex].entity;
+                entity = layerB.bodies[bIndex].entity
+            };
 #endif
         }
 
