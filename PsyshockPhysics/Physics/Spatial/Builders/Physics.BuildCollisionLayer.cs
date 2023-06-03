@@ -356,6 +356,8 @@ namespace Latios.Psyshock
                     colliderAoS = aos,
                     layer       = layer,
                 }.Run(count);
+#else
+                layer = default;
 #endif
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
@@ -447,6 +449,7 @@ namespace Latios.Psyshock
 
                 return jh;
 #else
+                layer = default;
                 return inputDeps;
 #endif
             }
@@ -543,6 +546,7 @@ namespace Latios.Psyshock
 
                 return jh;
 #else
+                layer = default;
                 return inputDeps;
 #endif
             }

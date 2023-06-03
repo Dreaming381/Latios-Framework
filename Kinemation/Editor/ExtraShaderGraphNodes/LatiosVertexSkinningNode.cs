@@ -219,7 +219,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                 sb.AppendLine("#if defined(UNITY_DOTS_INSTANCING_ENABLED)");
                 // Comment mutes function-not-provided warning
                 sb.AppendLine("// includeLatiosVertexSkinning");
-                sb.AppendLine("#include \"Packages/com.latios.latios-framework/Kinemation/ShaderLibrary/VertexSkinning.hlsl\"");
+                sb.AppendLine("#include \"Packages/com.latios.latiosframework/Kinemation/ShaderLibrary/VertexSkinning.hlsl\"");
                 sb.AppendLine("#endif");
             });
 

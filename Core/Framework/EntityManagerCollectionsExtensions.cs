@@ -155,6 +155,21 @@ namespace Latios
         {
             em.GetLatiosWorldUnmanaged().UpdateCollectionComponentDependency<T>(entity, handle, isReadOnlyHandle);
         }
+
+        /// <summary>
+        /// Specifies that the accessed collection component on the specified entity was operated fully by the main thread.
+        /// The collection component will no longer be automatically updated with the final Dependency of the currently executing system.
+        /// If the collection component was retrieved, added, or set outside of a tracked system execution but not used in jobs, then you
+        /// must call this method to ensure correct behavior.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
+        /// <param name="entity">The entity with the collection component that was accessed, modified, or replaced</param>
+        /// <param name="wasAccessedAsReadOnly">True if the main thread requested the collection component as readOnly</param>
+        public static void UpdateCollectionComponentMainThreadAccess<T>(this EntityManager em, Entity entity, bool wasAccessedAsReadOnly) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            em.GetLatiosWorldUnmanaged().UpdateCollectionComponentMainThreadAccess<T>(entity, wasAccessedAsReadOnly);
+        }
     }
 }
 

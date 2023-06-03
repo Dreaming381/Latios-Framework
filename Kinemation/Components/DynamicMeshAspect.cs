@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -80,4 +81,5 @@ namespace Latios.Kinemation
         public static ComponentTypeSet RequiredComponentTypeSet => new ComponentTypeSet(ComponentType.ReadWrite<DynamicMeshState>(), ComponentType.ReadWrite<DynamicMeshVertex>());
     }
 }
+#endif
 

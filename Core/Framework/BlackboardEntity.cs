@@ -1,4 +1,6 @@
-﻿using Unity.Entities;
+﻿using Codice.Client.BaseCommands;
+using Unity.Burst;
+using Unity.Entities;
 using Unity.Jobs;
 
 namespace Latios
@@ -293,6 +295,19 @@ namespace Latios
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
             latiosWorld.UpdateCollectionComponentDependency<T>(entity, handle, wasReadOnly);
+        }
+
+        /// <summary>
+        /// Specifies that the accessed collection component on the blackboard entity was operated fully by the main thread.
+        /// The collection component will no longer be automatically updated with the final Dependency of the currently executing system.
+        /// If the collection component was retrieved, added, or set outside of a tracked system execution but not used in jobs, then you
+        /// must call this method to ensure correct behavior.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
+        /// <param name="wasAccessedAsReadOnly">True if the main thread requested the collection component as readOnly</param>
+        public void UpdateMainThreadAccess<T>(bool wasReadOnly) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            latiosWorld.UpdateCollectionComponentMainThreadAccess<T>(entity, wasReadOnly);
         }
     }
 }

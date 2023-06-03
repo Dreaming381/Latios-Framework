@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -95,4 +96,5 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
+#endif
 

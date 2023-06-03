@@ -9,6 +9,17 @@ Versioning](http://semver.org/spec/v2.0.0.html).
 You can find changelogs for the individual modules inside the Documentation\~
 directory.
 
+## [0.7.1] – 2023-6-3
+
+Officially supports Entities [1.0.10]
+
+### Changed
+
+-   Updated the minimum required Unity version to 2022.3.0f1
+-   Updated Core to v0.7.1
+-   Updated Psyshock to v0.7.1
+-   Updated Kinemation to v0.7.1
+
 ## [0.7.0] – 2023-5-29
 
 Officially supports Entities [1.0.10]

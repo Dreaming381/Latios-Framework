@@ -151,7 +151,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                 sb.AppendLine("#if defined(UNITY_DOTS_INSTANCING_ENABLED)");
                 // Comment mutes function-not-provided warning
                 sb.AppendLine("// includeLatiosDeform");
-                sb.AppendLine("#include \"Packages/com.latios.latios-framework/Kinemation/ShaderLibrary/DeformBufferSample.hlsl\"");
+                sb.AppendLine("#include \"Packages/com.latios.latiosframework/Kinemation/ShaderLibrary/DeformBufferSample.hlsl\"");
                 sb.AppendLine("#endif");
             });
 

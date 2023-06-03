@@ -1,3 +1,4 @@
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -79,7 +80,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         unsafe struct SingleSplitCullingJob : IJobChunk
         {
-            [ReadOnly] public NativeReference<CullingSplits>                cullingSplits;
+            [ReadOnly] public NativeReference<CullingSplits>                         cullingSplits;
             [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonWorldBounds>      worldRenderBoundsHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkOptimizedSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
 
@@ -130,7 +131,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         unsafe struct MultiSplitCullingJob : IJobChunk
         {
-            [ReadOnly] public NativeReference<CullingSplits>                cullingSplits;
+            [ReadOnly] public NativeReference<CullingSplits>                         cullingSplits;
             [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonWorldBounds>      worldRenderBoundsHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkOptimizedSkeletonWorldBounds> chunkWorldRenderBoundsHandle;
 
@@ -302,4 +303,5 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
+#endif
 

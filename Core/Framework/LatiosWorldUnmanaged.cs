@@ -445,8 +445,8 @@ namespace Latios
         /// <summary>
         /// Provides a dependency for the collection component attached to the entity.
         /// The collection component will no longer be automatically updated with the final Dependency of the currently executing system.
-        /// If the collection component was retrieved, added, or set outside of a tracked system execution, then you must call this method
-        /// to ensure correct behavior.
+        /// If the collection component was retrieved, added, or set outside of a tracked system execution and used in jobs, then you
+        /// must call this method to ensure correct behavior.
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="entity">The entity with the collection component whose dependency should be updated</param>
@@ -476,6 +476,29 @@ namespace Latios
             else
             {
                 storedRef.writeHandle = handle;
+                storedRef.readHandles.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Specifies that the accessed collection component on the specified entity was operated fully by the main thread.
+        /// The collection component will no longer be automatically updated with the final Dependency of the currently executing system.
+        /// If the collection component was retrieved, added, or set outside of a tracked system execution but not used in jobs, then you
+        /// must call this method to ensure correct behavior.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
+        /// <param name="entity">The entity with the collection component that was accessed, modified, or replaced</param>
+        /// <param name="wasAccessedAsReadOnly">True if the main thread requested the collection component as readOnly</param>
+        public void UpdateCollectionComponentMainThreadAccess<T>(Entity entity, bool wasAccessedAsReadOnly) where T : unmanaged, ICollectionComponent,
+        InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
+            if (wasAccessedAsReadOnly)
+                return;
+
+            if (m_impl->m_collectionComponentStorage.TryGetCollectionComponent<T>(entity, out var storedRef))
+            {
+                storedRef.writeHandle = default;
                 storedRef.readHandles.Clear();
             }
         }
@@ -558,14 +581,15 @@ namespace Latios
                 {
                     var text = m_worldUnmanaged.ResolveSystemStateRef(system).DebugName;
                     UnityEngine.Debug.LogError(
-                        $"An unresolved sync point dependency was detected that originated outside of any Latios ComponentSystemGroup. Beginning execution of {text}.");
+                        $"An unresolved sync point dependency was detected that originated outside of any Latios ComponentSystemGroup. See Core/\"Automatic Dependency Management Errors.md\" in the documentation. Beginning execution of {text}.");
                     m_errorState = true;
                 }
                 else
                 {
                     var lastSystem = m_executingSystemStack[m_executingSystemStack.Length - 1];
                     var text       = m_worldUnmanaged.ResolveSystemStateRef(lastSystem).DebugName;
-                    UnityEngine.Debug.LogError($"{text} has a pending auto-dependency on syncPoint but a new system has started executing. This is not allowed.");
+                    UnityEngine.Debug.LogError(
+                        $"{text} has a pending auto-dependency on syncPoint but a new system has started executing. This is not allowed. See Core/\"Automatic Dependency Management Errors.md\" in the documentation.");
                     m_errorState = true;
                 }
             }
@@ -576,14 +600,15 @@ namespace Latios
                 {
                     var text = m_worldUnmanaged.ResolveSystemStateRef(system).DebugName;
                     UnityEngine.Debug.LogError(
-                        $"An unresolved collection component dependency was detected that originated outside of any Latios ComponentSystemGroup. Beginning execution of {text}.");
+                        $"An unresolved collection component dependency was detected that originated outside of any Latios ComponentSystemGroup. See Core/\"Automatic Dependency Management Errors.md\" in the documentation. Beginning execution of {text}.");
                     m_errorState = true;
                 }
                 else
                 {
                     var lastSystem = m_executingSystemStack[m_executingSystemStack.Length - 1];
                     var text       = m_worldUnmanaged.ResolveSystemStateRef(lastSystem).DebugName;
-                    UnityEngine.Debug.LogError($"{text} has a pending auto-dependency on a collection component but a new system has started executing. This is not allowed.");
+                    UnityEngine.Debug.LogError(
+                        $"{text} has a pending auto-dependency on a collection component but a new system has started executing. This is not allowed. See Core/\"Automatic Dependency Management Errors.md\" in the documentation.");
                     m_errorState = true;
                 }
             }
