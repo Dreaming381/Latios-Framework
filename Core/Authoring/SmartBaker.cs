@@ -75,8 +75,9 @@ namespace Latios.Authoring
             }
         }
 
-        void ICreateSmartBakerSystem.Create(World world, ComponentSystemGroup addToThis)
+        unsafe void ICreateSmartBakerSystem.Create(World world, ComponentSystemGroup addToThis)
         {
+            TypeManager.GetSystemTypeIndex(typeof(SmartBakerSystem<TAuthoring, TSmartBakeItem>));
             var system        = world.GetOrCreateSystemManaged<SmartBakerSystem<TAuthoring, TSmartBakeItem> >();
             system.runInBurst = RunPostProcessInBurst();
             addToThis.AddSystemToUpdateList(system);

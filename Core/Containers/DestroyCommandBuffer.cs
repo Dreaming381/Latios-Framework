@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 
@@ -70,19 +71,7 @@ namespace Latios
         public void Playback(EntityManager entityManager)
         {
             CheckDidNotPlayback();
-            bool               ran      = false;
-            NativeList<Entity> entities = default;
-            RunPrepInJob(ref ran, ref entities);
-            if (ran)
-            {
-                entityManager.DestroyEntity(entities.AsArray());
-                entities.Dispose();
-            }
-            else
-            {
-                entityManager.DestroyEntity(m_entityOperationCommandBuffer.GetEntities(Allocator.Temp));
-            }
-            m_playedBack.Value = true;
+            Playbacker.Playback((DestroyCommandBuffer*)UnsafeUtility.AddressOf(ref this), (EntityManager*)UnsafeUtility.AddressOf(ref entityManager));
         }
 
         /// <summary>
@@ -112,23 +101,14 @@ namespace Latios
         }
 
         #region PlaybackJobs
-        [BurstDiscard]
-        private unsafe void RunPrepInJob(ref bool ran, ref NativeList<Entity> entities)
-        {
-            ran                = true;
-            entities           = new NativeList<Entity>(0, Allocator.TempJob);
-            new PrepJob { eocb = m_entityOperationCommandBuffer, entities = entities }.Run();
-        }
-
         [BurstCompile]
-        private struct PrepJob : IJob
+        static class Playbacker
         {
-            [ReadOnly] public EntityOperationCommandBuffer eocb;
-            public NativeList<Entity>                      entities;
-
-            public void Execute()
+            [BurstCompile]
+            public static unsafe void Playback(DestroyCommandBuffer* dcb, EntityManager* em)
             {
-                eocb.GetEntities(ref entities);
+                em->DestroyEntity(dcb->m_entityOperationCommandBuffer.GetEntities(Allocator.Temp));
+                dcb->m_playedBack.Value = true;
             }
         }
         #endregion

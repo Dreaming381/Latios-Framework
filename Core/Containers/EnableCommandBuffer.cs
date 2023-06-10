@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 
@@ -10,6 +11,7 @@ namespace Latios
     /// A specialized variant of the EntityCommandBuffer exclusively for enabling entities.
     /// Enabled entities automatically account for LinkedEntityGroup at the time of playback.
     /// </summary>
+    [BurstCompile]
     public unsafe struct EnableCommandBuffer : INativeDisposable
     {
         #region Structure
@@ -67,22 +69,11 @@ namespace Latios
         /// </summary>
         /// <param name="entityManager">The EntityManager with which to play back the EnableCommandBuffer</param>
         /// <param name="linkedFEReadOnly">A ReadOnly accessor to the entities' LinkedEntityGroup</param>
-        public void Playback(EntityManager entityManager, BufferLookup<LinkedEntityGroup> linkedFEReadOnly)
+        public unsafe void Playback(EntityManager entityManager, BufferLookup<LinkedEntityGroup> linkedFEReadOnly)
         {
             CheckDidNotPlayback();
-            bool               ran      = false;
-            NativeList<Entity> entities = default;
-            RunPrepInJob(linkedFEReadOnly, ref ran, ref entities);
-            if (ran)
-            {
-                entityManager.RemoveComponent<Disabled>(entities.AsArray());
-                entities.Dispose();
-            }
-            else
-            {
-                entityManager.RemoveComponent<Disabled>(m_entityOperationCommandBuffer.GetLinkedEntities(linkedFEReadOnly, Allocator.Temp));
-            }
-            m_playedBack.Value = true;
+            Playbacker.Playback((EnableCommandBuffer*)UnsafeUtility.AddressOf(ref this), (EntityManager*)UnsafeUtility.AddressOf(ref entityManager),
+                                (BufferLookup<LinkedEntityGroup>*)UnsafeUtility.AddressOf(ref linkedFEReadOnly));
         }
 
         /// <summary>
@@ -112,25 +103,14 @@ namespace Latios
         }
 
         #region PlaybackJobs
-        [BurstDiscard]
-        private void RunPrepInJob(BufferLookup<LinkedEntityGroup> linkedFE, ref bool ran, ref NativeList<Entity> entities)
-        {
-            ran                    = true;
-            entities               = new NativeList<Entity>(0, Allocator.TempJob);
-            new PrepJob { linkedFE = linkedFE, eocb = m_entityOperationCommandBuffer, entities = entities }.Run();
-            entities.Dispose();
-        }
-
         [BurstCompile]
-        private struct PrepJob : IJob
+        static class Playbacker
         {
-            [ReadOnly] public BufferLookup<LinkedEntityGroup> linkedFE;
-            [ReadOnly] public EntityOperationCommandBuffer    eocb;
-            public NativeList<Entity>                         entities;
-
-            public void Execute()
+            [BurstCompile]
+            public static unsafe void Playback(EnableCommandBuffer* ecb, EntityManager* em, BufferLookup<LinkedEntityGroup>* lookup)
             {
-                eocb.GetLinkedEntities(linkedFE, ref entities);
+                em->RemoveComponent<Disabled>(ecb->m_entityOperationCommandBuffer.GetLinkedEntities(*lookup, Allocator.Temp));
+                ecb->m_playedBack.Value = true;
             }
         }
         #endregion

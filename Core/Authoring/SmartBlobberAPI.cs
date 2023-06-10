@@ -257,6 +257,7 @@ namespace Latios.Authoring
         {
             if (managedWorld.GetExistingSystemManaged<Systems.SmartBlobberTypedPostProcessBakingSystem<TBlobType> >() != null)
                 return;
+            TypeManager.GetSystemTypeIndex(typeof(Systems.SmartBlobberTypedPostProcessBakingSystem<TBlobType>));
             var system = managedWorld.GetOrCreateSystemManaged<Systems.SmartBlobberTypedPostProcessBakingSystem<TBlobType> >();
             var group  = managedWorld.GetExistingSystemManaged<Systems.SmartBlobberCleanupBakingGroup>();
             group.AddSystemToUpdateListSafe(system.SystemHandle);

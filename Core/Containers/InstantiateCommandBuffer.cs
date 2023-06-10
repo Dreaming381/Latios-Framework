@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 
@@ -10,6 +11,7 @@ namespace Latios
     /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
     /// This variant does not perform any additional initialization after instantiation.
     /// </summary>
+    [BurstCompile]
     public struct InstantiateCommandBuffer : INativeDisposable
     {
         #region Structure
@@ -66,13 +68,10 @@ namespace Latios
         /// Plays back the InstantiateCommandBuffer.
         /// </summary>
         /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
-        public void Playback(EntityManager entityManager)
+        public unsafe void Playback(EntityManager entityManager)
         {
             CheckDidNotPlayback();
-            var eet                = entityManager.BeginExclusiveEntityTransaction();
-            new PlaybackJob { eocb = m_entityOperationCommandBuffer, eet = eet }.Run();
-            eet.EntityManager.EndExclusiveEntityTransaction();
-            m_playedBack.Value = true;
+            Playbacker.Playback((InstantiateCommandBuffer*)UnsafeUtility.AddressOf(ref this), (EntityManager*)UnsafeUtility.AddressOf(ref entityManager));
         }
 
         /// <summary>
@@ -103,14 +102,12 @@ namespace Latios
 
         #region PlaybackJobs
         [BurstCompile]
-        private struct PlaybackJob : IJob
+        static class Playbacker
         {
-            [ReadOnly] public EntityOperationCommandBuffer eocb;
-            public ExclusiveEntityTransaction              eet;
-
-            public void Execute()
+            [BurstCompile]
+            public static unsafe void Playback(InstantiateCommandBuffer* icb, EntityManager* em)
             {
-                var prefabs = eocb.GetEntitiesSortedByEntity(Allocator.Temp);
+                var prefabs = icb->m_entityOperationCommandBuffer.GetEntitiesSortedByEntity(Allocator.Temp);
                 int i       = 0;
                 while (i < prefabs.Length)
                 {
@@ -122,23 +119,9 @@ namespace Latios
                         i++;
                         count++;
                     }
-                    eet.EntityManager.Instantiate(prefab, count, Allocator.Temp);
+                    em->Instantiate(prefab, count, Allocator.Temp);
                 }
-            }
-
-            public void RunOrExecute()
-            {
-                bool ran = false;
-                TryRun(ref ran);
-                if (!ran)
-                    Execute();
-            }
-
-            [BurstDiscard]
-            void TryRun(ref bool ran)
-            {
-                this.Run();
-                ran = true;
+                icb->m_playedBack.Value = true;
             }
         }
         #endregion

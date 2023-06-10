@@ -9,6 +9,15 @@ Versioning](http://semver.org/spec/v2.0.0.html).
 You can find changelogs for the individual modules inside the Documentation\~
 directory.
 
+## [0.7.3] – 2023-6-10
+
+Officially supports Entities [1.0.10]
+
+### Changed
+
+-   Updated Core to v0.7.3
+-   Updated Psyshock to v0.7.3
+
 ## [0.7.2] – 2023-6-4
 
 Officially supports Entities [1.0.10]
