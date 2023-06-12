@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -79,5 +78,4 @@ namespace Latios.Kinemation
         //}
     }
 }
-#endif
 

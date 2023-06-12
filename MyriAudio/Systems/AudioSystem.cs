@@ -1,5 +1,4 @@
-﻿#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using Latios.Transforms;
+﻿using Latios.Transforms.Abstract;
 using Unity.Audio;
 using Unity.Burst;
 using Unity.Collections;
@@ -55,7 +54,7 @@ namespace Latios.Myri.Systems
         ComponentTypeHandle<AudioSourceOneShot>     m_oneshotHandle;
         ComponentTypeHandle<AudioSourceLooped>      m_loopedHandle;
         ComponentTypeHandle<AudioSourceEmitterCone> m_coneHandle;
-        ComponentTypeHandle<WorldTransform>         m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.TypeHandle     m_worldTransformHandle;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -135,7 +134,7 @@ namespace Latios.Myri.Systems
             m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
             m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
             m_coneHandle           = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
-            m_worldTransformHandle = state.GetComponentTypeHandle<WorldTransform>(true);
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         [BurstCompile]
@@ -456,5 +455,4 @@ namespace Latios.Myri.Systems
         }
     }
 }
-#endif
 

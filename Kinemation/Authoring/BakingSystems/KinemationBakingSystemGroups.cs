@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Authoring.Systems;
 using Unity.Entities;
 
@@ -68,7 +67,11 @@ namespace Latios.Kinemation.Authoring.Systems
 
             GetOrCreateAndAddSystem<SetupExportedBonesSystem>();  // async -> sync
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             GetOrCreateAndAddSystem<Latios.Transforms.Authoring.Systems.TransformHierarchySyncBakingSystem>();  // async | Needed for correcting children of exported bones.
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+            // Todo: How do we set LTWs correctly for exported bones in Unity Transforms?
+#endif
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync
         }
     }
@@ -97,5 +100,4 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
-#endif
 

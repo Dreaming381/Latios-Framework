@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Collections;
@@ -49,5 +48,4 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
-#endif
 

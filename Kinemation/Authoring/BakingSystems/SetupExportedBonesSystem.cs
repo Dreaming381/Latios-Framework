@@ -1,5 +1,5 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -16,9 +16,14 @@ namespace Latios.Kinemation.Authoring.Systems
     [BurstCompile]
     public partial struct SetupExportedBonesSystem : ISystem
     {
+        LocalTransformReadWriteAspect.Lookup m_localTransformLookup;
+        ParentReadOnlyAspect.Lookup          m_parentROLookup;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
+            m_localTransformLookup = new LocalTransformReadWriteAspect.Lookup(ref state);
+            m_parentROLookup       = new ParentReadOnlyAspect.Lookup(ref state);
         }
 
         [BurstCompile]
@@ -29,24 +34,24 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            m_localTransformLookup.Update(ref state);
+            m_parentROLookup.Update(ref state);
+
             var componentsToAdd = new ComponentTypeSet(ComponentType.ReadWrite<CopyLocalToParentFromBone>(),
                                                        ComponentType.ReadWrite<BoneOwningSkeletonReference>());
 
             new ClearJob().ScheduleParallel();
 
-            var ecbAdd                          = new EntityCommandBuffer(Allocator.TempJob);
-            var skeletonReferenceLookup         = GetComponentLookup<BoneOwningSkeletonReference>(false);
-            var copyLocalToParentFromBoneLookup = GetComponentLookup<CopyLocalToParentFromBone>(false);
-            var parentLookup                    = GetComponentLookup<Parent>(false);
+            var ecbAdd = new EntityCommandBuffer(Allocator.TempJob);
             new ApplySkeletonsToBonesJob
             {
                 componentTypesToAdd             = componentsToAdd,
                 ecb                             = ecbAdd.AsParallelWriter(),
-                skeletonReferenceLookup         = skeletonReferenceLookup,
-                copyLocalToParentFromBoneLookup = copyLocalToParentFromBoneLookup,
-                parentLookup                    = parentLookup,
+                skeletonReferenceLookup         = GetComponentLookup<BoneOwningSkeletonReference>(false),
+                copyLocalToParentFromBoneLookup = GetComponentLookup<CopyLocalToParentFromBone>(false),
+                parentLookup                    = m_parentROLookup,
                 transformAuthoringLookup        = GetComponentLookup<TransformAuthoring>(true),
-                localTransformLookup            = GetComponentLookup<LocalTransform>(false)
+                localTransformLookup            = m_localTransformLookup
             }.ScheduleParallel();
 
             var ecbRemove                        = new EntityCommandBuffer(Allocator.TempJob);
@@ -76,10 +81,10 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         partial struct ApplySkeletonsToBonesJob : IJobEntity
         {
-            [NativeDisableParallelForRestriction] public ComponentLookup<LocalTransform>              localTransformLookup;
+            [NativeDisableParallelForRestriction] public LocalTransformReadWriteAspect.Lookup         localTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<CopyLocalToParentFromBone>   copyLocalToParentFromBoneLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<BoneOwningSkeletonReference> skeletonReferenceLookup;
-            [ReadOnly] public ComponentLookup<Parent>                                                 parentLookup;
+            [ReadOnly] public ParentReadOnlyAspect.Lookup                                             parentLookup;
             public EntityCommandBuffer.ParallelWriter                                                 ecb;
             public ComponentTypeSet                                                                   componentTypesToAdd;
 
@@ -100,12 +105,9 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 foreach (var bone in bones)
                 {
-                    var root                              = ComputeRootTransformOfBone(bone.boneIndex, in boneTransforms);
-                    localTransformLookup[bone.boneEntity] = new LocalTransform
-                    {
-                        localTransform = new TransformQvs(root.position, root.rotation, root.scale)
-                    };
-
+                    var root                            = ComputeRootTransformOfBone(bone.boneIndex, in boneTransforms);
+                    var localTransformAspect            = localTransformLookup[bone.boneEntity];
+                    localTransformAspect.localTransform = new TransformQvs(root.position, root.rotation, root.scale);
                     if (copyLocalToParentFromBoneLookup.HasComponent(bone.boneEntity))
                     {
                         skeletonReferenceLookup[bone.boneEntity]         = new BoneOwningSkeletonReference { skeletonRoot = entity };
@@ -152,5 +154,4 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
-#endif
 

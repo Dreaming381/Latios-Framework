@@ -1,9 +1,8 @@
-﻿#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Latios.Transforms;
-using Latios.Transforms.Authoring;
+using Latios.Transforms.Authoring.Abstract;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -49,7 +48,7 @@ namespace Latios.Psyshock.Authoring
                     continue;
 
                 var currentTransform = baker.GetComponent<UnityEngine.Transform>(unityCollider);
-                var transformQvvs    = currentTransform.GetQvvsRelativeTo(compoundTransform);
+                var transformQvvs    = AbstractBakingUtilities.ExtractTransformRelativeTo(currentTransform, compoundTransform);
 
                 if (unityCollider is UnityEngine.SphereCollider unitySphere)
                 {
@@ -167,5 +166,4 @@ namespace Latios.Psyshock.Authoring.Systems
         }
     }
 }
-#endif
 

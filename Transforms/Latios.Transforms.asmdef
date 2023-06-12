@@ -6,9 +6,9 @@
         "Unity.Entities",
         "Unity.Burst",
         "Unity.Collections",
-        "Unity.Jobs",
         "Latios.Core",
-        "Unity.Entities.Hybrid"
+        "Unity.Entities.Hybrid",
+        "Unity.Transforms"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

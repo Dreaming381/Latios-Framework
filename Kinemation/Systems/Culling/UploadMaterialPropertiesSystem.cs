@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using Latios;
 using Latios.Kinemation.SparseUpload;
@@ -11,6 +10,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
+using Unity.Transforms;
 using UnityEngine.Profiling;
 
 namespace Latios.Kinemation.Systems
@@ -115,13 +115,18 @@ namespace Latios.Kinemation.Systems
                     ComponentTypes                  = m_burstCompatibleTypeArray,
                     GpuUploadOperations             = gpuUploadOperations,
                     EntitiesGraphicsChunkInfo       = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                    WorldTransformType              = TypeManager.GetTypeIndex<WorldTransform>(),
                     NumGpuUploadOperations          = numGpuUploadOperations,
-                    PreviousTransformType           = TypeManager.GetTypeIndex<PreviousTransform>(),
                     PreviousTransformPreviousType   = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
                     WorldTransformInverseType       = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
                     postProcessMatrixHandle         = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
-                    previousPostProcessMatrixHandle = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true)
+                    previousPostProcessMatrixHandle = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true),
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                    WorldTransformType    = TypeManager.GetTypeIndex<WorldTransform>(),
+                    PreviousTransformType = TypeManager.GetTypeIndex<PreviousTransform>(),
+# elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                    WorldTransformType    = TypeManager.GetTypeIndex<LocalToWorld>(),
+                    PreviousTransformType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
+#endif
                 }.ScheduleParallel(m_metaQuery, Dependency);
 
                 var uploadSizeRequirements = new NativeReference<UploadSizeRequirements>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
@@ -297,9 +302,9 @@ namespace Latios.Kinemation.Systems
                             var dstOffset = chunkProperty.GPUDataBegin;
                             if (isLocalToWorld || isPrevLocalToWorld)
                             {
-                                var numQvvs = sizeBytes / sizeof(TransformQvvs);
-
                                 void* extraPtr = null;
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                                var numQvvs = sizeBytes / sizeof(TransformQvvs);
                                 if (isLocalToWorld)
                                     extraPtr = chunk.GetComponentDataPtrRO(ref postProcessMatrixHandle);
                                 else
@@ -312,6 +317,20 @@ namespace Latios.Kinemation.Systems
                                     isLocalToWorld ? dstOffsetWorldToLocal : dstOffsetPrevWorldToLocal,
                                     extraPtr
                                     );
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                                var numMatrices = sizeBytes / sizeof(float4x4);
+                                AddMatrixUpload(
+                                    srcPtr,
+                                    numMatrices,
+                                    dstOffset,
+                                    isLocalToWorld ? dstOffsetWorldToLocal : dstOffsetPrevWorldToLocal,
+                                    (chunkProperty.ValueSizeBytesCPU == 4 * 4 * 3) ?
+                                    LatiosThreadedSparseUploader.MatrixType.MatrixType3x4 :
+                                    LatiosThreadedSparseUploader.MatrixType.MatrixType4x4,
+                                    (chunkProperty.ValueSizeBytesGPU == 4 * 4 * 3) ?
+                                    LatiosThreadedSparseUploader.MatrixType.MatrixType3x4 :
+                                    LatiosThreadedSparseUploader.MatrixType.MatrixType4x4);
+#endif
                             }
                             else
                             {
@@ -353,12 +372,12 @@ namespace Latios.Kinemation.Systems
             }
 
             private unsafe void AddMatrixUpload(
-                void*                             srcPtr,
+                void*                                   srcPtr,
                 int numMatrices,
                 int dstOffset,
                 int dstOffsetInverse,
-                ThreadedSparseUploader.MatrixType matrixTypeCpu,
-                ThreadedSparseUploader.MatrixType matrixTypeGpu)
+                LatiosThreadedSparseUploader.MatrixType matrixTypeCpu,
+                LatiosThreadedSparseUploader.MatrixType matrixTypeGpu)
             {
                 int* numGpuUploadOperations = (int*)NumGpuUploadOperations.GetUnsafePtr();
                 int  index                  = System.Threading.Interlocked.Add(ref numGpuUploadOperations[0], 1) - 1;
@@ -367,9 +386,10 @@ namespace Latios.Kinemation.Systems
                 {
                     GpuUploadOperations[index] = new GpuUploadOperation
                     {
-                        Kind = (matrixTypeGpu == ThreadedSparseUploader.MatrixType.MatrixType3x4) ?
+                        Kind = (matrixTypeGpu == LatiosThreadedSparseUploader.MatrixType.MatrixType3x4) ?
                                GpuUploadOperation.UploadOperationKind.SOAMatrixUpload3x4 :
                                GpuUploadOperation.UploadOperationKind.SOAMatrixUpload4x4,
+                        SrcMatrixType    = matrixTypeCpu,
                         Src              = srcPtr,
                         DstOffset        = dstOffset,
                         DstOffsetInverse = dstOffsetInverse,
@@ -764,5 +784,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

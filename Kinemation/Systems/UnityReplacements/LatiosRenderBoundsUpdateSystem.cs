@@ -1,7 +1,6 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
 using Latios.Psyshock;
-using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -24,21 +23,19 @@ namespace Latios.Kinemation
     [BurstCompile]
     public partial struct LatiosRenderBoundsUpdateSystem : ISystem
     {
-        EntityQuery m_WorldRenderBounds;
+        EntityQuery                             m_WorldRenderBounds;
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_WorldRenderBounds = state.GetEntityQuery
-                                  (
-                new EntityQueryDesc
-            {
-                All = new[] { ComponentType.ChunkComponent<ChunkWorldRenderBounds>(), ComponentType.ReadWrite<WorldRenderBounds>(),
-                              ComponentType.ReadOnly<RenderBounds>(), ComponentType.ReadOnly<WorldTransform>() },
-                None = new [] { ComponentType.ChunkComponentExclude<ChunkSkinningCullingTag>() }
-            }
-                                  );
-            m_WorldRenderBounds.SetChangedVersionFilter(new[] { ComponentType.ReadOnly<RenderBounds>(), ComponentType.ReadOnly<WorldTransform>() });
+            m_WorldRenderBounds = state.Fluent().WithAll<ChunkWorldRenderBounds>(false, true).WithAll<WorldRenderBounds>(false).WithAll<RenderBounds>(true)
+                                  .WithWorldTransformReadOnlyAspectWeak().Without<ChunkSkinningCullingTag>(true).Build();
+            m_WorldRenderBounds.AddChangedVersionFilter(ComponentType.ReadOnly<RenderBounds>());
+            m_WorldRenderBounds.AddWorldTranformChangeFilter();
             m_WorldRenderBounds.AddOrderVersionFilter();
+
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         [BurstCompile]
@@ -49,10 +46,12 @@ namespace Latios.Kinemation
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            m_worldTransformHandle.Update(ref state);
+
             var boundsJob = new BoundsJob
             {
                 RendererBounds         = GetComponentTypeHandle<RenderBounds>(true),
-                WorldTransform         = GetComponentTypeHandle<WorldTransform>(true),
+                WorldTransform         = m_worldTransformHandle,
                 PostProcessMatrix      = GetComponentTypeHandle<PostProcessMatrix>(true),
                 WorldRenderBounds      = GetComponentTypeHandle<WorldRenderBounds>(),
                 ChunkWorldRenderBounds = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
@@ -63,11 +62,11 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct BoundsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<RenderBounds>      RendererBounds;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>    WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix> PostProcessMatrix;
-            public ComponentTypeHandle<WorldRenderBounds>            WorldRenderBounds;
-            public ComponentTypeHandle<ChunkWorldRenderBounds>       ChunkWorldRenderBounds;
+            [ReadOnly] public ComponentTypeHandle<RenderBounds>       RendererBounds;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>  PostProcessMatrix;
+            public ComponentTypeHandle<WorldRenderBounds>             WorldRenderBounds;
+            public ComponentTypeHandle<ChunkWorldRenderBounds>        ChunkWorldRenderBounds;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -76,7 +75,7 @@ namespace Latios.Kinemation
 
                 var worldBounds     = chunk.GetNativeArray(ref WorldRenderBounds);
                 var localBounds     = chunk.GetNativeArray(ref RendererBounds);
-                var worldTransforms = chunk.GetNativeArray(ref WorldTransform);
+                var worldTransforms = WorldTransform.Resolve(chunk);
 
                 var chunkAabb = new Aabb(float.MaxValue, float.MinValue);
 
@@ -85,7 +84,7 @@ namespace Latios.Kinemation
                     var matrices = chunk.GetNativeArray(ref PostProcessMatrix);
                     for (int i = 0; i != localBounds.Length; i++)
                     {
-                        var worldAabb = Physics.TransformAabb(worldTransforms[i].worldTransform, new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
+                        var worldAabb = Physics.TransformAabb(worldTransforms[i], new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
                         chunkAabb     = Physics.CombineAabb(chunkAabb, worldAabb);
                         Physics.GetCenterExtents(worldAabb, out var center, out var extents);
                         var matrix = new float4x4(new float4(matrices[i].postProcessMatrix.c0, 0f),
@@ -99,7 +98,7 @@ namespace Latios.Kinemation
                 {
                     for (int i = 0; i != localBounds.Length; i++)
                     {
-                        var worldAabb = Physics.TransformAabb(worldTransforms[i].worldTransform, new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
+                        var worldAabb = Physics.TransformAabb(worldTransforms[i], new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
                         chunkAabb     = Physics.CombineAabb(chunkAabb, worldAabb);
                         Physics.GetCenterExtents(worldAabb, out var center, out var extents);
                         worldBounds[i] = new WorldRenderBounds { Value = new AABB { Center = center, Extents = extents } };
@@ -113,5 +112,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

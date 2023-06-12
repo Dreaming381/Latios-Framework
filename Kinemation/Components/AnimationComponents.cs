@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -375,5 +374,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

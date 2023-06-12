@@ -1,4 +1,7 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using Latios.Authoring.Systems;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -10,12 +13,10 @@ namespace Latios.Authoring
     /// <summary>
     /// Implement this interface to specify a type that can "remember" SmartBlobberHandles or
     /// other data (like additional entities) and applying them to entities later inside of a generated Baking System.
-    /// You must also subclass SmartBaker for this to do anything. The SmartBaker will create instances of this type for you.
-    /// Lastly, you must add the TemporaryBakingType attribute to your type implementing this interface.
+    /// You must also subclass SmartBaker for this to be effective. The SmartBaker will create instances of this type for you.
     /// </summary>
     /// <typeparam name="TAuthoring"></typeparam>
-    [TemporaryBakingType]
-    public interface ISmartBakeItem<TAuthoring> : IComponentData where TAuthoring : Component
+    public interface ISmartBakeItem<TAuthoring> : ISmartPostProcessItem where TAuthoring : Component
     {
         /// <summary>
         /// Perform the initial bake step on the authoring component.
@@ -24,6 +25,15 @@ namespace Latios.Authoring
         /// <param name="baker">The baker to use for baking. You can cast this to the SmartBaker subclass if necessary.</param>
         /// <returns>False if this item's "memory" should be discarded and not processed later.</returns>
         public bool Bake(TAuthoring authoring, IBaker baker);
+    }
+
+    /// <summary>
+    /// Implement this interface directly to contain data that should be applied by a baking system later.
+    /// You can add instances of these via the IBaker.AddPostProcessItem extension method.
+    /// A baking system will discover and process these automatically.
+    /// </summary>
+    public interface ISmartPostProcessItem : IComponentData
+    {
         /// <summary>
         /// This method is called by a baking system and provides an opportunity to resolve SmartBlobberHandles.
         /// If you wish to do more than assign BlobReferences via entityManager.SetComponent, see remarks for detailed rules.
@@ -49,19 +59,9 @@ namespace Latios.Authoring
     /// <typeparam name="TAuthoring">The authoring type this baker should apply for</typeparam>
     /// <typeparam name="TSmartBakeItem">The bake item type to generate an instance of and invoke Bake() on</typeparam>
     [BurstCompile]
-    public abstract partial class SmartBaker<TAuthoring, TSmartBakeItem> : Baker<TAuthoring>,
-        ICreateSmartBakerSystem where TAuthoring : Component where TSmartBakeItem : unmanaged,
-        ISmartBakeItem<TAuthoring>
+    public abstract partial class SmartBaker<TAuthoring, TSmartBakeItem> : Baker<TAuthoring>
+        where TAuthoring : Component where TSmartBakeItem : unmanaged, ISmartBakeItem<TAuthoring>
     {
-        /// <summary>
-        /// Currently non-functional. Burst is not used for Post-Processing.
-        /// </summary>
-        /// <returns></returns>
-        public virtual bool RunPostProcessInBurst()
-        {
-            return true;
-        }
-
         public sealed override void Bake(TAuthoring authoring)
         {
             // Todo: May need to cache construction of this to avoid GC.
@@ -74,105 +74,116 @@ namespace Latios.Authoring
                 AddComponent(smartBakerEntity, new SmartBakerTargetEntityReference { targetEntity = GetEntityWithoutDependency() });
             }
         }
+    }
 
-        unsafe void ICreateSmartBakerSystem.Create(World world, ComponentSystemGroup addToThis)
+    public static class SmartBakerExtensions
+    {
+        /// <summary>
+        /// Adds an ISmartPostProcessItem targeting the entity to run after Smart Blobbers.
+        /// It is safe to call this more than once for the same target entity.
+        /// </summary>
+        /// <param name="entity">The target entity that will be passed into the PostProcessBlobRequests callback</param>
+        /// <param name="smartPostProcessItem">The ISmartPostProcessItem containing SmartBlobberHandles</param>
+        public static void AddPostProcessItem<T>(this IBaker baker, Entity entity, T smartPostProcessItem) where T : unmanaged, ISmartPostProcessItem
         {
-            TypeManager.GetSystemTypeIndex(typeof(SmartBakerSystem<TAuthoring, TSmartBakeItem>));
-            var system        = world.GetOrCreateSystemManaged<SmartBakerSystem<TAuthoring, TSmartBakeItem> >();
-            system.runInBurst = RunPostProcessInBurst();
-            addToThis.AddSystemToUpdateList(system);
-        }
-
-        // These jobs are here but the system is split out due to a bug in source generators dropping the generics
-        // on the wrapper type.
-        [BurstCompile]
-        internal struct ProcessSmartBakeDataBurstedJob : IJob
-        {
-            public EntityManager                                           em;
-            [ReadOnly] public NativeArray<SmartBakerTargetEntityReference> targetReferences;
-            public NativeArray<TSmartBakeItem>                             smartDataArray;
-
-            public void Execute()
-            {
-                for (int i = 0; i < targetReferences.Length; i++)
-                {
-                    var smartData = smartDataArray[i];
-                    smartData.PostProcessBlobRequests(em, targetReferences[i].targetEntity);
-                    smartDataArray[i] = smartData;
-                }
-            }
-        }
-
-        [BurstCompile]
-        internal struct WriteBackBakedDataJob : IJobFor
-        {
-            [NativeDisableParallelForRestriction] public ComponentLookup<TSmartBakeItem> smartDataLookup;
-            [ReadOnly] public NativeArray<Entity>                                        entities;
-            [ReadOnly] public NativeArray<TSmartBakeItem>                                smartDataArray;
-
-            public void Execute(int i)
-            {
-                smartDataLookup[entities[i]] = smartDataArray[i];
-            }
+            var smartBakerEntity = baker.CreateAdditionalEntity(TransformUsageFlags.None, true);
+            baker.AddComponent(smartBakerEntity, smartPostProcessItem);
+            baker.AddComponent(smartBakerEntity, new SmartBakerTargetEntityReference { targetEntity = entity });
         }
     }
 
+    [UpdateInGroup(typeof(SmartBakerBakingGroup))]
+    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [RequireMatchingQueriesForUpdate]
     [BurstCompile]
-    internal partial class SmartBakerSystem<TAuthoring, TSmartBakeItem> : SystemBase where TAuthoring : Component where TSmartBakeItem : unmanaged,
-        ISmartBakeItem<TAuthoring>
+    internal partial class SmartBakerSystem : SystemBase
     {
-        public bool runInBurst;
+        abstract class BaseItem
+        {
+            public abstract void OnCreate(ref SystemState state);
+            public abstract void OnUpdate(ref SystemState state);
+            public abstract void OnAfterUpdate(ref SystemState state);
+        }
 
-        EntityQuery m_query;
+        class Item<TSmartItem> : BaseItem where TSmartItem : unmanaged, ISmartPostProcessItem
+        {
+            EntityQuery m_query;
+
+            public override void OnCreate(ref SystemState state)
+            {
+                m_query = new EntityQueryBuilder(Allocator.Temp)
+                          .WithAllRW<TSmartItem>()
+                          .WithAll<SmartBakerTargetEntityReference>()
+                          .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)
+                          .Build(ref state);
+            }
+
+            public override void OnUpdate(ref SystemState state)
+            {
+                if (m_query.IsEmptyIgnoreFilter)
+                    return;
+
+                var targetReferences = m_query.ToComponentDataArray<SmartBakerTargetEntityReference>(Allocator.Temp);
+                var smartDataArray   = m_query.ToComponentDataArray<TSmartItem>(Allocator.Temp);
+
+                for (int i = 0; i < targetReferences.Length; i++)
+                {
+                    var smartData = smartDataArray[i];
+                    smartData.PostProcessBlobRequests(state.EntityManager, targetReferences[i].targetEntity);
+                    smartDataArray[i] = smartData;
+                }
+            }
+
+            public override void OnAfterUpdate(ref SystemState state)
+            {
+                state.EntityManager.RemoveComponent<TSmartItem>(m_query);
+            }
+        }
+
+        List<BaseItem>             m_items     = new List<BaseItem>();
+        static List<ComponentType> s_itemTypes = null;
 
         protected override void OnCreate()
         {
-            m_query = new EntityQueryBuilder(Allocator.Temp)
-                      .WithAllRW<TSmartBakeItem>()
-                      .WithAll<SmartBakerTargetEntityReference>()
-                      .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)
-                      .Build(this);
+            if (s_itemTypes == null)
+            {
+                var itemType = typeof(ISmartPostProcessItem);
+                s_itemTypes  = new List<ComponentType>();
+                foreach (var type in TypeManager.AllTypes)
+                {
+                    if (itemType.IsAssignableFrom(type.Type))
+                    {
+                        s_itemTypes.Add(ComponentType.ReadOnly(type.TypeIndex));
+                    }
+                }
+            }
+
+            var genericType = typeof(Item<>);
+            foreach (var t in s_itemTypes)
+            {
+                m_items.Add(Activator.CreateInstance(genericType.MakeGenericType(t.GetManagedType())) as BaseItem);
+            }
+
+            ref var state = ref CheckedStateRef;
+            foreach (var t in m_items)
+            {
+                t.OnCreate(ref state);
+            }
         }
 
         protected override void OnUpdate()
         {
-            CompleteDependency();
-
-            var entities         = m_query.ToEntityArray(Allocator.TempJob);
-            var targetReferences = m_query.ToComponentDataArray<SmartBakerTargetEntityReference>(Allocator.TempJob);
-            var smartDataArray   = m_query.ToComponentDataArray<TSmartBakeItem>(Allocator.TempJob);
-
-            var processJob = new SmartBaker<TAuthoring, TSmartBakeItem>.ProcessSmartBakeDataBurstedJob
+            ref var state = ref CheckedStateRef;
+            state.CompleteDependency();
+            foreach (var t in m_items)
             {
-                em               = EntityManager,
-                targetReferences = targetReferences,
-                smartDataArray   = smartDataArray
-            };
-
-            // Todo: Figure out how to get safety to not complain here.
-            //if (runInBurst)
-            //    processJob.Run();
-            //else
-            processJob.Execute();
-
-            var writeBackJob = new SmartBaker<TAuthoring, TSmartBakeItem>.WriteBackBakedDataJob
+                t.OnUpdate(ref state);
+            }
+            foreach (var t in m_items)
             {
-                smartDataLookup = GetComponentLookup<TSmartBakeItem>(),
-                entities        = entities,
-                smartDataArray  = smartDataArray
-            };
-            writeBackJob.RunByRef(entities.Length);
-
-            entities.Dispose();
-            targetReferences.Dispose();
-            smartDataArray.Dispose();
+                t.OnAfterUpdate(ref state);
+            }
         }
-    }
-
-    internal interface ICreateSmartBakerSystem
-    {
-        internal void Create(World world, ComponentSystemGroup addToThis);
     }
 
     [TemporaryBakingType]

@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
-using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEditorInternal;
 
 namespace Latios.Psyshock
 {
@@ -15,18 +16,17 @@ namespace Latios.Psyshock
     /// </summary>
     public struct BuildCollisionLayerTypeHandles
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-        [ReadOnly] public ComponentTypeHandle<Collider>       collider;
-        [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransform;
-        [ReadOnly] public EntityTypeHandle                    entity;
+        [ReadOnly] public ComponentTypeHandle<Collider>           collider;
+        [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransform;
+        [ReadOnly] public EntityTypeHandle                        entity;
 
         /// <summary>
         /// Constructs the BuildCollsionLayer type handles using a managed system
         /// </summary>
-        public BuildCollisionLayerTypeHandles(ComponentSystemBase system)
+        public BuildCollisionLayerTypeHandles(SystemBase system)
         {
             collider       = system.GetComponentTypeHandle<Collider>(true);
-            worldTransform = system.GetComponentTypeHandle<WorldTransform>(true);
+            worldTransform = new WorldTransformReadOnlyAspect.TypeHandle(ref system.CheckedStateRef);
             entity         = system.GetEntityTypeHandle();
         }
 
@@ -36,7 +36,7 @@ namespace Latios.Psyshock
         public BuildCollisionLayerTypeHandles(ref SystemState system)
         {
             collider       = system.GetComponentTypeHandle<Collider>(true);
-            worldTransform = system.GetComponentTypeHandle<WorldTransform>(true);
+            worldTransform = new WorldTransformReadOnlyAspect.TypeHandle(ref system);
             entity         = system.GetEntityTypeHandle();
         }
 
@@ -46,7 +46,7 @@ namespace Latios.Psyshock
         public void Update(SystemBase system)
         {
             collider.Update(system);
-            worldTransform.Update(system);
+            worldTransform.Update(ref system.CheckedStateRef);
             entity.Update(system);
         }
 
@@ -59,7 +59,6 @@ namespace Latios.Psyshock
             worldTransform.Update(ref system);
             entity.Update(ref system);
         }
-#endif
     }
 
     /// <summary>
@@ -94,25 +93,22 @@ namespace Latios.Psyshock
 
     public static partial class Physics
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         /// <summary>
         /// Adds the necessary components to an EntityQuery to ensure proper building of a CollisionLayer
         /// </summary>
         public static FluentQuery PatchQueryForBuildingCollisionLayer(this FluentQuery fluent)
         {
-            return fluent.WithAllWeak<Collider>().WithAllWeak<WorldTransform>();
+            return fluent.WithAllWeak<Collider>().WithWorldTransformReadOnlyAspectWeak();
         }
-#endif
 
         #region Starters
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         /// <summary>
         /// Creates a new CollisionLayer by extracting collider and transform data from the entities in an EntityQuery.
         /// This is a start of a fluent chain.
         /// </summary>
         /// <param name="query">The EntityQuery from which to extract collider and transform data</param>
         /// <param name="system">The system used for extracting ComponentTypeHandles</param>
-        public static BuildCollisionLayerConfig BuildCollisionLayer(EntityQuery query, ComponentSystemBase system)
+        public static BuildCollisionLayerConfig BuildCollisionLayer(EntityQuery query, SystemBase system)
         {
             var config          = new BuildCollisionLayerConfig();
             config.query        = query;
@@ -156,7 +152,6 @@ namespace Latios.Psyshock
             config.count        = query.CalculateEntityCount();
             return config;
         }
-#endif
 
         /// <summary>
         /// Creates a new CollisionLayer using the collider and transform data provided by the bodies array
@@ -313,7 +308,6 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.count;
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -356,9 +350,6 @@ namespace Latios.Psyshock
                     colliderAoS = aos,
                     layer       = layer,
                 }.Run(count);
-#else
-                layer = default;
-#endif
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
@@ -403,7 +394,6 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.count;
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -448,10 +438,6 @@ namespace Latios.Psyshock
                 }.Schedule(jh);
 
                 return jh;
-#else
-                layer = default;
-                return inputDeps;
-#endif
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
@@ -500,7 +486,6 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 int count        = config.query.CalculateEntityCount();
                 layer            = new CollisionLayer(count, config.settings, allocator);
                 var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
@@ -545,10 +530,6 @@ namespace Latios.Psyshock
                 }.Schedule(count, 128, jh);
 
                 return jh;
-#else
-                layer = default;
-                return inputDeps;
-#endif
             }
             else if (config.hasBodiesArray)
             {

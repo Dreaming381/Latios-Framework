@@ -55,8 +55,8 @@ namespace Latios.Authoring.Systems
     }
 
     /// <summary>
-    /// Baking System Group when all the Smart Baker Systems execute to post-process ISmartBakeItem.
-    /// Do not add custom systems to this group unless you absolutely know what you are doing.
+    /// Baking System Group when all the Smart Blobber Resolver Systems execute to post-process Blob Assets
+    /// before any other baking systems.
     /// </summary>
     [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderLast = true)]
     [UpdateAfter(typeof(SmartBlobberCleanupBakingGroup))]

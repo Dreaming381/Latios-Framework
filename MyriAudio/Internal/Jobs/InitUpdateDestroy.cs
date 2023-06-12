@@ -1,5 +1,4 @@
-﻿#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using Latios.Transforms;
+﻿using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -51,14 +50,14 @@ namespace Latios.Myri
         [BurstCompile]
         public struct UpdateListenersJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<AudioListener>  listenerHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransformHandle;
-            public NativeList<ListenerWithTransform>              listenersWithTransforms;
+            [ReadOnly] public ComponentTypeHandle<AudioListener>      listenerHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
+            public NativeList<ListenerWithTransform>                  listenersWithTransforms;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var listeners       = chunk.GetNativeArray(ref listenerHandle);
-                var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                var worldTransforms = worldTransformHandle.Resolve(chunk);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var l = listeners[i];
@@ -81,7 +80,7 @@ namespace Latios.Myri
         {
             public ComponentTypeHandle<AudioSourceOneShot>                           oneshotHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>            coneHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>                    worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                worldTransformHandle;
             [NativeDisableParallelForRestriction] public NativeArray<OneshotEmitter> emitters;
             [ReadOnly] public NativeReference<int>                                   audioFrame;
             [ReadOnly] public NativeReference<int>                                   lastPlayedAudioFrame;
@@ -111,7 +110,7 @@ namespace Latios.Myri
 
                 if (chunk.Has(ref coneHandle))
                 {
-                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var worldTransforms = worldTransformHandle.Resolve(chunk);
                     var cones           = chunk.GetNativeArray(ref coneHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
@@ -126,7 +125,7 @@ namespace Latios.Myri
                 }
                 else
                 {
-                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var worldTransforms = worldTransformHandle.Resolve(chunk);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         emitters[firstEntityIndex + i] = new OneshotEmitter
@@ -148,7 +147,7 @@ namespace Latios.Myri
         {
             public ComponentTypeHandle<AudioSourceLooped>                           loopedHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>           coneHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>                   worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle               worldTransformHandle;
             [NativeDisableParallelForRestriction] public NativeArray<LoopedEmitter> emitters;
             [ReadOnly] public NativeReference<int>                                  audioFrame;
             [ReadOnly] public NativeReference<int>                                  lastConsumedBufferId;
@@ -224,7 +223,7 @@ namespace Latios.Myri
 
                 if (chunk.Has(ref coneHandle))
                 {
-                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var worldTransforms = worldTransformHandle.Resolve(chunk);
                     var cones           = chunk.GetNativeArray(ref coneHandle);
                     for (int i = 0; i < chunk.Count; i++)
                     {
@@ -239,7 +238,7 @@ namespace Latios.Myri
                 }
                 else
                 {
-                    var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                    var worldTransforms = worldTransformHandle.Resolve(chunk);
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         emitters[firstEntityIndex + i] = new LoopedEmitter
@@ -255,5 +254,4 @@ namespace Latios.Myri
         }
     }
 }
-#endif
 

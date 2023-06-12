@@ -1,7 +1,5 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
-using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
@@ -34,18 +32,19 @@ namespace Latios.Kinemation
         LatiosWorldUnmanaged latiosWorld;
         EntityQuery          m_probeGridQuery;
 
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
+
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_probeGridQuery = state.GetEntityQuery(
-                ComponentType.ReadWrite<BuiltinMaterialPropertyUnity_SHCoefficients>(),
-                ComponentType.ReadOnly<WorldTransform>(),
-                ComponentType.ReadOnly<BlendProbeTag>()
-                );
+            m_probeGridQuery =
+                state.Fluent().WithAll<BuiltinMaterialPropertyUnity_SHCoefficients>(false).WithWorldTransformReadOnlyAspectWeak().WithAll<BlendProbeTag>(true).Build();
 
             state.EntityManager.AddComponentData(state.SystemHandle, new RequiresFullRebuild { requiresFullRebuild = true });
             state.EntityManager.AddComponentObject(state.SystemHandle, new TetrahedralizationChangeCallbackReceiver(ref state));
+
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         public void OnDestroy(ref SystemState state)
@@ -70,6 +69,8 @@ namespace Latios.Kinemation
                 return;
             }
 
+            m_worldTransformHandle.Update(ref state);
+
             int shIndex = latiosWorld.worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true).Reinterpret<ComponentType>()
                           .AsNativeArray().IndexOf(ComponentType.ReadOnly<BuiltinMaterialPropertyUnity_SHCoefficients>());
             ulong shMaterialMaskLower = (ulong)shIndex >= 64UL ? 0UL : (1UL << shIndex);
@@ -88,8 +89,18 @@ namespace Latios.Kinemation
                 shHandle                = GetComponentTypeHandle<BuiltinMaterialPropertyUnity_SHCoefficients>(false),
                 shMaskLower             = shMaterialMaskLower,
                 shMaskUpper             = shMaterialMaskUpper,
-                worldTransformHandle    = GetComponentTypeHandle<WorldTransform>(true)
+                worldTransformHandle    = m_worldTransformHandle
             };
+
+            if (requiresFullRebuild.requiresFullRebuild)
+            {
+                m_probeGridQuery.ResetFilter();
+            }
+            else if (!m_probeGridQuery.HasFilter())
+            {
+                m_probeGridQuery.AddWorldTranformChangeFilter();
+                m_probeGridQuery.AddChangedVersionFilter(ComponentType.ReadOnly<BlendProbeTag>());
+            }
 
             requiresFullRebuild.requiresFullRebuild = false;
             state.EntityManager.SetComponentData(state.SystemHandle, requiresFullRebuild);
@@ -140,7 +151,7 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct Job : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>                   worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle               worldTransformHandle;
             [ReadOnly] public ComponentTypeHandle<BlendProbeTag>                    blendProbeTagHandle;
             public ComponentTypeHandle<BuiltinMaterialPropertyUnity_SHCoefficients> shHandle;
             public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>              chunkMaterialMaskHandle;
@@ -152,17 +163,18 @@ namespace Latios.Kinemation
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool changed  = chunk.DidChange(ref worldTransformHandle, lastSystemVersion);
-                changed      |= chunk.DidChange(ref blendProbeTagHandle, lastSystemVersion);
+                // We use a change filter now since aspects don't allow change filtering in job.
+                //bool changed  = chunk.DidChange(ref worldTransformHandle, lastSystemVersion);
+                //changed      |= chunk.DidChange(ref blendProbeTagHandle, lastSystemVersion);
 
-                if (!(changed || requiresFullRebuild))
-                    return;
+                //if (!(changed || requiresFullRebuild))
+                //    return;
 
                 ref var mask      = ref chunk.GetChunkComponentRefRW(ref chunkMaterialMaskHandle);
                 mask.lower.Value |= shMaskLower;
                 mask.upper.Value |= shMaskUpper;
 
-                var worldTransforms = chunk.GetNativeArray(ref worldTransformHandle);
+                var worldTransforms = worldTransformHandle.Resolve(chunk);
                 var shArray         = chunk.GetNativeArray(ref shHandle);
                 if (requiresFullRebuild)
                 {
@@ -203,5 +215,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

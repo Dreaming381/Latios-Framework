@@ -1,6 +1,5 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
-using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -25,27 +24,9 @@ namespace Latios.Kinemation
 #endif
         public void OnCreate(ref SystemState state)
         {
-            m_MissingHybridChunkInfo = state.GetEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ChunkComponentReadOnly<ChunkWorldRenderBounds>(),
-                    ComponentType.ReadOnly<WorldRenderBounds>(),
-                    ComponentType.ReadOnly<WorldTransform>(),
-                    ComponentType.ReadOnly<MaterialMeshInfo>(),
-                },
-                None = new[]
-                {
-                    ComponentType.ChunkComponentReadOnly<EntitiesGraphicsChunkInfo>(),
-                    ComponentType.ReadOnly<DisableRendering>(),
-                },
-
-                // TODO: Add chunk component to disabled entities and prefab entities to work around
-                // the fragmentation issue where entities are not added to existing chunks with chunk
-                // components. Remove this once chunk components don't affect archetype matching
-                // on entity creation.
-                Options = EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab,
-            });
+            m_MissingHybridChunkInfo = state.Fluent().WithAll<ChunkWorldRenderBounds>(true, true).WithAll<WorldRenderBounds>(true).WithWorldTransformReadOnlyAspectWeak()
+                                       .WithAll<MaterialMeshInfo>(true).Without<EntitiesGraphicsChunkInfo>(true).Without<DisableRendering>().IncludePrefabs().
+                                       IncludeDisabledEntities().Build();
 
             m_DisabledRenderingQuery = state.GetEntityQuery(new EntityQueryDesc
             {
@@ -87,5 +68,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

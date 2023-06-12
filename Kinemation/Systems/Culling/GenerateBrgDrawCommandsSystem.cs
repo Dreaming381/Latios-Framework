@@ -1,4 +1,4 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+//#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using Latios.Transforms;
 using Unity.Burst;
@@ -82,14 +82,18 @@ namespace Latios.Kinemation.Systems
                 EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                 LastSystemVersion         = state.LastSystemVersion,
                 LightMaps                 = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
-                WorldTransform            = GetComponentTypeHandle<WorldTransform>(true),
-                PostProcessMatrix         = GetComponentTypeHandle<PostProcessMatrix>(true),
-                MaterialMeshInfo          = GetComponentTypeHandle<MaterialMeshInfo>(true),
-                ProfilerEmitChunk         = m_profilerEmitChunk,
-                RenderFilterSettings      = GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                RenderMeshArray           = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
-                SceneCullingMask          = cullingContext.sceneCullingMask,
-                splitsAreValid            = cullingContext.viewType == BatchCullingViewType.Light,
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                WorldTransform = GetComponentTypeHandle<WorldTransform>(true),
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                WorldTransform = GetComponentTypeHandle<Unity.Transforms.LocalToWorld>(true),
+#endif
+                PostProcessMatrix    = GetComponentTypeHandle<PostProcessMatrix>(true),
+                MaterialMeshInfo     = GetComponentTypeHandle<MaterialMeshInfo>(true),
+                ProfilerEmitChunk    = m_profilerEmitChunk,
+                RenderFilterSettings = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                RenderMeshArray      = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
+                SceneCullingMask     = cullingContext.sceneCullingMask,
+                splitsAreValid       = cullingContext.viewType == BatchCullingViewType.Light,
             };
 
             var allocateWorkItemsJob = new AllocateWorkItemsJob
@@ -222,6 +226,7 @@ namespace Latios.Kinemation.Systems
             }
         }
 
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         [BurstCompile]
         unsafe struct EmitDrawCommandsJob : IJobParallelForDefer
         {
@@ -743,7 +748,206 @@ namespace Latios.Kinemation.Systems
                 }
             }
         }
+#endif
+
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+        [BurstCompile]
+        unsafe struct EmitDrawCommandsJob : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeArray<ArchetypeChunk>                          chunksToProcess;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
+            public bool                                                            splitsAreValid;
+
+            //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>     EntitiesGraphicsChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>              MaterialMeshInfo;
+            [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>             PostProcessMatrix;
+            [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag>               DepthSorted;
+            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>         RenderMeshArray;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings>    RenderFilterSettings;
+            [ReadOnly] public SharedComponentTypeHandle<LightMaps>               LightMaps;
+            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray>     BRGRenderMeshArrays;
+
+            public ChunkDrawCommandOutput DrawCommandOutput;
+
+            public ulong  SceneCullingMask;
+            public float3 CameraPosition;
+            public uint   LastSystemVersion;
+            public uint   CullingLayerMask;
+
+            public ProfilerMarker ProfilerEmitChunk;
+
+#if UNITY_EDITOR
+            [ReadOnly] public SharedComponentTypeHandle<EditorRenderData> EditorDataComponentHandle;
+#endif
+
+            public void Execute(int i)
+            {
+                Execute(chunksToProcess[i]);
+            }
+
+            void Execute(in ArchetypeChunk chunk)
+            {
+                //var visibilityItem = VisibilityItems.ElementAt(index);
+
+                //var chunkVisibility = visibilityItem.Visibility;
+
+                int filterIndex = chunk.GetSharedComponentIndex(RenderFilterSettings);
+
+                DrawCommandOutput.InitializeForEmitThread();
+
+                {
+                    var entitiesGraphicsChunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
+
+                    if (!entitiesGraphicsChunkInfo.Valid)
+                        return;
+
+                    // If the chunk has a RenderMeshArray, get access to the corresponding registered
+                    // Material and Mesh IDs
+                    BRGRenderMeshArray brgRenderMeshArray = default;
+                    if (!BRGRenderMeshArrays.IsEmpty)
+                    {
+                        int  renderMeshArrayIndex = chunk.GetSharedComponentIndex(RenderMeshArray);
+                        bool hasRenderMeshArray   = renderMeshArrayIndex >= 0;
+                        if (hasRenderMeshArray)
+                            BRGRenderMeshArrays.TryGetValue(renderMeshArrayIndex, out brgRenderMeshArray);
+                    }
+
+                    ref var chunkCullingData = ref entitiesGraphicsChunkInfo.CullingData;
+
+                    int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
+
+                    var  materialMeshInfos   = chunk.GetNativeArray(ref MaterialMeshInfo);
+                    var  worldTransforms     = chunk.GetNativeArray(ref WorldTransform);
+                    var  postProcessMatrices = chunk.GetNativeArray(ref PostProcessMatrix);
+                    bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
+                    bool isDepthSorted       = chunk.Has(ref DepthSorted);
+                    bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+
+                    // Check if the chunk has statically disabled motion (i.e. never in motion pass)
+                    // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
+                    // We make sure to never set the motion flag if motion is statically disabled to improve batching
+                    // in cases where the transform is changed.
+                    bool hasMotion = (chunkCullingData.Flags & EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion) != 0;
+
+                    if (hasMotion)
+                    {
+                        bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
+                        bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
+                        if (hasPostProcess)
+                            transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
+#if ENABLE_DOTS_DEFORMATION_MOTION_VECTORS
+                        bool isDeformed = chunk.Has(ref DeformedMeshIndex);
+#else
+                        bool isDeformed = false;
+#endif
+                        hasMotion = orderChanged || transformChanged || isDeformed;
+                    }
+
+                    int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
+
+                    var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
+                    var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
+
+                    TransformQvvs* postProcessDepthSortingTransformsPtr = null;
+                    if (isDepthSorted && hasPostProcess)
+                    {
+                        // In this case, we don't actually have a component that represents the rendered position.
+                        // So we allocate a new array and compute the world positions. We store them in TransformQvvs
+                        // so that the read pointer looks the same as our WorldTransforms.
+                        // We compute them in the inner loop since only the visible instances are read from later,
+                        // and it is a lot cheaper to only compute the visible instances.
+                        var allocator                        = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
+                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<TransformQvvs>(allocator, chunk.Count);
+                    }
+
+                    for (int j = 0; j < 2; j++)
+                    {
+                        ulong visibleWord = mask.ValueRO.GetUlongFromIndex(j);
+
+                        while (visibleWord != 0)
+                        {
+                            int   bitIndex    = math.tzcnt(visibleWord);
+                            int   entityIndex = (j << 6) + bitIndex;
+                            ulong entityMask  = 1ul << bitIndex;
+
+                            // Clear the bit first in case we early out from the loop
+                            visibleWord ^= entityMask;
+
+                            var materialMeshInfo = materialMeshInfos[entityIndex];
+
+                            BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
+                                                         materialMeshInfo.MaterialID :
+                                                         brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                            BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
+                                                 materialMeshInfo.MeshID :
+                                                 brgRenderMeshArray.GetMeshID(materialMeshInfo);
+
+                            // Null materials are handled internally by Unity using the error material if available.
+                            // Invalid meshes at this point will be skipped.
+                            if (materialMeshInfo.Mesh <= 0)
+                                if (meshID == BatchMeshID.Null)
+                                    continue;
+
+                            bool flipWinding = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
+
+                            var settings = new DrawCommandSettings
+                            {
+                                FilterIndex  = filterIndex,
+                                BatchID      = new BatchID { value = (uint)batchIndex },
+                                MaterialID   = materialID,
+                                MeshID       = meshID,
+                                SplitMask    = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0,  // Todo: Should the default be 1 instead of 0?
+                                SubmeshIndex = (ushort)materialMeshInfo.Submesh,
+                                Flags        = 0
+                            };
+
+                            if (flipWinding)
+                                settings.Flags |= BatchDrawCommandFlags.FlipWinding;
+
+                            if (hasMotion)
+                                settings.Flags |= BatchDrawCommandFlags.HasMotion;
+
+                            if (isLightMapped)
+                                settings.Flags |= BatchDrawCommandFlags.IsLightMapped;
+
+                            // Depth sorted draws are emitted with access to entity transforms,
+                            // so they can also be written out for sorting
+                            if (isDepthSorted)
+                            {
+                                settings.Flags |= BatchDrawCommandFlags.HasSortingPosition;
+                                // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
+                                // We also customize the code where this pointer is read.
+                                if (hasPostProcess)
+                                {
+                                    var index = j * 64 + bitIndex;
+                                    var f4x4  = new float4x4(new float4(postProcessMatrices[index].postProcessMatrix.c0, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
+                                    postProcessDepthSortingTransformsPtr[index].position = math.transform(f4x4, worldTransforms[index].Position);
+                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
+                                                                      (float4x4*)postProcessDepthSortingTransformsPtr);
+                                }
+                                else
+                                {
+                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
+                                                                      (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr());
+                                }
+                            }
+                            else
+                            {
+                                DrawCommandOutput.Emit(settings, j, bitIndex, chunkStartIndex);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+#endif
     }
 }
-#endif
 

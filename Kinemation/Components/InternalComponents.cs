@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using Latios.Psyshock;
 using Unity.Collections;
@@ -439,5 +438,4 @@ namespace Latios.Kinemation
     }
     #endregion
 }
-#endif
 

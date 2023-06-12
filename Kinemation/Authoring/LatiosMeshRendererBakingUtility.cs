@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using System.Reflection;
 using Latios.Transforms;
@@ -74,8 +73,11 @@ namespace Latios.Kinemation.Authoring
             baker.AddComponent(entity, componentTypes);
             for (int i = 0; i < componentTypes.Length; i++)
             {
+                // Todo: What to do for Unity Transforms?
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 if (componentTypes.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
                     baker.AddComponent<RequestPreviousTag>(entity);
+#endif
             }
 
             baker.SetSharedComponentManaged(entity, renderMesh);
@@ -217,5 +219,4 @@ namespace Latios.Kinemation.Authoring
         }
     }
 }
-#endif
 

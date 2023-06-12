@@ -1,8 +1,8 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -51,13 +51,24 @@ namespace Latios.Kinemation.Systems
 
         LatiosWorldUnmanaged latiosWorld;
 
+        ParentReadWriteAspect.Lookup m_parentLookup;
+
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+        // Dummy for Unity Transforms
+        struct PreviousTransform : IComponentData
+        {
+        }
+#endif
+
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
+            m_parentLookup = new ParentReadWriteAspect.Lookup(ref state);
+
             m_newMeshesQuery                    = state.Fluent().WithAll<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).Build();
             m_deadMeshesQuery                   = state.Fluent().WithAll<ChunkPerFrameCullingMask>(false, true).Without<MaterialMeshInfo>().Build();
-            m_newPreviousPostProcessMatrixQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>(true)
+            m_newPreviousPostProcessMatrixQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<PreviousTransform>(true)
                                                   .Without<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
             m_deadPreviousPostProcessMatrixQuery = state.Fluent().WithAll<PreviousPostProcessMatrix>(true).Without<PostProcessMatrix>().Build();
 
@@ -332,7 +343,8 @@ namespace Latios.Kinemation.Systems
                 {
                     m_failedSkeletonMeshBindingEntity = state.EntityManager.CreateEntity();
                     state.EntityManager.AddComponent(m_failedSkeletonMeshBindingEntity,
-                                                     new ComponentTypeSet(ComponentType.ReadWrite<WorldTransform>(), ComponentType.ReadWrite<FailedBindingsRootTag>()));
+                                                     new ComponentTypeSet(Transforms.Abstract.QueryExtensions.GetAbstractWorldTransformRWComponentType(),
+                                                                          ComponentType.ReadWrite<FailedBindingsRootTag>()));
                     state.EntityManager.SetName(m_failedSkeletonMeshBindingEntity, "Failed Bindings Root");
                 }
 
@@ -343,14 +355,18 @@ namespace Latios.Kinemation.Systems
 
                 // If CopyLocalToParentFromBone somehow gets added by accident, we might as well remove it.
                 // Also, we remove the LocalTransform and ParentToWorldTransform now to possibly prevent a structural change later.
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 state.EntityManager.RemoveComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<CopyLocalToParentFromBone>(),
                                                                                                   ComponentType.ReadWrite<LocalTransform>(),
                                                                                                   ComponentType.ReadWrite<ParentToWorldTransform>()));
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                state.EntityManager.RemoveComponent<CopyLocalToParentFromBone>(m_newMeshesQuery);
+#endif
                 var skinnedMeshAddTypes = new FixedList128Bytes<ComponentType>();
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<BoundMesh>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<SkeletonDependent>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadOnly<CopyParentWorldTransformTag>());
-                skinnedMeshAddTypes.Add(ComponentType.ReadWrite<Parent>());
+                skinnedMeshAddTypes.Add(ParentReadWriteAspect.componentType);
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>());
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformPrefixSums>());
 
@@ -423,11 +439,12 @@ namespace Latios.Kinemation.Systems
                     stateLookup = GetComponentLookup<BoundMesh>(false)
                 }.Schedule(meshBindingStatesToWrite, 16, state.Dependency);
 
+                m_parentLookup.Update(ref state);
                 state.Dependency = new ProcessSkinnedMeshStateOpsJob
                 {
                     failedBindingEntity = m_failedSkeletonMeshBindingEntity,
                     ops                 = skinnedMeshBindingsStatesToWrite.AsDeferredJobArray(),
-                    parentLookup        = GetComponentLookup<Parent>(false),
+                    parentLookup        = m_parentLookup,
                     stateLookup         = GetComponentLookup<SkeletonDependent>(false)
                 }.Schedule(skinnedMeshBindingsStatesToWrite, 16, state.Dependency);
             }
@@ -1565,7 +1582,7 @@ namespace Latios.Kinemation.Systems
         struct ProcessSkinnedMeshStateOpsJob : IJobParallelForDefer
         {
             [NativeDisableParallelForRestriction] public ComponentLookup<SkeletonDependent> stateLookup;
-            [NativeDisableParallelForRestriction] public ComponentLookup<Parent>            parentLookup;
+            [NativeDisableParallelForRestriction] public ParentReadWriteAspect.Lookup       parentLookup;  // Todo: Does this even work?
             [ReadOnly] public NativeArray<SkinnedMeshWriteStateOperation>                   ops;
             public Entity                                                                   failedBindingEntity;
 
@@ -1573,10 +1590,11 @@ namespace Latios.Kinemation.Systems
             {
                 var op                     = ops[index];
                 stateLookup[op.meshEntity] = op.skinnedState;
+                var parentAspect           = parentLookup[op.meshEntity];
                 if (op.skinnedState.root == Entity.Null)
-                    parentLookup[op.meshEntity] = new Parent { parent = failedBindingEntity };
+                    parentAspect.parent = failedBindingEntity;
                 else
-                    parentLookup[op.meshEntity] = new Parent { parent = op.skinnedState.root };
+                    parentAspect.parent = op.skinnedState.root;
             }
         }
 
@@ -1914,5 +1932,4 @@ namespace Latios.Kinemation.Systems
         #endregion
     }
 }
-#endif
 

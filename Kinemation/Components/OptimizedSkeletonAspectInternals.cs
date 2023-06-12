@@ -1,7 +1,7 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Diagnostics;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -138,7 +138,7 @@ namespace Latios.Kinemation
 
     public partial struct OptimizedBone
     {
-        internal RefRO<WorldTransform>                          m_skeletonWorldTransform;
+        internal WorldTransformReadOnlyAspect                   m_skeletonWorldTransform;
         internal RefRO<OptimizedSkeletonHierarchyBlobReference> m_skeletonHierarchyBlobRef;
         internal RefRW<OptimizedSkeletonState>                  m_skeletonState;
         internal DynamicBuffer<OptimizedBoneTransform>          m_boneTransforms;
@@ -187,7 +187,7 @@ namespace Latios.Kinemation
         int m_twoAgoRootIndex => OptimizedSkeletonState.TwoAgoFromMask[m_rotationMask] * m_boneCount * 2 + m_index;
 
         ref BlobArray<BlobArray<short> > m_allChildrenIndices => ref m_skeletonHierarchyBlobRef.ValueRO.blob.Value.childrenIndices;
-        ref readonly TransformQvvs m_skeletonWorldQvvs => ref m_skeletonWorldTransform.ValueRO.worldTransform;
+        TransformQvvs m_skeletonWorldQvvs => m_skeletonWorldTransform.worldTransformQvvs;
 
         bool TryGetParentRootIndexIgnoreRootBone(int boneRootIndex, out int parentIndex)
         {
@@ -280,5 +280,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

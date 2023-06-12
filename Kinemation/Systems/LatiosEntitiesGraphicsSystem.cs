@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 #region Header
 // This define fails tests due to the extra log spam. Don't check this in enabled
 // #define DEBUG_LOG_HYBRID_RENDERER
@@ -72,9 +71,11 @@ using UnityEditor;
 #endif
 
 using System.Runtime.InteropServices;
+using Latios.Transforms.Abstract;
 using MaterialPropertyType = Unity.Rendering.MaterialPropertyType;
 using Unity.Entities.Exposed;
 using Unity.Rendering;
+using Unity.Transforms;
 
 #endregion
 
@@ -242,7 +243,7 @@ namespace Latios.Kinemation.Systems
                 {
                     ComponentType.ChunkComponentReadOnly<ChunkWorldRenderBounds>(),
                     ComponentType.ReadOnly<WorldRenderBounds>(),
-                    ComponentType.ReadOnly<WorldTransform>(),
+                    QueryExtensions.GetAbstractWorldTransformROComponentType(),
                     ComponentType.ReadOnly<MaterialMeshInfo>(),
                     ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>(),
                 },
@@ -262,7 +263,7 @@ namespace Latios.Kinemation.Systems
             {
                 All = new[]
                 {
-                    ComponentType.ReadOnly<WorldTransform>(),
+                    QueryExtensions.GetAbstractWorldTransformROComponentType(),
                     ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>(),
                 },
             });
@@ -331,13 +332,13 @@ namespace Latios.Kinemation.Systems
             m_FilterSettings = new NativeParallelHashMap<int, BatchFilterSettings>(256, Allocator.Persistent);
 
             // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS (*cough Latios Transforms)
-#if SRP_10_0_0_OR_NEWER
-            RegisterMaterialPropertyType<WorldTransform>(   "unity_ObjectToWorld",   4 * 4 * 3);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>( "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
-            RegisterMaterialPropertyType<PreviousTransform>("unity_MatrixPreviousM", 4 * 4 * 3);
-#else
-            RegisterMaterialPropertyType<LocalToWorld>(     "unity_ObjectToWorld",   4 * 4 * 4);
-            RegisterMaterialPropertyType<WorldToLocal_Tag>( "unity_WorldToObject",   4 * 4 * 4);
+            RegisterMaterialPropertyType<WorldToLocal_Tag>(                            "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+            RegisterMaterialPropertyType<WorldTransform>(                              "unity_ObjectToWorld",   4 * 4 * 3);
+            RegisterMaterialPropertyType<PreviousTransform>(                           "unity_MatrixPreviousM", 4 * 4 * 3);
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+            RegisterMaterialPropertyType<LocalToWorld>(                                "unity_ObjectToWorld",   4 * 4 * 3);
+            RegisterMaterialPropertyType<BuiltinMaterialPropertyUnity_MatrixPreviousM>("unity_MatrixPreviousM", 4 * 4 * 3);
 #endif
 
 #if ENABLE_PICKING
@@ -898,7 +899,6 @@ namespace Latios.Kinemation.Systems
             var entitiesGraphicsRenderedChunkType   = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(false);
             var entitiesGraphicsRenderedChunkTypeRO = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true);
             var chunkHeadersRO                      = GetComponentTypeHandle<ChunkHeader>(true);
-            var worldTransformsRO                   = GetComponentTypeHandle<WorldTransform>(true);
             var lodRangesRO                         = GetComponentTypeHandle<LODRange>(true);
             var rootLodRangesRO                     = GetComponentTypeHandle<RootLODRange>(true);
             var materialMeshInfosRO                 = GetComponentTypeHandle<MaterialMeshInfo>(true);
@@ -972,7 +972,7 @@ namespace Latios.Kinemation.Systems
             {
                 EntitiesGraphicsChunkInfo    = entitiesGraphicsRenderedChunkType,
                 ChunkHeader                  = chunkHeadersRO,
-                WorldTransform               = worldTransformsRO,
+                WorldTransform               = GetDynamicComponentTypeHandle(QueryExtensions.GetAbstractWorldTransformROComponentType()),
                 LodRange                     = lodRangesRO,
                 RootLodRange                 = rootLodRangesRO,
                 RenderMeshArray              = renderMeshArrays,
@@ -1016,8 +1016,12 @@ namespace Latios.Kinemation.Systems
 
             var drawCommandFlagsUpdated = new UpdateDrawCommandFlagsJob
             {
-                WorldTransform            = GetComponentTypeHandle<WorldTransform>(true),
-                PostProcessMatrix         = GetComponentTypeHandle<PostProcessMatrix>(true),
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                WorldTransform    = GetComponentTypeHandle<WorldTransform>(true),
+                PostProcessMatrix = GetComponentTypeHandle<PostProcessMatrix>(true),
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                WorldTransform = GetComponentTypeHandle<LocalToWorld>(true),
+#endif
                 RenderFilterSettings      = GetSharedComponentTypeHandle<RenderFilterSettings>(),
                 EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(),
                 FilterSettings            = m_FilterSettings,
@@ -1760,7 +1764,7 @@ namespace Latios.Kinemation.Systems
         {
             public ComponentTypeHandle<EntitiesGraphicsChunkInfo>        EntitiesGraphicsChunkInfo;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>           ChunkHeader;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>        WorldTransform;
+            [ReadOnly] public DynamicComponentTypeHandle                 WorldTransform;
             [ReadOnly] public ComponentTypeHandle<LODRange>              LodRange;
             [ReadOnly] public ComponentTypeHandle<RootLODRange>          RootLodRange;
             [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>      MaterialMeshInfo;
@@ -1829,6 +1833,7 @@ namespace Latios.Kinemation.Systems
         }
         #endregion
 
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         [BurstCompile]
         internal unsafe struct UpdateDrawCommandFlagsJob : IJobChunk
         {
@@ -1926,7 +1931,70 @@ namespace Latios.Kinemation.Systems
                 return math.determinant(product) < 0f;
             }
         }
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+        [BurstCompile]
+        internal unsafe struct UpdateDrawCommandFlagsJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<LocalToWorld> WorldTransform;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
+            public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
+
+            [ReadOnly] public NativeParallelHashMap<int, BatchFilterSettings> FilterSettings;
+            public BatchFilterSettings DefaultFilterSettings;
+
+            public uint lastSystemVersion;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var changed = chunk.DidChange(ref WorldTransform, lastSystemVersion);
+                changed |= chunk.DidOrderChange(lastSystemVersion);
+                if (!changed)
+                    return;
+
+                // This job is not written to support queries with enableable component types.
+                Assert.IsFalse(useEnabledMask);
+
+                var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
+                Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
+
+                // This job runs for all chunks that have structural changes, so if different
+                // RenderFilterSettings get set on entities, they should be picked up by
+                // the order change filter.
+                int filterIndex = chunk.GetSharedComponentIndex(RenderFilterSettings);
+                if (!FilterSettings.TryGetValue(filterIndex, out var filterSettings))
+                    filterSettings = DefaultFilterSettings;
+
+                bool hasPerObjectMotion = filterSettings.motionMode != MotionVectorGenerationMode.Camera;
+                if (hasPerObjectMotion)
+                    chunkInfo.CullingData.Flags |= EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion;
+                else
+                    chunkInfo.CullingData.Flags &= unchecked ((byte)~EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion);
+
+                var worldTransforms = chunk.GetNativeArray(ref WorldTransform);
+
+                for (int i = 0, chunkEntityCount = chunk.Count; i < chunkEntityCount; i++)
+                {
+                    bool flippedWinding = RequiresFlippedWinding(worldTransforms[i]);
+
+                    int qwordIndex = i / 64;
+                    int bitIndex   = i % 64;
+                    ulong mask       = 1ul << bitIndex;
+
+                    if (flippedWinding)
+                        chunkInfo.CullingData.FlippedWinding[qwordIndex] |= mask;
+                    else
+                        chunkInfo.CullingData.FlippedWinding[qwordIndex] &= ~mask;
+                }
+
+                chunk.SetChunkComponentData(ref EntitiesGraphicsChunkInfo, chunkInfo);
+            }
+
+            private bool RequiresFlippedWinding(in LocalToWorld worldTransform)
+            {
+                return math.determinant(worldTransform.Value) < 0f;
+            }
+        }
+#endif
     }
 }
-#endif
 

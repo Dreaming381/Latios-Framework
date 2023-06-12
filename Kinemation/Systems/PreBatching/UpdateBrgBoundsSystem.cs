@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Psyshock;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -280,5 +279,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

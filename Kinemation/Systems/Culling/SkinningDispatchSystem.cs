@@ -1,8 +1,8 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Collections.Generic;
 using Latios.Psyshock;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -21,6 +21,9 @@ namespace Latios.Kinemation.Systems
     [DisableAutoCreation]
     public partial class SkinningDispatchSystem : CullingComputeDispatchSubSystemBase
     {
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.Lookup     m_worldTransformLookup;
+
         EntityQuery m_skeletonQuery;
         EntityQuery m_skinnedMeshQuery;
         EntityQuery m_skinnedMeshMetaQuery;
@@ -54,6 +57,9 @@ namespace Latios.Kinemation.Systems
 
         protected override void OnCreate()
         {
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref CheckedStateRef);
+            m_worldTransformLookup = new WorldTransformReadOnlyAspect.Lookup(ref CheckedStateRef);
+
             m_skeletonQuery        = Fluent.WithAll<DependentSkinnedMesh>(true).WithAll<ChunkPerCameraSkeletonCullingMask>(true, true).Build();
             m_skinnedMeshQuery     = Fluent.WithAll<SkeletonDependent>(true).WithAll<ChunkPerCameraCullingMask>(true, true).Build();
             m_skinnedMeshMetaQuery = Fluent.WithAll<ChunkHeader>(true).WithAll<ChunkPerCameraCullingMask>(true).Build();
@@ -201,6 +207,9 @@ namespace Latios.Kinemation.Systems
                     continue;
                 }
 
+                m_worldTransformHandle.Update(ref CheckedStateRef);
+                m_worldTransformLookup.Update(ref CheckedStateRef);
+
                 var skinningMetaBuffer   = graphicsPool.GetDispatchMetaBuffer(layouts.requiredMetaSize);
                 var boneTransformsBuffer = graphicsPool.GetBonesBuffer(layouts.requiredUploadTransforms);
                 var skinningMetaArray    = skinningMetaBuffer.LockBufferForWrite<uint4>(0, (int)layouts.requiredMetaSize);
@@ -218,14 +227,16 @@ namespace Latios.Kinemation.Systems
                     optimizedBoneBufferHandle    = SystemAPI.GetBufferTypeHandle<OptimizedBoneTransform>(true),
                     optimizedSkeletonStateHandle = SystemAPI.GetComponentTypeHandle<OptimizedSkeletonState>(true),
                     perChunkPrefixSums           = perChunkPrefixSums,
-                    previousTransformHandle      = SystemAPI.GetComponentTypeHandle<PreviousTransform>(true),
-                    previousTransformLookup      = SystemAPI.GetComponentLookup<PreviousTransform>(true),
+                    worldTransformHandle         = m_worldTransformHandle,
+                    worldTransformLookup         = m_worldTransformLookup,
                     skinnedMeshesBufferHandle    = SystemAPI.GetBufferTypeHandle<DependentSkinnedMesh>(true),
                     skinningStream               = skinningStream.AsReader(),
-                    twoAgoTransformHandle        = SystemAPI.GetComponentTypeHandle<TwoAgoTransform>(true),
-                    twoAgoTransformLookup        = SystemAPI.GetComponentLookup<TwoAgoTransform>(true),
-                    worldTransformHandle         = SystemAPI.GetComponentTypeHandle<WorldTransform>(true),
-                    worldTransformLookup         = SystemAPI.GetComponentLookup<WorldTransform>(true)
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                    previousTransformHandle = SystemAPI.GetComponentTypeHandle<PreviousTransform>(true),
+                    previousTransformLookup = SystemAPI.GetComponentLookup<PreviousTransform>(true),
+                    twoAgoTransformHandle   = SystemAPI.GetComponentTypeHandle<TwoAgoTransform>(true),
+                    twoAgoTransformLookup   = SystemAPI.GetComponentLookup<TwoAgoTransform>(true),
+#endif
                 }.ScheduleParallel(m_skeletonQuery, Dependency);
 
                 yield return true;
@@ -1917,13 +1928,15 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public BufferTypeHandle<DependentSkinnedMesh> skinnedMeshesBufferHandle;
             [ReadOnly] public NativeArray<short>                     boneOffsetsBuffer;
 
-            [ReadOnly] public BufferTypeHandle<BoneReference>        boneReferenceBufferHandle;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>    worldTransformHandle;
-            [ReadOnly] public ComponentLookup<WorldTransform>        worldTransformLookup;
+            [ReadOnly] public BufferTypeHandle<BoneReference>         boneReferenceBufferHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.Lookup     worldTransformLookup;
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             [ReadOnly] public ComponentTypeHandle<PreviousTransform> previousTransformHandle;
             [ReadOnly] public ComponentLookup<PreviousTransform>     previousTransformLookup;
             [ReadOnly] public ComponentTypeHandle<TwoAgoTransform>   twoAgoTransformHandle;
             [ReadOnly] public ComponentLookup<TwoAgoTransform>       twoAgoTransformLookup;
+#endif
 
             [ReadOnly] public BufferTypeHandle<OptimizedBoneTransform>    optimizedBoneBufferHandle;
             [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonState> optimizedSkeletonStateHandle;
@@ -1962,10 +1975,15 @@ namespace Latios.Kinemation.Systems
             {
                 var meshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
 
-                var bonesAccessor              = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
-                var skeletonWorldTransforms    = chunk.GetNativeArray(ref worldTransformHandle);
+                var bonesAccessor           = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
+                var skeletonWorldTransforms = worldTransformHandle.Resolve(chunk);
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 var skeletonPreviousTransforms = chunk.GetNativeArray(ref previousTransformHandle);
                 var skeletonTwoAgoTransforms   = chunk.GetNativeArray(ref twoAgoTransformHandle);
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                var skeletonPreviousTransforms = skeletonWorldTransforms;
+                var skeletonTwoAgoTransform    = skeletonWorldTransforms;
+#endif
 
                 var layouts = bufferLayouts.Value;
 
@@ -1996,18 +2014,20 @@ namespace Latios.Kinemation.Systems
                     var meshes = meshesAccessor[header.indexInSkeletonChunk].AsNativeArray();
 
                     var history = header.loadOp & SkinningStreamHeader.LoadOp.HistoryMask;
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                     if (history == SkinningStreamHeader.LoadOp.Current)
+#endif
                     {
                         // Todo: Need to switch this to be bone index 0 for better compliance with documentation.
                         // This should use a check if it and the skeleton entity are the same.
-                        var skeletonWorldTransform = skeletonWorldTransforms[header.indexInSkeletonChunk].worldTransform;
+                        var skeletonWorldTransform = skeletonWorldTransforms[header.indexInSkeletonChunk].worldTransformQvvs;
                         if (bones.Length == header.boneTransformCount)
                         {
                             boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload] = TransformQvvs.identity;
                             for (int i = 1; i < bones.Length; i++)
                             {
                                 var entity                                                             = bones[i].bone;
-                                var boneWorldTransform                                                 = worldTransformLookup[entity].worldTransform;
+                                var boneWorldTransform                                                 = worldTransformLookup[entity].worldTransformQvvs;
                                 var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
@@ -2029,7 +2049,7 @@ namespace Latios.Kinemation.Systems
                                     continue;
                                 }
                                 var entity                                                             = bones[offsets[i]].bone;
-                                var boneWorldTransform                                                 = worldTransformLookup[entity].worldTransform;
+                                var boneWorldTransform                                                 = worldTransformLookup[entity].worldTransformQvvs;
                                 var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
@@ -2037,6 +2057,7 @@ namespace Latios.Kinemation.Systems
                             prefixSums.boneTransformsToUpload += (uint)offsets.Length;
                         }
                     }
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                     else if (history == SkinningStreamHeader.LoadOp.Previous)
                     {
                         var skeletonWorldTransform = skeletonPreviousTransforms[header.indexInSkeletonChunk].worldTransform;
@@ -2115,6 +2136,7 @@ namespace Latios.Kinemation.Systems
                             prefixSums.boneTransformsToUpload += (uint)offsets.Length;
                         }
                     }
+#endif
 
                     if ((header.loadOp & SkinningStreamHeader.LoadOp.LargeSkeleton) != SkinningStreamHeader.LoadOp.LargeSkeleton)
                     {
@@ -2325,5 +2347,4 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
-#endif
 

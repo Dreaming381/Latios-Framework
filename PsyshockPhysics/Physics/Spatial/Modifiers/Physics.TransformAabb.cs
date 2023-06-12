@@ -1,4 +1,5 @@
 ﻿using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -41,6 +42,14 @@ namespace Latios.Psyshock
             newAabb.min = center - extents;
             newAabb.max = center + extents;
             return newAabb;
+        }
+
+        public static Aabb TransformAabb(in WorldTransformReadOnlyAspect transform, in Aabb localAabb)
+        {
+            if (transform.isNativeQvvs)
+                return TransformAabb(transform.worldTransformQvvs, in localAabb);
+            GetCenterExtents(localAabb, out var center, out var extents);
+            return TransformAabb(transform.matrix4x4, center, extents);
         }
 
         /// <summary>

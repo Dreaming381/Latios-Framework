@@ -1,6 +1,5 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
-using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -20,27 +19,15 @@ namespace Latios.Kinemation
         EntityQuery m_MissingWorldRenderBounds;
         EntityQuery m_MissingWorldChunkRenderBounds;
 
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_MissingWorldRenderBounds = state.GetEntityQuery
-                                         (
-                new EntityQueryDesc
-            {
-                All     = new[] { ComponentType.ReadOnly<RenderBounds>(), ComponentType.ReadOnly<WorldTransform>() },
-                None    = new[] { ComponentType.ReadOnly<WorldRenderBounds>() },
-                Options = EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab
-            }
-                                         );
+            m_MissingWorldRenderBounds =
+                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyAspectWeak().Without<WorldRenderBounds>().IncludePrefabs().IncludeDisabledEntities().Build();
 
-            m_MissingWorldChunkRenderBounds = state.GetEntityQuery
-                                              (
-                new EntityQueryDesc
-            {
-                All     = new[] { ComponentType.ReadOnly<RenderBounds>(), ComponentType.ReadOnly<WorldTransform>() },
-                None    = new[] { ComponentType.ChunkComponentReadOnly<ChunkWorldRenderBounds>() },
-                Options = EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab
-            }
-                                              );
+            m_MissingWorldChunkRenderBounds =
+                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyAspectWeak().Without<ChunkWorldRenderBounds>(true).IncludePrefabs().IncludeDisabledEntities().
+                Build();
         }
 
         [BurstCompile]
@@ -56,5 +43,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

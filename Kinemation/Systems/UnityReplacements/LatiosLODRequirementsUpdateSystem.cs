@@ -1,7 +1,7 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+//#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Diagnostics;
-using Latios;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -25,21 +25,24 @@ namespace Latios.Kinemation
         EntityQuery m_LODReferencePoints;
         EntityQuery m_LODGroupReferencePoints;
 
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
+
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             // Change filter: LODGroupConversion add MeshLODComponent for all LOD children. When the MeshLODComponent is added/changed, we recalculate LOD ranges.
-            m_UpdatedLODRanges = state.GetEntityQuery(ComponentType.ReadOnly<WorldTransform>(), typeof(MeshLODComponent), typeof(RootLODRange), typeof(LODRange));
+            m_UpdatedLODRanges = state.Fluent().WithWorldTransformReadOnlyAspectWeak().WithAll<MeshLODComponent>().WithAll<RootLODRange>().WithAll<LODRange>().Build();
             m_UpdatedLODRanges.SetChangedVersionFilter(ComponentType.ReadWrite<MeshLODComponent>());
 
-            m_LODReferencePoints = state.GetEntityQuery(ComponentType.ReadOnly<WorldTransform>(),
-                                                        ComponentType.ReadOnly<MeshLODComponent>(),
-                                                        typeof(RootLODWorldReferencePoint),
-                                                        typeof(LODWorldReferencePoint));
+            m_LODReferencePoints =
+                state.Fluent().WithWorldTransformReadOnlyAspectWeak().WithAll<MeshLODComponent>(true).WithAll<RootLODWorldReferencePoint>().WithAll<LODWorldReferencePoint>().Build();
 
             // Change filter: LOD Group world reference points only change when MeshLODGroupComponent or LocalToWorld change
-            m_LODGroupReferencePoints =
-                state.GetEntityQuery(ComponentType.ReadOnly<MeshLODGroupComponent>(), ComponentType.ReadOnly<WorldTransform>(), typeof(LODGroupWorldReferencePoint));
-            m_LODGroupReferencePoints.SetChangedVersionFilter(new[] { ComponentType.ReadWrite<MeshLODGroupComponent>(), ComponentType.ReadWrite<WorldTransform>() });
+            m_LODGroupReferencePoints = state.Fluent().WithAll<MeshLODGroupComponent>(true).WithWorldTransformReadOnlyAspectWeak().WithAll<LODGroupWorldReferencePoint>().Build();
+            m_LODGroupReferencePoints.AddChangedVersionFilter(ComponentType.ReadWrite<MeshLODGroupComponent>());
+            m_LODGroupReferencePoints.AddWorldTranformChangeFilter();
+
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         [BurstCompile]
@@ -50,6 +53,8 @@ namespace Latios.Kinemation
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            m_worldTransformHandle.Update(ref state);
+
             var updateLODRangesJob = new UpdateLODRangesJob
             {
                 MeshLODGroupComponent = GetComponentLookup<MeshLODGroupComponent>(true),
@@ -61,7 +66,7 @@ namespace Latios.Kinemation
             var updateGroupReferencePointJob = new UpdateLODGroupWorldReferencePointsJob
             {
                 MeshLODGroupComponent       = GetComponentTypeHandle<MeshLODGroupComponent>(true),
-                WorldTransform              = GetComponentTypeHandle<WorldTransform>(true),
+                WorldTransform              = m_worldTransformHandle,
                 LODGroupWorldReferencePoint = GetComponentTypeHandle<LODGroupWorldReferencePoint>(),
             };
 
@@ -153,7 +158,7 @@ namespace Latios.Kinemation
         struct UpdateLODGroupWorldReferencePointsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<MeshLODGroupComponent> MeshLODGroupComponent;
-            [ReadOnly] public ComponentTypeHandle<WorldTransform>        WorldTransform;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle    WorldTransform;
             public ComponentTypeHandle<LODGroupWorldReferencePoint>      LODGroupWorldReferencePoint;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
@@ -162,14 +167,14 @@ namespace Latios.Kinemation
                 Unity.Assertions.Assert.IsFalse(useEnabledMask);
 
                 var meshLODGroupComponent       = chunk.GetNativeArray(ref MeshLODGroupComponent);
-                var worldTransform              = chunk.GetNativeArray(ref WorldTransform);
+                var worldTransform              = WorldTransform.Resolve(chunk);
                 var lodGroupWorldReferencePoint = chunk.GetNativeArray(ref LODGroupWorldReferencePoint);
                 var instanceCount               = chunk.Count;
 
                 for (int i = 0; i < instanceCount; i++)
                 {
                     lodGroupWorldReferencePoint[i] = new LODGroupWorldReferencePoint {
-                        Value                      = qvvs.TransformPoint(worldTransform[i].worldTransform, meshLODGroupComponent[i].LocalReferencePoint)
+                        Value                      = qvvs.TransformPoint(worldTransform[i].worldTransformQvvs, meshLODGroupComponent[i].LocalReferencePoint)
                     };
                 }
             }
@@ -225,5 +230,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

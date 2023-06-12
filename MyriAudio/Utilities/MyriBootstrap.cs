@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Unity.Entities;
 
 namespace Latios.Myri
@@ -21,5 +20,4 @@ namespace Latios.Myri
         }
     }
 }
-#endif
 

@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -83,5 +82,4 @@ namespace Latios.Kinemation.Authoring
         public ClipEvent clipEvent;
     }
 }
-#endif
 

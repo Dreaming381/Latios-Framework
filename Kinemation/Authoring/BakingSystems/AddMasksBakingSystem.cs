@@ -51,13 +51,18 @@ namespace Latios.Kinemation.Authoring.Systems
     {
         protected override void OnUpdate()
         {
-            Entities.ForEach((Entity entity, in RenderMeshArray renderMeshArray, in RenderMesh renderMesh) =>
+            foreach ((var renderMeshArray, var renderMesh, var entity) in Query<RenderMeshArray, RenderMesh>().WithEntityAccess())
             {
-                if (renderMeshArray.Meshes == null)
-                {
-                    UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
-                }
-            }).WithoutBurst().Run();
+                UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
+            }
+
+            //Entities.ForEach((Entity entity, in RenderMeshArray renderMeshArray, in RenderMesh renderMesh) =>
+            //{
+            //    if (renderMeshArray.Meshes == null)
+            //    {
+            //        UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
+            //    }
+            //}).WithoutBurst().Run();
         }
     }
 }

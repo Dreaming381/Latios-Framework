@@ -55,12 +55,11 @@ namespace Latios.Authoring
 
     internal class BakingOverride
     {
-        OverrideBakers                       m_overrideBakers;
-        public List<ICreateSmartBakerSystem> m_smartBakerSystemCreators;
-        public NativeList<SystemTypeIndex>   m_bakingSystemTypesToDisable;
-        public NativeList<SystemTypeIndex>   m_bakingSystemTypesToInject;
-        public NativeList<SystemTypeIndex>   m_optimizationSystemTypesToDisable;
-        public NativeList<SystemTypeIndex>   m_optimizationSystemTypesToInject;
+        OverrideBakers                     m_overrideBakers;
+        public NativeList<SystemTypeIndex> m_bakingSystemTypesToDisable;
+        public NativeList<SystemTypeIndex> m_bakingSystemTypesToInject;
+        public NativeList<SystemTypeIndex> m_optimizationSystemTypesToDisable;
+        public NativeList<SystemTypeIndex> m_optimizationSystemTypesToInject;
 
         static bool s_appDomainUnloadRegistered;
         static bool s_initialized;
@@ -68,19 +67,6 @@ namespace Latios.Authoring
         public BakingOverride()
         {
 #if UNITY_EDITOR
-            // Todo: We always do this regardless of if the bakers are used.
-            // These bakers we create don't actually get added to the map.
-            // And the systems don't do anything without the bakers.
-            // Still, it would be nice to not have the systems created at all.
-            m_smartBakerSystemCreators = new List<ICreateSmartBakerSystem>();
-            foreach (var creatorType in UnityEditor.TypeCache.GetTypesDerivedFrom<ICreateSmartBakerSystem>())
-            {
-                if (creatorType.IsAbstract || creatorType.ContainsGenericParameters)
-                    continue;
-
-                m_smartBakerSystemCreators.Add(System.Activator.CreateInstance(creatorType) as ICreateSmartBakerSystem);
-            }
-
             IEnumerable<System.Type> bootstrapTypes;
 
             bootstrapTypes = UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(ICustomBakingBootstrap));
@@ -182,8 +168,6 @@ namespace Latios.Authoring
             if (!m_initialized)
             {
                 var smartBakingSystemGroup = World.GetOrCreateSystemManaged<Systems.SmartBakerBakingGroup>();
-                foreach (var creator in s_bakingOverride.m_smartBakerSystemCreators)
-                    creator.Create(World, smartBakingSystemGroup);
 
                 if (s_bakingOverride.m_bakingSystemTypesToDisable.IsCreated)
                 {
@@ -192,7 +176,7 @@ namespace Latios.Authoring
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)
                         {
-                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
+                            group.CheckedStateRef.Enabled = false;
                         }
                     }
                 }
@@ -258,7 +242,7 @@ namespace Latios.Authoring
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)
                         {
-                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
+                            group.CheckedStateRef.Enabled = false;
                         }
                     }
                 }

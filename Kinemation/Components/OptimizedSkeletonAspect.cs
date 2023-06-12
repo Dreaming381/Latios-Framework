@@ -1,7 +1,7 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Diagnostics;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
@@ -11,7 +11,7 @@ namespace Latios.Kinemation
 {
     public readonly partial struct OptimizedSkeletonAspect : IAspect
     {
-        readonly RefRO<WorldTransform>                          m_worldTransform;
+        readonly WorldTransformReadOnlyAspect                   m_worldTransform;
         readonly RefRO<OptimizedSkeletonHierarchyBlobReference> m_skeletonHierarchyBlobRef;
         readonly RefRW<OptimizedSkeletonState>                  m_skeletonState;
         readonly DynamicBuffer<OptimizedBoneTransform>          m_boneTransforms;
@@ -22,7 +22,7 @@ namespace Latios.Kinemation
         /// The skeleton's world transform. An optimized skeleton stores its bones in local and root space,
         /// so to get the world-space transforms of the bones, this component's value is used.
         /// </summary>
-        public ref readonly TransformQvvs skeletonWorldTransform => ref m_worldTransform.ValueRO.worldTransform;
+        public TransformQvvs skeletonWorldTransform => m_worldTransform.worldTransformQvvs;
         /// <summary>
         /// The blob value of the Optimized skeleton hierarchy
         /// </summary>
@@ -265,8 +265,8 @@ namespace Latios.Kinemation
         /// </summary>
         public float3 worldPosition
         {
-            get => qvvs.TransformPoint(in m_skeletonWorldQvvs, rootPosition);
-            set => rootPosition = qvvs.InverseTransformPoint(in m_skeletonWorldQvvs, value);
+            get => qvvs.TransformPoint(m_skeletonWorldQvvs, rootPosition);
+            set => rootPosition = qvvs.InverseTransformPoint(m_skeletonWorldQvvs, value);
         }
 
         /// <summary>
@@ -275,8 +275,8 @@ namespace Latios.Kinemation
         /// </summary>
         public quaternion worldRotation
         {
-            get => qvvs.TransformRotation(in m_skeletonWorldQvvs, rootRotation);
-            set => rootRotation = qvvs.InverseTransformRotation(in m_skeletonWorldQvvs, value);
+            get => qvvs.TransformRotation(m_skeletonWorldQvvs, rootRotation);
+            set => rootRotation = qvvs.InverseTransformRotation(m_skeletonWorldQvvs, value);
         }
 
         /// <summary>
@@ -285,8 +285,8 @@ namespace Latios.Kinemation
         /// </summary>
         public float worldScale
         {
-            get => qvvs.TransformScale(in m_skeletonWorldQvvs, rootScale);
-            set => rootScale = qvvs.InverseTransformScale(in m_skeletonWorldQvvs, value);
+            get => qvvs.TransformScale(m_skeletonWorldQvvs, rootScale);
+            set => rootScale = qvvs.InverseTransformScale(m_skeletonWorldQvvs, value);
         }
 
         /// <summary>
@@ -439,8 +439,8 @@ namespace Latios.Kinemation
         /// </summary>
         public TransformQvvs worldTransform
         {
-            get => qvvs.mul(in m_skeletonWorldQvvs, rootTransform);
-            set => rootTransform = qvvs.inversemulqvvs(in m_skeletonWorldQvvs, value);
+            get => qvvs.mul(m_skeletonWorldQvvs, rootTransform);
+            set => rootTransform = qvvs.inversemulqvvs(m_skeletonWorldQvvs, value);
         }
 
         /// <summary>
@@ -513,7 +513,7 @@ namespace Latios.Kinemation
     /// </summary>
     public struct OptimizedBoneChildrenArray
     {
-        internal RefRO<WorldTransform>                          m_skeletonWorldTransform;
+        internal WorldTransformReadOnlyAspect                   m_skeletonWorldTransform;
         internal RefRO<OptimizedSkeletonHierarchyBlobReference> m_skeletonHierarchyBlobRef;
         internal RefRW<OptimizedSkeletonState>                  m_skeletonState;
         internal DynamicBuffer<OptimizedBoneTransform>          m_boneTransforms;
@@ -554,7 +554,7 @@ namespace Latios.Kinemation
     /// </summary>
     public struct OptimizedBoneInSkeletonArray
     {
-        internal RefRO<WorldTransform>                          m_skeletonWorldTransform;
+        internal WorldTransformReadOnlyAspect                   m_skeletonWorldTransform;
         internal RefRO<OptimizedSkeletonHierarchyBlobReference> m_skeletonHierarchyBlobRef;
         internal RefRW<OptimizedSkeletonState>                  m_skeletonState;
         internal DynamicBuffer<OptimizedBoneTransform>          m_boneTransforms;
@@ -580,5 +580,4 @@ namespace Latios.Kinemation
         }
     }
 }
-#endif
 

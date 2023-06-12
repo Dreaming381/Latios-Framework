@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System;
 using System.Runtime.InteropServices;
 using Latios.Transforms;
@@ -6,6 +5,10 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
+
+#if LATIOS_TRANSFORMS_UNITY
+using Unity.Transforms;
+#endif
 
 namespace Latios.Kinemation
 {
@@ -142,7 +145,11 @@ namespace Latios.Kinemation
     [InternalBufferCapacity(0)]
     public struct BoneReference : IBufferElementData
     {
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         public EntityWith<WorldTransform> bone;
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+        public EntityWith<LocalToWorld> bone;
+#endif
     }
 
     /// <summary>
@@ -249,5 +256,4 @@ namespace Latios.Kinemation
     }
     #endregion
 }
-#endif
 

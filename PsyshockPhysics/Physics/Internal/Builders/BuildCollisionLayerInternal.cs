@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using Latios.Transforms;
+﻿using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -20,7 +19,6 @@ namespace Latios.Psyshock
         }
 
         #region Jobs
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         //Parallel
         //Calculate RigidTransform, AABB, and target bucket. Write the targetBucket as the layerIndex
         [BurstCompile]
@@ -39,7 +37,7 @@ namespace Latios.Psyshock
 
                 var chunkEntities   = chunk.GetNativeArray(typeGroup.entity);
                 var chunkColliders  = chunk.GetNativeArray(ref typeGroup.collider);
-                var chunkTransforms = chunk.GetNativeArray(ref typeGroup.worldTransform);
+                var chunkTransforms = typeGroup.worldTransform.Resolve(chunk);
                 var enumerator      = new ChunkEntityWithIndexEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count, firstEntityIndex);
                 while (enumerator.NextEntityIndex(out var i, out var index))
                 {
@@ -47,12 +45,12 @@ namespace Latios.Psyshock
                     var transform = chunkTransforms[i];
                     var entity    = chunkEntities[i];
 
-                    Aabb aabb = Physics.AabbFrom(in collider, in transform.worldTransform);
+                    Aabb aabb = Physics.AabbFrom(in collider, transform.worldTransformQvvs);
 
                     colliderAoS[index] = new ColliderAoSData
                     {
                         collider  = collider,
-                        transform = transform.worldTransform,
+                        transform = transform.worldTransformQvvs,
                         aabb      = aabb,
                         entity    = entity
                     };
@@ -78,7 +76,6 @@ namespace Latios.Psyshock
                 }
             }
         }
-#endif
 
         //Parallel
         //Calculated Target Bucket and write as layer index
