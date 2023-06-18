@@ -392,6 +392,7 @@ namespace Latios.Kinemation.Systems
                                                                                                ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>()));
 
                 optimizedTypes.Add(ComponentType.ReadWrite<DependentSkinnedMesh>());
+                optimizedTypes.Add(ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>());
 
                 state.EntityManager.AddComponent(m_newOptimizedSkeletonsQuery, new ComponentTypeSet(optimizedTypes));
                 state.EntityManager.AddComponent(m_newExposedSkeletonsQuery,   new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>(),

@@ -142,10 +142,10 @@ namespace Latios.Kinemation
         {
             if (needsHistorySync)
             {
+                m_skeletonState.ValueRW.state &= ~OptimizedSkeletonState.Flags.NeedsHistorySync;
                 if (m_currentBaseRootIndexWrite != 0)
                 {
                     // The buffers have already been rotated once. Nothing to sync.
-                    m_skeletonState.ValueRW.state &= ~OptimizedSkeletonState.Flags.NeedsHistorySync;
                 }
                 else
                 {
@@ -191,7 +191,7 @@ namespace Latios.Kinemation
                 array.GetSubArray(requiredBones * 2, requiredBones * 2).CopyFrom(array.GetSubArray(0, requiredBones * 2));
                 array.GetSubArray(requiredBones * 4, requiredBones * 2).CopyFrom(array.GetSubArray(0, requiredBones * 2));
             }
-            else
+            else if (boneCount < requiredBones)
             {
                 m_boneTransforms.Resize(requiredBones * 6, NativeArrayOptions.ClearMemory);
                 m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.NeedsHistorySync;

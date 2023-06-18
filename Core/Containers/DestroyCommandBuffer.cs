@@ -11,6 +11,7 @@ namespace Latios
     /// A specialized variant of the EntityCommandBuffer exclusively for destroying entities.
     /// Destroyed entities automatically account for LinkedEntityGroup at the time of playback.
     /// </summary>
+    [BurstCompile]
     public unsafe struct DestroyCommandBuffer : INativeDisposable
     {
         #region Structure

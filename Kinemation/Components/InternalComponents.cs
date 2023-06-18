@@ -383,9 +383,11 @@ namespace Latios.Kinemation
 
     internal partial struct ExposedSkeletonBoundsArrays : ICollectionComponent
     {
-        public NativeList<AABB> allAabbs;
-        public NativeList<AABB> batchedAabbs;
-        public const int        kCountPerBatch = 1 << 32;  // Todo: Is there a better size?
+        public NativeList<AABB>  allAabbs;
+        public NativeList<AABB>  batchedAabbs;
+        public NativeList<AABB>  allAabbsPreOffset;
+        public NativeList<float> meshOffsets;
+        public const int         kCountPerBatch = 1 << 32;  // Todo: Is there a better size?
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {
@@ -393,6 +395,8 @@ namespace Latios.Kinemation
                 return inputDeps;
 
             inputDeps = allAabbs.Dispose(inputDeps);
+            inputDeps = allAabbsPreOffset.Dispose(inputDeps);
+            inputDeps = meshOffsets.Dispose(inputDeps);
             return batchedAabbs.Dispose(inputDeps);
         }
     }

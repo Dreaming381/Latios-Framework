@@ -107,7 +107,7 @@ namespace Latios.Kinemation.Systems
                 var perChunkPrefixSums = CollectionHelper.CreateNativeArray<PerChunkPrefixSums>(skeletonChunkCount,
                                                                                                 WorldUpdateAllocator,
                                                                                                 NativeArrayOptions.UninitializedMemory);
-                var meshChunks        = new NativeList<ArchetypeChunk>(m_skinnedMeshMetaQuery.CalculateChunkCountWithoutFiltering(), WorldUpdateAllocator);
+                var meshChunks        = new NativeList<ArchetypeChunk>(m_skinnedMeshMetaQuery.CalculateEntityCountWithoutFiltering(), WorldUpdateAllocator);
                 var requestsBlockList =
                     new UnsafeParallelBlockList(UnsafeUtility.SizeOf<MeshSkinningRequestWithSkeletonTarget>(), 256, WorldUpdateAllocator);
                 var groupedSkinningRequestsStartsAndCounts   = new NativeList<int2>(WorldUpdateAllocator);

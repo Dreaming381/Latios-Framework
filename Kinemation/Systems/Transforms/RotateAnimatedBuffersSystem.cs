@@ -147,7 +147,7 @@ namespace Latios.Kinemation.Systems
                         bufferAsArray.GetSubArray(boneCount * 2, boneCount * 2).CopyFrom(bufferAsArray.GetSubArray(0, boneCount * 2));
                         bufferAsArray.GetSubArray(boneCount * 4, boneCount * 2).CopyFrom(bufferAsArray.GetSubArray(0, boneCount * 2));
                     }
-                    else  // Typically (buffer.Length == 0)
+                    else if (buffer.Length < boneCount * 6)  // Typically (buffer.Length == 0)
                     {
                         // Todo: Should we leave this uninitialized instead?
                         buffer.Resize(boneCount * 6, NativeArrayOptions.ClearMemory);

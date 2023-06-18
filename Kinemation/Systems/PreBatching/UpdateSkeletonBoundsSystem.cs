@@ -27,10 +27,11 @@ namespace Latios.Kinemation.Systems
             m_skeletonsQuery = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<SkeletonBoundsOffsetFromMeshes>(false).Build();
 
             m_exposedBonesQuery = state.Fluent().WithAll<BoneBounds>(true).WithAll<BoneWorldBounds>(false).WithAll<ChunkBoneWorldBounds>(false, true)
-                                  .WithAll<WorldTransform>(        true).Build();
+                                  .WithAll<WorldTransform>(                true).Build();
 
             m_optimizedSkeletonsQuery = state.Fluent().WithAll<OptimizedBoneBounds>(true).WithAll<OptimizedBoneTransform>(false).WithAll<OptimizedSkeletonWorldBounds>(false)
-                                        .WithAll<OptimizedSkeletonState>(false).WithAll<ChunkOptimizedSkeletonWorldBounds>(false, true).WithAll<WorldTransform>(true).Build();
+                                        .WithAll<OptimizedSkeletonState>(        false).WithAll<ChunkOptimizedSkeletonWorldBounds>(false, true)
+                                        .WithAll<SkeletonBoundsOffsetFromMeshes>(true).WithAll<WorldTransform>(true).Build();
         }
 
         [BurstCompile]

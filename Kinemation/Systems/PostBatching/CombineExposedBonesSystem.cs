@@ -1,5 +1,4 @@
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using Latios;
 using Latios.Psyshock;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -10,6 +9,8 @@ using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
 
+using static Unity.Entities.SystemAPI;
+
 namespace Latios.Kinemation
 {
     [RequireMatchingQueriesForUpdate]
@@ -17,7 +18,8 @@ namespace Latios.Kinemation
     [BurstCompile]
     public partial struct CombineExposedBonesSystem : ISystem
     {
-        EntityQuery m_query;
+        EntityQuery m_boneQuery;
+        EntityQuery m_skeletonQuery;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -28,12 +30,15 @@ namespace Latios.Kinemation
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_query = state.Fluent().WithAll<BoneWorldBounds>(true).WithAll<BoneCullingIndex>(true).Build();
+            m_boneQuery     = state.Fluent().WithAll<BoneWorldBounds>(true).WithAll<BoneCullingIndex>(true).Build();
+            m_skeletonQuery = state.Fluent().WithAll<ExposedSkeletonCullingIndex>(true).WithAll<SkeletonBoundsOffsetFromMeshes>(true).Build();
 
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new ExposedSkeletonBoundsArrays
             {
-                allAabbs     = new NativeList<AABB>(Allocator.Persistent),
-                batchedAabbs = new NativeList<AABB>(Allocator.Persistent)
+                allAabbs          = new NativeList<AABB>(Allocator.Persistent),
+                batchedAabbs      = new NativeList<AABB>(Allocator.Persistent),
+                allAabbsPreOffset = new NativeList<AABB>(Allocator.Persistent),
+                meshOffsets       = new NativeList<float>(Allocator.Persistent)
             });
 
             m_boneWorldBoundsHandle  = state.GetComponentTypeHandle<BoneWorldBounds>(true);
@@ -58,7 +63,7 @@ namespace Latios.Kinemation
             for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
                 perThreadBitArrays[i] = default;
 
-            state.Dependency = new FindDirtyBoundsJob
+            var bonesJH = new FindDirtyBoundsJob
             {
                 boundsHandle       = m_boneWorldBoundsHandle,
                 indexHandle        = m_boneCullingIndexHandle,
@@ -66,36 +71,47 @@ namespace Latios.Kinemation
                 perThreadBitArrays = perThreadBitArrays,
                 allocator          = state.WorldUpdateAllocator,
                 lastSystemVersion  = state.LastSystemVersion,
-            }.ScheduleParallel(m_query, state.Dependency);
+            }.ScheduleParallel(m_boneQuery, state.Dependency);
 
-            state.Dependency = new CollapseBitsJob
+            bonesJH = new CollapseBitsJob
             {
                 perThreadBitArrays = perThreadBitArrays
-            }.Schedule(state.Dependency);
+            }.Schedule(bonesJH);
 
             var perThreadBoundsArrays = state.WorldUnmanaged.UpdateAllocator.AllocateNativeArray<UnsafeList<Aabb> >(JobsUtility.MaxJobThreadCount);
             for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
                 perThreadBoundsArrays[i] = default;
 
-            state.Dependency = new CombineBoundsPerThreadJob
+            bonesJH = new CombineBoundsPerThreadJob
             {
-                boundsHandle            = m_boneWorldBoundsHandle,
-                indexHandle             = m_boneCullingIndexHandle,
-                maxBitIndex             = exposedCullingIndexManager.maxIndex,
-                perThreadBitArrays      = perThreadBitArrays,
-                perThreadBoundsArrays   = perThreadBoundsArrays,
-                allocator               = state.WorldUpdateAllocator,
-                finalAabbsToResize      = boundsArrays.allAabbs,
-                finalBatchAabbsToResize = boundsArrays.batchedAabbs
-            }.ScheduleParallel(m_query, state.Dependency);
+                boundsHandle                 = m_boneWorldBoundsHandle,
+                indexHandle                  = m_boneCullingIndexHandle,
+                maxBitIndex                  = exposedCullingIndexManager.maxIndex,
+                perThreadBitArrays           = perThreadBitArrays,
+                perThreadBoundsArrays        = perThreadBoundsArrays,
+                allocator                    = state.WorldUpdateAllocator,
+                finalAabbsToResize           = boundsArrays.allAabbs,
+                finalBatchAabbsToResize      = boundsArrays.batchedAabbs,
+                finalAabbsPreOffsetsToResize = boundsArrays.allAabbsPreOffset,
+                offsetsByIndexToResize       = boundsArrays.meshOffsets,
+            }.ScheduleParallel(m_boneQuery, bonesJH);
+
+            var skeletonsJH = new CollectSkeletonMeshBoundsOffsetJob
+            {
+                indexHandle    = GetComponentTypeHandle<ExposedSkeletonCullingIndex>(true),
+                offsetsHandle  = GetComponentTypeHandle<SkeletonBoundsOffsetFromMeshes>(true),
+                offsetsByIndex = boundsArrays.meshOffsets.AsDeferredJobArray()
+            }.ScheduleParallel(m_skeletonQuery, bonesJH);
 
             state.Dependency = new MergeThreadBoundsJob
             {
                 perThreadBitArrays    = perThreadBitArrays,
                 perThreadBoundsArrays = perThreadBoundsArrays,
-                finalAabbs            = boundsArrays.allAabbs,
-                finalBatchAabbs       = boundsArrays.batchedAabbs
-            }.ScheduleBatch(exposedCullingIndexManager.maxIndex.Value + 1, 32, state.Dependency);
+                offsetsByIndex        = boundsArrays.meshOffsets.AsDeferredJobArray(),
+                finalAabbsPreOffsets  = boundsArrays.allAabbsPreOffset.AsDeferredJobArray(),
+                finalAabbs            = boundsArrays.allAabbs.AsDeferredJobArray(),
+                finalBatchAabbs       = boundsArrays.batchedAabbs.AsDeferredJobArray()
+            }.ScheduleBatch(exposedCullingIndexManager.maxIndex.Value + 1, 32, skeletonsJH);
         }
 
         [BurstCompile]
@@ -184,8 +200,10 @@ namespace Latios.Kinemation
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeList<Aabb> > perThreadBoundsArrays;
             public Allocator                                                            allocator;
 
-            [NativeDisableParallelForRestriction] public NativeList<AABB> finalAabbsToResize;
-            [NativeDisableParallelForRestriction] public NativeList<AABB> finalBatchAabbsToResize;
+            [NativeDisableParallelForRestriction] public NativeList<AABB>  finalAabbsToResize;
+            [NativeDisableParallelForRestriction] public NativeList<AABB>  finalAabbsPreOffsetsToResize;
+            [NativeDisableParallelForRestriction] public NativeList<AABB>  finalBatchAabbsToResize;
+            [NativeDisableParallelForRestriction] public NativeList<float> offsetsByIndexToResize;
 
             [NativeSetThreadIndex] int m_NativeThreadIndex;
 
@@ -223,7 +241,9 @@ namespace Latios.Kinemation
                     int indexCount = maxBitIndex.Value + 1;
                     if (finalAabbsToResize.Length < indexCount)
                     {
-                        finalAabbsToResize.Length = indexCount;
+                        finalAabbsToResize.Length           = indexCount;
+                        finalAabbsPreOffsetsToResize.Length = indexCount;
+                        offsetsByIndexToResize.Length       = indexCount;
 
                         int batchCount = indexCount / 32;
                         if (indexCount % 32 != 0)
@@ -239,13 +259,41 @@ namespace Latios.Kinemation
         }
 
         [BurstCompile]
+        struct CollectSkeletonMeshBoundsOffsetJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<ExposedSkeletonCullingIndex>    indexHandle;
+            [ReadOnly] public ComponentTypeHandle<SkeletonBoundsOffsetFromMeshes> offsetsHandle;
+
+            [NativeDisableParallelForRestriction] public NativeArray<float> offsetsByIndex;
+            public uint                                                     lastSystemVersion;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                if (!(chunk.DidChange(ref indexHandle, lastSystemVersion) || chunk.DidChange(ref offsetsHandle, lastSystemVersion)))
+                    return;
+
+                var indices    = chunk.GetNativeArray(ref indexHandle);
+                var srcOffsets = chunk.GetNativeArray(ref offsetsHandle);
+
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var index = indices[i].cullingIndex;
+                    if (index < offsetsByIndex.Length)
+                        offsetsByIndex[index] = srcOffsets[i].radialBoundsInWorldSpace;
+                }
+            }
+        }
+
+        [BurstCompile]
         struct MergeThreadBoundsJob : IJobParallelForBatch
         {
             [ReadOnly] public NativeArray<UnsafeBitArray>    perThreadBitArrays;
             [ReadOnly] public NativeArray<UnsafeList<Aabb> > perThreadBoundsArrays;
+            [ReadOnly] public NativeArray<float>             offsetsByIndex;
 
-            [NativeDisableParallelForRestriction] public NativeList<AABB> finalAabbs;
-            [NativeDisableParallelForRestriction] public NativeList<AABB> finalBatchAabbs;
+            [NativeDisableParallelForRestriction] public NativeArray<AABB> finalAabbs;
+            [NativeDisableParallelForRestriction] public NativeArray<AABB> finalAabbsPreOffsets;
+            [NativeDisableParallelForRestriction] public NativeArray<AABB> finalBatchAabbs;
 
             public void Execute(int startIndex, int count)
             {
@@ -264,14 +312,20 @@ namespace Latios.Kinemation
                     }
                     else
                     {
-                        var aabb = new Aabb(finalAabbs[startIndex + i].Min, finalAabbs[startIndex + i].Max);
+                        var aabb = new Aabb(finalAabbsPreOffsets[startIndex + i].Min, finalAabbsPreOffsets[startIndex + i].Max);
                         cache.Add(aabb);
-                        batchAabb = Physics.CombineAabb(batchAabb, aabb);
+                        aabb.min                   -= offsetsByIndex[startIndex + i];
+                        aabb.max                   += offsetsByIndex[startIndex + i];
+                        finalAabbs[startIndex + i]  = FromAabb(aabb);
+                        batchAabb                   = Physics.CombineAabb(batchAabb, aabb);
                     }
                 }
 
                 if (mergeMask.Value == 0)
+                {
+                    finalBatchAabbs[startIndex / 32] = FromAabb(batchAabb);
                     return;
+                }
 
                 for (int threadIndex = 0; threadIndex < perThreadBoundsArrays.Length; threadIndex++)
                 {
@@ -281,8 +335,7 @@ namespace Latios.Kinemation
                     var tempMask = mergeMask;
                     for (int i = tempMask.CountTrailingZeros(); i < count; tempMask.SetBits(i, false), i = tempMask.CountTrailingZeros())
                     {
-                        cache[i]  = Physics.CombineAabb(cache[i], perThreadBoundsArrays[threadIndex][startIndex + i]);
-                        batchAabb = Physics.CombineAabb(batchAabb, perThreadBoundsArrays[threadIndex][startIndex + i]);
+                        cache[i] = Physics.CombineAabb(cache[i], perThreadBoundsArrays[threadIndex][startIndex + i]);
                     }
                 }
 
@@ -290,7 +343,12 @@ namespace Latios.Kinemation
                     var tempMask = mergeMask;
                     for (int i = tempMask.CountTrailingZeros(); i < count; tempMask.SetBits(i, false), i = tempMask.CountTrailingZeros())
                     {
-                        finalAabbs[startIndex + i] = FromAabb(cache[i]);
+                        var aabb                              = cache[i];
+                        finalAabbsPreOffsets[startIndex + i]  = FromAabb(aabb);
+                        aabb.min                             -= offsetsByIndex[startIndex + i];
+                        aabb.max                             += offsetsByIndex[startIndex + i];
+                        finalAabbs[startIndex + i]            = FromAabb(aabb);
+                        batchAabb                             = Physics.CombineAabb(batchAabb, aabb);
                     }
                     finalBatchAabbs[startIndex / 32] = FromAabb(batchAabb);
                 }
