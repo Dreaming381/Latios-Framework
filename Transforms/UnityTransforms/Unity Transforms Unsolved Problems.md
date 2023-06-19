@@ -31,12 +31,6 @@ no motion history is considered for skinning for exposed skeletons.
 How do we ensure children of exported bones end up with the right transforms
 during baking? Do we just hope that the GameObject hierarchy is sufficient?
 
-## Change Filters on WorldTransformReadOnlyAspect
-
-How do we get the change filter? Do we type-pun TypeHandle? Should we rewrite
-the aspect manually? Currently we are relying on extension methods for
-EntityQuery, but it would be nice to filter directly in a job.
-
 ## Writing to Exported Bones
 
 Exported bones may only have a LocalTransform and don’t have anything for
@@ -51,17 +45,39 @@ uploads. In 0.5, a proxy component was added, but this was expensive. In 0.7,
 QVVS Transforms have motion history which handle this responsibility. So what
 should this new Unity Transforms compatibility mode do?
 
-Currently, MatrixPrevious is updated in the motion history super system.
+Currently, MatrixPrevious is updated in the motion history super system, which
+exists as a shim to support Kinemation’s systems but does nothing itself.
 
 ## Skinned Mesh Culling with Scale and Shear
 
 How do we detect that a skinned mesh requires the slow path for culling that in
-QVVS world is handled by PostProcessMatrix? Currently, this is ignored.
+QVVS world is handled by PostProcessMatrix? Currently, the user must manage
+PostProcessMatrix as described by the XML documentation.
 
-## IAspect as an Abstraction
+## Consequences
 
-Currently, IAspect is used to generate abstractions in various places. However,
-the TypeHandle and Lookup types are not very flexible and make the abstractions
-not be sufficient in various places. Perhaps there should be manually-written
-abstractions for these rather than using IAspect-generated version? Then they
-could be customized for advanced usages.
+The following lists out the consequences of these unsolved problems as things
+stand today in this compatibility mode:
+
+1) Optimized skeletons may bake children of exported bones in the wrong spots
+which won’t get corrected until animation plays (which means it will always look
+wrong in the Editor).
+
+2) The system that handles motion vectors for normal meshes will update in the
+beginning of SimulationSystemGroup rather than in PresentationSystemGroup.
+
+3) Motion vectors for skinned meshes attached to exposed skeletons won’t work.
+
+4) Psyshock CollisionLayers generated from Entity Queries only consider position
+and rotation.
+
+5) Exposed skeletons only use position and rotation of bones for skinning.
+
+6) Exported bones only receive position, rotation, and uniform scale from the
+optimized skeleton and ignore stretch.
+
+7) Skinned meshes must have identical LocalToWorld as their parent skeleton or a
+properly specified PostProcessMatrix or else culling will be inaccurate.
+
+8) Some components may exist but have no or altered effect compared to QVVS
+Transforms.

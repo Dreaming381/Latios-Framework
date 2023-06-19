@@ -1,6 +1,6 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios;
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -19,8 +19,8 @@ namespace Latios.Kinemation.Authoring
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = new EntityQueryBuilder(Allocator.Temp).WithAll<SceneSection, RenderMesh, WorldTransform, Unity.Transforms.Static>().WithNone<FrozenRenderSceneTag>().Build(
-                ref state);
+            m_query = state.Fluent().WithAll<SceneSection>(true).WithAll<RenderMesh>(true).WithAll<Unity.Transforms.Static>().WithWorldTransformReadOnlyWeak()
+                      .Without<FrozenRenderSceneTag>().Build();
         }
 
         [BurstCompile]
@@ -54,5 +54,4 @@ namespace Latios.Kinemation.Authoring
         }
     }
 }
-#endif
 

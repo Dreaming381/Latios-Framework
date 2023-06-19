@@ -4,19 +4,19 @@ using Unity.Mathematics;
 
 namespace Latios.Transforms.Authoring
 {
-    // You must add this attribute to inheriting types
+    // You must add [BakingType] to inheriting types
     [BakingType]
     public interface IRequestPreviousTransform : IComponentData
     {
     }
 
-    // You must add this attribute to inheriting types
+    // You must add [BakingType] to inheriting types
     [BakingType]
     public interface IRequestTwoAgoTransform : IComponentData
     {
     }
 
-    // You must add this attribute to inheriting types
+    // You must add [BakingType] to inheriting types
     [BakingType]
     public interface IRequestCopyParentTransform : IComponentData
     {

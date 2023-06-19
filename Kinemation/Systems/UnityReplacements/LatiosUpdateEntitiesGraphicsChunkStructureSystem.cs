@@ -24,7 +24,7 @@ namespace Latios.Kinemation
 #endif
         public void OnCreate(ref SystemState state)
         {
-            m_MissingHybridChunkInfo = state.Fluent().WithAll<ChunkWorldRenderBounds>(true, true).WithAll<WorldRenderBounds>(true).WithWorldTransformReadOnlyAspectWeak()
+            m_MissingHybridChunkInfo = state.Fluent().WithAll<ChunkWorldRenderBounds>(true, true).WithAll<WorldRenderBounds>(true).WithWorldTransformReadOnlyWeak()
                                        .WithAll<MaterialMeshInfo>(true).Without<EntitiesGraphicsChunkInfo>(true).Without<DisableRendering>().IncludePrefabs().
                                        IncludeDisabledEntities().Build();
 

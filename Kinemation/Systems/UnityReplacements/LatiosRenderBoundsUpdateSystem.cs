@@ -30,7 +30,7 @@ namespace Latios.Kinemation
         public void OnCreate(ref SystemState state)
         {
             m_WorldRenderBounds = state.Fluent().WithAll<ChunkWorldRenderBounds>(false, true).WithAll<WorldRenderBounds>(false).WithAll<RenderBounds>(true)
-                                  .WithWorldTransformReadOnlyAspectWeak().Without<ChunkSkinningCullingTag>(true).Build();
+                                  .WithWorldTransformReadOnlyWeak().Without<ChunkSkinningCullingTag>(true).Build();
             m_WorldRenderBounds.AddChangedVersionFilter(ComponentType.ReadOnly<RenderBounds>());
             m_WorldRenderBounds.AddWorldTranformChangeFilter();
             m_WorldRenderBounds.AddOrderVersionFilter();

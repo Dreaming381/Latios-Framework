@@ -1,4 +1,3 @@
-//#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using System.Diagnostics;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
@@ -31,14 +30,14 @@ namespace Latios.Kinemation
         public void OnCreate(ref SystemState state)
         {
             // Change filter: LODGroupConversion add MeshLODComponent for all LOD children. When the MeshLODComponent is added/changed, we recalculate LOD ranges.
-            m_UpdatedLODRanges = state.Fluent().WithWorldTransformReadOnlyAspectWeak().WithAll<MeshLODComponent>().WithAll<RootLODRange>().WithAll<LODRange>().Build();
+            m_UpdatedLODRanges = state.Fluent().WithWorldTransformReadOnlyWeak().WithAll<MeshLODComponent>().WithAll<RootLODRange>().WithAll<LODRange>().Build();
             m_UpdatedLODRanges.SetChangedVersionFilter(ComponentType.ReadWrite<MeshLODComponent>());
 
             m_LODReferencePoints =
-                state.Fluent().WithWorldTransformReadOnlyAspectWeak().WithAll<MeshLODComponent>(true).WithAll<RootLODWorldReferencePoint>().WithAll<LODWorldReferencePoint>().Build();
+                state.Fluent().WithWorldTransformReadOnlyWeak().WithAll<MeshLODComponent>(true).WithAll<RootLODWorldReferencePoint>().WithAll<LODWorldReferencePoint>().Build();
 
             // Change filter: LOD Group world reference points only change when MeshLODGroupComponent or LocalToWorld change
-            m_LODGroupReferencePoints = state.Fluent().WithAll<MeshLODGroupComponent>(true).WithWorldTransformReadOnlyAspectWeak().WithAll<LODGroupWorldReferencePoint>().Build();
+            m_LODGroupReferencePoints = state.Fluent().WithAll<MeshLODGroupComponent>(true).WithWorldTransformReadOnlyWeak().WithAll<LODGroupWorldReferencePoint>().Build();
             m_LODGroupReferencePoints.AddChangedVersionFilter(ComponentType.ReadWrite<MeshLODGroupComponent>());
             m_LODGroupReferencePoints.AddWorldTranformChangeFilter();
 

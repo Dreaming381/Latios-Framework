@@ -1,4 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
 using Latios.Authoring;
 using Latios.Kinemation.Authoring.Systems;
 using Unity.Entities;
@@ -30,7 +29,6 @@ namespace Latios.Kinemation.Authoring
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberResolverBakingGroup>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddMasksBakingSystem>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddPostProcessMatrixSystem>());
-
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosFrozenStaticRendererSystem>());
             context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.FrozenStaticRendererSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosLODRequirementsUpdateSystem>());
@@ -39,5 +37,4 @@ namespace Latios.Kinemation.Authoring
         }
     }
 }
-#endif
 

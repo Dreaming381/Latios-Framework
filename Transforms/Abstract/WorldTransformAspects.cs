@@ -5,7 +5,7 @@ using Unity.Mathematics;
 
 namespace Latios.Transforms.Abstract
 {
-    public readonly partial struct WorldTransformReadOnlyAspect : IAspect, IAbstractWorldTransformReadOnlyAspect
+    public readonly partial struct WorldTransformReadOnlyAspect : IAspect
     {
         readonly RefRO<WorldTransform> worldTransform;
 
@@ -17,6 +17,36 @@ namespace Latios.Transforms.Abstract
         public bool isNativeQvvs => true;
         public float4x4 matrix4x4 => worldTransform.ValueRO.worldTransform.ToMatrix4x4();
     }
+
+    public struct WorldTransformReadOnlyTypeHandle
+    {
+        ComponentTypeHandle<WorldTransform> worldTransformHandle;
+
+        public WorldTransformReadOnlyTypeHandle(ref SystemState state)
+        {
+            worldTransformHandle = state.GetComponentTypeHandle<WorldTransform>(true);
+        }
+
+        public void Update(ref SystemState state)
+        {
+            worldTransformHandle.Update(ref state);
+        }
+
+        public bool DidChange(in ArchetypeChunk chunk, uint version)
+        {
+            return chunk.DidChange(ref worldTransformHandle, version);
+        }
+
+        public bool isNativeQvvs => true;
+
+        public WorldTransformReadOnlyAspect.ResolvedChunk Resolve(in ArchetypeChunk chunk)
+        {
+            var result                                            = new WorldTransformReadOnlyAspect.ResolvedChunk();
+            result.WorldTransformReadOnlyAspect_worldTransformNaC = chunk.GetNativeArray(ref worldTransformHandle);
+            result.Length                                         = chunk.Count;
+            return result;
+        }
+    }
 }
 
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
@@ -26,7 +56,7 @@ using Unity.Transforms;
 
 namespace Latios.Transforms.Abstract
 {
-    public readonly partial struct WorldTransformReadOnlyAspect : IAspect, IAbstractWorldTransformReadOnlyAspect
+    public readonly partial struct WorldTransformReadOnlyAspect : IAspect
     {
         readonly RefRO<LocalToWorld> localToWorld;
 
@@ -45,26 +75,44 @@ namespace Latios.Transforms.Abstract
         public bool isNativeQvvs => false;
         public float4x4 matrix4x4 => localToWorld.ValueRO.Value;
     }
+
+    public struct WorldTransformReadOnlyTypeHandle
+    {
+        ComponentTypeHandle<LocalToWorld> ltwHandle;
+
+        public WorldTransformReadOnlyTypeHandle(ref SystemState state)
+        {
+            ltwHandle = state.GetComponentTypeHandle<LocalToWorld>(true);
+        }
+
+        public void Update(ref SystemState state)
+        {
+            ltwHandle.Update(ref state);
+        }
+
+        public bool DidChange(in ArchetypeChunk chunk, uint version)
+        {
+            return chunk.DidChange(ref ltwHandle, version);
+        }
+
+        public bool isNativeQvvs => false;
+
+        public WorldTransformReadOnlyAspect.ResolvedChunk Resolve(in ArchetypeChunk chunk)
+        {
+            var result = new WorldTransformReadOnlyAspect.ResolvedChunk();
+            result.WorldTransformReadOnlyAspect_localToWorldNaC = chunk.GetNativeArray(ref ltwHandle);
+            result.Length                                       = chunk.Count;
+            return result;
+        }
+    }
 }
 #endif
 
 namespace Latios.Transforms.Abstract
 {
-    // This helps detect if the implementations are in-sync with utility methods.
-    public interface IAbstractWorldTransformReadOnlyAspect
-    {
-        public TransformQvvs worldTransformQvvs { get; }
-
-        public quaternion rotation { get; }
-        public float3 position { get; }
-
-        public bool isNativeQvvs { get; }
-        public float4x4 matrix4x4 {  get; }
-    }
-
     public static class QueryExtensions
     {
-        public static FluentQuery WithWorldTransformReadOnlyAspectWeak(this FluentQuery query)
+        public static FluentQuery WithWorldTransformReadOnlyWeak(this FluentQuery query)
         {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             return query.WithAllWeak<WorldTransform>();

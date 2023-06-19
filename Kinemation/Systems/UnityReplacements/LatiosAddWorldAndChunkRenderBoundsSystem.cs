@@ -23,10 +23,10 @@ namespace Latios.Kinemation
         public void OnCreate(ref SystemState state)
         {
             m_MissingWorldRenderBounds =
-                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyAspectWeak().Without<WorldRenderBounds>().IncludePrefabs().IncludeDisabledEntities().Build();
+                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyWeak().Without<WorldRenderBounds>().IncludePrefabs().IncludeDisabledEntities().Build();
 
             m_MissingWorldChunkRenderBounds =
-                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyAspectWeak().Without<ChunkWorldRenderBounds>(true).IncludePrefabs().IncludeDisabledEntities().
+                state.Fluent().WithAll<RenderBounds>(true).WithWorldTransformReadOnlyWeak().Without<ChunkWorldRenderBounds>(true).IncludePrefabs().IncludeDisabledEntities().
                 Build();
         }
 

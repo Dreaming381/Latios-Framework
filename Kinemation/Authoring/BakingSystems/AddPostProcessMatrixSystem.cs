@@ -1,5 +1,3 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-using Latios;
 using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -16,7 +14,9 @@ namespace Latios.Kinemation.Authoring.Systems
     [RequireMatchingQueriesForUpdate]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(TransformBakingSystemGroup))]
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
     [UpdateAfter(typeof(Latios.Transforms.Authoring.Systems.TransformBakingSystem))]
+#endif
     [DisableAutoCreation]
     [BurstCompile]
     public partial struct AddPostProcessMatrixSystem : ISystem
@@ -113,5 +113,4 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
-#endif
 
