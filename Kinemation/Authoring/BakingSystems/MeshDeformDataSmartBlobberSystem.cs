@@ -152,7 +152,8 @@ namespace Latios.Kinemation.Authoring.Systems
                         builder.blendShapeRanges.Add(in range);
                         verticesCount = math.max(verticesCount, range.endIndex + 1);
                     }
-                    var cpuBuffer                   = new NativeArray<BlendShapeVertexDisplacement>((int)verticesCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    var cpuBuffer =
+                        new NativeArray<BlendShapeVertexDisplacement>((int)verticesCount, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
                     blendShapeRequests[index]       = UnityEngine.Rendering.AsyncGPUReadback.RequestIntoNativeArray(ref cpuBuffer, gpuBuffer);
                     blendShapeRequestBuffers[index] = cpuBuffer;
                     m_graphicsBufferCache.Add(gpuBuffer);

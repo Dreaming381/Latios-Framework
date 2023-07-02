@@ -6,8 +6,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic
 Versioning](http://semver.org/spec/v2.0.0.html).
 
-You can find changelogs for the individual modules inside the Documentation\~
-directory.
+You can find changelogs for the individual modules in the [official Latios
+Framework Documentation
+repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
+
+## [0.7.5] – 2023-7-2
+
+Officially supports Entities [1.0.11]
+
+### Changed
+
+-   Updated Kinemation to v0.7.5
 
 ## [0.7.4] – 2023-6-18
 

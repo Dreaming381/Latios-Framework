@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.4]
+# Latios Framework for Unity ECS – [0.7.5]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -32,11 +32,12 @@ The Latios Framework is best-known in the community for Kinemation, a module
 which provides extremely high-performance CPU animation and GPU skinned mesh
 rendering features.
 
-This version targets Entities 1.0.10. If you are still using Entities 0.51.1,
+This version targets Entities 1.0.11. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
 
 **Note: This release is not compatible with Unity Transforms.** Compatibility
-may be added in the future via a community effort.
+will be added in 0.8 via an ongoing community effort. See the prerelease branch
+for more details.
 
 *[0.6.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*

@@ -246,7 +246,7 @@ namespace Latios.Kinemation.Systems
                 for (int i = 0; i < commands.Length; i++)
                 {
                     sums[i]  = s;
-                    s       += (uint)commands[i].blob.Value.blendShapesData.shapes.Length;
+                    s       += (uint)commands[i].blob.Value.blendShapesData.gpuData.Length;
                 }
             }
         }
@@ -320,9 +320,9 @@ namespace Latios.Kinemation.Systems
 
             public unsafe void Execute(int index)
             {
-                uint size         = (uint)commands[index].blob.Value.blendShapesData.shapes.Length;
-                mappedMeta[index] = new uint3(prefixSums[index], commands[index].verticesIndex, size);
-                var blobData      = commands[index].blob.Value.undeformedVertices.GetUnsafePtr();
+                uint size         = (uint)commands[index].blob.Value.blendShapesData.gpuData.Length;
+                mappedMeta[index] = new uint3(prefixSums[index], commands[index].blendShapesIndex, size);
+                var blobData      = commands[index].blob.Value.blendShapesData.gpuData.GetUnsafePtr();
                 var subArray      = mappedBlendShapes.GetSubArray((int)prefixSums[index], (int)size);
                 UnsafeUtility.MemCpy(subArray.GetUnsafePtr(), blobData, size * sizeof(BlendShapeVertexDisplacement));
             }

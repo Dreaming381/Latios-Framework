@@ -160,7 +160,7 @@ namespace Latios.Kinemation.Authoring
                 var weights = weightsBuffer.AsNativeArray().Reinterpret<float>();
                 for (int i = 0; i < sharedMesh.blendShapeCount; i++)
                 {
-                    weights[i] = authoring.GetBlendShapeWeight(i);
+                    weights[i] = authoring.GetBlendShapeWeight(i) / 100f;
                 }
             }
 

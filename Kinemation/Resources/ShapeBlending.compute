@@ -20,7 +20,7 @@ struct Vertex
 };
 
 uniform StructuredBuffer<Vertex>                _srcVertices;
-uniform StructuredBuffer<BlendShapeVertexDelta> _blendShapeDeltas;
+uniform StructuredBuffer<BlendShapeVertexDelta> _blendShapeDeltas2;
 
 // Stride of uint4
 uniform ByteAddressBuffer _metaBuffer;
@@ -66,7 +66,7 @@ void ShapeBlending (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 
         for (uint i = threadId; i < shapeDeltaCount; i += THREAD_GROUP_SIZE)
         {
-            BlendShapeVertexDelta delta = _blendShapeDeltas[firstShapeDeltaStart + i];
+            BlendShapeVertexDelta delta = _blendShapeDeltas2[firstShapeDeltaStart + i];
             const uint targetIndex = delta.index;
             
             Vertex vertex = _dstVertices[dstStart + targetIndex];
@@ -81,7 +81,7 @@ void ShapeBlending (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                 const uint runShapeDeltaStart = runShapeInfo.z;
                 const uint runShapeWeight = asfloat(runShapeInfo.w);
 
-                delta = _blendShapeDeltas[runShapeDeltaStart + i];
+                delta = _blendShapeDeltas2[runShapeDeltaStart + i];
                 vertex.position += runShapeWeight * delta.position;
                 vertex.normal += runShapeWeight * delta.normal;
                 vertex.tangent += runShapeWeight * delta.tangent;

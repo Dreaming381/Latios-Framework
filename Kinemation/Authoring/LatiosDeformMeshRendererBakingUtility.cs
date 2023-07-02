@@ -37,6 +37,35 @@ namespace Latios.Kinemation.Authoring
             public int      LodGroupIndex;
         }
 
+        public static bool CheckHasDeformMaterialProperty(Material material)
+        {
+            if (material.HasProperty(s_legacyLbsProperty))
+                return true;
+            if (material.HasProperty(s_legacyComputeDeformProperty))
+                return true;
+            if (material.HasProperty(s_legacyDotsDeformProperty))
+                return true;
+            if (material.HasProperty(s_currentVertexMatrixProperty))
+                return true;
+            if (material.HasProperty(s_previousVertexMatrixProperty))
+                return true;
+            if (material.HasProperty(s_twoAgoVertexMatrixProperty))
+                return true;
+            if (material.HasProperty(s_currentVertexDqsProperty))
+                return true;
+            if (material.HasProperty(s_previousVertexDqsProperty))
+                return true;
+            if (material.HasProperty(s_twoAgoVertexDqsProperty))
+                return true;
+            if (material.HasProperty(s_currentDeformProperty))
+                return true;
+            if (material.HasProperty(s_previousDeformProperty))
+                return true;
+            if (material.HasProperty(s_twoAgoDeformProperty))
+                return true;
+            return false;
+        }
+
         static void CreateLODState(IBaker baker, Renderer authoringSource, out LODState lodState)
         {
             // LODGroup

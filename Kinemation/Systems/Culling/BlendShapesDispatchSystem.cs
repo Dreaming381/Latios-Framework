@@ -31,14 +31,14 @@ namespace Latios.Kinemation
 
         protected override void OnCreate()
         {
-            m_query = Fluent.WithAll<DynamicMeshVertex>(true).WithAll<BlendShapeState>(true).WithAll<BoundMesh>(true)
+            m_query = Fluent.WithAll<BlendShapeWeight>(true).WithAll<BlendShapeState>(true).WithAll<BoundMesh>(true)
                       .WithAll<ChunkPerCameraCullingMask>(true, true).WithAll<ChunkPerFrameCullingMask>(true, true).Build();
 
             m_dispatchShader = Resources.Load<ComputeShader>("ShapeBlending");
 
-            _srcVertices                   = Shader.PropertyToID("_srcVertice");
+            _srcVertices                   = Shader.PropertyToID("_srcVertices");
             _dstVertices                   = Shader.PropertyToID("_dstVertices");
-            _blendShapeDeltas              = Shader.PropertyToID("_blendShapeDeltas");
+            _blendShapeDeltas              = Shader.PropertyToID("_blendShapeDeltas2");
             _startOffset                   = Shader.PropertyToID("_startOffset");
             _metaBuffer                    = Shader.PropertyToID("_metaBuffer");
             _latiosDeformBuffer            = Shader.PropertyToID("_latiosDeformBuffer");
@@ -58,7 +58,7 @@ namespace Latios.Kinemation
                 if (terminate)
                     break;
 
-                var streamCount       = new NativeArray<int>(1, WorldUpdateAllocator);
+                var streamCount       = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
                 streamCount[0]        = m_query.CalculateChunkCountWithoutFiltering();
                 var streamConstructJh = NativeStream.ScheduleConstruct(out var stream, streamCount, default, WorldUpdateAllocator);
                 var collectJh         = new GatherUploadOperationsJob
@@ -180,7 +180,7 @@ namespace Latios.Kinemation
             [ReadOnly] public ComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>      legacyDotsDeformShaderIndexHandle;
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
 
-            public NativeStream.Writer streamWriter;
+            [NativeDisableParallelForRestriction] public NativeStream.Writer streamWriter;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -243,8 +243,11 @@ namespace Latios.Kinemation
                     {
                         var  floatWeightsBuffer  = (float*)currentPtr;
                         uint nonzeroWeightsCount = 0;
-                        for (int j = 0; j < weightsCount; j++)
-                            nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        if (floatWeightsBuffer != null)
+                        {
+                            for (int j = 0; j < weightsCount; j++)
+                                nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        }
 
                         uint gpuTarget = 0;
                         if ((classification & DeformClassification.CurrentDeform) != DeformClassification.None)
@@ -266,8 +269,11 @@ namespace Latios.Kinemation
                     {
                         var  floatWeightsBuffer  = (float*)previousPtr;
                         uint nonzeroWeightsCount = 0;
-                        for (int j = 0; j < weightsCount; j++)
-                            nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        if (floatWeightsBuffer != null)
+                        {
+                            for (int j = 0; j < weightsCount; j++)
+                                nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        }
 
                         uint gpuTarget = 0;
                         if ((classification & DeformClassification.PreviousDeform) != DeformClassification.None)
@@ -287,8 +293,11 @@ namespace Latios.Kinemation
                     {
                         var  floatWeightsBuffer  = (float*)twoAgoPtr;
                         uint nonzeroWeightsCount = 0;
-                        for (int j = 0; j < weightsCount; j++)
-                            nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        if (floatWeightsBuffer != null)
+                        {
+                            for (int j = 0; j < weightsCount; j++)
+                                nonzeroWeightsCount += math.select(0u, 1u, floatWeightsBuffer[j] != 0f);
+                        }
 
                         streamWriter.Write(new UploadPayload
                         {
@@ -346,7 +355,7 @@ namespace Latios.Kinemation
             {
                 var payload           = payloads[index];
                 metaBuffer[2 * index] = new uint4(payload.nonzeroWeightsCount,
-                                                  payload.weightsBufferStart + (uint)payloads.Length,
+                                                  payload.weightsBufferStart + (uint)payloads.Length * 2,
                                                   0,
                                                   payload.persistentBufferStart);
                 var entry                 = meshGpuEntries[payload.meshEntryIndex];
@@ -355,25 +364,28 @@ namespace Latios.Kinemation
                                                       entry.verticesCount,
                                                       0u);
                 var weightsBuffer =
-                    (uint4*)metaBuffer.GetSubArray((int)payload.weightsBufferStart + payloads.Length, (int)payload.nonzeroWeightsCount).GetUnsafePtr();
+                    (uint4*)metaBuffer.GetSubArray((int)payload.weightsBufferStart + payloads.Length * 2, (int)payload.nonzeroWeightsCount).GetUnsafePtr();
                 ref var blobShapes             = ref entry.blob.Value.blendShapesData;
                 var     weightsPtr             = (float*)payload.weightsPtr;
                 var     nextNonzeroWeightIndex = 0;
-                for (int i = 0; i < blobShapes.shapes.Length; i++)
+                if (weightsPtr != null)
                 {
-                    if (weightsPtr[i] == 0f)
-                        continue;
+                    for (int i = 0; i < blobShapes.shapes.Length; i++)
+                    {
+                        if (weightsPtr[i] == 0f)
+                            continue;
 
-                    weightsBuffer[nextNonzeroWeightIndex] = new uint4(blobShapes.shapes[i].permutationID,
-                                                                      blobShapes.shapes[i].count,
-                                                                      blobShapes.shapes[i].start + entry.blendShapesStart,
-                                                                      math.asuint(weightsPtr[i]));
-                    nextNonzeroWeightIndex++;
+                        weightsBuffer[nextNonzeroWeightIndex] = new uint4(blobShapes.shapes[i].permutationID,
+                                                                          blobShapes.shapes[i].count,
+                                                                          blobShapes.shapes[i].start + entry.blendShapesStart,
+                                                                          math.asuint(weightsPtr[i]));
+                        nextNonzeroWeightIndex++;
+                    }
                 }
 
                 for (int i = 0; i < (int)payload.nonzeroWeightsCount; i++)
                 {
-                    uint runCount = 0;
+                    uint runCount = 1;
                     for (int j = i + 1; j < (int)payload.nonzeroWeightsCount; j++)
                     {
                         if (weightsBuffer[i].x != weightsBuffer[j].x)

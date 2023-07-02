@@ -109,6 +109,15 @@ namespace Latios.Kinemation.Authoring
             // Takes a dependency on the mesh
             baker.DependsOn(mesh);
 
+            foreach (var material in sharedMaterials)
+            {
+                if (LatiosDeformMeshRendererBakingUtility.CheckHasDeformMaterialProperty(material))
+                {
+                    Debug.LogWarning(
+                        $"Material {material.name} used on mesh {mesh.name} baked with reference Renderer {authoring.gameObject.name} is a deform material but is not being baked as such. This will result in incorrect rendering.");
+                }
+            }
+
             // RenderMeshDescription accesses the GameObject layer.
             // Declaring the dependency on the GameObject with GetLayer, so the baker rebakes if the layer changes
             baker.GetLayer(authoring);
