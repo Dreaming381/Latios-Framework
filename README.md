@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.0-alpha.2]
+# Latios Framework for Unity ECS – [0.8.0-alpha.3]
 
 **This is a prerelease version of the Latios Framework version 0.8 which is
 still under development. Changelogs and Documentation, including the remainder
@@ -10,7 +10,7 @@ of this README, have not been updated to reflect the new features and changes in
 **You are still welcome to submit bug reports and PRs for this and future
 prerelease versions!**
 
-**This version of the alpha uses Unity 2022.3.0 with Entities 1.0.10.**
+**This version of the alpha uses Unity 2022.3.0 with Entities 1.0.11.**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your

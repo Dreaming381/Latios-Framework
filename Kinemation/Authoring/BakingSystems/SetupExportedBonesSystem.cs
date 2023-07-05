@@ -16,13 +16,13 @@ namespace Latios.Kinemation.Authoring.Systems
     [BurstCompile]
     public partial struct SetupExportedBonesSystem : ISystem
     {
-        LocalTransformReadWriteAspect.Lookup m_localTransformLookup;
-        ParentReadOnlyAspect.Lookup          m_parentROLookup;
+        LocalTransformQvvsReadWriteAspect.Lookup m_localTransformLookup;
+        ParentReadOnlyAspect.Lookup              m_parentROLookup;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_localTransformLookup = new LocalTransformReadWriteAspect.Lookup(ref state);
+            m_localTransformLookup = new LocalTransformQvvsReadWriteAspect.Lookup(ref state);
             m_parentROLookup       = new ParentReadOnlyAspect.Lookup(ref state);
         }
 
@@ -81,7 +81,7 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         partial struct ApplySkeletonsToBonesJob : IJobEntity
         {
-            [NativeDisableParallelForRestriction] public LocalTransformReadWriteAspect.Lookup         localTransformLookup;
+            [NativeDisableParallelForRestriction] public LocalTransformQvvsReadWriteAspect.Lookup     localTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<CopyLocalToParentFromBone>   copyLocalToParentFromBoneLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<BoneOwningSkeletonReference> skeletonReferenceLookup;
             [ReadOnly] public ParentReadOnlyAspect.Lookup                                             parentLookup;
@@ -105,9 +105,8 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 foreach (var bone in bones)
                 {
-                    var root                            = ComputeRootTransformOfBone(bone.boneIndex, in boneTransforms);
                     var localTransformAspect            = localTransformLookup[bone.boneEntity];
-                    localTransformAspect.localTransform = new TransformQvs(root.position, root.rotation, root.scale);
+                    localTransformAspect.localTransform = ComputeRootTransformOfBone(bone.boneIndex, in boneTransforms);
                     if (copyLocalToParentFromBoneLookup.HasComponent(bone.boneEntity))
                     {
                         skeletonReferenceLookup[bone.boneEntity]         = new BoneOwningSkeletonReference { skeletonRoot = entity };

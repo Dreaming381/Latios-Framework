@@ -54,6 +54,15 @@ namespace Latios.Kinemation
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<RotateAnimatedBuffersSystem>(),                      world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateMatrixPreviousSystem>(),                       world);
         }
+
+        /// <summary>
+        /// Installs the Kinemation Mecanim state machine runtime systems. This should only be installed in the runtime world.
+        /// </summary>
+        /// <param name="world"></param>
+        public static void InstallMecanimFeatures(World world)
+        {
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationAnimatorStateMachineSuperSystem>(), world);
+        }
     }
 }
 

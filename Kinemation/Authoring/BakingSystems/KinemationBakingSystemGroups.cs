@@ -73,6 +73,7 @@ namespace Latios.Kinemation.Authoring.Systems
             // Todo: How do we set LTWs correctly for exported bones in Unity Transforms?
 #endif
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<MecanimAnimatorControllerSmartBlobberSystem>();  // sync
         }
     }
 

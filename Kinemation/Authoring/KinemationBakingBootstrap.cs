@@ -29,11 +29,21 @@ namespace Latios.Kinemation.Authoring
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberResolverBakingGroup>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddMasksBakingSystem>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddPostProcessMatrixSystem>());
+
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosFrozenStaticRendererSystem>());
             context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.FrozenStaticRendererSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosLODRequirementsUpdateSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosAddWorldAndChunkRenderBoundsSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosRenderBoundsUpdateSystem>());
+        }
+
+        /// <summary>
+        /// Adds Mecanim bakers and baking systems into baking world
+        /// </summary>
+        public static void InstallMecanimBakersAndSystems(ref CustomBakingBootstrapContext context)
+        {
+            context.filteredBakerTypes.Add(typeof(MecanimSmartBaker));
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<MecanimAnimatorControllerSmartBlobberSystem>());
         }
     }
 }

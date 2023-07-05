@@ -223,6 +223,38 @@ namespace Latios.Unsafe
             }
         }
 
+        /// <summary>
+        /// Copies all the elements from the blocklists into the contiguous memory region beginning at ptr.
+        /// </summary>
+        /// <param name="dstPtr">The first address of a contiguous memory region large enough to store all values in the blocklists</param>
+        [Unity.Burst.CompilerServices.IgnoreWarning(1371)]
+        public void CopyElementsRaw(void* dstPtr)
+        {
+            byte* dst = (byte*)dstPtr;
+
+            for (int threadBlockId = 0; threadBlockId < JobsUtility.MaxJobThreadCount; threadBlockId++)
+            {
+                var blockList = m_perThreadBlockLists + threadBlockId;
+                if (blockList->elementCount > 0)
+                {
+                    int src = 0;
+                    CheckBlockCountMatchesCount(blockList->elementCount, blockList->blocks.Length);
+                    for (int blockId = 0; blockId < blockList->blocks.Length - 1; blockId++)
+                    {
+                        var address = blockList->blocks[blockId].ptr;
+                        UnsafeUtility.MemCpy(dst, address, m_blockSize);
+                        dst += m_blockSize;
+                        src += m_elementsPerBlock;
+                    }
+                    {
+                        var address = blockList->blocks[blockList->blocks.Length - 1].ptr;
+                        if (src < blockList->elementCount)
+                            UnsafeUtility.MemCpy(dst, address, (blockList->elementCount - src) * m_elementSize);
+                    }
+                }
+            }
+        }
+
         //This catches race conditions if I accidentally pass in 0 for thread index in the parallel writer because copy and paste.
         [BurstDiscard]
         void CheckBlockCountMatchesCount(int count, int blockCount)

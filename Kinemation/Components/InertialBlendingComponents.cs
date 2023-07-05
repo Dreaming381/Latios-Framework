@@ -20,15 +20,6 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// The inertial blending state of an exposed bone.
-    /// Usage: Prefer to use ExposedBoneAspect instead of this component directly.
-    /// </summary>
-    public struct ExposedBoneInertialBlendState : IComponentData
-    {
-        public InertialBlendingTransformState inertialBlendState;
-    }
-
-    /// <summary>
     /// A structure used for performing inertial blending.
     /// You can reuse an instance for multiple inertial blending operations
     /// if they all have the same blendProgressTime.

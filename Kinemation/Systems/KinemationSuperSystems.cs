@@ -1,8 +1,35 @@
+using Latios.Transforms.Systems;
 using Unity.Entities;
 using Unity.Rendering;
+#if LATIOS_TRANSFORMS_UNCACHED_QVVS || LATIOS_TRANSFORMS_UNITY
+using Unity.Transforms;
+#endif
 
 namespace Latios.Kinemation.Systems
 {
+    /// <summary>
+    /// This super system contains systems that manage the animator state machine and
+    /// resulting layered bone transformations.
+    /// </summary>
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+    [UpdateBefore(typeof(TransformSuperSystem))]
+#else
+    [UpdateBefore(typeof(TransformSystemGroup))]
+#endif
+    [DisableAutoCreation]
+    public partial class KinemationAnimatorStateMachineSuperSystem : SuperSystem
+    {
+        protected override void CreateSystems()
+        {
+            EnableSystemSorting = false;
+
+            GetOrCreateAndAddUnmanagedSystem<MecanimStateMachineUpdateSystem>();
+            GetOrCreateAndAddUnmanagedSystem<ApplyMecanimLayersToExposedBonesSystem>();
+            GetOrCreateAndAddUnmanagedSystem<ApplyMecanimLayersToOptimizedSkeletonsSystem>();
+        }
+    }
+
     /// <summary>
     /// Subclass this class and add it to the world prior to installing Kinemation
     /// to customize the culling loop.

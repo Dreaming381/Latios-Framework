@@ -24,6 +24,7 @@ namespace Latios.Kinemation
     /// </summary>
     public struct RenderVisibilityFeedbackFlag : IComponentData, IEnableableComponent { }
 
+    /// <summary>
     /// QVVS Transforms: An optional matrix that is applied after computing the final WorldTransform.
     /// It can be used for additional squash, stretch, and shear effects on a renderer.
     ///

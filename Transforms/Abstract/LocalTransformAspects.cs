@@ -2,7 +2,7 @@ using Unity.Entities;
 
 namespace Latios.Transforms.Abstract
 {
-    public readonly partial struct LocalTransformReadOnlyAspect : IAspect
+    public readonly partial struct LocalTransformQvsReadOnlyAspect : IAspect
     {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         readonly RefRO<Latios.Transforms.LocalTransform> m_localTransform;
@@ -19,28 +19,24 @@ namespace Latios.Transforms.Abstract
 #endif
     }
 
-    public readonly partial struct LocalTransformReadWriteAspect : IAspect
+    public readonly partial struct LocalTransformQvvsReadWriteAspect : IAspect
     {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-        readonly RefRW<Latios.Transforms.LocalTransform> m_localTransform;
+        readonly TransformAspect m_transform;
 
-        public TransformQvs localTransform
+        public TransformQvvs localTransform
         {
-            get => m_localTransform.ValueRO.localTransform;
-            set => m_localTransform.ValueRW.localTransform = value;
+            get => m_transform.localTransformQvvs;
+            set => m_transform.localTransformQvvs = value;
         }
-
-        public ComponentType componentType => ComponentType.ReadWrite<Latios.Transforms.LocalTransform>();
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
         readonly RefRW<Unity.Transforms.LocalTransform> m_localTransform;
 
-        public TransformQvs localTransform
+        public TransformQvvs localTransform
         {
-            get => new TransformQvs(m_localTransform.ValueRO.Position, m_localTransform.ValueRO.Rotation, m_localTransform.ValueRO.Scale);
+            get => new TransformQvvs(m_localTransform.ValueRO.Position, m_localTransform.ValueRO.Rotation, m_localTransform.ValueRO.Scale, 1f);
             set => m_localTransform.ValueRW = new Unity.Transforms.LocalTransform { Position = value.position, Rotation = value.rotation, Scale = value.scale };
         }
-
-        public ComponentType componentType => ComponentType.ReadWrite<Unity.Transforms.LocalTransform>();
 #endif
     }
 }

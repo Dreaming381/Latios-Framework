@@ -1,0 +1,23 @@
+{
+    "name": "Latios.LifeFX",
+    "rootNamespace": "Latios.LifeFX",
+    "references": [
+        "Latios.Core",
+        "Unity.Collections",
+        "Unity.Jobs",
+        "Unity.Mathematics",
+        "Unity.Burst",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.VisualEffectGraph.Runtime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

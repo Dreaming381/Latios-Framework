@@ -74,6 +74,28 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public bool copyFirstKeyAtEnd;
 
+        public enum RootMotionOverrideMode
+        {
+            /// <summary>
+            /// Use whatever settings the animator is configured with
+            /// </summary>
+            UseAnimatorSettings = 0,
+            /// <summary>
+            /// Force exclusion of root motion for the source clip
+            /// </summary>
+            DisableRootMotion = 1,
+            /// <summary>
+            /// Force usage of root motion for the source clip
+            /// </summary>
+            EnableRootMotion = 2
+        }
+
+        /// <summary>
+        /// Allows changing the root motion mode when sampling the source clip.
+        /// This affects which bone inherits root motion data and in what form.
+        /// </summary>
+        public RootMotionOverrideMode rootMotionOverrideMode;
+
         /// <summary>
         /// Default animation clip compression settings. These provide relative fast compression,
         /// decently small clip sizes, and typically acceptable accuracy.
@@ -87,6 +109,17 @@ namespace Latios.Kinemation.Authoring
             maxUniformScaleError         = 0.00001f,
             copyFirstKeyAtEnd            = false
         };
+
+        /// <summary>
+        /// Overrides the root motion mode for these settings. You would typically call this per clip on kDefaultSettings or some other universal settings instance.
+        /// </summary>
+        /// <param name="useRootMotion">If true, root motion will be enabled when sampling the source clip. Otherwise it will be disabled.</param>
+        /// <returns>A new settings instance with the override applied</returns>
+        public SkeletonClipCompressionSettings WithRootMotionOverride(bool useRootMotion)
+        {
+            rootMotionOverrideMode = useRootMotion ? RootMotionOverrideMode.EnableRootMotion : RootMotionOverrideMode.DisableRootMotion;
+            return this;
+        }
     }
 
     public static class SkeletonClipSetBlobberAPIExtensions
@@ -224,24 +257,24 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_transformsCache == null)
                 m_transformsCache = new List<Transform>();
 
-            Entities.ForEach((ref DynamicBuffer<SkeletonClipSetBoneParentIndex> parentIndices,
-                              ref DynamicBuffer<SampledBoneTransform> sampledBoneTransforms,
-                              ref DynamicBuffer<SkeletonClipToBake> clipsToBake,
-                              in ShadowHierarchyReference shadowRef) =>
+            foreach ((var parentIndices, var sampledBoneTransforms, var clipsToBake, var shadowRef) in
+                     SystemAPI.Query<DynamicBuffer<SkeletonClipSetBoneParentIndex>, DynamicBuffer<SampledBoneTransform>, DynamicBuffer<SkeletonClipToBake>,
+                                     RefRO<ShadowHierarchyReference> >()
+                     .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities))
             {
-                var shadow = shadowRef.shadowHierarchyRoot.Value;
-                var taa    = FetchParentsAndTransformAccessArray(ref parentIndices, shadow);
+                var shadow = shadowRef.ValueRO.shadowHierarchyRoot.Value;
+                var taa    = FetchParentsAndTransformAccessArray(parentIndices, shadow);
 
                 for (int i = 0; i < clipsToBake.Length; i++)
                 {
                     ref var clip            = ref clipsToBake.ElementAt(i);
-                    var     startAndCount   = SampleClip(ref sampledBoneTransforms, taa, clip.clip, clip.settings.copyFirstKeyAtEnd);
+                    var     startAndCount   = SampleClip(sampledBoneTransforms, taa, clip.clip, clip.settings.copyFirstKeyAtEnd, clip.settings.rootMotionOverrideMode);
                     clip.boneTransformStart = startAndCount.x;
                     clip.boneTransformCount = startAndCount.y;
                 }
 
                 taa.Dispose();
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).WithoutBurst().Run();
+            }
 
             m_breadthQueue.Clear();
             m_transformsCache.Clear();
@@ -250,7 +283,7 @@ namespace Latios.Kinemation.Authoring.Systems
         }
 
         // Unlike in 0.5, this version assumes the breadth-first layout skeleton that the shadow hierarchy builds matches the runtime skeleton layout.
-        TransformAccessArray FetchParentsAndTransformAccessArray(ref DynamicBuffer<SkeletonClipSetBoneParentIndex> parentIndices, GameObject shadow)
+        TransformAccessArray FetchParentsAndTransformAccessArray(DynamicBuffer<SkeletonClipSetBoneParentIndex> parentIndices, GameObject shadow)
         {
             m_breadthQueue.Clear();
             m_transformsCache.Clear();
@@ -277,7 +310,11 @@ namespace Latios.Kinemation.Authoring.Systems
             return taa;
         }
 
-        int2 SampleClip(ref DynamicBuffer<SampledBoneTransform> appendNewSamplesToThis, TransformAccessArray shadowHierarchy, AnimationClip clip, bool copyFirstPose)
+        int2 SampleClip(DynamicBuffer<SampledBoneTransform>                    appendNewSamplesToThis,
+                        TransformAccessArray shadowHierarchy,
+                        AnimationClip clip,
+                        bool copyFirstPose,
+                        SkeletonClipCompressionSettings.RootMotionOverrideMode rootMotionMode)
         {
             int requiredSamples    = Mathf.CeilToInt(clip.frameRate * clip.length) + (copyFirstPose ? 1 : 0);
             int requiredTransforms = requiredSamples * shadowHierarchy.length;
@@ -286,11 +323,20 @@ namespace Latios.Kinemation.Authoring.Systems
 
             var boneTransforms = appendNewSamplesToThis.Reinterpret<TransformQvvs>().AsNativeArray().GetSubArray(startIndex, requiredTransforms);
 
-            var oldWrapMode = clip.wrapMode;
-            clip.wrapMode   = WrapMode.Clamp;
-            var   root      = shadowHierarchy[0].gameObject;
-            float timestep  = math.rcp(clip.frameRate);
-            var   job       = new CaptureBoneSamplesJob
+            var oldWrapMode                   = clip.wrapMode;
+            clip.wrapMode                     = WrapMode.Clamp;
+            var      root                     = shadowHierarchy[0].gameObject;
+            Animator animator                 = null;
+            bool     backupRootMotionSettings = false;
+            if (rootMotionMode != SkeletonClipCompressionSettings.RootMotionOverrideMode.UseAnimatorSettings)
+            {
+                animator                 = root.GetComponent<Animator>();
+                backupRootMotionSettings = animator.applyRootMotion;
+                animator.applyRootMotion = rootMotionMode == SkeletonClipCompressionSettings.RootMotionOverrideMode.EnableRootMotion;
+            }
+
+            float timestep = math.rcp(clip.frameRate);
+            var   job      = new CaptureBoneSamplesJob
             {
                 boneTransforms = boneTransforms,
                 samplesPerBone = requiredSamples,
@@ -314,7 +360,9 @@ namespace Latios.Kinemation.Authoring.Systems
                 job.RunReadOnly(shadowHierarchy);
             }
 
-            clip.wrapMode = oldWrapMode;
+            if (animator != null)
+                animator.applyRootMotion = backupRootMotionSettings;
+            clip.wrapMode                = oldWrapMode;
 
             return new int2(startIndex, requiredTransforms);
         }
