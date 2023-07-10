@@ -268,6 +268,8 @@ namespace Latios.Systems
             m_destroyIndex            = 0;
             m_instantiateNoDataIndex  = 0;
             m_instantiateUntypedIndex = 0;
+
+            m_commandBufferAllocator.Allocator.Rewind();
         }
 
         #endregion

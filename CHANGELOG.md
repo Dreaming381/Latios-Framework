@@ -10,6 +10,14 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.7.6] – 2023-7-9
+
+Officially supports Entities [1.0.11]
+
+### Changed
+
+-   Updated Core to v0.7.6
+
 ## [0.7.5] – 2023-7-2
 
 Officially supports Entities [1.0.11]
