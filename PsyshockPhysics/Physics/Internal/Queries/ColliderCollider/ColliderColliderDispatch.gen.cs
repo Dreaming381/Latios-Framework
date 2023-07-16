@@ -52,6 +52,15 @@ namespace Latios.Psyshock
                     (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
                     return r;
                 }
+                case (ColliderType.Sphere, ColliderType.TriMesh):
+                {
+                    var r = SphereTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
                 case (ColliderType.Sphere, ColliderType.Compound):
                 {
                     var r = SphereCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
@@ -92,6 +101,15 @@ namespace Latios.Psyshock
                     (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
                     return r;
                 }
+                case (ColliderType.Capsule, ColliderType.TriMesh):
+                {
+                    var r = CapsuleTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
                 case (ColliderType.Capsule, ColliderType.Compound):
                 {
                     var r = CapsuleCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
@@ -125,6 +143,15 @@ namespace Latios.Psyshock
                     (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
                     return r;
                 }
+                case (ColliderType.Box, ColliderType.TriMesh):
+                {
+                    var r = BoxTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
                 case (ColliderType.Box, ColliderType.Compound):
                 {
                     var r = BoxCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
@@ -151,6 +178,15 @@ namespace Latios.Psyshock
                     (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
                     return r;
                 }
+                case (ColliderType.Triangle, ColliderType.TriMesh):
+                {
+                    var r = TriangleTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
                 case (ColliderType.Triangle, ColliderType.Compound):
                 {
                     var r = TriangleCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
@@ -170,9 +206,39 @@ namespace Latios.Psyshock
                     return TriangleConvex.DistanceBetween(in colliderA.m_convex, in aTransform, in colliderB.m_triangle, in bTransform, maxDistance, out result);
                 case (ColliderType.Convex, ColliderType.Convex):
                     return ConvexConvex.DistanceBetween(in colliderA.m_convex, in aTransform, in colliderB.m_convex, in bTransform, maxDistance, out result);
+                case (ColliderType.Convex, ColliderType.TriMesh):
+                {
+                    var r = ConvexTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_convex, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
                 case (ColliderType.Convex, ColliderType.Compound):
                 {
                     var r = ConvexCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_convex, in aTransform, maxDistance, out result);
+
+                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
+                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
+                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    return r;
+                }
+                case (ColliderType.TriMesh, ColliderType.Sphere):
+                    return SphereTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.Capsule):
+                    return CapsuleTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.Box):
+                    return BoxTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_box, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.Triangle):
+                    return TriangleTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_triangle, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.Convex):
+                    return ConvexTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_convex, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.TriMesh):
+                    return TriMeshTriMesh.DistanceBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_triMesh, in bTransform, maxDistance, out result);
+                case (ColliderType.TriMesh, ColliderType.Compound):
+                {
+                    var r = TriMeshCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triMesh, in aTransform, maxDistance, out result);
 
                     (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
                     (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
@@ -189,6 +255,8 @@ namespace Latios.Psyshock
                     return TriangleCompound.DistanceBetween(in colliderA.m_compound, in aTransform, in colliderB.m_triangle, in bTransform, maxDistance, out result);
                 case (ColliderType.Compound, ColliderType.Convex):
                     return ConvexCompound.DistanceBetween(in colliderA.m_compound, in aTransform, in colliderB.m_convex, in bTransform, maxDistance, out result);
+                case (ColliderType.Compound, ColliderType.TriMesh):
+                    return TriMeshCompound.DistanceBetween(in colliderA.m_compound, in aTransform, in colliderB.m_triMesh, in bTransform, maxDistance, out result);
                 case (ColliderType.Compound, ColliderType.Compound):
                     return CompoundCompound.DistanceBetween(in colliderA.m_compound, in aTransform, in colliderB.m_compound, in bTransform, maxDistance, out result);
                 default:
@@ -216,6 +284,8 @@ namespace Latios.Psyshock
                     return SphereTriangle.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Sphere, ColliderType.Convex):
                     return SphereConvex.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Sphere, ColliderType.TriMesh):
+                    return SphereTriMesh.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Sphere, ColliderType.Compound):
                     return SphereCompound.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Sphere):
@@ -228,6 +298,8 @@ namespace Latios.Psyshock
                     return CapsuleTriangle.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Convex):
                     return CapsuleConvex.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Capsule, ColliderType.TriMesh):
+                    return CapsuleTriMesh.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Compound):
                     return CapsuleCompound.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Sphere):
@@ -240,6 +312,8 @@ namespace Latios.Psyshock
                     return BoxTriangle.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Convex):
                     return BoxConvex.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Box, ColliderType.TriMesh):
+                    return BoxTriMesh.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Compound):
                     return BoxCompound.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Sphere):
@@ -252,6 +326,8 @@ namespace Latios.Psyshock
                     return TriangleTriangle.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Convex):
                     return TriangleConvex.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Triangle, ColliderType.TriMesh):
+                    return TriangleTriMesh.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Compound):
                     return TriangleCompound.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Sphere):
@@ -264,8 +340,24 @@ namespace Latios.Psyshock
                     return TriangleConvex.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Convex):
                     return ConvexConvex.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Convex, ColliderType.TriMesh):
+                    return ConvexTriMesh.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Compound):
                     return ConvexCompound.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Sphere):
+                    return SphereTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Capsule):
+                    return CapsuleTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_capsule, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Box):
+                    return BoxTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_box, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Triangle):
+                    return TriangleTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Convex):
+                    return ConvexTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.TriMesh):
+                    return TriMeshTriMesh.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Compound):
+                    return TriMeshCompound.ColliderCast(in colliderToCast.m_triMesh, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Sphere):
                     return SphereCompound.ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Capsule):
@@ -276,6 +368,8 @@ namespace Latios.Psyshock
                     return TriangleCompound.ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Convex):
                     return ConvexCompound.ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Compound, ColliderType.TriMesh):
+                    return TriMeshCompound.ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in target.m_triMesh, in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Compound):
                     return CompoundCompound.ColliderCast(in colliderToCast.m_compound, in castStart, castEnd, in target.m_compound, in targetTransform, out result);
                 default:

@@ -36,6 +36,9 @@ namespace Latios.Psyshock
                 case ColliderType.Convex:
                     ScaleStretchCollider(ref collider.m_convex,   scale, stretch);
                     break;
+                case ColliderType.TriMesh:
+                    ScaleStretchCollider(ref collider.m_triMesh,  scale, stretch);
+                    break;
                 case ColliderType.Compound:
                     ScaleStretchCollider(ref collider.m_compound, scale, stretch);
                     break;
@@ -142,6 +145,17 @@ namespace Latios.Psyshock
         {
             ScaleStretchCollider(ref convex, scale, stretch);
             return convex;
+        }
+
+        internal static void ScaleStretchCollider(ref TriMeshCollider triMesh, float scale, float3 stretch)
+        {
+            triMesh.scale *= stretch * scale;
+        }
+
+        internal static TriMeshCollider ScaleStretchCollider(TriMeshCollider triMesh, float scale, float3 stretch)
+        {
+            ScaleStretchCollider(ref triMesh, scale, stretch);
+            return triMesh;
         }
 
         internal static void ScaleStretchCollider(ref CompoundCollider compound, float scale, float3 stretch)

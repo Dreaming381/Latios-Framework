@@ -1,0 +1,23 @@
+{
+    "name": "Latios.Calligraphics",
+    "rootNamespace": "Latios.Calligraphics",
+    "references": [
+        "Latios.Core",
+        "Latios.Kinemation",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.Burst",
+        "Unity.Entities.Graphics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

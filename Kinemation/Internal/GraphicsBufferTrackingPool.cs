@@ -18,6 +18,7 @@ namespace Latios.Kinemation
         PersistentPool m_meshBindPosesPool;
         PersistentPool m_meshBlendShapesPool;
         PersistentPool m_boneOffsetsPool;
+        PersistentPool m_glyphsPool;
 
         PerFramePool m_meshVerticesUploadPool;
         PerFramePool m_meshWeightsUploadPool;
@@ -25,6 +26,7 @@ namespace Latios.Kinemation
         PerFramePool m_meshBlendShapesUploadPool;
         PerFramePool m_boneOffsetsUploadPool;
         PerFramePool m_bonesPool;
+        PerFramePool m_glyphsUploadPool;
         PerFramePool m_dispatchMetaPool;  // uint4
         PerFramePool m_uploadMetaPool;  // uint3
 
@@ -43,6 +45,7 @@ namespace Latios.Kinemation
         const uint kMinMeshBlendShapesUploadSize = 1024;
         const uint kMinBoneOffsetsUploadSize     = 128;
         const uint kMinBonesSize                 = 128 * 128;
+        const uint kMinGlyphsUploadSize          = 128;
         const uint kMinDispatchMetaSize          = 128;
         const uint kMinUploadMetaSize            = 128;
 
@@ -66,6 +69,7 @@ namespace Latios.Kinemation
             m_meshBindPosesPool   = new PersistentPool(1024, 3 * 4 * 4, GraphicsBuffer.Target.Structured, m_copyTransformUnionsShader, m_destructionQueue);
             m_meshBlendShapesPool = new PersistentPool(16 * 1024, 10 * 4, GraphicsBuffer.Target.Structured, m_copyBlendShapesShader, m_destructionQueue);
             m_boneOffsetsPool     = new PersistentPool(512, 4, GraphicsBuffer.Target.Raw, m_copyByteAddressShader, m_destructionQueue);
+            m_glyphsPool          = new PersistentPool(128, 4, GraphicsBuffer.Target.Raw, m_copyByteAddressShader, m_destructionQueue);
 
             m_meshVerticesUploadPool    = new PerFramePool(3 * 3 * 4, GraphicsBuffer.Target.Structured);
             m_meshWeightsUploadPool     = new PerFramePool(4, GraphicsBuffer.Target.Raw);
@@ -73,6 +77,7 @@ namespace Latios.Kinemation
             m_meshBlendShapesUploadPool = new PerFramePool(10 * 4, GraphicsBuffer.Target.Structured);
             m_boneOffsetsUploadPool     = new PerFramePool(4, GraphicsBuffer.Target.Raw);
             m_bonesPool                 = new PerFramePool(3 * 4 * 4, GraphicsBuffer.Target.Structured);
+            m_glyphsUploadPool          = new PerFramePool(4, GraphicsBuffer.Target.Raw);
             m_dispatchMetaPool          = new PerFramePool(4, GraphicsBuffer.Target.Raw);
             m_uploadMetaPool            = new PerFramePool(4, GraphicsBuffer.Target.Raw);
 
@@ -88,6 +93,7 @@ namespace Latios.Kinemation
             m_meshBlendShapesUploadPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
             m_boneOffsetsUploadPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
             m_bonesPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
+            m_glyphsUploadPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
             m_dispatchMetaPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
             m_uploadMetaPool.CollectFinishedBuffers(m_fencePool.RecoveredFrameId);
 
@@ -112,6 +118,7 @@ namespace Latios.Kinemation
             m_meshWeightsPool.Dispose();
             m_meshBlendShapesPool.Dispose();
             m_meshBindPosesPool.Dispose();
+            m_glyphsPool.Dispose();
             m_meshVerticesUploadPool.Dispose();
             m_meshWeightsUploadPool.Dispose();
             m_meshBindPosesUploadPool.Dispose();
@@ -169,6 +176,11 @@ namespace Latios.Kinemation
 
         public GraphicsBuffer GetBoneOffsetsBufferRO() => m_boneOffsetsPool.GetBuffer(0, m_fencePool.CurrentFrameId);
 
+        public GraphicsBuffer GetGlyphsBuffer(uint requiredSize)
+        {
+            return m_glyphsPool.GetBuffer(requiredSize * 24, m_fencePool.CurrentFrameId);
+        }
+
         public GraphicsBuffer GetMeshVerticesUploadBuffer(uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinMeshVerticesUploadSize);
@@ -203,6 +215,12 @@ namespace Latios.Kinemation
         {
             requiredSize = math.max(requiredSize, kMinBonesSize);
             return m_bonesPool.GetBuffer(requiredSize, m_fencePool.CurrentFrameId);
+        }
+
+        public GraphicsBuffer GetGlyphsUploadBuffer(uint requiredSize)
+        {
+            requiredSize = math.max(requiredSize, kMinGlyphsUploadSize);
+            return m_glyphsUploadPool.GetBuffer(requiredSize * 24, m_fencePool.CurrentFrameId);
         }
 
         public GraphicsBuffer GetDispatchMetaBuffer(uint requiredSize)

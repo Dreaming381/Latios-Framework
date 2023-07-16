@@ -12,7 +12,19 @@ string[] colliderTypeNames =
 	"Box",
 	"Triangle",
 	"Convex",
+	"TriMesh",
 	"Compound"
+};
+
+Dictionary<string, string> colliderLowerNames = new Dictionary<string, string>()
+{
+	{"Sphere"   , "sphere" },
+	{"Capsule"  , "capsule" },
+	{"Box"      , "box" },
+	{"Triangle" , "triangle" },
+	{"Convex"   , "convex" },
+	{"TriMesh"  , "triMesh" },
+	{"Compound" , "compound" }
 };
 #>
 using Unity.Burst;
@@ -35,11 +47,11 @@ namespace Latios.Psyshock
 int i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderTypeNameA.ToLower();
+	var colliderNameA = colliderLowerNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderTypeNameB.ToLower();
+		var colliderNameB = colliderLowerNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
@@ -86,11 +98,11 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderTypeNameA.ToLower();
+	var colliderNameA = colliderLowerNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderTypeNameB.ToLower();
+		var colliderNameB = colliderLowerNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#

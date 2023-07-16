@@ -1,6 +1,7 @@
 using Latios.Transforms.Systems;
 using Unity.Entities;
 using Unity.Rendering;
+using Latios.Kinemation.TextBackend.Systems;
 #if LATIOS_TRANSFORMS_UNCACHED_QVVS || LATIOS_TRANSFORMS_UNITY
 using Unity.Transforms;
 #endif
@@ -73,6 +74,7 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
+            GetOrCreateAndAddManagedSystem<TextBackendDispatchSystem>();
             GetOrCreateAndAddManagedSystem<UploadDynamicMeshesSystem>();
             GetOrCreateAndAddManagedSystem<BlendShapesDispatchSystem>();
             GetOrCreateAndAddManagedSystem<SkinningDispatchSystem>();
@@ -101,6 +103,7 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
+            GetOrCreateAndAddUnmanagedSystem<TextBackendUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();

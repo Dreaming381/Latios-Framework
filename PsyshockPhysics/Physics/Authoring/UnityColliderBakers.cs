@@ -95,41 +95,56 @@ namespace Latios.Psyshock.Authoring.Systems
     }
 
     [TemporaryBakingType]
-    public struct ConvexColliderBakerWorker : ISmartBakeItem<UnityEngine.MeshCollider>
+    public struct MeshColliderBakeItem : ISmartBakeItem<UnityEngine.MeshCollider>
     {
-        SmartBlobberHandle<ConvexColliderBlob> m_handle;
+        SmartBlobberHandle<ConvexColliderBlob>  m_convexHandle;
+        SmartBlobberHandle<TriMeshColliderBlob> m_triMeshHandle;
+        bool                                    isConvex;
 
         public bool Bake(UnityEngine.MeshCollider authoring, IBaker baker)
         {
-            if (!authoring.convex)
-                return false;
-
-            if (!(baker as ConvexColliderBaker).m_helper.ShouldBake(authoring))
+            if (!(baker as MeshColliderBaker).m_helper.ShouldBake(authoring))
                 return false;
 
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
             baker.AddComponent<Collider>(entity);
-            m_handle = baker.RequestCreateBlobAsset(authoring.sharedMesh);
-            return m_handle.IsValid;
+            isConvex = authoring.convex;
+            if (isConvex)
+                m_convexHandle = baker.RequestCreateConvexBlobAsset(authoring.sharedMesh);
+            else
+                m_triMeshHandle = baker.RequestCreateTriMeshBlobAsset(authoring.sharedMesh);
+            return m_convexHandle.IsValid | m_triMeshHandle.IsValid;
         }
 
         public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
         {
-            Collider collider = new ConvexCollider
+            if (isConvex)
             {
-                convexColliderBlob = m_handle.Resolve(entityManager),
-                scale              = 1f
-            };
-            entityManager.SetComponentData(entity, collider);
+                Collider collider = new ConvexCollider
+                {
+                    convexColliderBlob = m_convexHandle.Resolve(entityManager),
+                    scale              = 1f
+                };
+                entityManager.SetComponentData(entity, collider);
+            }
+            else
+            {
+                Collider collider = new TriMeshCollider
+                {
+                    triMeshColliderBlob = m_triMeshHandle.Resolve(entityManager),
+                    scale               = 1f
+                };
+                entityManager.SetComponentData(entity, collider);
+            }
         }
     }
 
     [DisableAutoCreation]
-    public class ConvexColliderBaker : SmartBaker<UnityEngine.MeshCollider, ConvexColliderBakerWorker>
+    public class MeshColliderBaker : SmartBaker<UnityEngine.MeshCollider, MeshColliderBakeItem>
     {
         internal ColliderBakerHelper m_helper;
 
-        public ConvexColliderBaker()
+        public MeshColliderBaker()
         {
             m_helper = new ColliderBakerHelper(this);
         }

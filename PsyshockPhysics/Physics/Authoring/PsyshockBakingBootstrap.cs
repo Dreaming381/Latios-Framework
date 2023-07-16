@@ -20,7 +20,7 @@ namespace Latios.Psyshock.Authoring
             context.filteredBakerTypes.Add(typeof(SphereColliderBaker));
             context.filteredBakerTypes.Add(typeof(CapsuleColliderBaker));
             context.filteredBakerTypes.Add(typeof(BoxColliderBaker));
-            context.filteredBakerTypes.Add(typeof(ConvexColliderBaker));
+            context.filteredBakerTypes.Add(typeof(MeshColliderBaker));
             context.filteredBakerTypes.Add(typeof(CompoundColliderBaker));
         }
     }

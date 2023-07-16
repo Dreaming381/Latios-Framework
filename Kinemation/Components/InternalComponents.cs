@@ -436,6 +436,11 @@ namespace Latios.Kinemation
         // The data is owned by a world or system rewindable allocator.
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
+
+    internal struct GlyphCountThisFrame : IComponentData
+    {
+        public uint glyphCount;
+    }
     #endregion
 }
 

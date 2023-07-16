@@ -18,7 +18,7 @@ namespace Latios.Psyshock.Authoring
         /// <summary>
         /// Requests the creation of a BlobAssetReference<ConvexColliderBlob> that is a convex hull of the passed in mesh
         /// </summary>
-        public static SmartBlobberHandle<ConvexColliderBlob> RequestCreateBlobAsset(this IBaker baker, Mesh mesh)
+        public static SmartBlobberHandle<ConvexColliderBlob> RequestCreateConvexBlobAsset(this IBaker baker, Mesh mesh)
         {
             return baker.RequestCreateBlobAsset<ConvexColliderBlob, ConvexColliderBakeData>(new ConvexColliderBakeData { sharedMesh = mesh });
         }

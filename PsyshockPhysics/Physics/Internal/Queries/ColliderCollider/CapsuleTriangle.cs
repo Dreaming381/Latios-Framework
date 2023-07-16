@@ -144,7 +144,7 @@ namespace Latios.Psyshock
             return false;
         }
 
-        private static bool TriangleCapsuleDistance(in TriangleCollider triangle, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
+        internal static bool TriangleCapsuleDistance(in TriangleCollider triangle, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
         {
             // The strategy for this is different from Unity Physics, but is inspired by the capsule-capsule algorithm
             // and this blog: https://wickedengine.net/2020/04/26/capsule-collision-detection/

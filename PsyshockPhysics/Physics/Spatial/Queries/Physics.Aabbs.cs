@@ -53,6 +53,8 @@ namespace Latios.Psyshock
                     return AabbFrom(collider.m_triangle, in transform);
                 case ColliderType.Convex:
                     return AabbFrom(collider.m_convex, in transform);
+                case ColliderType.TriMesh:
+                    return AabbFrom(collider.m_triMesh, in transform);
                 case ColliderType.Compound:
                     return AabbFrom(collider.m_compound, in transform);
                 default:
@@ -90,6 +92,8 @@ namespace Latios.Psyshock
                     return AabbFrom(colliderToCast.m_triangle, in castStart, castEnd);
                 case ColliderType.Convex:
                     return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
+                case ColliderType.TriMesh:
+                    return AabbFrom(colliderToCast.m_triMesh, in castStart, castEnd);
                 case ColliderType.Compound:
                     return AabbFrom(colliderToCast.m_compound, in castStart, castEnd);
                 default:
@@ -112,6 +116,8 @@ namespace Latios.Psyshock
                     return AabbFrom(collider.m_triangle, in transform);
                 case ColliderType.Convex:
                     return AabbFrom(collider.m_convex, in transform);
+                case ColliderType.TriMesh:
+                    return AabbFrom(collider.m_triMesh, in transform);
                 case ColliderType.Compound:
                     return AabbFrom(collider.m_compound, in transform);
                 default:
@@ -215,6 +221,21 @@ namespace Latios.Psyshock
             return AabbFrom(in convex, new RigidTransform(transform.rotation, transform.position));
         }
 
+        private static Aabb AabbFrom(in TriMeshCollider triMesh, in RigidTransform transform)
+        {
+            var         local = triMesh.triMeshColliderBlob.Value.localAabb;
+            float3      c     = (local.min + local.max) / 2f;
+            BoxCollider box   = new BoxCollider(c, local.max - c);
+            ScaleStretchCollider(ref box, 1f, triMesh.scale);
+            return AabbFrom(in box, transform);
+        }
+
+        private static Aabb AabbFrom(TriMeshCollider triMesh, in TransformQvvs transform)
+        {
+            ScaleStretchCollider(ref triMesh, transform.scale, transform.stretch);
+            return AabbFrom(in triMesh, new RigidTransform(transform.rotation, transform.position));
+        }
+
         private static Aabb AabbFrom(in CompoundCollider compound, in RigidTransform transform)
         {
             var         local = compound.compoundColliderBlob.Value.localAabb;
@@ -300,6 +321,20 @@ namespace Latios.Psyshock
         {
             ScaleStretchCollider(ref convex, castStart.scale, castStart.stretch);
             return AabbFrom(in convex, new RigidTransform(castStart.rotation, castStart.position), castEnd);
+        }
+
+        private static Aabb AabbFrom(in TriMeshCollider triMeshToCast, in RigidTransform castStart, float3 castEnd)
+        {
+            var aabbStart = AabbFrom(triMeshToCast, castStart);
+            var diff      = castEnd - castStart.pos;
+            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
+            return CombineAabb(aabbStart, aabbEnd);
+        }
+
+        private static Aabb AabbFrom(TriMeshCollider triMesh, in TransformQvvs castStart, float3 castEnd)
+        {
+            ScaleStretchCollider(ref triMesh, castStart.scale, castStart.stretch);
+            return AabbFrom(in triMesh, new RigidTransform(castStart.rotation, castStart.position), castEnd);
         }
 
         private static Aabb AabbFrom(in CompoundCollider compoundToCast, in RigidTransform castStart, float3 castEnd)

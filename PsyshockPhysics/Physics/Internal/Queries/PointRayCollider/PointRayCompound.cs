@@ -3,7 +3,7 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    public static class PointRayCompound
+    internal static class PointRayCompound
     {
         public static bool DistanceBetween(float3 point, in CompoundCollider compound, in RigidTransform compoundTransform, float maxDistance, out PointDistanceResult result)
         {
