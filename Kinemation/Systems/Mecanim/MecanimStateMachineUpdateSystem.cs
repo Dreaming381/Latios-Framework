@@ -21,7 +21,7 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent().WithAll<MecanimController>(false).WithAll<MecanimLayerStateMachineStatus>(false).WithAll<MecanimParameter>(false)
-                      .WithAll<MecanimControllerEnabledTag>(true).Build();
+                      .WithAll<MecanimControllerEnabledFlag>(true).Build();
         }
 
         [BurstCompile]
@@ -97,7 +97,7 @@ namespace Latios.Kinemation.Systems
                                 ref var transition = ref currentState.transitions[i];
 
                                 // Early out if we have an exit time and we haven't reached it yet
-                                if (transition.hasExitTime && layer.timeInState < currentState.averageDuration) // Todo: Is this supposed to be exitTime?
+                                if (transition.hasExitTime && layer.timeInState < transition.exitTime)
                                     continue;
 
                                 // Evaluate conditions
@@ -139,7 +139,7 @@ namespace Latios.Kinemation.Systems
                                                                                     ref parameterBlobs,
                                                                                     ref inertialBlendMaxTime);
                             }
-                            else
+                            else if (layer.currentTransitionIndex >= 0)
                             {
                                 ref var currentTransition  = ref layerBlob.states[layer.previousStateIndex].transitions[layer.currentTransitionIndex];
                                 needsInertialBlend        |= TryInterruptTransition(ref layer,

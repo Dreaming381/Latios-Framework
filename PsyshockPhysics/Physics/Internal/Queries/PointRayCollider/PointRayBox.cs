@@ -12,9 +12,10 @@ namespace Latios.Psyshock
             bool hit             = PointBoxDistance(pointInBoxSpace, in box, maxDistance, out var localResult);
             result               = new PointDistanceResult
             {
-                hitpoint = math.transform(boxTransform, localResult.hitpoint),
-                normal   = math.rotate(boxTransform, localResult.normal),
-                distance = localResult.distance
+                hitpoint         = math.transform(boxTransform, localResult.hitpoint),
+                normal           = math.rotate(boxTransform, localResult.normal),
+                distance         = localResult.distance,
+                subColliderIndex = 0
             };
             return hit;
         }
@@ -30,7 +31,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool PointBoxDistance(float3 point, in BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
+        internal static bool PointBoxDistance(float3 point, in BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
         {
             // Idea: The positive octant of the box contains 7 feature regions: 3 faces, 3 edges, and inside.
             // The other octants are identical except with flipped signs. So if we unflip signs,
@@ -39,7 +40,7 @@ namespace Latios.Psyshock
             float3 osPoint    = point - box.center;  //os = origin space
             bool3  isNegative = osPoint < 0f;
             float3 ospPoint   = math.select(osPoint, -osPoint, isNegative);  //osp = origin space positive
-            int    region     = math.csum(math.select(new int3(4, 2, 1), int3.zero, ospPoint < box.halfSize));
+            int    region     = math.bitmask(new bool4(ospPoint < box.halfSize, false));
             switch (region)
             {
                 case 0:
@@ -50,74 +51,82 @@ namespace Latios.Psyshock
                     bool3  minMask = min == delta;
                     // Prioritize y first, then z, then x if multiple distances perfectly match.
                     // Todo: Should this be configurabe?
-                    minMask.xz      &= !minMask.y;
-                    minMask.x       &= !minMask.z;
-                    result.hitpoint  = math.select(ospPoint, box.halfSize, minMask);
-                    result.distance  = -min;
-                    result.normal    = math.select(0f, 1f, minMask);
+                    minMask.xz         &= !minMask.y;
+                    minMask.x          &= !minMask.z;
+                    result.hitpoint     = math.select(ospPoint, box.halfSize, minMask);
+                    result.distance     = -min;
+                    result.normal       = math.select(0f, 1f, minMask);
+                    result.featureCode  = (ushort)(0x8000 | (math.tzcnt(math.bitmask(new bool4(minMask, false))) + math.select(0, 3, math.any(minMask & isNegative))));
                     break;
                 }
                 case 1:
                 {
                     // xy in box, z outside
                     // Closest feature is the z-face
-                    result.distance = ospPoint.z - box.halfSize.z;
-                    result.hitpoint = new float3(ospPoint.xy, box.halfSize.z);
-                    result.normal   = new float3(0f, 0f, 1f);
+                    result.distance    = ospPoint.z - box.halfSize.z;
+                    result.hitpoint    = new float3(ospPoint.xy, box.halfSize.z);
+                    result.normal      = new float3(0f, 0f, 1f);
+                    result.featureCode = (ushort)(0x8002 + math.select(0, 3, isNegative.z));
                     break;
                 }
                 case 2:
                 {
                     // xz in box, y outside
                     // Closest feature is the y-face
-                    result.distance = ospPoint.y - box.halfSize.y;
-                    result.hitpoint = new float3(ospPoint.x, box.halfSize.y, ospPoint.z);
-                    result.normal   = new float3(0f, 1f, 0f);
+                    result.distance    = ospPoint.y - box.halfSize.y;
+                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.y, ospPoint.z);
+                    result.normal      = new float3(0f, 1f, 0f);
+                    result.featureCode = (ushort)(0x8001 + math.select(0, 3, isNegative.y));
                     break;
                 }
                 case 3:
                 {
                     // x in box, yz outside
                     // Closest feature is the x-axis edge
-                    result.distance = math.distance(ospPoint.yz, box.halfSize.yz);
-                    result.hitpoint = new float3(ospPoint.x, box.halfSize.yz);
-                    result.normal   = new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f);
+                    result.distance    = math.distance(ospPoint.yz, box.halfSize.yz);
+                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.yz);
+                    result.normal      = new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f);
+                    result.featureCode = (ushort)(0x4000 + math.bitmask(new bool4(isNegative.yz, false, false)));
                     break;
                 }
                 case 4:
                 {
                     // yz in box, x outside
                     // Closest feature is the x-face
-                    result.distance = ospPoint.x - box.halfSize.x;
-                    result.hitpoint = new float3(box.halfSize.x, ospPoint.yz);
-                    result.normal   = new float3(1f, 0f, 0f);
+                    result.distance    = ospPoint.x - box.halfSize.x;
+                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.yz);
+                    result.normal      = new float3(1f, 0f, 0f);
+                    result.featureCode = (ushort)(0x8000 + math.select(0, 3, isNegative.x));
                     break;
                 }
                 case 5:
                 {
                     // y in box, xz outside
                     // Closest feature is the y-axis edge
-                    result.distance = math.distance(ospPoint.xz, box.halfSize.xz);
-                    result.hitpoint = new float3(box.halfSize.x, ospPoint.y, box.halfSize.y);
-                    result.normal   = new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f);
+                    result.distance    = math.distance(ospPoint.xz, box.halfSize.xz);
+                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.y, box.halfSize.y);
+                    result.normal      = new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f);
+                    result.featureCode = (ushort)(0x4004 + math.bitmask(new bool4(isNegative.xz, false, false)));
                     break;
                 }
                 case 6:
                 {
                     // z in box, xy outside
                     // Closest feature is the z-axis edge
-                    result.distance = math.distance(ospPoint.xy, box.halfSize.xy);
-                    result.hitpoint = new float3(box.halfSize.xy, ospPoint.z);
-                    result.normal   = new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f);
+                    result.distance    = math.distance(ospPoint.xy, box.halfSize.xy);
+                    result.hitpoint    = new float3(box.halfSize.xy, ospPoint.z);
+                    result.normal      = new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f);
+                    result.featureCode = (ushort)(0x4008 + math.bitmask(new bool4(isNegative.xy, false, false)));
                     break;
                 }
                 default:
                 {
                     // xyz outside box
                     // Closest feature is the osp corner
-                    result.distance = math.distance(ospPoint, box.halfSize);
-                    result.hitpoint = box.halfSize;
-                    result.normal   = math.normalize(math.float3(1f));
+                    result.distance    = math.distance(ospPoint, box.halfSize);
+                    result.hitpoint    = box.halfSize;
+                    result.normal      = math.normalize(math.float3(1f));
+                    result.featureCode = (ushort)math.bitmask(new bool4(isNegative, false));
                     break;
                 }
             }
@@ -126,7 +135,7 @@ namespace Latios.Psyshock
             return result.distance <= maxDistance;
         }
 
-        public static bool RaycastAabb(in Ray ray, in Aabb aabb, out float fraction)
+        internal static bool RaycastAabb(in Ray ray, in Aabb aabb, out float fraction)
         {
             //slab clipping method
             float3 l     = aabb.min - ray.start;
@@ -171,7 +180,7 @@ namespace Latios.Psyshock
             }
         }
 
-        public static bool RaycastRoundedBox(in Ray ray, in BoxCollider box, float radius, out float fraction, out float3 normal)
+        internal static bool RaycastRoundedBox(in Ray ray, in BoxCollider box, float radius, out float fraction, out float3 normal)
         {
             // Early out if inside hit
             if (PointBoxDistance(ray.start, in box, radius, out _))
@@ -251,6 +260,22 @@ namespace Latios.Psyshock
             normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
             fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
             return fraction <= 1f;
+        }
+
+        internal static ushort FeatureCodeFromBoxNormal(float3 normalInBoxSpace)
+        {
+            bool3 isNegative             = normalInBoxSpace < 0f;
+            var   normalsNotZero         = math.abs(normalInBoxSpace) > 0.1f;
+            var   normalsNotZeroBitmask  = math.bitmask(new bool4(normalsNotZero, false));
+            var   normalsNotZeroCount    = math.countbits(normalsNotZeroBitmask);
+            var   featureCodeFace        = 0x8000 | (math.tzcnt(normalsNotZeroBitmask) + math.select(0, 3, math.any(normalsNotZero & isNegative)));
+            var   edgeDirectionIndex     = math.tzcnt(~normalsNotZeroBitmask);
+            var   featureCodeEdge        = 0x4000 | (edgeDirectionIndex * 4);
+            featureCodeEdge             += math.select(0, math.bitmask(new bool4(isNegative.yz, false, false)), edgeDirectionIndex == 0);
+            featureCodeEdge             += math.select(0, math.bitmask(new bool4(isNegative.xz, false, false)), edgeDirectionIndex == 1);
+            featureCodeEdge             += math.select(0, math.bitmask(new bool4(isNegative.xy, false, false)), edgeDirectionIndex == 2);
+            var featureCodeVertex        = math.bitmask(new bool4(isNegative, false));
+            return (ushort)math.select(featureCodeFace, math.select(featureCodeEdge, featureCodeVertex, normalsNotZeroCount == 3), normalsNotZeroCount > 1);
         }
     }
 }

@@ -9,7 +9,7 @@ namespace Latios.Kinemation
     /// </summary>
     public readonly partial struct  MecanimAspect : IAspect
     {
-        readonly EnabledRefRW<MecanimControllerEnabledTag>     m_enabledTag;
+        readonly EnabledRefRW<MecanimControllerEnabledFlag>     m_enabledTag;
         readonly RefRW<MecanimController>                      m_controller;
         readonly DynamicBuffer<MecanimLayerStateMachineStatus> m_layers;
         readonly DynamicBuffer<MecanimParameter>               m_parameters;

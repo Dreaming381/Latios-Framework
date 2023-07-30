@@ -33,7 +33,7 @@ namespace Latios.Psyshock
         }
 
         // Distance is unsigned, triangle is "double-sided"
-        public static bool PointTriangleDistance(float3 point, in TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
+        internal static bool PointTriangleDistance(float3 point, in TriangleCollider triangle, float maxDistance, out PointDistanceResultInternal result)
         {
             float3 ab = triangle.pointB - triangle.pointA;
             float3 bc = triangle.pointC - triangle.pointB;
@@ -43,8 +43,8 @@ namespace Latios.Psyshock
             float3 cp = point - triangle.pointC;
 
             // project point onto plane
-            // if clockwise, normal faces "up"
-            float3 planeNormal    = math.normalize(math.cross(ab, ca));
+            // if counter-clockwise, normal faces "up"
+            float3 planeNormal    = math.normalizesafe(math.cross(ab, ca));
             float  projectionDot  = math.dot(planeNormal, point - triangle.pointA);
             float3 projectedPoint = point - projectionDot * planeNormal;
 
@@ -57,62 +57,76 @@ namespace Latios.Psyshock
             float3 dots = new float3(math.dot(abUnnormal, ap),
                                      math.dot(bcUnnormal, bp),
                                      math.dot(caUnnormal, cp));
-            int region = math.csum(math.select(new int3(1, 2, 4), int3.zero, dots >= 0f));  // Todo: bitmask?
+            int region = math.bitmask(new bool4(dots <= 0f, false));
             switch (region)
             {
                 case 0:
                 {
                     // all inside, hit plane
-                    result.hitpoint = projectedPoint;
-                    result.distance = math.abs(projectionDot);
+                    result.hitpoint    = projectedPoint;
+                    result.distance    = math.abs(projectionDot);
+                    result.normal      = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
+                    result.featureCode = 0x8000;
                     break;
                 }
                 case 1:
                 {
                     // outside ab plane
-                    float abLengthSq = math.lengthsq(ab);
-                    float dot        = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
-                    result.hitpoint  = triangle.pointA + ab * dot / abLengthSq;
-                    result.distance  = math.distance(point, result.hitpoint);
+                    float abLengthSq   = math.lengthsq(ab);
+                    float dot          = math.clamp(math.dot(ap, ab), 0f, abLengthSq);
+                    result.hitpoint    = triangle.pointA + ab * dot / abLengthSq;
+                    result.distance    = math.distance(point, result.hitpoint);
+                    result.normal      = -math.normalize(abUnnormal);
+                    result.featureCode = 0x4000;
                     break;
                 }
                 case 2:
                 {
                     // outside bc plane
-                    float bcLengthSq = math.lengthsq(bc);
-                    float dot        = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
-                    result.hitpoint  = triangle.pointB + bc * dot / bcLengthSq;
-                    result.distance  = math.distance(point, result.hitpoint);
+                    float bcLengthSq   = math.lengthsq(bc);
+                    float dot          = math.clamp(math.dot(bp, bc), 0f, bcLengthSq);
+                    result.hitpoint    = triangle.pointB + bc * dot / bcLengthSq;
+                    result.distance    = math.distance(point, result.hitpoint);
+                    result.normal      = -math.normalize(bcUnnormal);
+                    result.featureCode = 0x4001;
                     break;
                 }
                 case 3:
                 {
                     // outside ab and bc so closest to point b
-                    result.hitpoint = triangle.pointB;
-                    result.distance = math.distance(point, triangle.pointB);
+                    result.hitpoint    = triangle.pointB;
+                    result.distance    = math.distance(point, triangle.pointB);
+                    result.normal      = math.normalize(-math.normalize(abUnnormal) - math.normalize(bcUnnormal));
+                    result.featureCode = 1;
                     break;
                 }
                 case 4:
                 {
                     // outside ca plane
-                    float caLengthSq = math.lengthsq(ca);
-                    float dot        = math.clamp(math.dot(cp, ca), 0f, caLengthSq);
-                    result.hitpoint  = triangle.pointC + ca * dot / caLengthSq;
-                    result.distance  = math.distance(point, result.hitpoint);
+                    float caLengthSq   = math.lengthsq(ca);
+                    float dot          = math.clamp(math.dot(cp, ca), 0f, caLengthSq);
+                    result.hitpoint    = triangle.pointC + ca * dot / caLengthSq;
+                    result.distance    = math.distance(point, result.hitpoint);
+                    result.normal      = -math.normalize(caUnnormal);
+                    result.featureCode = 0x4002;
                     break;
                 }
                 case 5:
                 {
                     // outside ab and ca so closest to point a
-                    result.hitpoint = triangle.pointA;
-                    result.distance = math.distance(point, triangle.pointA);
+                    result.hitpoint    = triangle.pointA;
+                    result.distance    = math.distance(point, triangle.pointA);
+                    result.normal      = math.normalize(-math.normalize(abUnnormal) - math.normalize(caUnnormal));
+                    result.featureCode = 0;
                     break;
                 }
                 case 6:
                 {
                     // outside bc and ca so closest to point c
-                    result.hitpoint = triangle.pointC;
-                    result.distance = math.distance(point, triangle.pointC);
+                    result.hitpoint    = triangle.pointC;
+                    result.distance    = math.distance(point, triangle.pointC);
+                    result.normal      = math.normalize(-math.normalize(caUnnormal) - math.normalize(bcUnnormal));
+                    result.featureCode = 2;
                     break;
                 }
                 case 7:
@@ -122,12 +136,14 @@ namespace Latios.Psyshock
                     bool            hitAB = PointRayCapsule.PointCapsuleDistance(point, in capAB, maxDistance, out var resultAB);
                     CapsuleCollider capBC = new CapsuleCollider(triangle.pointB, triangle.pointC, 0f);
                     bool            hitBC = PointRayCapsule.PointCapsuleDistance(point, in capBC, maxDistance, out var resultBC);
-                    CapsuleCollider capCA = new CapsuleCollider(triangle.pointC, triangle.pointA, 0f);
-                    bool            hitCA = PointRayCapsule.PointCapsuleDistance(point, in capCA, maxDistance, out var resultCA);
+                    resultBC.featureCode++;
+                    CapsuleCollider capCA  = new CapsuleCollider(triangle.pointC, triangle.pointA, 0f);
+                    bool            hitCA  = PointRayCapsule.PointCapsuleDistance(point, in capCA, maxDistance, out var resultCA);
+                    resultCA.featureCode  += (ushort)math.select(2, -1, (resultCA.featureCode & 0xff) == 1);
                     if (!hitAB && !hitBC && !hitCA)
                     {
                         result = resultCA;
-                        break;
+                        return false;
                     }
 
                     result          = default;
@@ -145,12 +161,13 @@ namespace Latios.Psyshock
                 {
                     //How the heck did we get here?
                     //throw new InvalidOperationException();
-                    result.hitpoint = projectedPoint;
-                    result.distance = 2f * maxDistance;
+                    result.hitpoint    = projectedPoint;
+                    result.distance    = 2f * maxDistance;
+                    result.normal      = new float3(0f, 1f, 0f);
+                    result.featureCode = 0;
                     break;
                 }
             }
-            result.normal = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
             return result.distance <= maxDistance;
         }
 
@@ -240,7 +257,8 @@ namespace Latios.Psyshock
                 }
             }
 
-            result.normal = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
+            result.normal      = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
+            result.featureCode = 0;  // Unusable for quads
             return result.distance <= maxDistance;
         }
 

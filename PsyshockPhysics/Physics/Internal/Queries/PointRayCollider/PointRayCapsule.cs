@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -29,7 +30,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool PointCapsuleDistance(float3 point, in CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
+        internal static bool PointCapsuleDistance(float3 point, in CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
             float3 edge                   = capsule.pointB - capsule.pointA;
@@ -39,10 +40,25 @@ namespace Latios.Psyshock
             dot                           = math.clamp(dot, 0f, edgeLengthSq);
             float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
             SphereCollider sphere         = new SphereCollider(pointOnSegment, capsule.radius);
-            return PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result);
+            var            hit            = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
+
+            result.featureCode = 0x4000;
+            result.featureCode = (ushort)math.select(result.featureCode, 0, dot == 0f);
+            result.featureCode = (ushort)math.select(result.featureCode, 1, dot == edgeLengthSq);
+            if (Hint.Likely(!degenerate))
+                return hit;
+
+            if (math.all(edge == 0f))
+                return hit;
+
+            mathex.GetDualPerpendicularNormalized(edge, out var capsuleNormal, out _);
+            result.normal   = capsuleNormal;
+            result.hitpoint = pointOnSegment;
+            result.distance = 0f;
+            return hit;
         }
 
-        public static bool RaycastCapsule(in Ray ray, in CapsuleCollider capsule, out float fraction, out float3 normal)
+        internal static bool RaycastCapsule(in Ray ray, in CapsuleCollider capsule, out float fraction, out float3 normal)
         {
             float          axisLength = mathex.GetLengthAndNormal(capsule.pointB - capsule.pointA, out float3 axis);
             SphereCollider sphere1    = new SphereCollider(capsule.pointA, capsule.radius);
@@ -77,7 +93,7 @@ namespace Latios.Psyshock
             return hit1 | hit2;
         }
 
-        public static bool4 Raycast4Capsules(in Ray ray, in simdFloat3 capA, in simdFloat3 capB, float4 capRadius, out float4 fraction, out simdFloat3 normal)
+        internal static bool4 Raycast4Capsules(in Ray ray, in simdFloat3 capA, in simdFloat3 capB, float4 capRadius, out float4 fraction, out simdFloat3 normal)
         {
             float4 axisLength = mathex.GetLengthAndNormal(capB - capA, out simdFloat3 axis);
             // Ray vs infinite cylinder

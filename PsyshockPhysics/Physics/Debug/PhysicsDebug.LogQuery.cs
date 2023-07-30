@@ -106,6 +106,11 @@ namespace Latios.Psyshock
                 ConvexCollider convex = collider;
                 writer.Write(convex.convexColliderBlob);
             }
+            else if (collider.type == ColliderType.TriMesh)
+            {
+                TriMeshCollider triMesh = collider;
+                writer.Write(triMesh.triMeshColliderBlob);
+            }
             else if (collider.type == ColliderType.Compound)
             {
                 CompoundCollider compound = collider;

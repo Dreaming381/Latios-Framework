@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -153,7 +154,7 @@ namespace Latios.Psyshock
             simdFloat3 triEdges  = triPoints.bcaa - triPoints;
 
             float3 capEdge = capsule.pointB - capsule.pointA;
-            CapsuleCapsule.SegmentSegment(triPoints, triEdges, new simdFloat3(capsule.pointA), new simdFloat3(capEdge), out var closestTriEdges, out var closestCapsuleAxis);
+            CapsuleCapsule.SegmentSegment(in triPoints, in triEdges, new simdFloat3(capsule.pointA), new simdFloat3(capEdge), out var closestTriEdges, out var closestCapsuleAxis);
             float3 segSegDists      = simd.distancesq(closestTriEdges, closestCapsuleAxis).xyz;
             bool   bIsBetter        = segSegDists.y < segSegDists.x;
             float3 closestEdgePoint = math.select(closestTriEdges.a, closestTriEdges.b, bIsBetter);
@@ -162,41 +163,116 @@ namespace Latios.Psyshock
             closestEdgePoint        = math.select(closestEdgePoint, closestTriEdges.c, cIsBetter);
             closestAxisPoint        = math.select(closestAxisPoint, closestCapsuleAxis.c, cIsBetter);
 
-            if (PointRayTriangle.RaycastTriangle(new Ray(capsule.pointA, capsule.pointB), triPoints, out float fraction, out _))
+            if (PointRayTriangle.RaycastTriangle(new Ray(capsule.pointA, capsule.pointB), in triPoints, out float fraction, out _) && fraction != 1f)
             {
                 float3 triNormal         = math.normalizesafe(math.cross(triEdges.a, triEdges.b), math.normalizesafe(capEdge, 0f));
                 float  minFractionOffset = math.min(fraction, 1f - fraction);
-                // This is how much we have to move the axis along the triangle through the axis to achieve separation.
+                // This is the length of the segment projected onto the triangle normal.
                 float dot = math.dot(triNormal, capEdge);
-
+                // This is how much we have to move the segment along the triangle normal to achieve separation.
                 float offsetDistance = minFractionOffset * math.abs(dot);
 
-                if (offsetDistance * offsetDistance <= math.distancesq(closestEdgePoint, closestAxisPoint))
+                if (offsetDistance * offsetDistance < math.distancesq(closestEdgePoint, closestAxisPoint))
                 {
-                    bool useCapB                 = 1f - fraction < fraction;
-                    triNormal                    = math.select(triNormal, -triNormal, (dot < 0f) ^ useCapB);
-                    float3         capsuleOffset = triNormal * (offsetDistance + capsule.radius);
-                    SphereCollider sphere        = new SphereCollider(math.select(capsule.pointA, capsule.pointB, useCapB) + capsuleOffset, capsule.radius);
-                    SphereTriangle.TriangleSphereDistance(triangle, sphere, maxDistance, out result);
-                    result.distance   = -offsetDistance;
-                    result.hitpointB -= capsuleOffset;
+                    bool useCapB = 1f - fraction < fraction;
+                    triNormal    = math.select(triNormal, -triNormal, (dot < 0f) ^ useCapB);
+                    result       = new ColliderDistanceResultInternal
+                    {
+                        distance     = -offsetDistance * capsule.radius,
+                        hitpointA    = math.lerp(capsule.pointA, capsule.pointB, fraction),
+                        hitpointB    = math.select(capsule.pointA, capsule.pointB, useCapB) - capsule.radius * triNormal,
+                        normalA      = triNormal,
+                        normalB      = -triNormal,
+                        featureCodeA = 0x8000,
+                        featureCodeB = 0x4000
+                    };
+
                     return true;
                 }
                 else
                 {
-                    SphereCollider axisSphere = new SphereCollider(closestAxisPoint, capsule.radius);
-                    SphereCollider edgeSphere = new SphereCollider(closestEdgePoint, 0f);
-                    // This gives us the positive distance from the capsule to edge.
-                    // The penetration point is the opposite side of the capsule.
-                    SphereSphere.SphereSphereDistance(edgeSphere, axisSphere, float.MaxValue, out result);
-                    result.distance   = -result.distance - capsule.radius;
-                    result.normalB    = -result.normalB;
-                    result.hitpointB += result.normalB * 2f * capsule.radius;
-                    return true;
+                    var bestEdge   = math.select(math.select(triEdges.a, triEdges.b, bIsBetter), triEdges.c, cIsBetter);
+                    var edgeNormal = math.cross(math.normalizesafe(math.cross(triEdges.a, triEdges.c)), bestEdge);
+                    if (Hint.Unlikely(edgeNormal.Equals(float3.zero)))
+                    {
+                        // The ray hit a degenerate triangle.
+                        // Find the longest edge and do capsule vs capsule
+                        var lengthSqs        = simd.lengthsq(triEdges);
+                        var longestEdgeIndex = math.tzcnt(math.bitmask(new bool4(lengthSqs.xyz == math.cmax(lengthSqs.xyz), false)));
+                        var edgeCap          = new CapsuleCollider
+                        {
+                            pointA = triPoints[longestEdgeIndex],
+                            pointB = triPoints[(longestEdgeIndex + 1) % 3],
+                            radius = 0f
+                        };
+                        CapsuleCapsule.CapsuleCapsuleDistance(in edgeCap, in capsule, float.MaxValue, out result);
+                        result.featureCodeA  = (ushort)(result.featureCodeA + longestEdgeIndex);
+                        result.featureCodeA -= (ushort)math.select(0, 3, (result.featureCodeA & 0xff) > 2);
+                        return true;
+                    }
+
+                    // Check for the closest point on the triangle being a vertex
+                    var closestIsVertex = (closestEdgePoint == triPoints).xyz;
+                    if (Hint.Unlikely(math.any(closestIsVertex)))
+                    {
+                        // The capsule segment must have crossed right through the triangle vertex of a non-degenerate triangle
+                        var    allEdgeNormals = simd.cross(math.cross(triEdges.a, triEdges.c), triEdges);
+                        uint   index;
+                        float3 bestNormal;
+                        if (closestIsVertex.x)
+                        {
+                            index      = 0;
+                            bestNormal = math.normalize(allEdgeNormals.a + allEdgeNormals.c);
+                        }
+                        else if (closestIsVertex.y)
+                        {
+                            index      = 1;
+                            bestNormal = math.normalize(allEdgeNormals.a + allEdgeNormals.b);
+                        }
+                        else
+                        {
+                            index      = 2;
+                            bestNormal = math.normalize(allEdgeNormals.b + allEdgeNormals.c);
+                        }
+
+                        // We know neither the capsule nor the edge is degenerate, so find the normal that points towards the triangle
+                        var capNormal = math.normalize(math.cross(capEdge, math.cross(capEdge, bestNormal)));
+                        // We also know that the closest point on the capsule is not an endpoint since the ray hit.
+                        result = new ColliderDistanceResultInternal
+                        {
+                            distance     = -math.distance(closestAxisPoint, closestEdgePoint) - capsule.radius,
+                            hitpointA    = closestEdgePoint,
+                            hitpointB    = closestAxisPoint + capNormal * capsule.radius,
+                            normalA      = bestNormal,
+                            normalB      = capNormal,
+                            featureCodeA = (ushort)index,
+                            featureCodeB = 0x4000
+                        };
+                        return true;
+                    }
+
+                    {
+                        // We know neither the capsule nor the edge is degenerate, so find the normal that points towards the triangle
+                        var capNormal = math.normalize(math.cross(capEdge, math.cross(capEdge, edgeNormal)));
+                        // We also know that the closest point on the capsule is not an endpoint since the ray hit.
+                        // And we know that the closest point on the triangle is not a vertex as we already checked that.
+                        result = new ColliderDistanceResultInternal
+                        {
+                            distance     = -math.distance(closestAxisPoint, closestEdgePoint) - capsule.radius,
+                            hitpointA    = closestEdgePoint,
+                            hitpointB    = closestAxisPoint + capNormal * capsule.radius,
+                            normalA      = edgeNormal,
+                            normalB      = capNormal,
+                            featureCodeA = (ushort)(0x4000 + math.select(math.select(0, 1, bIsBetter), 2, cIsBetter)),
+                            featureCodeB = 0x4000
+                        };
+                        return true;
+                    }
                 }
             }
             else
             {
+                // Because the ray didn't hit, we should hopefully not have to worry about degenerate distance checks for the capsule segment
                 SphereCollider axisSphere = new SphereCollider(closestAxisPoint, capsule.radius);
                 bool           hitAxis    = SphereTriangle.TriangleSphereDistance(triangle, axisSphere, maxDistance, out var axisResult);
                 SphereCollider aSphere    = new SphereCollider(capsule.pointA, capsule.radius);
@@ -212,11 +288,22 @@ namespace Latios.Psyshock
                 result          = default;
                 result.distance = float.MaxValue;
                 if (hitAxis)
-                    result = axisResult;
+                {
+                    result              = axisResult;
+                    result.featureCodeB = 0x4000;
+                }
+                bool capDegenerate = capsule.pointA.Equals(capsule.pointB);
                 if (hitA && aResult.distance < result.distance)
+                {
                     result = aResult;
-                if (hitB && bResult.distance < result.distance)
-                    result = bResult;
+                    if (!capDegenerate && math.dot(result.normalB, capEdge) > 0f)
+                        result.normalB = math.normalize(math.cross(math.cross(capEdge, result.normalB), capEdge));
+                }
+                if (hitB && !capDegenerate && bResult.distance < result.distance)
+                {
+                    result              = bResult;
+                    result.featureCodeB = 1;
+                }
                 return true;
             }
         }

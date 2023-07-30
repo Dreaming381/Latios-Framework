@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -66,23 +67,61 @@ namespace Latios.Psyshock
             return false;
         }
 
-        private static bool CapsuleCapsuleDistance(in CapsuleCollider capsuleA, in CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
+        internal static bool CapsuleCapsuleDistance(in CapsuleCollider capsuleA, in CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 edgeA = capsuleA.pointB - capsuleA.pointA;
             float3 edgeB = capsuleB.pointB - capsuleB.pointA;
 
-            SegmentSegment(capsuleA.pointA, edgeA, capsuleB.pointA, edgeB, out float3 closestA, out float3 closestB);
-            //Todo: There may be some precision issues at close distances. Figure this out later.
+            SegmentSegment(capsuleA.pointA, edgeA, capsuleB.pointA, edgeB, out float3 closestA, out float3 closestB, out var isStartEndAB);
             SphereCollider sphereA = new SphereCollider(closestA, capsuleA.radius);
             SphereCollider sphereB = new SphereCollider(closestB, capsuleB.radius);
-            return SphereSphere.SphereSphereDistance(in sphereA, in sphereB, maxDistance, out result);
+            var            hit     = SphereSphere.SphereSphereDistance(in sphereA, in sphereB, maxDistance, out result, out bool degenerate);
+            result.featureCodeA    = 0x4000;
+            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 0, isStartEndAB.x);
+            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 1, isStartEndAB.y);
+            result.featureCodeB    = 0x4000;
+            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 0, isStartEndAB.z);
+            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 1, isStartEndAB.w);
+            if (Hint.Likely(!degenerate))
+                return hit;
+
+            if (math.all((edgeA == 0f) & (edgeB == 0f)))
+                return hit;
+
+            if (math.all(edgeA == 0f))
+            {
+                mathex.GetDualPerpendicularNormalized(edgeB, out var capsuleNormal, out _);
+                result.normalB   = capsuleNormal;
+                result.normalA   = -capsuleNormal;
+                result.hitpointB = closestB - capsuleB.radius * capsuleNormal;
+                result.hitpointA = closestA + capsuleA.radius * capsuleNormal;
+                return hit;
+            }
+            if (math.all(edgeB == 0f))
+            {
+                mathex.GetDualPerpendicularNormalized(edgeA, out var capsuleNormal, out _);
+                result.normalA   = capsuleNormal;
+                result.normalB   = -capsuleNormal;
+                result.hitpointA = closestA - capsuleA.radius * capsuleNormal;
+                result.hitpointB = closestB + capsuleB.radius * capsuleNormal;
+                return hit;
+            }
+
+            {
+                var capsuleNormal = math.normalize(math.cross(edgeA, edgeB));
+                result.normalA    = capsuleNormal;
+                result.normalB    = -capsuleNormal;
+                result.hitpointA  = closestA - capsuleA.radius * capsuleNormal;
+                result.hitpointB  = closestB + capsuleB.radius * capsuleNormal;
+                return hit;
+            }
         }
 
         // Todo: Copied from Unity.Physics. I still don't fully understand this, but it is working correctly for degenerate segments somehow.
         // I tested with parallel segments, segments with 0-length edges and a few other weird things. It holds up with pretty good accuracy.
         // I'm not sure where the NaNs or infinities disappear. But they do.
         // Find the closest points on a pair of line segments
-        public static void SegmentSegment(float3 pointA, float3 edgeA, float3 pointB, float3 edgeB, out float3 closestAOut, out float3 closestBOut)
+        internal static void SegmentSegment(float3 pointA, float3 edgeA, float3 pointB, float3 edgeB, out float3 closestAOut, out float3 closestBOut, out bool4 isStartEndAB)
         {
             // Find the closest point on edge A to the line containing edge B
             float3 diff = pointB - pointA;
@@ -115,9 +154,16 @@ namespace Latios.Psyshock
 
             closestAOut = pointA + fracA * edgeA;
             closestBOut = pointB + fracB * edgeB;
+
+            isStartEndAB = new float4(fracA, fracA, fracB, fracB) == new float4(0f, 1f, 0f, 1f);
         }
 
-        public static void SegmentSegment(simdFloat3 pointA, simdFloat3 edgeA, simdFloat3 pointB, simdFloat3 edgeB, out simdFloat3 closestAOut, out simdFloat3 closestBOut)
+        internal static void SegmentSegment(in simdFloat3 pointA,
+                                            in simdFloat3 edgeA,
+                                            in simdFloat3 pointB,
+                                            in simdFloat3 edgeB,
+                                            out simdFloat3 closestAOut,
+                                            out simdFloat3 closestBOut)
         {
             simdFloat3 diff = pointB - pointA;
 

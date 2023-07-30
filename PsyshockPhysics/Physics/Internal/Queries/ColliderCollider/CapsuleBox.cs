@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -384,19 +385,45 @@ namespace Latios.Psyshock
             bestPointOnSegment                   = math.select(bestPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
             bestPointOnBox                       = math.select(bestPointOnBox, pointsPointOnBox, pointsBeatEdges);
 
-            // Step 4: Build result
-            float3 boxNormal     = math.normalize(math.select(0f, 1f, bestPointOnBox == box.halfSize) + math.select(0f, -1f, bestPointOnBox == -box.halfSize));
-            float3 capsuleNormal = math.normalizesafe(bestPointOnBox - bestPointOnSegment, -boxNormal);
-            capsuleNormal        = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
-            result               = new ColliderDistanceResultInternal
+            // Step 4: Create result
+            float3 boxNormal         = math.normalize(math.select(0f, 1f, bestPointOnBox == box.halfSize) + math.select(0f, -1f, bestPointOnBox == -box.halfSize));
+            float3 capsuleNormal     = math.normalizesafe(bestPointOnBox - bestPointOnSegment);
+            bool   capsuleDegenerate = capsuleNormal.Equals(float3.zero);
+            capsuleNormal            = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
+            result                   = new ColliderDistanceResultInternal
             {
-                hitpointA = bestPointOnBox + box.center,
-                hitpointB = bestPointOnSegment + box.center + capsuleNormal * capsule.radius,
-                normalA   = boxNormal,
-                normalB   = capsuleNormal,
-                distance  = math.sign(bestSignedDistanceSq) * math.sqrt(math.abs(bestSignedDistanceSq)) - capsule.radius
+                hitpointA    = bestPointOnBox + box.center,
+                hitpointB    = bestPointOnSegment + box.center + capsuleNormal * capsule.radius,
+                normalA      = boxNormal,
+                normalB      = capsuleNormal,
+                distance     = math.sign(bestSignedDistanceSq) * math.sqrt(math.abs(bestSignedDistanceSq)) - capsule.radius,
+                featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(boxNormal),
+                featureCodeB =
+                    (ushort)math.select(0x4000, math.select(0, 1, math.all(bestPointOnSegment == osPointB)),
+                                        math.all(bestPointOnSegment == osPointA) && math.all(bestPointOnSegment == osPointB))
             };
 
+            if (Hint.Likely(!capsuleDegenerate))
+                return result.distance <= maxDistance;
+
+            if (capsuleEdge.Equals(float3.zero))
+            {
+                result.hitpointB -= boxNormal * capsule.radius;
+                result.normalB    = -boxNormal;
+                return result.distance <= maxDistance;
+            }
+
+            var edgeNormalized = math.normalize(capsuleEdge);
+            edgeNormalized     = math.select(edgeNormalized, -edgeNormalized, result.featureCodeB == 1);
+            if (result.featureCodeB < 2 && math.dot(result.normalA, edgeNormalized) >= 0f)
+            {
+                result.hitpointB -= boxNormal * capsule.radius;
+                result.normalB    = -boxNormal;
+                return result.distance <= maxDistance;
+            }
+
+            result.normalB    = math.normalize(math.cross(math.cross(capsuleEdge, -boxNormal), capsuleEdge));
+            result.hitpointB += result.normalB * capsule.radius;
             return result.distance <= maxDistance;
         }
     }

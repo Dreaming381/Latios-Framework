@@ -1,4 +1,5 @@
 using Latios.Transforms;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -39,6 +40,27 @@ namespace Latios.Psyshock
             }
             result = default;
             return false;
+        }
+
+        public static unsafe void DistanceBetweenAll<T>(in TriMeshCollider triMesh,
+                                                        in RigidTransform triMeshTransform,
+                                                        in TriangleCollider triangle,
+                                                        in RigidTransform triangleTransform,
+                                                        float maxDistance,
+                                                        ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            var triangleInTriMeshTransform = math.mul(math.inverse(triMeshTransform), triangleTransform);
+            var aabb                       = Physics.AabbFrom(triangle, triangleInTriMeshTransform);
+            var triProcessor               = new DistanceAllProcessor<T>
+            {
+                triMesh           = triMesh,
+                triMeshTransform  = triMeshTransform,
+                triangle          = triangle,
+                triangleTransform = triangleTransform,
+                maxDistance       = maxDistance,
+                processor         = (T*)UnsafeUtility.AddressOf(ref processor)
+            };
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor);
         }
 
         public static bool ColliderCast(in TriangleCollider triangleToCast,
@@ -157,8 +179,8 @@ namespace Latios.Psyshock
 
             public bool Execute(int index)
             {
-                var triangle = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
-                if (TriangleTriangle.DistanceBetween(in triangle, in RigidTransform.identity, in triangle, in triangleTransform, maxDistance, out var hit))
+                var triangle2 = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
+                if (TriangleTriangle.DistanceBetween(in triangle2, in RigidTransform.identity, in triangle, in triangleTransform, maxDistance, out var hit))
                 {
                     if (!found || hit.distance < bestDistance)
                     {
@@ -168,6 +190,27 @@ namespace Latios.Psyshock
                     }
                 }
 
+                return true;
+            }
+        }
+
+        unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            public TriMeshCollider  triMesh;
+            public RigidTransform   triMeshTransform;
+            public TriangleCollider triangle;
+            public RigidTransform   triangleTransform;
+            public float            maxDistance;
+            public T*               processor;
+
+            public bool Execute(int index)
+            {
+                var triangle2 = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[index], 1f, triMesh.scale);
+                if (TriangleTriangle.DistanceBetween(in triangle2, in triMeshTransform, in triangle, in triangleTransform, maxDistance, out var result))
+                {
+                    result.subColliderIndexA = index;
+                    processor->Execute(in result);
+                }
                 return true;
             }
         }
@@ -187,14 +230,14 @@ namespace Latios.Psyshock
 
             public bool Execute(int index)
             {
-                var triangle = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
+                var triangle2 = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
                 // Check that we don't start already intersecting.
-                if (TriangleTriangle.DistanceBetween(in triangle, in targetTransform, in triangle, in castStart, 0f, out _))
+                if (TriangleTriangle.DistanceBetween(in triangle, in targetTransform, in triangle2, in castStart, 0f, out _))
                 {
                     invalid = true;
                     return false;
                 }
-                if (TriangleTriangle.ColliderCast(in triangle, in castStart, castEnd, in triangle, in targetTransform, out var hit))
+                if (TriangleTriangle.ColliderCast(in triangle, in castStart, castEnd, in triangle2, in targetTransform, out var hit))
                 {
                     if (!found || hit.distance < bestDistance)
                     {

@@ -34,8 +34,8 @@ namespace Latios.Kinemation.Authoring
 
             // Bake controller
             baker.AddComponent(                             entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
-            baker.AddComponent<MecanimControllerEnabledTag>(entity);
-            baker.SetComponentEnabled<MecanimControllerEnabledTag>(entity, authoring.enabled);
+            baker.AddComponent<MecanimControllerEnabledFlag>(entity);
+            baker.SetComponentEnabled<MecanimControllerEnabledFlag>(entity, authoring.enabled);
 
             AnimatorController animatorController = baker.FindAnimatorController(runtimeAnimatorController);
 

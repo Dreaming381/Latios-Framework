@@ -602,11 +602,13 @@ namespace Latios.Psyshock
             //Step 4: Build result
             result = new ColliderDistanceResultInternal
             {
-                hitpointA = bestClosestA,
-                hitpointB = bestClosestB,
-                normalA   = bestNormalA,
-                normalB   = bestNormalB,
-                distance  = math.sign(bestAxisDistance) * math.sqrt(math.abs(bestDistanceSq))
+                hitpointA    = bestClosestA,
+                hitpointB    = bestClosestB,
+                normalA      = bestNormalA,
+                normalB      = bestNormalB,
+                distance     = math.sign(bestAxisDistance) * math.sqrt(math.abs(bestDistanceSq)),
+                featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(bestNormalA),
+                featureCodeB = PointRayBox.FeatureCodeFromBoxNormal(math.rotate(aInBSpace, bestNormalB))
             };
             return result.distance <= maxDistance;
         }

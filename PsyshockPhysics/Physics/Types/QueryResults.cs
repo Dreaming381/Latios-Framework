@@ -62,6 +62,9 @@ namespace Latios.Psyshock
         /// If colliderB is composed of multiple primitives such as a compound collider, this is the index of the primitive that generated the result
         /// </summary>
         public int subColliderIndexB;
+
+        internal ushort featureCodeA;
+        internal ushort featureCodeB;
     }
 
     /// <summary>

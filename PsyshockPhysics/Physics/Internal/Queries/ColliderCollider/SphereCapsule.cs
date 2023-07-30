@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -23,11 +24,15 @@ namespace Latios.Psyshock
                                                                    out ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
-                hitpointA = math.transform(capsuleTransform, localResult.hitpointA),
-                hitpointB = math.transform(capsuleTransform, localResult.hitpointB),
-                normalA   = math.rotate(capsuleTransform, localResult.normalA),
-                normalB   = math.rotate(capsuleTransform, localResult.normalB),
-                distance  = localResult.distance
+                hitpointA         = math.transform(capsuleTransform, localResult.hitpointA),
+                hitpointB         = math.transform(capsuleTransform, localResult.hitpointB),
+                normalA           = math.rotate(capsuleTransform, localResult.normalA),
+                normalB           = math.rotate(capsuleTransform, localResult.normalB),
+                distance          = localResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = localResult.featureCodeA,
+                featureCodeB      = 0
             };
             return hit;
         }
@@ -107,7 +112,23 @@ namespace Latios.Psyshock
             dot                           = math.clamp(dot, 0f, edgeLengthSq);
             float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
             SphereCollider sphereA        = new SphereCollider(pointOnSegment, capsule.radius);
-            return SphereSphere.SphereSphereDistance(in sphereA, in sphere, maxDistance, out result);
+            var            hit            = SphereSphere.SphereSphereDistance(in sphereA, in sphere, maxDistance, out result, out bool degenerate);
+            result.featureCodeA           = 0x4000;
+            result.featureCodeA           = (ushort)math.select(result.featureCodeA, 0, dot == 0f);
+            result.featureCodeA           = (ushort)math.select(result.featureCodeA, 1, dot == edgeLengthSq);
+            if (Hint.Likely(!degenerate))
+                return hit;
+
+            if (math.all(edge == 0f))
+                return hit;
+
+            mathex.GetDualPerpendicularNormalized(edge, out var capsuleNormal, out _);
+            result.normalA   = capsuleNormal;
+            result.normalB   = -capsuleNormal;
+            result.hitpointA = pointOnSegment - capsule.radius * capsuleNormal;
+            result.hitpointB = pointOnSegment + sphere.radius * capsuleNormal;
+            result.distance  = -capsule.radius - sphere.radius;
+            return hit;
         }
     }
 }

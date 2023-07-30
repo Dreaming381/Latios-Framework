@@ -34,6 +34,31 @@ namespace Latios.Psyshock
             return hit;
         }
 
+        public static void DistanceBetweenAll<T>(in CompoundCollider compound,
+                                                 in RigidTransform compoundTransform,
+                                                 in BoxCollider box,
+                                                 in RigidTransform boxTransform,
+                                                 float maxDistance,
+                                                 ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            ref var blob = ref compound.compoundColliderBlob.Value;
+            for (int i = 0; i < blob.colliders.Length; i++)
+            {
+                compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
+                bool newHit = DistanceBetween(in blobCollider,
+                                              math.mul(compoundTransform, blobTransform),
+                                              in box,
+                                              in boxTransform,
+                                              maxDistance,
+                                              out var newResult);
+
+                newResult.subColliderIndexA = i;
+
+                if (newHit)
+                    processor.Execute(in newResult);
+            }
+        }
+
         public static bool ColliderCast(in BoxCollider boxToCast,
                                         in RigidTransform castStart,
                                         float3 castEnd,

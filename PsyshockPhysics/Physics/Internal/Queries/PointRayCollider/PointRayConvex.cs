@@ -54,10 +54,11 @@ namespace Latios.Psyshock
                 var localNormal = new float3(blob.facePlaneX[bestPlaneIndex], blob.facePlaneY[bestPlaneIndex], blob.facePlaneZ[bestPlaneIndex]);
                 if (maxSignedDistance < 0f)
                 {
-                    var localHit    = localNormal * -maxSignedDistance + scaledPoint;
-                    result.hitpoint = localHit * convex.scale;
-                    result.distance = math.distance(result.hitpoint, point);
-                    result.normal   = math.normalize(localNormal * invScale);
+                    var localHit       = localNormal * -maxSignedDistance + scaledPoint;
+                    result.hitpoint    = localHit * convex.scale;
+                    result.distance    = math.distance(result.hitpoint, point);
+                    result.normal      = math.normalize(localNormal * invScale);
+                    result.featureCode = (ushort)(0x8000 + bestPlaneIndex);
                     return result.distance <= maxDistance;
                 }
 
@@ -76,10 +77,11 @@ namespace Latios.Psyshock
 
                 if (maxEdgeSignedDistance < 0f)
                 {
-                    var localHit    = localNormal * -maxSignedDistance + scaledPoint;
-                    result.hitpoint = localHit * convex.scale;
-                    result.distance = math.distance(result.hitpoint, point);
-                    result.normal   = math.normalize(localNormal * invScale);
+                    var localHit       = localNormal * -maxSignedDistance + scaledPoint;
+                    result.hitpoint    = localHit * convex.scale;
+                    result.distance    = math.distance(result.hitpoint, point);
+                    result.normal      = math.normalize(localNormal * invScale);
+                    result.featureCode = (ushort)(0x8000 + bestPlaneIndex);
                     return result.distance <= maxDistance;
                 }
 
@@ -93,9 +95,10 @@ namespace Latios.Psyshock
 
                 if (edgeDot <= 0f)
                 {
-                    result.hitpoint = vertexA * convex.scale;
-                    result.distance = math.distance(result.hitpoint, point);
-                    result.normal   = math.normalize(blob.vertexNormals[edgeVertices.x] * invScale);
+                    result.hitpoint    = vertexA * convex.scale;
+                    result.distance    = math.distance(result.hitpoint, point);
+                    result.normal      = math.normalize(blob.vertexNormals[edgeVertices.x] * invScale);
+                    result.featureCode = (ushort)edgeVertices.x;
                     return result.distance <= maxDistance;
                 }
 
@@ -103,22 +106,25 @@ namespace Latios.Psyshock
 
                 if (edgeDot >= edgeLengthSq)
                 {
-                    result.hitpoint = vertexB * convex.scale;
-                    result.distance = math.distance(result.hitpoint, point);
-                    result.normal   = math.normalize(blob.vertexNormals[edgeVertices.y] * invScale);
+                    result.hitpoint    = vertexB * convex.scale;
+                    result.distance    = math.distance(result.hitpoint, point);
+                    result.normal      = math.normalize(blob.vertexNormals[edgeVertices.y] * invScale);
+                    result.featureCode = (ushort)edgeVertices.y;
                     return result.distance <= maxDistance;
                 }
 
-                result.hitpoint = (vertexA + ab * edgeDot / edgeLengthSq) * convex.scale;
-                result.distance = math.distance(result.hitpoint, point);
-                result.normal   = math.normalize(blob.edgeNormals[blob.edgeIndicesInFaces[bestFaceEdgeIndex + edgeRange.x]] * invScale);
+                result.hitpoint    = (vertexA + ab * edgeDot / edgeLengthSq) * convex.scale;
+                result.distance    = math.distance(result.hitpoint, point);
+                result.normal      = math.normalize(blob.edgeNormals[blob.edgeIndicesInFaces[bestFaceEdgeIndex + edgeRange.x]] * invScale);
+                result.featureCode = (ushort)(0x4000 + blob.edgeIndicesInFaces[bestFaceEdgeIndex + edgeRange.x]);
                 return result.distance <= maxDistance;
             }
             else if (dimensions == 0)
             {
-                result.hitpoint = 0f;
-                result.distance = math.length(point);
-                result.normal   = math.normalizesafe(point, new float3(0f, 1f, 0f));
+                result.hitpoint    = 0f;
+                result.distance    = math.length(point);
+                result.normal      = math.normalizesafe(point, new float3(0f, 1f, 0f));
+                result.featureCode = 0;
                 return result.distance <= maxDistance;
             }
             else if (dimensions == 1)
@@ -150,21 +156,24 @@ namespace Latios.Psyshock
                 float3 mask = math.select(0f, 1f, math.isfinite(invScale));
                 if (position <= min)
                 {
-                    result.hitpoint = min * mask;
-                    result.distance = math.distance(point, result.hitpoint);
-                    result.normal   = -mask;
+                    result.hitpoint    = min * mask;
+                    result.distance    = math.distance(point, result.hitpoint);
+                    result.normal      = -mask;
+                    result.featureCode = 0;
                     return result.distance <= maxDistance;
                 }
                 if (position >= max)
                 {
-                    result.hitpoint = max * mask;
-                    result.distance = math.distance(point, result.hitpoint);
-                    result.normal   = mask;
+                    result.hitpoint    = max * mask;
+                    result.distance    = math.distance(point, result.hitpoint);
+                    result.normal      = mask;
+                    result.featureCode = 1;
                     return result.distance <= maxDistance;
                 }
-                result.hitpoint = position * mask;
-                result.distance = math.distance(point, result.hitpoint);
-                result.normal   = math.normalizesafe(point - result.hitpoint, math.select(-mask, mask, position >= (min + mask) / 2f));
+                result.hitpoint    = position * mask;
+                result.distance    = math.distance(point, result.hitpoint);
+                result.normal      = math.normalizesafe(point - result.hitpoint, math.select(-mask, mask, position >= (min + mask) / 2f));
+                result.featureCode = 0x4000;
                 return result.distance <= maxDistance;
             }
             else  //if (dimensions == 2)
@@ -187,9 +196,10 @@ namespace Latios.Psyshock
                 inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
                 if (RaycastConvex(in inflateRay, in inflateConvex, out _, out _))
                 {
-                    result.hitpoint = hitPoint;
-                    result.distance = math.abs(math.csum(point * mask));
-                    result.normal   = math.select(-1f, 1f, point >= 0f) * mask;
+                    result.hitpoint    = hitPoint;
+                    result.distance    = math.abs(math.csum(point * mask));
+                    result.normal      = math.select(-1f, 1f, point >= 0f) * mask;
+                    result.featureCode = 0x8000;
                     return true;
                 }
 
@@ -214,14 +224,23 @@ namespace Latios.Psyshock
 
                     if (newDistance < result.distance)
                     {
-                        result.distance = newDistance;
-                        result.hitpoint = pointOnSegment;
+                        result.distance    = newDistance;
+                        result.hitpoint    = pointOnSegment;
+                        result.featureCode = (ushort)math.select(math.select(0x4000 + i, indices.x, dot == 0f), indices.y, dot == edgeLengthSq);
                     }
                 }
 
                 if (result.distance <= maxDistance)
                 {
-                    result.normal = math.select(-1f, 1f, point >= 0f) * mask;
+                    var normalScale = math.select(0f, invScale, flipMask == 1f);
+                    if (result.featureCode >= 0x4000)
+                    {
+                        result.normal = math.normalize(normalScale * blob.edgeNormals[result.featureCode & 0x7fff]);
+                    }
+                    else
+                    {
+                        result.normal = math.normalize(normalScale * blob.vertexNormals[result.featureCode & 0x7fff]);
+                    }
                     return true;
                 }
                 return false;

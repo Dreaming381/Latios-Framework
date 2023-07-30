@@ -15,15 +15,27 @@ namespace Latios.Psyshock
             var bInATransform = math.mul(math.inverse(convexTransform), triangleTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(convex, triangle, in bInATransform);
             var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
-            PointRayConvex.DistanceBetween(gjkResult.hitpointOnAInASpace + epsilon, in convex, in RigidTransform.identity, float.MaxValue, out var closestOnA);
-            PointRayTriangle.DistanceBetween(gjkResult.hitpointOnBInASpace - epsilon, in triangle, in bInATransform, float.MaxValue, out var closestOnB);
+            SphereConvex.DistanceBetween(in convex,
+                                         in RigidTransform.identity,
+                                         new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
+                                         RigidTransform.identity,
+                                         float.MaxValue,
+                                         out var closestOnA);
+            SphereTriangle.DistanceBetween(in triangle,
+                                           in bInATransform,
+                                           new SphereCollider(gjkResult.hitpointOnBInASpace - epsilon, 0f),
+                                           RigidTransform.identity,
+                                           float.MaxValue,
+                                           out var closestOnB);
             result = InternalQueryTypeUtilities.BinAResultToWorld(new ColliderDistanceResultInternal
             {
-                distance  = gjkResult.distance,
-                hitpointA = gjkResult.hitpointOnAInASpace,
-                hitpointB = gjkResult.hitpointOnBInASpace,
-                normalA   = closestOnA.normal,
-                normalB   = closestOnB.normal
+                distance     = gjkResult.distance,
+                hitpointA    = gjkResult.hitpointOnAInASpace,
+                hitpointB    = gjkResult.hitpointOnBInASpace,
+                normalA      = closestOnA.normalA,
+                normalB      = closestOnB.normalA,
+                featureCodeA = closestOnA.featureCodeA,
+                featureCodeB = closestOnB.featureCodeA
             }, convexTransform);
             return result.distance <= maxDistance;
         }

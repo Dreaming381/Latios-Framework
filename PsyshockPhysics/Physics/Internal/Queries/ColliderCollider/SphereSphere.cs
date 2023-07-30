@@ -15,14 +15,18 @@ namespace Latios.Psyshock
             var            aWorldToLocal      = math.inverse(aTransform);
             var            bInASpaceTransform = math.mul(aWorldToLocal, bTransform);
             SphereCollider bInASpace          = new SphereCollider(math.transform(bInASpaceTransform, sphereB.center), sphereB.radius);
-            bool           hit                = SphereSphereDistance(in sphereA, in bInASpace, maxDistance, out ColliderDistanceResultInternal localResult);
+            bool           hit                = SphereSphereDistance(in sphereA, in bInASpace, maxDistance, out ColliderDistanceResultInternal localResult, out _);
             result                            = new ColliderDistanceResult
             {
-                hitpointA = math.transform(aTransform, localResult.hitpointA),
-                hitpointB = math.transform(aTransform, localResult.hitpointB),
-                normalA   = math.rotate(aTransform, localResult.normalA),
-                normalB   = math.rotate(aTransform, localResult.normalB),
-                distance  = localResult.distance
+                hitpointA         = math.transform(aTransform, localResult.hitpointA),
+                hitpointB         = math.transform(aTransform, localResult.hitpointB),
+                normalA           = math.rotate(aTransform, localResult.normalA),
+                normalB           = math.rotate(aTransform, localResult.normalB),
+                distance          = localResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = 0,
+                featureCodeB      = 0,
             };
             return hit;
         }
@@ -59,7 +63,11 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool SphereSphereDistance(in SphereCollider sphereA, in SphereCollider sphereB, float maxDistance, out ColliderDistanceResultInternal result)
+        internal static bool SphereSphereDistance(in SphereCollider sphereA,
+                                                  in SphereCollider sphereB,
+                                                  float maxDistance,
+                                                  out ColliderDistanceResultInternal result,
+                                                  out bool degenerate)
         {
             float3 delta          = sphereB.center - sphereA.center;
             float  ccDistanceSq   = math.lengthsq(delta);  //center center distance
@@ -75,6 +83,7 @@ namespace Latios.Psyshock
                 normalB   = -normalA,
                 distance  = distance,
             };
+            degenerate = distanceIsZero;
             return distance <= maxDistance;
         }
     }

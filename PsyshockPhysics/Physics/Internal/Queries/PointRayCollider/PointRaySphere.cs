@@ -8,7 +8,7 @@ namespace Latios.Psyshock
         public static bool DistanceBetween(float3 point, in SphereCollider sphere, in RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInSphereSpace = math.transform(math.inverse(sphereTransform), point);
-            bool hit                = PointSphereDistance(pointInSphereSpace, in sphere, maxDistance, out var localResult);
+            bool hit                = PointSphereDistance(pointInSphereSpace, in sphere, maxDistance, out var localResult, out _);
             result                  = new PointDistanceResult
             {
                 hitpoint = math.transform(sphereTransform, localResult.hitpoint),
@@ -30,7 +30,7 @@ namespace Latios.Psyshock
             return hit;
         }
 
-        public static bool PointSphereDistance(float3 point, in SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result)
+        public static bool PointSphereDistance(float3 point, in SphereCollider sphere, float maxDistance, out PointDistanceResultInternal result, out bool degenerate)
         {
             float3 delta          = sphere.center - point;
             float  pcDistanceSq   = math.lengthsq(delta);  //point center distance
@@ -44,6 +44,7 @@ namespace Latios.Psyshock
                 distance = distance,
                 normal   = -inNormal,
             };
+            degenerate = distanceIsZero;
             return distance <= maxDistance;
         }
 

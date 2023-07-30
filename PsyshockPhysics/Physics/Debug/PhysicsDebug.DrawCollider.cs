@@ -215,6 +215,23 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Draws a wireframe of a TriMesh using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="triMesh">The convex mesh to draw</param>
+        /// <param name="transform">The transform of the convex mesh in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        public static void DrawCollider(in TriMeshCollider triMesh, in RigidTransform transform, Color color)
+        {
+            ref var blob = ref triMesh.triMeshColliderBlob.Value;
+
+            for (int i = 0; i < blob.triangles.Length; i++)
+            {
+                var triangle = Physics.ScaleStretchCollider(blob.triangles[i], 1f, triMesh.scale);
+                DrawCollider(in triangle, in transform, color);
+            }
+        }
+
+        /// <summary>
         /// Draws a wireframe of all subcolliders in a compound using UnityEngine.Debug.DrawLine calls
         /// </summary>
         /// <param name="sphere">The compound to draw</param>
@@ -258,6 +275,9 @@ namespace Latios.Psyshock
                     break;
                 case ColliderType.Convex:
                     DrawCollider(in collider.m_convex,   transform, color);
+                    break;
+                case ColliderType.TriMesh:
+                    DrawCollider(in collider.m_triMesh,  transform, color);
                     break;
                 case ColliderType.Compound:
                     DrawCollider(in collider.m_compound, transform, color, segmentsPerPi);

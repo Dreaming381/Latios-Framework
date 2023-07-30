@@ -23,11 +23,15 @@ namespace Latios.Psyshock
                                                                out ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
-                hitpointA = math.transform(boxTransform, localResult.hitpointA),
-                hitpointB = math.transform(boxTransform, localResult.hitpointB),
-                normalA   = math.rotate(boxTransform, localResult.normalA),
-                normalB   = math.rotate(boxTransform, localResult.normalB),
-                distance  = localResult.distance
+                hitpointA         = math.transform(boxTransform, localResult.hitpointA),
+                hitpointB         = math.transform(boxTransform, localResult.hitpointB),
+                normalA           = math.rotate(boxTransform, localResult.normalA),
+                normalB           = math.rotate(boxTransform, localResult.normalB),
+                distance          = localResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = localResult.featureCodeA,
+                featureCodeB      = 0
             };
             return hit;
         }
@@ -102,11 +106,13 @@ namespace Latios.Psyshock
             float3 normalB = math.normalizesafe(pointDistanceResult.hitpoint - sphere.center, -pointDistanceResult.normal);
             result         = new ColliderDistanceResultInternal
             {
-                distance  = pointDistanceResult.distance - sphere.radius,
-                hitpointA = pointDistanceResult.hitpoint,
-                hitpointB = sphere.center + normalB * sphere.radius,
-                normalA   = pointDistanceResult.normal,
-                normalB   = normalB,
+                distance     = pointDistanceResult.distance - sphere.radius,
+                hitpointA    = pointDistanceResult.hitpoint,
+                hitpointB    = sphere.center + normalB * sphere.radius,
+                normalA      = pointDistanceResult.normal,
+                normalB      = normalB,
+                featureCodeA = pointDistanceResult.featureCode,
+                featureCodeB = 0
             };
             return hit;
         }

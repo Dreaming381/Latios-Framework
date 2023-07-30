@@ -19,11 +19,11 @@ namespace Latios.Psyshock
         /// to be registered. A value less than 0 requires that the point be inside the collider.</param>
         /// <param name="result">Info about the surface point found if it is close enough to the query point</param>
         /// <returns>Returns true if the closest surface point is within maxDistance of the query point</returns>
-        /// <remarks>In the case of compound colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the compound.
+        /// <remarks>In the case of composite colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the composite.
         /// This can only happen when the query point is inside the collider. This may cause problems for algorithms which intend to place objects on the surface
-        /// of the compound collider. Also, in the case of compounds, the closest surface point of each subcollider is found, and the subcollider with the smallest
+        /// of the composite collider. Also, in the case of composites, the closest surface point of each subcollider is found, and the subcollider with the smallest
         /// signed distance to the query point is reported (most negative if the query point is inside), even if it is technically not the closest surface point across
-        /// all the compounds.</remarks>
+        /// all the composites.</remarks>
         public static bool DistanceBetween(float3 point, in Collider collider, in TransformQvvs transform, float maxDistance, out PointDistanceResult result)
         {
             return PointRayDispatch.DistanceBetween(point, in collider, in transform, maxDistance, out result);
@@ -43,11 +43,11 @@ namespace Latios.Psyshock
         /// <param name="result">Info about the surface point found if it is close enough to the query point</param>
         /// <param name="layerBodyInfo">Additional info as to which collider in the CollisionLayer was hit</param>
         /// <returns>Returns true if the closest surface point is within maxDistance of the query point</returns>
-        /// <remarks>In the case of compound colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the compound.
+        /// <remarks>In the case of composite colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the composite.
         /// This can only happen when the query point is inside the collider. This may cause problems for algorithms which intend to place objects on the surface
-        /// of the compound collider. Also, in the case of compounds, the closest surface point of each subcollider is found, and the subcollider with the smallest
+        /// of the composite collider. Also, in the case of composites, the closest surface point of each subcollider is found, and the subcollider with the smallest
         /// signed distance to the query point is reported (most negative if the query point is inside), even if it is technically not the closest surface point across
-        /// all the compounds.
+        /// all the composites.
         /// These same rules also apply to colliders in CollisionLayer. A reported surface point may be inside another collider inside the CollisionLayer. And the
         /// collider with the smallest signed distance to the query point is reported. If you want to find all hits, use FindObjects instead.</remarks>
         public static bool DistanceBetween(float3 point, in CollisionLayer layer, float maxDistance, out PointDistanceResult result, out LayerBodyInfo layerBodyInfo)
@@ -74,11 +74,11 @@ namespace Latios.Psyshock
         /// <param name="result">Info about the surface point found if it is close enough to the query point</param>
         /// <param name="layerBodyInfo">Additional info as to which collider in the CollisionLayer was hit</param>
         /// <returns>Returns true if the closest surface point is within maxDistance of the query point</returns>
-        /// <remarks>In the case of compound colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the compound.
+        /// <remarks>In the case of composite colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the composite.
         /// This can only happen when the query point is inside the collider. This may cause problems for algorithms which intend to place objects on the surface
-        /// of the compound collider. Also, in the case of compounds, the closest surface point of each subcollider is found, and the subcollider with the smallest
+        /// of the composite collider. Also, in the case of composites, the closest surface point of each subcollider is found, and the subcollider with the smallest
         /// signed distance to the query point is reported (most negative if the query point is inside), even if it is technically not the closest surface point across
-        /// all the compounds.
+        /// all the composites.
         /// Similar rules also apply to colliders in CollisionLayer. A reported surface point may be inside another collider inside the CollisionLayer. However, only
         /// the first surface point within maxDistance found by the algorithm is reported.</remarks>
         public static bool DistanceBetweenAny(float3 point, in CollisionLayer layer, float maxDistance, out PointDistanceResult result, out LayerBodyInfo layerBodyInfo)
@@ -109,10 +109,10 @@ namespace Latios.Psyshock
         /// corresponds to the first collider, and any field suffixed 'B' in the result corresponds to the second collider. If the method returns false, the
         /// contents of this result are undefined.</param>
         /// <returns>Returns true if the signed distance of the surface points are less than maxDistance, false otherwise</returns>
-        /// <remarks>If either colliderA or colliderB is a compound collider, the distance tests are performed individually across all subcolliders, and the subcollider
+        /// <remarks>If either colliderA or colliderB is a composite collider, the distance tests are performed individually across all subcolliders, and the subcollider
         /// with the smallest (or most negative in the case of overlaps) distance is used for the overall evaluation. The surface points reported may be inside other
         /// subcolliders. This may cause problems if this algorithm is used for depenetration, as only the individual subcolliders reported will be depenetrated, rather
-        /// than the entire compound.</remarks>
+        /// than the entire composite.</remarks>
         public static bool DistanceBetween(in Collider colliderA,
                                            in TransformQvvs transformA,
                                            in Collider colliderB,
@@ -132,6 +132,46 @@ namespace Latios.Psyshock
                                                             maxDistance,
                                                             out result);
         }
+
+        /// <summary>
+        /// An interface whose Execute method is invoked for each primitive pair found in a DistanceBetweenAll operation.
+        /// </summary>
+        public interface IDistanceBetweenAllProcessor
+        {
+            void Execute(in ColliderDistanceResult result);
+        }
+
+        /// <summary>
+        /// Checks if the distance between the surfaces of all subcolliders between two colliders are within maxDistance. If the colliders are overlapping, the determined
+        /// distance is negative. If the signed distance is less than maxDistance, info about the pair of surface points, one for each subcollider, is generated and
+        /// dispatched to the processor.
+        /// </summary>
+        /// <param name="colliderA">The first of the two colliders to test for distance</param>
+        /// <param name="transformA">The transform of the first of the two colliders</param>
+        /// <param name="colliderB">The second of the two colliders to test for distance</param>
+        /// <param name="transformB">The transform of the second of the two colliders</param>
+        /// <param name="maxDistance">The signed distance the surface points must be less than in order for a "hit" to be registered. A value less than 0 requires that
+        /// the colliders be overlapping.</param>
+        /// <param name="processor">The processor that will receive a ColliderDistanceResult for each found pair of subcolliders.</param>
+        public static void DistanceBetweenAll<T>(in Collider colliderA,
+                                                 in TransformQvvs transformA,
+                                                 in Collider colliderB,
+                                                 in TransformQvvs transformB,
+                                                 float maxDistance,
+                                                 ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
+        {
+            var scaledColliderA = colliderA;
+            var scaledColliderB = colliderB;
+
+            ScaleStretchCollider(ref scaledColliderA, transformA.scale, transformA.stretch);
+            ScaleStretchCollider(ref scaledColliderB, transformB.scale, transformB.stretch);
+            ColliderColliderDispatch.DistanceBetweenAll(in scaledColliderA,
+                                                        new RigidTransform(transformA.rotation, transformA.position),
+                                                        in scaledColliderB,
+                                                        new RigidTransform(transformB.rotation, transformB.position),
+                                                        maxDistance,
+                                                        ref processor);
+        }
         #endregion
 
         #region Collider vs Layer
@@ -150,10 +190,10 @@ namespace Latios.Psyshock
         /// contents of this result are undefined.</param>
         /// <param name="layerBodyInfo">Additional info as to which collider in the CollisionLayer was hit</param>
         /// <returns>Returns true if the signed distance of the surface points are less than maxDistance, false otherwise</returns>
-        /// <remarks>If either the test collider or the collider in the CollisionLayer is a compound collider, the distance tests are performed individually across all
+        /// <remarks>If either the test collider or the collider in the CollisionLayer is a composite collider, the distance tests are performed individually across all
         /// subcolliders, and the subcollider with the smallest (or most negative in the case of overlaps) distance is used for the overall evaluation. The surface points
         /// reported may be inside other subcolliders. This may cause problems if this algorithm is used for depenetration, as only the individual subcolliders reported
-        /// will be depenetrated, rather than the entire compound.
+        /// will be depenetrated, rather than the entire composite.
         /// The same rule applies for colliders in the CollisionLayer. The surface points reported may be inside other colliders in the CollisionLayer. If you want to
         /// find all hits, use FindObjects instead.</remarks>
         public static bool DistanceBetween(in Collider collider,
@@ -199,10 +239,10 @@ namespace Latios.Psyshock
         /// contents of this result are undefined.</param>
         /// <param name="layerBodyInfo">Additional info as to which collider in the CollisionLayer was hit</param>
         /// <returns>Returns true if the signed distance of the surface points are less than maxDistance, false otherwise</returns>
-        /// <remarks>If either the test collider or the collider in the CollisionLayer is a compound collider, the distance tests are performed individually across all
+        /// <remarks>If either the test collider or the collider in the CollisionLayer is a composite collider, the distance tests are performed individually across all
         /// subcolliders, and the subcollider with the smallest (or most negative in the case of overlaps) distance is used for the overall evaluation. The surface points
         /// reported may be inside other subcolliders. This may cause problems if this algorithm is used for depenetration, as only the individual subcolliders reported
-        /// will be depenetrated, rather than the entire compound.
+        /// will be depenetrated, rather than the entire composite.
         /// Similar rules apply for colliders in the CollisionLayer. The surface points reported may be inside other colliders in the CollisionLayer. However, only the
         /// first result found by the algorithm is reported.</remarks>
         public static bool DistanceBetweenAny(Collider collider,

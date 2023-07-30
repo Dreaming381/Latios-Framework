@@ -27,7 +27,7 @@ namespace Latios.Kinemation.Systems
         {
             var builder = new EntityQueryBuilder(Allocator.Temp)
                           .WithAllRW<MecanimController>()
-                          .WithAll<MecanimControllerEnabledTag>()
+                          .WithAll<MecanimControllerEnabledFlag>()
                           .WithAll<MecanimLayerStateMachineStatus>()
                           .WithAll<MecanimParameter>()
                           .WithAll<BoneReference>()

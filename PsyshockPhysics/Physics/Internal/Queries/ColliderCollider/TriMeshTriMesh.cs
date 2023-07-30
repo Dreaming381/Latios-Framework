@@ -1,4 +1,5 @@
 using Latios.Transforms;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -51,6 +52,42 @@ namespace Latios.Psyshock
             }
             result = default;
             return false;
+        }
+
+        public static unsafe void DistanceBetweenAll<T>(in TriMeshCollider triMeshA,
+                                                        in RigidTransform aTransform,
+                                                        in TriMeshCollider triMeshB,
+                                                        in RigidTransform bTransform,
+                                                        float maxDistance,
+                                                        ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            var transformAinB = math.mul(math.inverse(bTransform), aTransform);
+            var transformBinA = math.mul(math.inverse(aTransform), bTransform);
+            var aabbAinB      =
+                Physics.TransformAabb(new TransformQvvs(transformAinB.pos, transformAinB.rot, 1f, triMeshA.scale), in triMeshA.triMeshColliderBlob.Value.localAabb);
+            var aabbBinA =
+                Physics.TransformAabb(new TransformQvvs(transformBinA.pos, transformBinA.rot, 1f, triMeshB.scale), in triMeshB.triMeshColliderBlob.Value.localAabb);
+            aabbAinB.min *= maxDistance;
+            aabbAinB.max *= maxDistance;
+            aabbBinA.min *= maxDistance;
+            aabbBinA.max *= maxDistance;
+
+            var outerProcessor = new DistanceAllOuterProcessor<T>
+            {
+                processor = new DistanceAllInnerProcessor<T>
+                {
+                    maxDistance = maxDistance,
+                    processor   = (T*)UnsafeUtility.AddressOf(ref processor),
+                    transformA  = aTransform,
+                    transformB  = bTransform,
+                    triMeshA    = triMeshA
+                },
+                aabbBinA   = aabbBinA,
+                transformB = bTransform,
+                triMeshB   = triMeshB
+            };
+
+            triMeshB.triMeshColliderBlob.Value.FindTriangles(in aabbAinB, ref outerProcessor, triMeshB.scale);
         }
 
         public static bool ColliderCast(in TriMeshCollider triMeshToCast,
@@ -179,6 +216,47 @@ namespace Latios.Psyshock
                         bestIndexB   = index;
                     }
                 }
+
+                return true;
+            }
+        }
+
+        unsafe struct DistanceAllInnerProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            public TriMeshCollider  triMeshA;
+            public RigidTransform   transformA;
+            public TriangleCollider triangleB;
+            public RigidTransform   transformB;
+            public int              bIndex;
+            public float            maxDistance;
+            public T*               processor;
+
+            public bool Execute(int index)
+            {
+                var triangleA = Physics.ScaleStretchCollider(triMeshA.triMeshColliderBlob.Value.triangles[index], 1f, triMeshA.scale);
+                if (TriangleTriangle.DistanceBetween(in triangleA, in transformA, in triangleB, in transformB, maxDistance, out var hit))
+                {
+                    hit.subColliderIndexA = index;
+                    hit.subColliderIndexB = bIndex;
+                    processor->Execute(in hit);
+                }
+
+                return true;
+            }
+        }
+
+        unsafe struct DistanceAllOuterProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            public TriMeshCollider              triMeshB;
+            public RigidTransform               transformB;
+            public Aabb                         aabbBinA;
+            public DistanceAllInnerProcessor<T> processor;
+
+            public bool Execute(int index)
+            {
+                processor.triangleB = Physics.ScaleStretchCollider(triMeshB.triMeshColliderBlob.Value.triangles[index], 1f, triMeshB.scale);
+                processor.bIndex    = index;
+                processor.triMeshA.triMeshColliderBlob.Value.FindTriangles(in aabbBinA, ref processor, triMeshB.scale);
 
                 return true;
             }

@@ -1,4 +1,5 @@
 using Latios.Transforms;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -36,6 +37,27 @@ namespace Latios.Psyshock
             }
             result = default;
             return false;
+        }
+
+        public static unsafe void DistanceBetweenAll<T>(in TriMeshCollider triMesh,
+                                                        in RigidTransform triMeshTransform,
+                                                        in CapsuleCollider capsule,
+                                                        in RigidTransform capsuleTransform,
+                                                        float maxDistance,
+                                                        ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            var capsuleInTriMeshTransform = math.mul(math.inverse(triMeshTransform), capsuleTransform);
+            var aabb                      = Physics.AabbFrom(capsule, capsuleInTriMeshTransform);
+            var triProcessor              = new DistanceAllProcessor<T>
+            {
+                triMesh          = triMesh,
+                triMeshTransform = triMeshTransform,
+                capsule          = capsule,
+                capsuleTransform = capsuleTransform,
+                maxDistance      = maxDistance,
+                processor        = (T*)UnsafeUtility.AddressOf(ref processor)
+            };
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor);
         }
 
         public static bool ColliderCast(in CapsuleCollider capsuleToCast,
@@ -164,6 +186,27 @@ namespace Latios.Psyshock
                     }
                 }
 
+                return true;
+            }
+        }
+
+        unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        {
+            public TriMeshCollider triMesh;
+            public RigidTransform  triMeshTransform;
+            public CapsuleCollider capsule;
+            public RigidTransform  capsuleTransform;
+            public float           maxDistance;
+            public T*              processor;
+
+            public bool Execute(int index)
+            {
+                var triangle = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[index], 1f, triMesh.scale);
+                if (CapsuleTriangle.DistanceBetween(in triangle, in triMeshTransform, in capsule, in capsuleTransform, maxDistance, out var result))
+                {
+                    result.subColliderIndexA = index;
+                    processor->Execute(in result);
+                }
                 return true;
             }
         }

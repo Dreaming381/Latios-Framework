@@ -16,15 +16,27 @@ namespace Latios.Psyshock
             var bInATransform = math.mul(math.inverse(triangleTransform), boxTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(triangle, box, in bInATransform);
             var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
-            PointRayTriangle.DistanceBetween(gjkResult.hitpointOnAInASpace + epsilon, in triangle, in RigidTransform.identity, float.MaxValue, out var closestOnA);
-            PointRayBox.DistanceBetween(gjkResult.hitpointOnBInASpace - epsilon, in box, in bInATransform, float.MaxValue, out var closestOnB);
+            SphereTriangle.DistanceBetween(in triangle,
+                                           in triangleTransform,
+                                           new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
+                                           RigidTransform.identity,
+                                           float.MaxValue,
+                                           out var closestOnA);
+            SphereBox.DistanceBetween(in box,
+                                      in boxTransform,
+                                      new SphereCollider(gjkResult.hitpointOnBInASpace - epsilon, 0f),
+                                      RigidTransform.identity,
+                                      float.MaxValue,
+                                      out var closestOnB);
             result = InternalQueryTypeUtilities.BinAResultToWorld(new ColliderDistanceResultInternal
             {
-                distance  = gjkResult.distance,
-                hitpointA = gjkResult.hitpointOnAInASpace,
-                hitpointB = gjkResult.hitpointOnBInASpace,
-                normalA   = closestOnA.normal,
-                normalB   = closestOnB.normal
+                distance     = gjkResult.distance,
+                hitpointA    = gjkResult.hitpointOnAInASpace,
+                hitpointB    = gjkResult.hitpointOnBInASpace,
+                normalA      = closestOnA.normalA,
+                normalB      = closestOnB.normalA,
+                featureCodeA = closestOnA.featureCodeA,
+                featureCodeB = closestOnB.featureCodeA
             }, triangleTransform);
             return result.distance <= maxDistance;
         }

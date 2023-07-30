@@ -401,7 +401,7 @@ namespace Latios.Psyshock
                     }
                     float3 farthestAway = math.select(targetA, targetB, math.lengthsq(targetB) > math.lengthsq(targetA));
                     float3 rayExtents   = normalizedSearchDirectionInASpace * math.dot(farthestAway, normalizedSearchDirectionInASpace) * 2f;
-                    CapsuleCapsule.SegmentSegment(0f, rayExtents, targetA, targetB - targetA, out var closestA, out _);
+                    CapsuleCapsule.SegmentSegment(0f, rayExtents, targetA, targetB - targetA, out var closestA, out _, out _);
                     return math.length(closestA);
                 }
                 // We have a real triangle with a real normal
@@ -815,7 +815,7 @@ namespace Latios.Psyshock
                     }
                     float3 farthestAway = math.select(targetA, targetB, math.lengthsq(targetB) > math.lengthsq(targetA));
                     float3 rayExtents   = normalizedSearchDirectionInASpace * math.dot(farthestAway, normalizedSearchDirectionInASpace) * 2f;
-                    CapsuleCapsule.SegmentSegment(0f, rayExtents, targetA, targetB - targetA, out var closestA, out _);
+                    CapsuleCapsule.SegmentSegment(0f, rayExtents, targetA, targetB - targetA, out var closestA, out _, out _);
                     UnityEngine.Debug.Log($"Coplanar portal is line. winner: {winner}, closestA: {closestA}");
                     return math.length(closestA);
                 }

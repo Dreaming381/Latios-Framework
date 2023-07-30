@@ -12,7 +12,7 @@ namespace Latios.Kinemation
     /// Represents the enabled state of the animator controller.
     /// Prefer to use MecanimAspect instead of this component directly.
     /// </summary>
-    public struct MecanimControllerEnabledTag : IComponentData, IEnableableComponent { }
+    public struct MecanimControllerEnabledFlag : IComponentData, IEnableableComponent { }
 
     /// <summary>
     /// Represents the animator controller, containing animation clips and controller configuration.

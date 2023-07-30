@@ -23,11 +23,15 @@ namespace Latios.Psyshock
                                                                          out ColliderDistanceResultInternal localResult);
             result = new ColliderDistanceResult
             {
-                hitpointA = math.transform(triangleTransform, localResult.hitpointA),
-                hitpointB = math.transform(triangleTransform, localResult.hitpointB),
-                normalA   = math.rotate(triangleTransform, localResult.normalA),
-                normalB   = math.rotate(triangleTransform, localResult.normalB),
-                distance  = localResult.distance
+                hitpointA         = math.transform(triangleTransform, localResult.hitpointA),
+                hitpointB         = math.transform(triangleTransform, localResult.hitpointB),
+                normalA           = math.rotate(triangleTransform, localResult.normalA),
+                normalB           = math.rotate(triangleTransform, localResult.normalB),
+                distance          = localResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = localResult.featureCodeA,
+                featureCodeB      = 0
             };
             return hit;
         }
@@ -100,17 +104,18 @@ namespace Latios.Psyshock
             return false;
         }
 
-        public static bool TriangleSphereDistance(in TriangleCollider triangle, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
+        internal static bool TriangleSphereDistance(in TriangleCollider triangle, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
         {
             bool   hit     = PointRayTriangle.PointTriangleDistance(sphere.center, in triangle, maxDistance + sphere.radius, out PointDistanceResultInternal pointDistanceResult);
             float3 normalB = math.normalizesafe(pointDistanceResult.hitpoint - sphere.center, -pointDistanceResult.normal);
             result         = new ColliderDistanceResultInternal
             {
-                distance  = pointDistanceResult.distance - sphere.radius,
-                hitpointA = pointDistanceResult.hitpoint,
-                hitpointB = sphere.center + normalB * sphere.radius,
-                normalA   = pointDistanceResult.normal,
-                normalB   = normalB,
+                distance     = pointDistanceResult.distance - sphere.radius,
+                hitpointA    = pointDistanceResult.hitpoint,
+                hitpointB    = sphere.center + normalB * sphere.radius,
+                normalA      = pointDistanceResult.normal,
+                normalB      = normalB,
+                featureCodeA = pointDistanceResult.featureCode
             };
             return hit;
         }

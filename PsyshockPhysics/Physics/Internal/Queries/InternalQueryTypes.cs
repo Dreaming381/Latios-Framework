@@ -8,15 +8,18 @@ namespace Latios.Psyshock
         public float3 hitpoint;
         public float  distance;  // Negative if inside the collider
         public float3 normal;
+        public ushort featureCode;
     }
 
     public struct ColliderDistanceResultInternal
     {
-        public float3 hitpointA;
-        public float3 hitpointB;
-        public float3 normalA;
-        public float3 normalB;
-        public float  distance;
+        public float3   hitpointA;
+        public float3   hitpointB;
+        public float3   normalA;
+        public float3   normalB;
+        public float    distance;
+        internal ushort featureCodeA;
+        internal ushort featureCodeB;
     }
 
     internal struct SupportPoint
@@ -30,15 +33,19 @@ namespace Latios.Psyshock
 
     internal static class InternalQueryTypeUtilities
     {
-        public static ColliderDistanceResult BinAResultToWorld(in ColliderDistanceResultInternal BinAResult, in RigidTransform aTransform)
+        public static ColliderDistanceResult BinAResultToWorld(in ColliderDistanceResultInternal bInAResult, in RigidTransform aTransform)
         {
             return new ColliderDistanceResult
             {
-                hitpointA = math.transform(aTransform, BinAResult.hitpointA),
-                hitpointB = math.transform(aTransform, BinAResult.hitpointB),
-                normalA   = math.rotate(aTransform, BinAResult.normalA),
-                normalB   = math.rotate(aTransform, BinAResult.normalB),
-                distance  = BinAResult.distance
+                hitpointA         = math.transform(aTransform, bInAResult.hitpointA),
+                hitpointB         = math.transform(aTransform, bInAResult.hitpointB),
+                normalA           = math.rotate(aTransform, bInAResult.normalA),
+                normalB           = math.rotate(aTransform, bInAResult.normalB),
+                distance          = bInAResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = bInAResult.featureCodeA,
+                featureCodeB      = bInAResult.featureCodeB
             };
         }
 
