@@ -42,8 +42,9 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public static void InstallMecanimBakersAndSystems(ref CustomBakingBootstrapContext context)
         {
+#if UNITY_EDITOR
             context.filteredBakerTypes.Add(typeof(MecanimSmartBaker));
-            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<MecanimAnimatorControllerSmartBlobberSystem>());
+#endif
         }
     }
 }

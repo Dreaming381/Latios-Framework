@@ -6,7 +6,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 using static Unity.Entities.SystemAPI;
 
@@ -15,8 +14,10 @@ namespace Latios.Myri.Systems
     [DisableAutoCreation]
     [UpdateInGroup(typeof(Latios.Systems.PreSyncPointGroup))]
     [BurstCompile]
-    public partial struct AudioSystem : ISystem
+    public partial struct AudioSystem : ISystem, ISystemShouldUpdate
     {
+        bool m_initialized;
+
         private DSPGraph             m_graph;
         private LatiosDSPGraphDriver m_driver;
         private AudioOutputHandle    m_outputHandle;
@@ -62,7 +63,43 @@ namespace Latios.Myri.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            //Initialize containers first
+            m_initialized = false;
+
+            latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new AudioSettings
+            {
+                safetyAudioFrames             = 2,
+                audioFramesPerUpdate          = 1,
+                lookaheadAudioFrames          = 0,
+                logWarningIfBuffersAreStarved = false
+            });
+
+            // Create queries
+            m_aliveListenersQuery                = state.Fluent().WithAll<AudioListener>(true).Build();
+            m_deadListenersQuery                 = state.Fluent().Without<AudioListener>().WithAll<ListenerGraphState>().Build();
+            m_oneshotsToDestroyWhenFinishedQuery = state.Fluent().WithAll<AudioSourceOneShot>().WithAll<AudioSourceDestroyOneShotWhenFinished>(true).Build();
+            m_oneshotsQuery                      = state.Fluent().WithAll<AudioSourceOneShot>().Build();
+            m_loopedQuery                        = state.Fluent().WithAll<AudioSourceLooped>().Build();
+
+            m_entityHandle         = state.GetEntityTypeHandle();
+            m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);
+            m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
+            m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
+            m_coneHandle           = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
+        }
+
+        public bool ShouldUpdateSystem(ref SystemState state)
+        {
+            if (m_initialized)
+                return true;
+
+            if (m_aliveListenersQuery.IsEmptyIgnoreFilter && m_deadListenersQuery.IsEmptyIgnoreFilter && m_loopedQuery.IsEmptyIgnoreFilter && m_oneshotsQuery.IsEmptyIgnoreFilter &&
+                m_oneshotsToDestroyWhenFinishedQuery.IsEmptyIgnoreFilter)
+                return false;
+
+            m_initialized = true;
+
+            // Initialize containers first
             m_mixNodePortFreelist          = new NativeList<int>(Allocator.Persistent);
             m_mixNodePortCount             = new NativeReference<int>(Allocator.Persistent);
             m_ildNodePortCount             = new NativeReference<int>(Allocator.Persistent);
@@ -74,15 +111,7 @@ namespace Latios.Myri.Systems
             m_audioFrameHistory            = new NativeQueue<AudioFrameBufferHistoryElement>(Allocator.Persistent);
             m_listenerGraphStatesToDispose = new NativeList<ListenerGraphState>(Allocator.Persistent);
 
-            latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new AudioSettings
-            {
-                safetyAudioFrames             = 2,
-                audioFramesPerUpdate          = 1,
-                lookaheadAudioFrames          = 0,
-                logWarningIfBuffersAreStarved = false
-            });
-
-            //Create graph and driver
+            // Create graph and driver
             var format   = ChannelEnumConverter.GetSoundFormatFromSpeakerMode(UnityEngine.AudioSettings.speakerMode);
             var channels = ChannelEnumConverter.GetChannelCountFromSoundFormat(format);
             UnityEngine.AudioSettings.GetDSPBufferSize(out m_samplesPerFrame, out _);
@@ -108,14 +137,7 @@ namespace Latios.Myri.Systems
             }
             commandBlock.Complete();
 
-            //Create queries
-            m_aliveListenersQuery                = state.Fluent().WithAll<AudioListener>(true).Build();
-            m_deadListenersQuery                 = state.Fluent().Without<AudioListener>().WithAll<ListenerGraphState>().Build();
-            m_oneshotsToDestroyWhenFinishedQuery = state.Fluent().WithAll<AudioSourceOneShot>().WithAll<AudioSourceDestroyOneShotWhenFinished>(true).Build();
-            m_oneshotsQuery                      = state.Fluent().WithAll<AudioSourceOneShot>().Build();
-            m_loopedQuery                        = state.Fluent().WithAll<AudioSourceLooped>().Build();
-
-            //Force initialization of Burst
+            // Force initialization of Burst
             commandBlock  = m_graph.CreateCommandBlock();
             var dummyNode = commandBlock.CreateDSPNode<MixPortsToStereoNode.Parameters, MixPortsToStereoNode.SampleProviders, MixPortsToStereoNode>();
             StateVariableFilterNode.Create(commandBlock, StateVariableFilterNode.FilterType.Bandpass, 0f, 0f, 0f, 1);
@@ -129,12 +151,7 @@ namespace Latios.Myri.Systems
                                                                                                                                                             m_ildNode);
             commandBlock.Cancel();
 
-            m_entityHandle         = state.GetEntityTypeHandle();
-            m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);
-            m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
-            m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
-            m_coneHandle           = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
-            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
+            return true;
         }
 
         [BurstCompile]
@@ -403,6 +420,9 @@ namespace Latios.Myri.Systems
 
         public void OnDestroy(ref SystemState state)
         {
+            if (!m_initialized)
+                return;
+
             //UnityEngine.Debug.Log("AudioSystem.OnDestroy");
             m_lastUpdateJobHandle.Complete();
             state.CompleteDependency();

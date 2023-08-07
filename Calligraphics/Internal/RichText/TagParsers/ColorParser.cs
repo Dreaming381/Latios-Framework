@@ -25,10 +25,10 @@ namespace Latios.Calligraphics.RichText.Parsing
 
             if (tagValue.Length == 7 && tagValue[0] == m_hash)
             {
-                for (int i = 1, j = 1; i < ((tagValue.Length - 1) / 2); i++, j += 2)
+                for (int i = 0, j = 1; i < 3; i++, j += 2)
                     bytearray[i] = (byte)((tagValue[j] % 32 + 9) % 25 * 16 + (tagValue[j + 1] % 32 + 9) % 25);
 
-                tag.color = new Color32(bytearray[1], bytearray[2], bytearray[3], 255);
+                tag.color = new Color32(bytearray[0], bytearray[1], bytearray[2], 255);
                 return true;
             }
 

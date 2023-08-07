@@ -21,7 +21,7 @@ namespace Latios.Calligraphics.RichText.Parsing
             }
 
             //TODO:  More validations
-            if (tagValue.Length > 3)
+            if (tagValue.Length != 3)
                 return false;
             if (tagValue[0] != m_hash)
                 return false;

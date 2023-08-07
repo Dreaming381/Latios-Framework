@@ -49,6 +49,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             EnableSystemSorting = false;
 
+#if UNITY_EDITOR
             GetOrCreateAndAddManagedSystem<CreateShadowHierarchiesSystem>();  // sync
             GetOrCreateAndAddManagedSystem<GatherMeshBindingPathsFromShadowHierarchySystem>();  // sync
             GetOrCreateAndAddManagedSystem<PruneShadowHierarchiesSystem>();  // sync
@@ -74,6 +75,7 @@ namespace Latios.Kinemation.Authoring.Systems
 #endif
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync
             GetOrCreateAndAddManagedSystem<MecanimAnimatorControllerSmartBlobberSystem>();  // sync
+#endif
         }
     }
 

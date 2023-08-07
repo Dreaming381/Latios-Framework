@@ -20,10 +20,30 @@ namespace Latios.Calligraphics.Authoring
         [Multiline]
         public string text;
 
-        public float   fontSize = 12f;
-        public Color32 Color    = UnityEngine.Color.white;
+        public float               fontSize            = 12f;
+        public bool                wordWrap            = true;
+        public float               maxLineWidth        = float.MaxValue;
+        public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
+        public VerticalAlignment   verticalAlignment   = VerticalAlignment.Top;
+
+        public Color32 color = UnityEngine.Color.white;
 
         public List<FontMaterialPair> fontsAndMaterials;
+
+        public enum HorizontalAlignment : byte
+        {
+            Left = 0x0,
+            Right = 0x1,
+            Center = 0x2,
+            Justified = 0x3
+        }
+
+        public enum VerticalAlignment : byte
+        {
+            Top = 0x0,
+            Middle = 0x1 << 2,
+            Bottom = 0x2 << 2,
+        }
     }
 
     [Serializable]
@@ -60,11 +80,19 @@ namespace Latios.Calligraphics.Authoring
 
             var calliString = new CalliString(AddBuffer<CalliByte>(entity));
             calliString.Append(authoring.text);
-            AddComponent(entity, new TextBaseConfiguration { fontSize = authoring.fontSize, color = authoring.Color });
+            AddComponent(entity, new TextBaseConfiguration
+            {
+                fontSize     = authoring.fontSize,
+                color        = authoring.color,
+                maxLineWidth = math.select(float.MaxValue, authoring.maxLineWidth, authoring.wordWrap),
+                alignMode    = (AlignMode)(((byte)authoring.horizontalAlignment) | ((byte)authoring.verticalAlignment))
+            });
         }
 
         void AddFontRendering(Entity entity, FontMaterialPair fontMaterialPair)
         {
+            if (fontMaterialPair.font == null)
+                return;
             DependsOn(fontMaterialPair.font);
             DependsOn(fontMaterialPair.material);
             var layer = GetLayer();

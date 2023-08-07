@@ -29,15 +29,23 @@ namespace Latios.Kinemation.Authoring
             var sourceClips = runtimeAnimatorController.animationClips;
             for (int i = 0; i < sourceClips.Length; i++)
             {
-                clips[i] = new SkeletonClipConfig { clip = sourceClips[i], settings = SkeletonClipCompressionSettings.kDefaultSettings };
+                var sourceClip = sourceClips[i];
+                clips[i] = new SkeletonClipConfig {
+                    clip = sourceClip, events = sourceClip.ExtractKinemationClipEvents(Allocator.Temp), settings = SkeletonClipCompressionSettings.kDefaultSettings
+                };
             }
 
+            baker.AddBuffer<MecanimActiveClipEvent>(entity);
+
             // Bake controller
-            baker.AddComponent(                             entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
+            baker.AddComponent(                              entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
             baker.AddComponent<MecanimControllerEnabledFlag>(entity);
             baker.SetComponentEnabled<MecanimControllerEnabledFlag>(entity, authoring.enabled);
 
             AnimatorController animatorController = baker.FindAnimatorController(runtimeAnimatorController);
+
+            // Add previous state buffer
+            baker.AddBuffer<TimedMecanimClipInfo>(entity);
 
             // Bake parameters
             var parameters       = animatorController.parameters;

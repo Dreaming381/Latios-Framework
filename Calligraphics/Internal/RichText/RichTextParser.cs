@@ -22,7 +22,8 @@ namespace Latios.Calligraphics.RichText.Parsing
                         nextInfluenceTagOffset = 1,
                         startTagStartIndex     = currentCharIndex,
                         startScopeOffset       = (sbyte)(endIndex - currentCharIndex + 1),
-                        endTagOffset           = -1
+                        endTagStartIndex       = calliBytes.Length,
+                        endTagOffset           = 3
                     };
                     //Align
                     if (tagName == AlignParser.tagName && AlignParser.TryParseTagTypeAndValue(tagValue, ref tag))

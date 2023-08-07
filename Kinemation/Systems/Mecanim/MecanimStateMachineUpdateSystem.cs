@@ -20,8 +20,12 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<MecanimController>(false).WithAll<MecanimLayerStateMachineStatus>(false).WithAll<MecanimParameter>(false)
-                      .WithAll<MecanimControllerEnabledFlag>(true).Build();
+            m_query = state.Fluent()
+                .WithAll<MecanimController>(false)
+                .WithAll<MecanimLayerStateMachineStatus>(false)
+                .WithAll<MecanimParameter>(false)
+                .WithAll<TimedMecanimClipInfo>(false)
+                .WithAll<MecanimControllerEnabledFlag>(true).Build();
         }
 
         [BurstCompile]
@@ -38,6 +42,7 @@ namespace Latios.Kinemation.Systems
                 controllerHandle = GetComponentTypeHandle<MecanimController>(false),
                 parameterHandle  = GetBufferTypeHandle<MecanimParameter>(false),
                 layerHandle      = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(false),
+                previousFrameClipInfoHandle = GetBufferTypeHandle<TimedMecanimClipInfo>(false)
             }.ScheduleParallel(m_query, state.Dependency);
         }
 
@@ -49,23 +54,26 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<MecanimController>           controllerHandle;
             public BufferTypeHandle<MecanimLayerStateMachineStatus> layerHandle;
             public BufferTypeHandle<MecanimParameter>               parameterHandle;
+            public BufferTypeHandle<TimedMecanimClipInfo>           previousFrameClipInfoHandle;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var controllers      = chunk.GetNativeArray(ref controllerHandle);
                 var layersBuffers    = chunk.GetBufferAccessor(ref layerHandle);
-                var paramtersBuffers = chunk.GetBufferAccessor(ref parameterHandle);
-
+                var parametersBuffers = chunk.GetBufferAccessor(ref parameterHandle);
+                var previousFrameClipInfoBuffers =  chunk.GetBufferAccessor(ref previousFrameClipInfoHandle);
+                
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 while (enumerator.NextEntityIndex(out var indexInChunk))
                 {
                     var     controller     = controllers[indexInChunk];
                     ref var controllerBlob = ref controller.controller.Value;
-                    var     parameters     = paramtersBuffers[indexInChunk].AsNativeArray();
+                    var     parameters     = parametersBuffers[indexInChunk].AsNativeArray();
                     ref var parameterBlobs = ref controllerBlob.parameters;
                     var     layers         = layersBuffers[indexInChunk].AsNativeArray();
-
+                    var     previousFrameClipInfo = previousFrameClipInfoBuffers[indexInChunk].AsNativeArray();
+                    
                     var   deltaTime            = this.deltaTime * controller.speed;
                     float inertialBlendMaxTime = float.MaxValue;
                     bool  needsInertialBlend   = false;
@@ -77,12 +85,34 @@ namespace Latios.Kinemation.Systems
 
                         layer.timeInState += deltaTime;
 
-                        // Finish active transition
+                        // Finish active transition and update previous clip info time fragments
                         if (layer.previousStateIndex >= 0 && layer.transitionEndTimeInState <= layer.timeInState)
                         {
-                            layer.previousStateIndex          = -1;
-                            layer.currentTransitionIndex      = -1;
+                            for (int i = 0; i < previousFrameClipInfo.Length; i++)
+                            {
+                                var clipInfo = previousFrameClipInfo[i];
+                                if (clipInfo.layerIndex == layerIndex && clipInfo.stateIndex == layer.previousStateIndex)
+                                {
+                                    clipInfo.timeFragment = layer.timeInState - layer.transitionEndTimeInState;
+                                    previousFrameClipInfo[i] = clipInfo;
+                                }
+                            }
+
+                            layer.previousStateIndex = -1;
+                            layer.currentTransitionIndex = -1;
                             layer.currentTransitionIsAnyState = false;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < previousFrameClipInfo.Length; i++)
+                            {
+                                var clipInfo = previousFrameClipInfo[i];
+                                if (clipInfo.layerIndex == layerIndex)
+                                {
+                                    clipInfo.timeFragment = deltaTime;
+                                    previousFrameClipInfo[i] = clipInfo;
+                                }
+                            }
                         }
 
                         // Only evaluate non-interrupting transitions if we are not already transitioning
@@ -97,7 +127,9 @@ namespace Latios.Kinemation.Systems
                                 ref var transition = ref currentState.transitions[i];
 
                                 // Early out if we have an exit time and we haven't reached it yet
-                                if (transition.hasExitTime && layer.timeInState < transition.exitTime)
+                                ref var state = ref layerBlob.states[layer.currentStateIndex];
+                                float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
+                                if (transition.hasExitTime && transition.exitTime > normalizedTimeInState)
                                     continue;
 
                                 // Evaluate conditions
@@ -323,7 +355,7 @@ namespace Latios.Kinemation.Systems
                             }
                             else
                             {
-                                conditionsMet = Approximately(parameter.floatParam, condition.threshold);
+                                conditionsMet = MecanimInternalUtilities.Approximately(parameter.floatParam, condition.threshold);
                             }
 
                             break;
@@ -334,7 +366,7 @@ namespace Latios.Kinemation.Systems
                             }
                             else
                             {
-                                conditionsMet = !Approximately(parameter.floatParam, condition.threshold);
+                                conditionsMet = !MecanimInternalUtilities.Approximately(parameter.floatParam, condition.threshold);
                             }
 
                             break;
@@ -372,16 +404,8 @@ namespace Latios.Kinemation.Systems
                 if (transitionBlob.hasExitTime)
                 {
                     ref var state = ref layerBlob.states[layer.currentStateIndex];
-
-                    float normalizedTimeInState = 0f;  // Todo: Unused?
-                    if (transitionBlob.exitTime > 1f)
-                    {
-                        normalizedTimeInState = layer.timeInState / state.averageDuration;
-                    }
-                    else
-                    {
-                        normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
-                    }
+                    
+                    float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
                     var normalizedDeltaTime = deltaTime / state.averageDuration;
 
                     conditionsMet &= transitionBlob.exitTime > normalizedTimeInState - normalizedDeltaTime && transitionBlob.exitTime <= normalizedTimeInState;
@@ -401,11 +425,6 @@ namespace Latios.Kinemation.Systems
                     if (paramterBlobs[parameterIndex].parameterType == AnimatorControllerParameterType.Trigger)
                         parameters[parameterIndex] = new MecanimParameter { triggerParam = false };
                 }
-            }
-
-            private static bool Approximately(float a, in float b)
-            {
-                return math.abs(b - a) < math.max(0.000001f * math.max(math.abs(a), math.abs(b)), math.EPSILON * 8f);
             }
         }
     }

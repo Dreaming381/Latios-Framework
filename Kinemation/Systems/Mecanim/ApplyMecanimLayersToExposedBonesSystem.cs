@@ -30,6 +30,7 @@ namespace Latios.Kinemation.Systems
                           .WithAll<MecanimControllerEnabledFlag>()
                           .WithAll<MecanimLayerStateMachineStatus>()
                           .WithAll<MecanimParameter>()
+                          .WithAll<MecanimActiveClipEvent>()
                           .WithAll<BoneReference>()
                           .WithAllRW<ExposedSkeletonInertialBlendState>();
             m_query = builder.Build(ref state);
@@ -48,15 +49,17 @@ namespace Latios.Kinemation.Systems
             {
                 controllerHandle          = GetComponentTypeHandle<MecanimController>(false),
                 parametersHandle          = GetBufferTypeHandle<MecanimParameter>(true),
+                clipEventsHandle          = GetBufferTypeHandle<MecanimActiveClipEvent>(false),
                 layerStatusesHandle       = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(true),
                 boneReferenceHandle       = GetBufferTypeHandle<BoneReference>(true),
                 localTransformLookup      = m_localTransformLookup,
                 inertialBlendStatesHandle = GetBufferTypeHandle<ExposedSkeletonInertialBlendState>(false),
+                previousFrameClipInfoHandle = GetBufferTypeHandle<TimedMecanimClipInfo>(false),
                 previousDeltaTime         = m_previousDeltaTime,
-                deltaTime                 = Time.DeltaTime
+                deltaTime                 = SystemAPI.Time.DeltaTime
             }.ScheduleParallel(m_query, state.Dependency);
 
-            m_previousDeltaTime = Time.DeltaTime;
+            m_previousDeltaTime = SystemAPI.Time.DeltaTime;
         }
 
         [BurstCompile]
@@ -65,6 +68,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public BufferTypeHandle<MecanimLayerStateMachineStatus> layerStatusesHandle;
             [ReadOnly] public BufferTypeHandle<MecanimParameter>               parametersHandle;
             [ReadOnly] public BufferTypeHandle<BoneReference>                  boneReferenceHandle;
+            public BufferTypeHandle<MecanimActiveClipEvent>                    clipEventsHandle;
+            public BufferTypeHandle<TimedMecanimClipInfo>                      previousFrameClipInfoHandle;
 
             public BufferTypeHandle<ExposedSkeletonInertialBlendState> inertialBlendStatesHandle;
             public ComponentTypeHandle<MecanimController>              controllerHandle;
@@ -84,7 +89,9 @@ namespace Latios.Kinemation.Systems
                 var controllers                = chunk.GetNativeArray(ref controllerHandle);
                 var layerStatusesBuffers       = chunk.GetBufferAccessor(ref layerStatusesHandle);
                 var parametersBuffers          = chunk.GetBufferAccessor(ref parametersHandle);
+                var clipEventsBuffers          = chunk.GetBufferAccessor(ref clipEventsHandle);
                 var boneReferencesBuffers      = chunk.GetBufferAccessor(ref boneReferenceHandle);
+                var previousFrameClipInfoBuffers = chunk.GetBufferAccessor(ref previousFrameClipInfoHandle);
                 var inertialBlendStatesBuffers = chunk.GetBufferAccessor(ref inertialBlendStatesHandle);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
@@ -93,8 +100,10 @@ namespace Latios.Kinemation.Systems
                     var     controller     = controllers[indexInChunk];
                     ref var controllerBlob = ref controller.controller.Value;
                     var     parameters     = parametersBuffers[indexInChunk].AsNativeArray();
+                    var     clipEvents     = clipEventsBuffers[indexInChunk];
                     var     layerStatuses  = layerStatusesBuffers[indexInChunk].AsNativeArray();
                     var     boneReferences = boneReferencesBuffers[indexInChunk].AsNativeArray();
+                    var     previousFrameClipInfo = previousFrameClipInfoBuffers[indexInChunk];
 
                     if (!clipWeights.IsCreated)
                     {
@@ -110,14 +119,14 @@ namespace Latios.Kinemation.Systems
                     for (int i = 0; i < layerStatuses.Length; i++)
                     {
                         var layer = layerStatuses[i];
-
                         ref var layerBlob = ref controllerBlob.layers[i];
-                        if (i == 0 || layerBlob.blendingMode ==
-                            MecanimControllerLayerBlob.LayerBlendingMode.Override)
+                        if (i == 0 || layerBlob.blendingMode == MecanimControllerLayerBlob.LayerBlendingMode.Override)
                         {
-                            MecanimInternalUtilities.AddLayerClipWeights(ref clipWeights, ref layerBlob,
+                            MecanimInternalUtilities.AddLayerClipWeights(ref clipWeights, 
+                                                                         ref layerBlob,
+                                                                         (short)i,
                                                                          layer.currentStateIndex,
-                                                                         math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
+                                                                         (short)math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
                                                                          parameters,
                                                                          layer.timeInState,
                                                                          layer.transitionEndTimeInState,
@@ -130,9 +139,11 @@ namespace Latios.Kinemation.Systems
                             //TODO:  Compare this to base functionality with avatar masks
                             var layerWeight = layerBlob.defaultWeight;
 
-                            MecanimInternalUtilities.AddLayerClipWeights(ref clipWeights, ref layerBlob,
+                            MecanimInternalUtilities.AddLayerClipWeights(ref clipWeights, 
+                                                                         ref layerBlob,
+                                                                         (short)i,
                                                                          layer.currentStateIndex,
-                                                                         math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
+                                                                         (short)math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
                                                                          parameters,
                                                                          layer.timeInState,
                                                                          layer.transitionEndTimeInState,
@@ -141,6 +152,11 @@ namespace Latios.Kinemation.Systems
                                                                          floatCache);
                         }
                     }
+                    
+                    //Add clip events
+                    ref var clipSet = ref controller.clips.Value;
+                    clipEvents.Clear();
+                    MecanimInternalUtilities.AddClipEvents(clipWeights, previousFrameClipInfo, ref clipSet, ref clipEvents, deltaTime);
 
                     //Grab total weight for normalization
                     var totalWeight = 0f;
@@ -154,7 +170,6 @@ namespace Latios.Kinemation.Systems
                     NativeArray<TransformQvvs> transforms = transformCache.AsArray();
                     var                        blender    = new BufferPoseBlender(transforms);
 
-                    ref var clipSet = ref controller.clips.Value;
                     for (int i = 0; i < clipWeights.Length; i++)
                     {
                         ref var clip        = ref clipSet.clips[clipWeights[i].mecanimClipIndex];
@@ -164,12 +179,14 @@ namespace Latios.Kinemation.Systems
                         if (blendWeight < 0.0001f)
                             continue;
 
-                        var time = clip.LoopToClipTime(clipWeight.motionTime);
+                        ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
+                        
+                        var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
                         clipSet.clips[clipWeights[i].mecanimClipIndex].SamplePose(ref blender, time, blendWeight);
                     }
 
                     blender.NormalizeRotations();
-
+                    
                     // Begin write-back with inertial blending
                     bool startInertialBlend = controller.triggerStartInertialBlend;
                     if (controller.triggerStartInertialBlend)
@@ -193,11 +210,15 @@ namespace Latios.Kinemation.Systems
                         inertialStatesBuffer.Clear();
                         inertialStatesBuffer.ResizeUninitialized(transforms.Length);
                     }
+
                     var   inertialStates = (ExposedSkeletonInertialBlendState*)inertialBlendStatesBuffers[indexInChunk].GetUnsafePtr();
                     var   inertialTime   = new InertialBlendingTimingData(controller.timeSinceLastInertialBlendStart);
                     float rcpPreviousDt  = math.rcp(previousDeltaTime);
                     for (int i = 0; i < transforms.Length; i++)
                     {
+                        if (i == 0)
+                            continue;
+                        
                         var localTransform = localTransformLookup[boneReferences[i].bone];
                         var localValue     = localTransform.localTransform;
                         var worldIndex     = localValue.worldIndex;
@@ -227,8 +248,115 @@ namespace Latios.Kinemation.Systems
 
                         localValue.worldIndex = worldIndex;
 
-                        if (i > 0)
-                            localTransform.localTransform = localValue;
+                        localTransform.localTransform = localValue;
+                    }
+
+                    //Root motion
+                    if (controller.applyRootMotion)
+                    {
+                        //Get the current clip deltas
+                        var currentRoot = TransformQvvs.identity;
+                        for (int i = 0; i < clipWeights.Length; i++)
+                        {
+                            var clipWeight = clipWeights[i];
+                            ref var clip = ref clipSet.clips[clipWeight.mecanimClipIndex];
+                            var blendWeight = clipWeight.weight / totalWeight;
+                            //Cull clips with negligible weight
+                            if (blendWeight < 0.0001f)
+                                continue;
+
+                            ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
+                            var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
+                            var deltaTransform = TransformQvvs.identity;
+                            var hasLooped = state.isLooping && time - deltaTime < 0f;
+
+                            //If the clip has looped, get a sample of the end of the clip to incorporate it into the delta
+                            if (hasLooped)
+                            {
+                                deltaTransform = clip.SampleBone(0, time);
+                                var previousClipSample = clip.SampleBone(0, clipWeight.motionTime - deltaTime);
+                                var endClipSample = clip.SampleBone(0, clip.duration);
+
+                                deltaTransform.position += endClipSample.position - previousClipSample.position;
+                                deltaTransform.rotation = math.mul(deltaTransform.rotation, math.mul(math.inverse(endClipSample.rotation), previousClipSample.rotation));
+                            }
+                            else if (time < clip.duration)
+                            {
+                                //Get the delta as normal
+                                var currentClipSample = clip.SampleBone(0, time);
+                                var previousClipSample = clip.SampleBone(0, time - deltaTime);
+                                
+                                deltaTransform.position += currentClipSample.position - previousClipSample.position;
+                                deltaTransform.rotation = math.mul(math.inverse(currentClipSample.rotation), previousClipSample.rotation);
+                            }
+
+                            currentRoot.position += deltaTransform.position * blendWeight;
+                            currentRoot.rotation = math.slerp(currentRoot.rotation, deltaTransform.rotation, blendWeight);
+                        }
+
+                        //Get the previous clip deltas
+                        var previousRoot = TransformQvvs.identity;
+                        for (int i = 0; i < previousFrameClipInfo.Length; i++)
+                        {
+                            var clipWeight = previousFrameClipInfo[i]; 
+                            //We can tell if the clip is playing still by comparing the timeFragment to deltaTime
+                            //If the clip is no longer playing, we need to capture the fragmented delta by sampling at the motion time and at the motion time + time fragment
+                            var isPlaying = clipWeight.timeFragment == deltaTime;
+                            if (isPlaying)
+                                continue;
+
+                            ref var clip = ref clipSet.clips[clipWeight.mecanimClipIndex];
+                            var blendWeight = clipWeight.weight / totalWeight;
+                            //Cull clips with negligible weight
+                            if (blendWeight < 0.0001f) 
+                                continue;
+                    
+                            ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
+                            var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
+                            var sampleTransform = clip.SampleBone(0, time);
+                    
+                            //If the clip has looped, we need the previous sample to capture the delta of the clip end
+                            var hasLooped = state.isLooping && time - deltaTime < 0f;
+                            if (hasLooped)
+                            { 
+                                var endClipSample = clip.SampleBone(0, clip.duration);
+                         
+                                sampleTransform.position -= endClipSample.position;
+                                sampleTransform.rotation = math.mul(math.inverse(sampleTransform.rotation), endClipSample.rotation);
+                
+                                var remainderSample = clip.SampleBone(0, clipWeight.timeFragment - (clip.duration - time));
+                     
+                                sampleTransform.position -= remainderSample.position;
+                                sampleTransform.rotation = math.mul(math.inverse(sampleTransform.rotation), remainderSample.rotation);
+                            }
+                            else
+                            { 
+                                //need to get the sample at the time fragment
+                                var timeFragmentSample = clip.SampleBone(0, time + clipWeight.timeFragment);
+                             
+                                sampleTransform.position -= timeFragmentSample.position;
+                                sampleTransform.rotation = math.mul(math.inverse(sampleTransform.rotation), timeFragmentSample.rotation);
+                            }
+                    
+                            previousRoot.position += sampleTransform.position * blendWeight;
+                            previousRoot.rotation = math.slerp(previousRoot.rotation, sampleTransform.rotation, blendWeight);
+                        }
+                        
+                        //write the deltas to the root transform
+                        var rootBone = localTransformLookup[boneReferences[0].bone];
+                        var rootDelta = TransformQvvs.identity;
+
+                        rootDelta.position = currentRoot.position - previousRoot.position;
+                        rootDelta.rotation = math.mul(math.inverse(previousRoot.rotation), currentRoot.rotation);
+                        
+                        rootBone.localTransform = qvvs.mul(rootBone.localTransform, rootDelta);
+                    }
+
+                    //Store previous frame clip info
+                    previousFrameClipInfo.Clear();
+                    for (int i = 0; i < clipWeights.Length; i++)
+                    {
+                        previousFrameClipInfo.Add(clipWeights[i]);
                     }
                 }
             }

@@ -64,6 +64,8 @@ namespace Latios.Kinemation
     [InternalBufferCapacity(1)]
     public struct MecanimLayerStateMachineStatus : IBufferElementData
     {
+        // Todo: Move TimeFragment here and add previousStatePreviousTimeInState
+
         /// <summary>
         /// The time in the current state in seconds.  This controls at what point in time an animation clip is sampled.
         /// </summary>
@@ -126,6 +128,16 @@ namespace Latios.Kinemation
 
         [FieldOffset(0)]
         public bool triggerParam;
+    }
+
+    /// <summary>
+    /// An active animation clip event.  The indices refer to an animation clip event in a baked SkeletonClipSetBlob.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct MecanimActiveClipEvent : IBufferElementData
+    {
+        public int   clipIndex;
+        public short eventIndex;
     }
 
     [InternalBufferCapacity(0)]
@@ -295,14 +307,38 @@ namespace Latios.Kinemation
 
     #endregion
 
-    // Todo: Find a better home for this.
-    public struct TimedMecanimClipInfo
+    // Todo: Remove from entity
+    [InternalBufferCapacity(0)]
+    public struct TimedMecanimClipInfo : IBufferElementData
     {
-        public int   mecanimClipIndex;
+        /// <summary>
+        /// The index of the clip contained within the Mecanim Controller.
+        /// </summary>
+        public int mecanimClipIndex;
+        /// <summary>
+        /// The blend weight of the clip
+        /// </summary>
         public float weight;
+        /// <summary>
+        /// The absolute motion time of the clip
+        /// </summary>
         public float motionTime;
+        /// <summary>
+        /// The amount of time this clip will have remained active from the previous frame.
+        /// This will be volatile during transitions.  Populated during the state machine update.
+        /// Will be delta time if the same clip is active between frames.
+        /// </summary>
+        public float timeFragment;
+        /// <summary>
+        /// The index of the layer on which the clip is used
+        /// </summary>
+        public short layerIndex;
+        /// <summary>
+        /// The index of the state on which the clip is active.  This will be used to calculate time fragments.
+        /// </summary>
+        public short stateIndex;
 
-        public TimedMecanimClipInfo(ref MecanimStateBlob state, NativeArray<MecanimParameter> parameters, float weightFactor, float timeInState)
+        public TimedMecanimClipInfo(ref MecanimStateBlob state, NativeArray<MecanimParameter> parameters, float weightFactor, float timeInState, short layerIndex, short stateIndex)
         {
             mecanimClipIndex = state.clipIndex;
             weight           = weightFactor;
@@ -314,7 +350,11 @@ namespace Latios.Kinemation
                         state.speed;
             motionTime = state.timeParameterIndex != -1 ?
                          parameters[state.timeParameterIndex].floatParam :
-                         (timeInState * speed) % state.averageDuration + cycleOffset;  // Todo: Should cycleOffset be added before the loop modulus?
+                         (timeInState * speed) + cycleOffset;
+
+            this.layerIndex = layerIndex;
+            this.stateIndex = stateIndex;
+            timeFragment    = 0;
         }
     }
 }

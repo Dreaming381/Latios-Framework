@@ -7,10 +7,79 @@ namespace Latios.Kinemation
 {
     internal static class MecanimInternalUtilities
     {
+        internal static bool Approximately(float a, in float b)
+        {
+            return math.abs(b - a) < math.max(0.000001f * math.max(math.abs(a), math.abs(b)), math.EPSILON * 8f);
+        }
+
+        internal static void AddClipEvents(NativeList<TimedMecanimClipInfo>          currentClipWeights,
+                                           DynamicBuffer<TimedMecanimClipInfo>       previousClipWeights,
+                                           ref SkeletonClipSetBlob clipSet,
+                                           ref DynamicBuffer<MecanimActiveClipEvent> clipEvents,
+                                           float deltaTime)
+        {
+            // Todo: I think this implementation can generate double events if the motionTime is exactly equal to the eventTime.
+            //Check for events in the current clips
+
+            for (int i = 0; i < currentClipWeights.Length; i++)
+            {
+                var     clipWeight = currentClipWeights[i];
+                ref var clip       = ref clipSet.clips[clipWeight.mecanimClipIndex];
+
+                for (int j = 0; j < clip.events.times.Length; j++)
+                {
+                    var eventTime          = clip.events.times[j];
+                    var motionTime         = clip.LoopToClipTime(clipWeight.motionTime);
+                    var previousMotionTime = motionTime - deltaTime;
+                    var hasLooped          = motionTime < clipWeight.motionTime && clipWeight.motionTime > clip.duration;
+                    if ((eventTime >= previousMotionTime && eventTime <= motionTime) ||
+                        (hasLooped && eventTime >= clip.duration + previousMotionTime && eventTime <= clip.duration))
+                    {
+                        clipEvents.Add(new MecanimActiveClipEvent
+                        {
+                            clipIndex  = clipWeight.mecanimClipIndex,
+                            eventIndex = (short)j,
+                        });
+                    }
+                }
+            }
+
+            //Check for clip events in the previous clips
+            for (int i = 0; i < previousClipWeights.Length; i++)
+            {
+                var  clipWeight = previousClipWeights[i];
+                bool isPlaying  = clipWeight.timeFragment == deltaTime;
+
+                if (isPlaying)
+                {
+                    continue;
+                }
+
+                ref var clip = ref clipSet.clips[clipWeight.mecanimClipIndex];
+                for (int j = 0; j < clip.events.times.Length; j++)
+                {
+                    var eventTime          = clip.events.times[j];
+                    var previousMotionTime = clip.LoopToClipTime(clipWeight.motionTime);
+                    var motionTime         = clip.LoopToClipTime(clipWeight.motionTime + clipWeight.timeFragment);
+                    var hasLooped          = motionTime < clipWeight.motionTime && clipWeight.motionTime > clip.duration;
+                    if ((eventTime >= previousMotionTime && eventTime <= motionTime) ||
+                        (hasLooped && eventTime >= clip.duration + previousMotionTime && eventTime <= clip.duration))
+                    {
+                        clipEvents.Add(new MecanimActiveClipEvent
+                        {
+                            clipIndex  = clipWeight.mecanimClipIndex,
+                            eventIndex = (short)j,
+                        });
+                    }
+                }
+            }
+        }
+
         internal static void AddLayerClipWeights(ref NativeList<TimedMecanimClipInfo> clipWeights,
                                                  ref MecanimControllerLayerBlob layer,
-                                                 int currentStateIndex,
-                                                 int lastStateIndex,
+                                                 short layerIndex,
+                                                 short currentStateIndex,
+                                                 short lastStateIndex,
                                                  NativeArray<MecanimParameter>        parameters,
                                                  float timeInState,
                                                  float lastTransitionDuration,
@@ -33,15 +102,19 @@ namespace Latios.Kinemation
                     var lastStateTime  = timeInState + lastExitTime;
                     var normalizedTime = timeInState / lastTransitionDuration;
 
-                    AddStateClipWeights(ref clipWeights,
+                    AddStateClipWeights(layerIndex,
+                                        ref clipWeights,
                                         ref lastState,
+                                        lastStateIndex,
                                         ref layer.childMotions,
                                         parameters,
                                         lastStateTime,
                                         layerWeight * (1 - normalizedTime),
                                         weightCache);
-                    AddStateClipWeights(ref clipWeights,
+                    AddStateClipWeights(layerIndex,
+                                        ref clipWeights,
                                         ref layer.states[currentStateIndex],
+                                        currentStateIndex,
                                         ref layer.childMotions,
                                         parameters,
                                         timeInState,
@@ -50,8 +123,10 @@ namespace Latios.Kinemation
                 }
                 else
                 {
-                    AddStateClipWeights(ref clipWeights,
+                    AddStateClipWeights(layerIndex,
+                                        ref clipWeights,
                                         ref layer.states[currentStateIndex],
+                                        currentStateIndex,
                                         ref layer.childMotions,
                                         parameters,
                                         timeInState,
@@ -61,8 +136,10 @@ namespace Latios.Kinemation
             }
             else
             {
-                AddStateClipWeights(ref clipWeights,
+                AddStateClipWeights(layerIndex,
+                                    ref clipWeights,
                                     ref layer.states[currentStateIndex],
+                                    currentStateIndex,
                                     ref layer.childMotions,
                                     parameters,
                                     timeInState,
@@ -71,8 +148,10 @@ namespace Latios.Kinemation
             }
         }
 
-        private static void AddStateClipWeights(ref NativeList<TimedMecanimClipInfo> clipWeights,
+        private static void AddStateClipWeights(short layerIndex,
+                                                ref NativeList<TimedMecanimClipInfo> clipWeights,
                                                 ref MecanimStateBlob state,
+                                                short stateIndex,
                                                 ref BlobArray<MecanimStateBlob>      childMotions,
                                                 NativeArray<MecanimParameter>        parameters,
                                                 float timeInState,
@@ -91,8 +170,10 @@ namespace Latios.Kinemation
                         {
                             ref var childMotion               = ref childMotions[state.childMotionIndices[i]];
                             var     directBlendParameterValue = parameters[state.directBlendParameterIndices[i]].floatParam;
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref childMotion,
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -111,7 +192,7 @@ namespace Latios.Kinemation
                             {
                                 ref var childMotion = ref childMotions[state.childMotionIndices[0]];
                                 clipWeights.Add(new TimedMecanimClipInfo(ref childMotion, parameters, weightFactor,
-                                                                         timeInState));
+                                                                         timeInState, layerIndex, stateIndex));
                             }
 
                             break;
@@ -122,7 +203,7 @@ namespace Latios.Kinemation
                         int stateChildMotionStartIndex = -1;
                         for (int i = 0; i < state.childMotionIndices.Length - 1; i++)
                         {
-                            if (state.childMotionThresholds[i] < blendParameter &&
+                            if (state.childMotionThresholds[i] <= blendParameter &&
                                 state.childMotionThresholds[i + 1] >= blendParameter)
                             {
                                 //Blend these two
@@ -142,15 +223,19 @@ namespace Latios.Kinemation
                             ref var endChildMotion =
                                 ref childMotions[state.childMotionIndices[stateChildMotionStartIndex + 1]];
 
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref startChildMotion,
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
                                                 weightFactor * (1f - blendFactor),
                                                 motionWeightCache);
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref endChildMotion,
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -161,8 +246,10 @@ namespace Latios.Kinemation
                         {
                             //Find the motion at the edge of the blend
                             var childMotionIndex = blendParameter < state.childMotionThresholds[0] ? 0 : state.childMotionIndices.Length - 1;
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref childMotions[state.childMotionIndices[childMotionIndex]],
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -198,8 +285,10 @@ namespace Latios.Kinemation
                         for (int i = 0; i < state.childMotionIndices.Length; i++)
                         {
                             int childMotionIndex = state.childMotionIndices[i];
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref childMotions[childMotionIndex],
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -264,8 +353,10 @@ namespace Latios.Kinemation
                         for (int i = 0; i < state.childMotionIndices.Length; i++)
                         {
                             int childMotionIndex = state.childMotionIndices[i];
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref childMotions[childMotionIndex],
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -341,8 +432,10 @@ namespace Latios.Kinemation
                         for (int i = 0; i < state.childMotionIndices.Length; i++)
                         {
                             int childMotionIndex = state.childMotionIndices[i];
-                            AddStateClipWeights(ref clipWeights,
+                            AddStateClipWeights(layerIndex,
+                                                ref clipWeights,
                                                 ref childMotions[childMotionIndex],
+                                                stateIndex,
                                                 ref childMotions,
                                                 parameters,
                                                 timeInState,
@@ -356,7 +449,7 @@ namespace Latios.Kinemation
             }
             else
             {
-                clipWeights.Add(new TimedMecanimClipInfo(ref state, parameters, weightFactor, timeInState));
+                clipWeights.Add(new TimedMecanimClipInfo(ref state, parameters, weightFactor, timeInState, layerIndex, stateIndex));
             }
         }
 

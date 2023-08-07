@@ -162,8 +162,9 @@ namespace Latios.Kinemation
             ref var state     = ref layerData.states[layer.currentStateIndex];
             MecanimInternalUtilities.AddLayerClipWeights(ref clipInfo,
                                                          ref layerData,
+                                                         (short)layerIndex,
                                                          layer.currentStateIndex,
-                                                         math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
+                                                         (short)math.select(layer.previousStateIndex, -3, layer.transitionIsInertialBlend),
                                                          m_parameters.AsNativeArray(),
                                                          layer.timeInState,
                                                          layer.transitionEndTimeInState,
