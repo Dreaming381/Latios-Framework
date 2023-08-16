@@ -58,7 +58,7 @@ namespace Latios.Psyshock
                 }
             }
 
-            SearchTreeLooped(0, ref context, ref processor);
+            SearchTreeLooped(ref context, ref processor);
         }
 
         private static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
@@ -115,6 +115,9 @@ namespace Latios.Psyshock
             }
         }
 
+        private static void SearchTree<T>(ref AabbSweepRecursiveContext context, ref T processor) where T : struct, IFindObjectsProcessor => SearchTree(0,
+                                                                                                                                                        ref context,
+                                                                                                                                                        ref processor);
         private static void SearchTree<T>(uint currentIndex, ref AabbSweepRecursiveContext context, ref T processor) where T : struct, IFindObjectsProcessor
         {
             if (currentIndex >= context.bucket.count)
@@ -152,11 +155,11 @@ namespace Latios.Psyshock
         }
 
         [SkipLocalsInit]
-        private static unsafe void SearchTreeLooped<T>(uint _currentIndex, ref AabbSweepRecursiveContext context, ref T processor) where T : struct, IFindObjectsProcessor
+        private static unsafe void SearchTreeLooped<T>(ref AabbSweepRecursiveContext context, ref T processor) where T : struct, IFindObjectsProcessor
         {
             uint        currentFrameIndex = 0;
             StackFrame* stack             = stackalloc StackFrame[32];
-            stack[0]                      = new StackFrame { currentIndex = _currentIndex, checkpoint = 0 };
+            stack[0]                      = new StackFrame { currentIndex = 0, checkpoint = 0 };
 
             while (currentFrameIndex < 32)
             {

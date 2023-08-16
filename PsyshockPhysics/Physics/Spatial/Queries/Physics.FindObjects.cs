@@ -43,7 +43,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// The index of the collider in the CollisionLayer
         /// </summary>
-        public int bodyIndex => m_bodyIndexRelative + m_bucket.count;
+        public int bodyIndex => m_bodyIndexRelative + m_bucket.bucketGlobalStart;
         /// <summary>
         /// The index of the collider relative to the original EntityQuery or NativeArrays used to create the CollisionLayer
         /// </summary>

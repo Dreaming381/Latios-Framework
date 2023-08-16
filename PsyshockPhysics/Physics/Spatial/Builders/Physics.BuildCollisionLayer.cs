@@ -281,7 +281,7 @@ namespace Latios.Psyshock
             else if (config.hasBodiesArray)
             {
                 layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies, config.aabbs);
+                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies);
             }
             else
             {

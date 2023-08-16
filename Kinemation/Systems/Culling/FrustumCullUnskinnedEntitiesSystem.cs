@@ -230,6 +230,10 @@ namespace Latios.Kinemation.Systems
 
                 var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
 
+                int visibleSplitMask = ~0;
+                if (splits.SphereTestEnabled)
+                    visibleSplitMask = splits.ReceiverSphereCuller.Cull(chunkBounds.ValueRO.Value);
+
                 var numEntities = chunk.Count;
 
                 // First, perform frustum and receiver plane culling for all splits
@@ -246,10 +250,8 @@ namespace Latios.Kinemation.Systems
                         s.CombinedPlanePacketOffset,
                         s.CombinedPlanePacketCount);
 
-                    float2 receiverSphereLightSpace = splits.TransformToLightSpaceXY(s.CullingSphereCenter);
-
                     // If the entire chunk fails the sphere test, no need to consider further
-                    if (splits.SphereTestEnabled && SphereTest(ref splits, s, chunkBounds.ValueRO.Value, receiverSphereLightSpace) == SphereTestResult.CannotCastShadow)
+                    if ((visibleSplitMask & (1 << splitIndex)) == 0)
                         continue;
 
                     // See note above about per-instance culling
@@ -300,14 +302,14 @@ namespace Latios.Kinemation.Systems
                     var inMask = mask.lower.Value;
                     for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                     {
-                        var  sphereMask          = splits.SplitSOASphereTest.SOASphereTestSplitMask(ref splits, worldBounds[i].Value);
+                        var  sphereMask          = splits.ReceiverSphereCuller.Cull(worldBounds[i].Value);
                         uint oldMask             = splitMasks.splitMasks[i];
                         splitMasks.splitMasks[i] = (byte)(math.asuint(sphereMask) & oldMask);
                     }
                     inMask = mask.upper.Value;
                     for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                     {
-                        var  sphereMask               = splits.SplitSOASphereTest.SOASphereTestSplitMask(ref splits, worldBounds[i + 64].Value);
+                        var  sphereMask               = splits.ReceiverSphereCuller.Cull(worldBounds[i + 64].Value);
                         uint oldMask                  = splitMasks.splitMasks[i + 64];
                         splitMasks.splitMasks[i + 64] = (byte)(math.asuint(sphereMask) & oldMask);
                     }
@@ -324,40 +326,6 @@ namespace Latios.Kinemation.Systems
                         mask.upper.Value &= upper;
                     }
                 }
-            }
-
-            private enum SphereTestResult
-            {
-                // The caster is guaranteed to not cast a visible shadow in the tested cascade
-                CannotCastShadow,
-                // The caster might cast a shadow in the tested cascade, and has to be rendered in the shadow map
-                MightCastShadow,
-            }
-
-            private SphereTestResult SphereTest(ref CullingSplits cullingSplits, CullingSplitData split, AABB aabb, float2 receiverSphereLightSpace)
-            {
-                // This test has been ported from the corresponding test done by Unity's
-                // built in shadow culling.
-
-                float  casterRadius             = math.length(aabb.Extents);
-                float2 casterCenterLightSpaceXY = cullingSplits.TransformToLightSpaceXY(aabb.Center);
-
-                // A spherical caster casts a cylindrical shadow volume. In XY in light space this ends up being a circle/circle intersection test.
-                // Thus we first check if the caster bounding circle is at least partially inside the cascade circle.
-                float sqrDistBetweenCasterAndCascadeCenter = math.lengthsq(casterCenterLightSpaceXY - receiverSphereLightSpace);
-                float combinedRadius                       = casterRadius + split.CullingSphereRadius;
-                float sqrCombinedRadius                    = combinedRadius * combinedRadius;
-
-                // If the 2D circles intersect, then the caster is potentially visible in the cascade.
-                // If they don't intersect, then there is no way for the caster to cast a shadow that is
-                // visible inside the circle.
-                // Casters that intersect the circle but are behind the receiver sphere also don't cast shadows.
-                // We don't consider that here, since those casters should be culled out by the receiver
-                // plane culling.
-                if (sqrDistBetweenCasterAndCascadeCenter <= sqrCombinedRadius)
-                    return SphereTestResult.MightCastShadow;
-                else
-                    return SphereTestResult.CannotCastShadow;
             }
         }
     }

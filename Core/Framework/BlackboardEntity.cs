@@ -134,6 +134,16 @@ namespace Latios
         }
 
         /// <summary>
+        /// Sets the shared component on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to set</typeparam>
+        /// <param name="data"The value of the shared component to set></param>
+        public void SetSharedComponentDataManaged<T>(T data) where T : struct, ISharedComponentData
+        {
+            em.SetSharedComponentManaged(entity, data);
+        }
+
+        /// <summary>
         /// Retrieves the value of the shared component from the blackboard entity
         /// </summary>
         /// <typeparam name="T">The type of shared component to retrieve</typeparam>
@@ -141,6 +151,16 @@ namespace Latios
         public T GetSharedComponentData<T>() where T : unmanaged, ISharedComponentData
         {
             return em.GetSharedComponent<T>(entity);
+        }
+
+        /// <summary>
+        /// Retrieves the value of the shared component from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to retrieve</typeparam>
+        /// <returns>The retrieved shared component value</returns>
+        public T GetSharedComponentDataManaged<T>() where T : struct, ISharedComponentData
+        {
+            return em.GetSharedComponentManaged<T>(entity);
         }
 
         /// <summary>

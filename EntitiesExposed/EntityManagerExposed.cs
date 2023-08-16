@@ -19,6 +19,14 @@ namespace Unity.Entities.Exposed
             entityManager.SetSharedComponentDataBoxedDefaultMustBeNull(dst, componentType.TypeIndex, box);
         }
 
+        public static void MoveManagedComponent(this EntityManager entityManager, Entity src, Entity dst, ComponentType componentType)
+        {
+            var access  = entityManager.GetCheckedEntityDataAccess();
+            var changes = access->BeginStructuralChanges();
+            access->MoveComponentObjectDuringStructuralChange(src, dst, componentType);
+            access->EndStructuralChanges(ref changes);
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         private static void CheckComponentTypeIsSharedComponent(ComponentType type)
         {

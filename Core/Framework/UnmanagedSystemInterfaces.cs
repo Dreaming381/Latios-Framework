@@ -48,11 +48,19 @@ namespace Latios
 
         public UnmanagedExtraInterfacesDispatcher()
         {
-            var systems         = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.All);
+            // The following line is bugged and does not include systems with [DisableAutoCreation].
+            //var systems         = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.All);
+
+            // Use reflection instead.
+            var systems = typeof(TypeManager).GetField("s_SystemTypes",
+                                                       System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null) as List<Type>;
+
             var filteredIndices = new NativeList<int>(Allocator.Temp);
             for (int i = 0; i < systems.Count; i++)
             {
                 var type = systems[i];
+                if (type == null)
+                    continue;
                 if (typeof(ISystem).IsAssignableFrom(type))
                 {
                     if (typeof(ISystemNewScene).IsAssignableFrom(type) || typeof(ISystemShouldUpdate).IsAssignableFrom(type))

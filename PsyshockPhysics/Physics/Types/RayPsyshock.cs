@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Latios.Transforms;
+using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
@@ -78,7 +79,7 @@ namespace Latios.Psyshock
         /// <param name="transform">The position and rotation of the old coordinate space relative to the new coordinate space</param>
         /// <param name="ray">The original Ray</param>
         /// <returns>A new Ray in the new coordinate space</returns>
-        public static Ray TransformRay(RigidTransform transform, Ray ray)
+        public static Ray TransformRay(in RigidTransform transform, in Ray ray)
         {
             var disp   = math.rotate(transform, ray.m_displacement);
             Ray newRay = new Ray
@@ -88,6 +89,20 @@ namespace Latios.Psyshock
                 m_reciprocalDisplacement = math.select(math.rcp(disp), math.sqrt(float.MaxValue), disp == float3.zero),
             };
             return newRay;
+        }
+
+        /// <summary>
+        /// Creates a new Ray by reorienting an existing ray in a new coordinate space
+        /// </summary>
+        /// <param name="transform">The QVVS of the old coordinate space relative to the new coordinate space</param>
+        /// <param name="ray">The original Ray</param>
+        /// <returns>A new Ray in the new coordinate space</returns>
+        public static Ray TransformRay(in TransformQvvs transform, in Ray ray)
+        {
+            var newStart = qvvs.TransformPoint(in transform, ray.start);
+            var newEnd   = qvvs.TransformPoint(in transform, ray.end);
+
+            return new Ray(newStart, newEnd);
         }
     }
 

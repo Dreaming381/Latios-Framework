@@ -23,9 +23,9 @@ namespace Latios.Psyshock
 
         // From Unity's CalculatePerpendicularNormalized.
         // Todo: If input is unscaledNormal, which is tangent and which is bitangent?
-        public static void GetDualPerpendicularNormalized(float3 unsacledInput, out float3 perpendicularA, out float3 perpendicularB)
+        public static void GetDualPerpendicularNormalized(float3 unscaledInput, out float3 perpendicularA, out float3 perpendicularB)
         {
-            float3 v              = unsacledInput;
+            float3 v              = unscaledInput;
             float3 vSquared       = v * v;
             float3 lengthsSquared = vSquared + vSquared.xxx;  // y = ||j x v||^2, z = ||k x v||^2
             float3 invLengths     = math.rsqrt(lengthsSquared);

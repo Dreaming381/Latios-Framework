@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 
 // Todo: Merge Enabled bits
@@ -68,7 +69,7 @@ namespace Latios.Systems
                         continue;
 
                     if (blackboardEntityData.mergeMethod == MergeMethod.Overwrite || !targetEntity.HasComponent(type))
-                        m_copyKit.CopyData(entity, targetEntity, type);
+                        MoveComponent(entity, targetEntity, type);
                     else if (blackboardEntityData.mergeMethod == MergeMethod.ErrorOnConflict)
                     {
                         errorType = type;
@@ -83,6 +84,18 @@ namespace Latios.Systems
                 }
             }).Run();
             EntityManager.DestroyEntity(m_query);
+        }
+
+        void MoveComponent(Entity srcEntity, Entity dstEntity, ComponentType type)
+        {
+            if (type.IsManagedComponent)
+            {
+                EntityManager.MoveManagedComponent(srcEntity, dstEntity, type);
+            }
+            else
+            {
+                m_copyKit.CopyData(srcEntity, dstEntity, type);
+            }
         }
 
         /*private EntityQuery group;

@@ -10,6 +10,7 @@ namespace Latios.Kinemation
         /// <summary>
         /// Installs the Kinemation renderer and additional Kinemation systems, and disables some Entities.Graphics systems which Kinemation replaces.
         /// This must be installed in a LatiosWorldUnmanaged, but can be safely installed in ICustomEditorBootstrap.
+        /// This should be installed in both the Editor and runtime worlds.
         /// </summary>
         /// <param name="world">The World to install Kinemation into. Must be a LatiosWorldUnmanaged.</param>
         public static void InstallKinemation(World world)

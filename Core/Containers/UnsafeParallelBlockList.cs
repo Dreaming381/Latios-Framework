@@ -126,6 +126,13 @@ namespace Latios.Unsafe
         }
 
         /// <summary>
+        /// Returns true if the struct is not in a default uninitialized state.
+        /// This may report true incorrectly if the memory where this instance
+        /// exists was left uninitialized rather than cleared.
+        /// </summary>
+        public bool isCreated => m_perThreadBlockLists != null;
+
+        /// <summary>
         /// A pointer to an element stored
         /// </summary>
         public struct ElementPtr

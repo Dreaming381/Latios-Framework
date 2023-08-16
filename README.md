@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.7.6]
+# Latios Framework for Unity ECS – [0.7.7]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -32,7 +32,7 @@ The Latios Framework is best-known in the community for Kinemation, a module
 which provides extremely high-performance CPU animation and GPU skinned mesh
 rendering features.
 
-This version targets Entities 1.0.11. If you are still using Entities 0.51.1,
+This version targets Entities 1.0.14. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
 
 **Note: This release is not compatible with Unity Transforms.** Compatibility
@@ -111,6 +111,7 @@ used in AAA titles such as Rise of the Tomb Raider and Valorant.
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
+-   Calligraphics – World-space text rendering and related utilities
 
 ## Why Use the Latios Framework?
 
@@ -171,6 +172,7 @@ Getting Started pages and documentation are provided with each module.
 ### Open Projects
 
 -   [Latios Space Shooter Sample](https://github.com/Dreaming381/lsss-wip)
+-   [Free Parking](https://github.com/Dreaming381/Free-Parking)
 
 ## Support
 

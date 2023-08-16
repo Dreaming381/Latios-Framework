@@ -61,7 +61,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Draws a wireframe of a capsule using UnityEngine.Debug.DrawLine calls
         /// </summary>
-        /// <param name="sphere">The capsule to draw</param>
+        /// <param name="capsule">The capsule to draw</param>
         /// <param name="transform">The transform of the capsule in world space</param>
         /// <param name="color">The color of the wireframe</param>
         /// <param name="segmentsPerPi">The number of segments to draw per 180 degree arc</param>
@@ -146,7 +146,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Draws a wireframe of a box using UnityEngine.Debug.DrawLine calls
         /// </summary>
-        /// <param name="sphere">The box to draw</param>
+        /// <param name="box">The box to draw</param>
         /// <param name="transform">The transform of the box in world space</param>
         /// <param name="color">The color of the wireframe</param>
         public static void DrawCollider(in BoxCollider box, in RigidTransform transform, Color color)
@@ -181,7 +181,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Draws a wireframe of a triangle using UnityEngine.Debug.DrawLine calls
         /// </summary>
-        /// <param name="sphere">The triangle to draw</param>
+        /// <param name="triangle">The triangle to draw</param>
         /// <param name="transform">The transform of the triangle in world space</param>
         /// <param name="color">The color of the wireframe</param>
         public static void DrawCollider(in TriangleCollider triangle, in RigidTransform transform, Color color)
@@ -198,7 +198,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Draws a wireframe of a convex mesh using UnityEngine.Debug.DrawLine calls
         /// </summary>
-        /// <param name="sphere">The convex mesh to draw</param>
+        /// <param name="convex">The convex mesh to draw</param>
         /// <param name="transform">The transform of the convex mesh in world space</param>
         /// <param name="color">The color of the wireframe</param>
         public static void DrawCollider(in ConvexCollider convex, in RigidTransform transform, Color color)
