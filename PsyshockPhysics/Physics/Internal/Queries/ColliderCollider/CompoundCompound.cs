@@ -47,7 +47,7 @@ namespace Latios.Psyshock
                                                  in CompoundCollider compoundB,
                                                  in RigidTransform bTransform,
                                                  float maxDistance,
-                                                 ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+                                                 ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
             ref var blobA = ref compoundA.compoundColliderBlob.Value;
             ref var blobB = ref compoundB.compoundColliderBlob.Value;

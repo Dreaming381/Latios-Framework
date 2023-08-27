@@ -166,50 +166,6 @@ namespace Latios.Kinemation.Authoring.Systems
             blobAnimatorState.name           = new FixedString64Bytes(state.name);
             blobAnimatorState.nameHash       = blobAnimatorState.name.GetHashCode();
             blobAnimatorState.editorNameHash = state.nameHash;
-            blobAnimatorState.speed          = state.speed;
-            blobAnimatorState.cycleOffset    = state.cycleOffset;
-            blobAnimatorState.mirror         = state.mirror;
-            blobAnimatorState.ikOnFeet       = state.iKOnFeet;
-
-            blobAnimatorState.speedParameterIndex = -1;
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (parameters[i].name == state.speedParameter)
-                {
-                    blobAnimatorState.speedParameterIndex = (short)i;
-                    break;
-                }
-            }
-
-            blobAnimatorState.cycleOffsetParameterIndex = -1;
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (parameters[i].name == state.cycleOffsetParameter)
-                {
-                    blobAnimatorState.cycleOffsetParameterIndex = (short)i;
-                    break;
-                }
-            }
-
-            blobAnimatorState.mirrorParameterIndex = -1;
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (parameters[i].name == state.mirrorParameter)
-                {
-                    blobAnimatorState.mirrorParameterIndex = (short)i;
-                    break;
-                }
-            }
-
-            blobAnimatorState.timeParameterIndex = -1;
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                if (parameters[i].name == state.timeParameter)
-                {
-                    blobAnimatorState.timeParameterIndex = (short)i;
-                    break;
-                }
-            }
 
             BlobBuilderArray<MecanimStateTransitionBlob> transitionsBuilder =
                 builder.Allocate(ref blobAnimatorState.transitions, state.transitions.Length);
@@ -224,14 +180,13 @@ namespace Latios.Kinemation.Authoring.Systems
         private void BakeAnimatorMotion(ref BlobBuilder builder,
                                         ref MecanimStateBlob blobAnimatorState,
                                         Motion motion,
-                                        float speed,
-                                        List<Motion>                  motions,
+                                        AnimatorState parentState,
+                                        List<ChildMotion>             motions,
                                         AnimatorControllerParameter[] parameters,
                                         AnimationClip[]               clips)
         {
             blobAnimatorState.name = new FixedString64Bytes("ChildMotion");
 
-            blobAnimatorState.speed               = speed;
             blobAnimatorState.averageDuration     = motion.averageDuration;
             blobAnimatorState.averageSpeed        = motion.averageSpeed;
             blobAnimatorState.averageAngularSpeed = motion.averageAngularSpeed;
@@ -239,11 +194,63 @@ namespace Latios.Kinemation.Authoring.Systems
             blobAnimatorState.isHumanMotion       = motion.isHumanMotion;
             blobAnimatorState.legacy              = motion.legacy;
             blobAnimatorState.isLooping           = motion.isLooping;
+            
+            blobAnimatorState.speed          = parentState.speed;
+            blobAnimatorState.cycleOffset    = parentState.cycleOffset;
+            blobAnimatorState.mirror         = parentState.mirror;
+            blobAnimatorState.ikOnFeet       = parentState.iKOnFeet;
+            blobAnimatorState.speedMultiplierParameterIndex = -1;
 
-            blobAnimatorState.speedParameterIndex       = -1;
+            if (parentState.speedParameterActive)
+            {
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (parameters[i].name == parentState.speedParameter)
+                    {
+                        blobAnimatorState.speedMultiplierParameterIndex = (short)i;
+                        break;
+                    }
+                }
+            }
+
             blobAnimatorState.cycleOffsetParameterIndex = -1;
-            blobAnimatorState.mirrorParameterIndex      = -1;
-            blobAnimatorState.timeParameterIndex        = -1;
+            if (parentState.cycleOffsetParameterActive)
+            {
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (parameters[i].name == parentState.cycleOffsetParameter)
+                    {
+                        blobAnimatorState.cycleOffsetParameterIndex = (short)i;
+                        break;
+                    }
+                }
+            }
+
+            blobAnimatorState.mirrorParameterIndex = -1;
+            if (parentState.mirrorParameterActive)
+            {
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (parameters[i].name == parentState.mirrorParameter)
+                    {
+                        blobAnimatorState.mirrorParameterIndex = (short)i;
+                        break;
+                    }
+                }
+            }
+
+            blobAnimatorState.timeParameterIndex = -1;
+            if (parentState.timeParameterActive)
+            {
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    if (parameters[i].name == parentState.timeParameter)
+                    {
+                        blobAnimatorState.timeParameterIndex = (short)i;
+                        break;
+                    }
+                }
+            }
 
             if (motion is BlendTree blendTree)
             {
@@ -284,7 +291,15 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 for (int i = 0; i < blendTree.children.Length; i++)
                 {
-                    var motionIndex = (short)motions.IndexOf(blendTree.children[i].motion);
+                    short motionIndex = -1;
+                    for (int j = 0; j < motions.Count; j++)
+                    {
+                        if (motions[j].Motion == blendTree.children[i].motion)
+                        {
+                            motionIndex = (short)j;
+                            break;
+                        }
+                    }
 
                     if (motionIndex == -1)
                     {
@@ -337,7 +352,7 @@ namespace Latios.Kinemation.Authoring.Systems
             blobAnimatorParameter.editorNameHash = parameter.nameHash;
         }
 
-        List<Motion> m_motionCache = new List<Motion>();
+        List<ChildMotion> m_motionCache = new List<ChildMotion>();
 
         private MecanimControllerLayerBlob BakeAnimatorControllerLayer(ref BlobBuilder builder,
                                                                        ref MecanimControllerLayerBlob blobAnimatorControllerLayer,
@@ -359,7 +374,7 @@ namespace Latios.Kinemation.Authoring.Systems
             var childMotions = m_motionCache;
             foreach (var state in states)
             {
-                PopulateChildMotions(ref childMotions, state.motion);
+                PopulateChildMotions(ref childMotions, state.motion, state);
             }
 
             //States
@@ -373,7 +388,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 }
 
                 ref var stateBlob = ref statesBuilder[i];
-                BakeAnimatorMotion(ref builder, ref stateBlob, states[i].motion, 1f, childMotions, parameters, clips);
+                BakeAnimatorMotion(ref builder, ref stateBlob, states[i].motion, states[i], childMotions, parameters, clips);
                 AddStateSpecifics(ref builder, ref stateBlob, states[i], states, parameters);
                 statesBuilder[i] = stateBlob;
             }
@@ -383,9 +398,8 @@ namespace Latios.Kinemation.Authoring.Systems
                 builder.Allocate(ref blobAnimatorControllerLayer.childMotions, childMotions.Count);
             for (int i = 0; i < childMotions.Count; i++)
             {
-                //TODO:  Need to get the speed of the child motion
                 ref var childMotionBlob = ref childMotionsBuilder[i];
-                BakeAnimatorMotion(ref builder, ref childMotionBlob, childMotions[i], 1f, childMotions, parameters, clips);
+                BakeAnimatorMotion(ref builder, ref childMotionBlob, childMotions[i].Motion, childMotions[i].ParentState , childMotions, parameters, clips);
                 childMotionsBuilder[i] = childMotionBlob;
             }
 
@@ -431,20 +445,26 @@ namespace Latios.Kinemation.Authoring.Systems
             return result;
         }
 
-        private void PopulateChildMotions(ref List<Motion> motions, Motion motion)
+        private void PopulateChildMotions(ref List<ChildMotion> motions, Motion motion, AnimatorState parentState)
         {
             if (motion is BlendTree blendTree)
             {
                 foreach (var childMotion in blendTree.children)
                 {
-                    motions.Add(childMotion.motion);
+                    motions.Add(new ChildMotion { Motion = childMotion.motion, ParentState = parentState });
 
                     if (childMotion.motion is BlendTree childBlendTree)
                     {
-                        PopulateChildMotions(ref motions, childBlendTree);
+                        PopulateChildMotions(ref motions, childBlendTree, parentState);
                     }
                 }
             }
+        }
+
+        private struct ChildMotion
+        {
+            public Motion Motion;
+            public AnimatorState ParentState;
         }
     }
 }

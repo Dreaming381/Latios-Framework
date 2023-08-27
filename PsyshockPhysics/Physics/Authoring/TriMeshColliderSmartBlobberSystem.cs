@@ -101,6 +101,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 {
                     meshes[i]   = pair.Value.bakeData.mesh;
                     builders[i] = default;
+                    i++;
                 }
             }).Schedule();
 
@@ -118,7 +119,13 @@ namespace Latios.Psyshock.Authoring.Systems
                 m_meshCache.Add(mesh);
             }
 
+            #if UNITY_EDITOR
+            var meshDataArray = UnityEditor.MeshUtility.AcquireReadOnlyMeshData(m_meshCache);
+            #else
             var meshDataArray = Mesh.AcquireReadOnlyMeshData(m_meshCache);
+            #endif
+
+            // var meshDataArray = Mesh.AcquireReadOnlyMeshData(m_meshCache);
 
             Dependency = new BuildBlobsJob
             {

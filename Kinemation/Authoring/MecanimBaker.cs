@@ -30,8 +30,12 @@ namespace Latios.Kinemation.Authoring
             for (int i = 0; i < sourceClips.Length; i++)
             {
                 var sourceClip = sourceClips[i];
-                clips[i] = new SkeletonClipConfig {
-                    clip = sourceClip, events = sourceClip.ExtractKinemationClipEvents(Allocator.Temp), settings = SkeletonClipCompressionSettings.kDefaultSettings
+
+                clips[i] = new SkeletonClipConfig
+                {
+                    clip     = sourceClip,
+                    events   = sourceClip.ExtractKinemationClipEvents(Allocator.Temp),
+                    settings = SkeletonClipCompressionSettings.kDefaultSettings
                 };
             }
 

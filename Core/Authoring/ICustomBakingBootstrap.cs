@@ -176,7 +176,7 @@ namespace Latios.Authoring
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)
                         {
-                            group.CheckedStateRef.Enabled = false;
+                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
                         }
                     }
                 }
@@ -185,6 +185,20 @@ namespace Latios.Authoring
                     BootstrapTools.InjectSystems(s_bakingOverride.m_bakingSystemTypesToInject, World, World.GetExistingSystemManaged<BakingSystemGroup>());
 
                 m_initialized = true;
+            }
+            else
+            {
+                if (s_bakingOverride.m_bakingSystemTypesToDisable.IsCreated)
+                {
+                    foreach (var disableType in s_bakingOverride.m_bakingSystemTypesToDisable)
+                    {
+                        var handle = World.GetExistingSystem(disableType);
+                        if (handle != SystemHandle.Null)
+                        {
+                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
+                        }
+                    }
+                }
             }
 
             var result = !m_ranOnce;
@@ -242,7 +256,7 @@ namespace Latios.Authoring
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)
                         {
-                            group.CheckedStateRef.Enabled = false;
+                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
                         }
                     }
                 }
@@ -251,6 +265,20 @@ namespace Latios.Authoring
                     BootstrapTools.InjectSystems(s_bakingOverride.m_optimizationSystemTypesToInject, World, World.GetExistingSystemManaged<BakingSystemGroup>());
 
                 m_initialized = true;
+            }
+            else
+            {
+                if (s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
+                {
+                    foreach (var disableType in s_bakingOverride.m_optimizationSystemTypesToDisable)
+                    {
+                        var handle = World.GetExistingSystem(disableType);
+                        if (handle != SystemHandle.Null)
+                        {
+                            World.Unmanaged.ResolveSystemStateRef(handle).Enabled = false;
+                        }
+                    }
+                }
             }
 
             var result = !m_ranOnce;

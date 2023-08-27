@@ -40,7 +40,7 @@ namespace Latios.Psyshock
             float3 osPoint    = point - box.center;  //os = origin space
             bool3  isNegative = osPoint < 0f;
             float3 ospPoint   = math.select(osPoint, -osPoint, isNegative);  //osp = origin space positive
-            int    region     = math.bitmask(new bool4(ospPoint < box.halfSize, false));
+            int    region     = math.bitmask(new bool4(ospPoint >= box.halfSize, false).zyxw);
             switch (region)
             {
                 case 0:

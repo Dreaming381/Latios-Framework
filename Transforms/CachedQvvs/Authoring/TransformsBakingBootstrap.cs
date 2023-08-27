@@ -28,6 +28,7 @@ namespace Latios.Transforms.Authoring
                     break;
                 }
             }
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Systems.HierarchyUpdateModeFlagsBakingSystem>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Systems.ExtraTransformComponentsBakingSystem>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Systems.TransformBakingSystem>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Systems.TransformHierarchySyncBakingSystem>());

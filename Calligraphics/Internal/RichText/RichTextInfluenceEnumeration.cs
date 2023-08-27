@@ -14,6 +14,8 @@ namespace Latios.Calligraphics.RichText
         int                     m_currentCharIndex;
         int                     m_skipCharsUntilIndex;
         int                     m_nextTagTerminationOfConcernCharIndex;
+        int                     m_currentByteIndex;
+        int                     m_lastCharacterByteCount;
 
         public RichTextInfluenceCharEnumerator(NativeList<RichTextTag> tags, CalliString calliString)
         {
@@ -24,6 +26,8 @@ namespace Latios.Calligraphics.RichText
             m_lastActiveTagIndex                   = -1;
             m_skipCharsUntilIndex                  = 0;
             m_nextTagTerminationOfConcernCharIndex = int.MaxValue;
+            m_lastCharacterByteCount               = 0;
+            m_currentByteIndex                     = 0;
         }
 
         public RichTextInfluenceContext Current => new RichTextInfluenceContext(m_tags.AsArray().GetSubArray(m_firstActiveTagIndex,
@@ -31,6 +35,11 @@ namespace Latios.Calligraphics.RichText
                                                                                 m_stringEnumerator.Current);
 
         object IEnumerator.Current => Current;
+        
+        public int CurrentCharIndex => m_currentCharIndex;
+        public int CurrentByteIndex => m_currentByteIndex;
+
+        public int CurrentCharacterSize => m_stringEnumerator.Current.LengthInUtf8Bytes();
 
         public void Dispose()
         {
@@ -44,9 +53,12 @@ namespace Latios.Calligraphics.RichText
                     return false;
                 m_currentCharIndex++;
 
+                m_currentByteIndex += m_lastCharacterByteCount;
+                m_lastCharacterByteCount = CurrentCharacterSize;
+
                 if (m_currentCharIndex < m_skipCharsUntilIndex)
                     continue;
-
+                
                 // Check for new tag
                 if (m_lastActiveTagIndex + 1 < m_tags.Length && m_tags.ElementAt(m_lastActiveTagIndex + 1).startTagStartIndex <= m_currentCharIndex)
                 {

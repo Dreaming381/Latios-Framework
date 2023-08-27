@@ -287,7 +287,7 @@ namespace Latios.Psyshock
             }
         }
 
-        unsafe struct DistanceAllResultFlipper<T> : Physics.IDistanceBetweenAllProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        unsafe struct DistanceAllResultFlipper<T> : IDistanceBetweenAllProcessor where T : unmanaged, IDistanceBetweenAllProcessor
         {
             public T* processor;
 
@@ -307,7 +307,7 @@ namespace Latios.Psyshock
                                                         in Collider colliderB,
                                                         in RigidTransform bTransform,
                                                         float maxDistance,
-                                                        ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+                                                        ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
             var                    flipper = new DistanceAllResultFlipper<T> { processor = (T*)UnsafeUtility.AddressOf(ref processor) };
             ColliderDistanceResult result                                                = default;

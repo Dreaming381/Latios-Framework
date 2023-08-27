@@ -89,7 +89,7 @@ namespace Latios.Transforms
 
         // Assuming B represents a transform in A's space, this converts B into the same space
         // A resides in, where bStretch is forwarded from bWorld
-        public static void mul(ref TransformQvvs bWorld, in TransformQvvs a, TransformQvs b)
+        public static void mul(ref TransformQvvs bWorld, in TransformQvvs a, in TransformQvs b)
         {
             bWorld.rotation = math.mul(a.rotation, b.rotation);
             bWorld.position = a.position + math.rotate(a.rotation, b.position * a.stretch * a.scale);

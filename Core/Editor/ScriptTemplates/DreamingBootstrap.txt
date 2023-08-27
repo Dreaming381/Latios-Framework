@@ -55,6 +55,7 @@ public class LatiosBootstrap : ICustomBootstrap
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         Latios.Kinemation.KinemationBootstrap.InstallMecanimFeatures(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
 
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 

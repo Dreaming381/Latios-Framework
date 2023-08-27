@@ -86,10 +86,13 @@ GlyphVertex sampleGlyph(uint vertexId, uint textBase, uint glyphCount)
         float cosine = cos(angle);
         float sine = sin(angle);
         
-        float newX = vertex.position.x * cosine - vertex.position.y * sine;
-        float newY = vertex.position.x * sine + vertex.position.y * cosine;
-        vertex.position.x = newX;
-        vertex.position.y = newY;
+        float4 corners = asfloat(_latiosTextBuffer.Load4(glyphBase));
+        float2 center = (corners.xy + corners.zw) * 0.5;
+        float2 relative = vertex.position.xy - center;
+        float newX = relative.x * cosine - relative.y * sine;
+        float newY = relative.x * sine + relative.y * cosine;
+        vertex.position.x = center.x + newX;
+        vertex.position.y = center.y + newY;
     }
 
     vertex.color.x = (color & 0xff) / 255.;

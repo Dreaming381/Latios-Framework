@@ -52,13 +52,14 @@ namespace Latios.Transforms.Authoring.Systems
 
             state.Dependency = new UpdateJob
             {
-                entityHandle         = GetEntityTypeHandle(),
-                worldTransformHandle = GetComponentTypeHandle<WorldTransform>(true),
-                localTransformLookup = GetComponentLookup<LocalTransform>(true),
-                parentLookup         = GetComponentLookup<Parent>(true),
-                parentToChildrenMap  = map,
-                worldTransformLookup = GetComponentLookup<WorldTransform>(false),
-                lastSystemVersion    = state.LastSystemVersion
+                entityHandle              = GetEntityTypeHandle(),
+                worldTransformHandle      = GetComponentTypeHandle<WorldTransform>(true),
+                localTransformLookup      = GetComponentLookup<LocalTransform>(false),
+                parentLookup              = GetComponentLookup<Parent>(true),
+                parentToChildrenMap       = map,
+                worldTransformLookup      = GetComponentLookup<WorldTransform>(false),
+                hierarchyUpdateModeLookup = GetComponentLookup<HierarchyUpdateMode>(true),
+                lastSystemVersion         = state.LastSystemVersion
             }.ScheduleParallel(m_parentQuery, state.Dependency);
 
             state.Dependency = map.Dispose(state.Dependency);
@@ -89,10 +90,11 @@ namespace Latios.Transforms.Authoring.Systems
         {
             [ReadOnly] public EntityTypeHandle                           entityHandle;
             [ReadOnly] public ComponentTypeHandle<WorldTransform>        worldTransformHandle;
-            [ReadOnly] public ComponentLookup<LocalTransform>            localTransformLookup;
             [ReadOnly] public ComponentLookup<Parent>                    parentLookup;
+            [ReadOnly] public ComponentLookup<HierarchyUpdateMode>       hierarchyUpdateModeLookup;
             [ReadOnly] public NativeParallelMultiHashMap<Entity, Entity> parentToChildrenMap;
 
+            [NativeDisableParallelForRestriction] public ComponentLookup<LocalTransform>     localTransformLookup;
             [NativeDisableContainerSafetyRestriction] public ComponentLookup<WorldTransform> worldTransformLookup;
 
             public uint lastSystemVersion;
@@ -130,6 +132,9 @@ namespace Latios.Transforms.Authoring.Systems
                     needsUpdate  = localTransformLookup.DidChange(entity, lastSystemVersion);
                     needsUpdate |= parentTransformDirty;
                     needsUpdate |= parentLookup.DidChange(entity, lastSystemVersion);
+
+                    // This shouldn't matter because if there was no change, then the old and new world transforms are the same.
+                    //needsUpdate |= hierarchyUpdateModeLookup.DidChange(entity, lastSystemVersion);
                 }
 
                 TransformQvvs worldTransformToPropagate = default;
@@ -145,7 +150,17 @@ namespace Latios.Transforms.Authoring.Systems
                     if (hasMutableLocalTransform)
                     {
                         ref var worldTransform = ref worldTransformLookup.GetRefRW(entity).ValueRW;
-                        qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, localTransformLookup[entity].localTransform);
+                        if (hierarchyUpdateModeLookup.TryGetComponent(entity, out var flags))
+                        {
+                            HierarchyInternalUtilities.UpdateTransform(ref worldTransform.worldTransform,
+                                                                       ref localTransformLookup.GetRefRW(entity).ValueRW.localTransform,
+                                                                       in parentWorldTransform,
+                                                                       flags.modeFlags);
+                        }
+                        else
+                        {
+                            qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, in localTransformLookup.GetRefRO(entity).ValueRO.localTransform);
+                        }
                         worldTransformToPropagate = worldTransform.worldTransform;
                     }
                     else

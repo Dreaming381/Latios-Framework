@@ -153,7 +153,7 @@ namespace Latios.Psyshock
         public static implicit operator Collider(TriangleCollider triangleCollider)
         {
             Collider collider   = default;
-            collider.m_type     = ColliderType.Box;
+            collider.m_type     = ColliderType.Triangle;
             collider.m_triangle = triangleCollider;
             return collider;
         }

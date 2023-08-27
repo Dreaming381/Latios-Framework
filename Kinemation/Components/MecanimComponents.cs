@@ -223,7 +223,7 @@ namespace Latios.Kinemation
         public bool               mirror;  // Todo: Unused
         public bool               ikOnFeet;  // Todo: Unused
 
-        public short speedParameterIndex;
+        public short speedMultiplierParameterIndex;
         public short cycleOffsetParameterIndex;
         public short mirrorParameterIndex;
         public short timeParameterIndex;
@@ -345,8 +345,8 @@ namespace Latios.Kinemation
             var cycleOffset  = state.cycleOffsetParameterIndex != -1 ?
                                parameters[state.cycleOffsetParameterIndex].floatParam :
                                state.cycleOffset;
-            var speed = state.speedParameterIndex != -1 ?
-                        parameters[state.speedParameterIndex].floatParam :
+            var speed = state.speedMultiplierParameterIndex != -1 ?
+                        parameters[state.speedMultiplierParameterIndex].floatParam * state.speed :
                         state.speed;
             motionTime = state.timeParameterIndex != -1 ?
                          parameters[state.timeParameterIndex].floatParam :

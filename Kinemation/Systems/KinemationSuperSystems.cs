@@ -1,7 +1,7 @@
+using Latios.Kinemation.TextBackend.Systems;
 using Latios.Transforms.Systems;
 using Unity.Entities;
 using Unity.Rendering;
-using Latios.Kinemation.TextBackend.Systems;
 #if LATIOS_TRANSFORMS_UNCACHED_QVVS || LATIOS_TRANSFORMS_UNITY
 using Unity.Transforms;
 #endif
@@ -19,7 +19,7 @@ namespace Latios.Kinemation.Systems
     [UpdateBefore(typeof(TransformSystemGroup))]
 #endif
     [DisableAutoCreation]
-    public partial class KinemationAnimatorStateMachineSuperSystem : SuperSystem
+    public partial class MecanimSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {

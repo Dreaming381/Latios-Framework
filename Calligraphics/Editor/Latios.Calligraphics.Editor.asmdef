@@ -1,0 +1,21 @@
+{
+    "name": "Latios.Calligraphics.Editor",
+    "rootNamespace": "Latios.Calligraphics.Editor",
+    "references": [
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.Platforms.UI.Editor",
+        "Latios.Calligraphics"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

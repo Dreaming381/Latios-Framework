@@ -107,32 +107,50 @@ namespace Latios
             public uint2 NextUInt2() => new uint2(NextState(), NextState());
             public uint3 NextUInt3() => new uint3(NextState(), NextState(), NextState());
             public uint4 NextUInt4() => new uint4(NextState(), NextState(), NextState(), NextState());
-            public uint  NextUInt (uint min, uint max) => RngToolkit.AsUInt(NextState(), min, max);
-            public uint2 NextUInt2(uint2 min, uint2 max) => RngToolkit.AsUInt2(NextUInt2(), min, max);
-            public uint3 NextUInt3(uint3 min, uint3 max) => RngToolkit.AsUInt3(NextUInt3(), min, max);
-            public uint4 NextUInt4(uint4 min, uint4 max) => RngToolkit.AsUInt4(NextUInt4(), min, max);
+            public uint  NextUInt (uint minInclusive, uint maxExclusive) => RngToolkit.AsUInt(NextState(), minInclusive, maxExclusive);
+            public uint2 NextUInt2(uint2 minInclusive, uint2 maxExclusive) => RngToolkit.AsUInt2(NextUInt2(), minInclusive, maxExclusive);
+            public uint3 NextUInt3(uint3 minInclusive, uint3 maxExclusive) => RngToolkit.AsUInt3(NextUInt3(), minInclusive, maxExclusive);
+            public uint4 NextUInt4(uint4 minInclusive, uint4 maxExclusive) => RngToolkit.AsUInt4(NextUInt4(), minInclusive, maxExclusive);
 
             public int NextInt() => RngToolkit.AsInt(NextState());
             public int2 NextInt2() => RngToolkit.AsInt2(NextUInt2());
             public int3 NextInt3() => RngToolkit.AsInt3(NextUInt3());
             public int4 NextInt4() => RngToolkit.AsInt4(NextUInt4());
-            public int NextInt(int min, int max) => RngToolkit.AsInt(NextState(), min, max);
-            public int2 NextInt2(int2 min, int2 max) => RngToolkit.AsInt2(NextUInt2(), min, max);
-            public int3 NextInt3(int3 min, int3 max) => RngToolkit.AsInt3(NextUInt3(), min, max);
-            public int4 NextInt4(int4 min, int4 max) => RngToolkit.AsInt4(NextUInt4(), min, max);
+            public int NextInt(int minInclusive, int maxExclusive) => RngToolkit.AsInt(NextState(), minInclusive, maxExclusive);
+            public int2 NextInt2(int2 minInclusive, int2 maxExclusive) => RngToolkit.AsInt2(NextUInt2(), minInclusive, maxExclusive);
+            public int3 NextInt3(int3 minInclusive, int3 maxExclusive) => RngToolkit.AsInt3(NextUInt3(), minInclusive, maxExclusive);
+            public int4 NextInt4(int4 minInclusive, int4 maxExclusive) => RngToolkit.AsInt4(NextUInt4(), minInclusive, maxExclusive);
 
             public float NextFloat() => RngToolkit.AsFloat(NextState());
             public float2 NextFloat2() => RngToolkit.AsFloat2(NextUInt2());
             public float3 NextFloat3() => RngToolkit.AsFloat3(NextUInt3());
             public float4 NextFloat4() => RngToolkit.AsFloat4(NextUInt4());
-            public float NextFloat(float min, float max) => RngToolkit.AsFloat(NextState(), min, max);
-            public float2 NextFloat2(float2 min, float2 max) => RngToolkit.AsFloat2(NextUInt2(), min, max);
-            public float3 NextFloat3(float3 min, float3 max) => RngToolkit.AsFloat3(NextUInt3(), min, max);
-            public float4 NextFloat4(float4 min, float4 max) => RngToolkit.AsFloat4(NextUInt4(), min, max);
+            public float NextFloat(float minInclusive, float maxExclusive) => RngToolkit.AsFloat(NextState(), minInclusive, maxExclusive);
+            public float2 NextFloat2(float2 minInclusive, float2 maxExclusive) => RngToolkit.AsFloat2(NextUInt2(), minInclusive, maxExclusive);
+            public float3 NextFloat3(float3 minInclusive, float3 maxExclusive) => RngToolkit.AsFloat3(NextUInt3(), minInclusive, maxExclusive);
+            public float4 NextFloat4(float4 minInclusive, float4 maxExclusive) => RngToolkit.AsFloat4(NextUInt4(), minInclusive, maxExclusive);
 
             public float2 NextFloat2Direction() => RngToolkit.AsFloat2Direction(NextState());
             public float3 NextFloat3Direction() => RngToolkit.AsFloat3Direction(NextUInt2());
             public quaternion NextQuaternionRotation() => RngToolkit.AsQuaternionRotation(NextUInt3());
+
+            public void ShuffleElements<T>(NativeArray<T> array) where T : unmanaged
+            {
+                for (int i = 0; i < array.Length - 1; i++)
+                {
+                    var swapTarget                = NextInt(i, array.Length);
+                    (array[i], array[swapTarget]) = (array[swapTarget], array[i]);
+                }
+            }
+
+            public void ShuffleElements<T, U>(T list) where T : unmanaged, INativeList<U> where U : unmanaged
+            {
+                for (int i = 0; i < list.Length - 1; i++)
+                {
+                    var swapTarget              = NextInt(i, list.Length);
+                    (list[i], list[swapTarget]) = (list[swapTarget], list[i]);
+                }
+            }
         }
     }
 
@@ -190,32 +208,35 @@ namespace Latios
         public uint2 NextUInt2() => currentSequence.NextUInt2();
         public uint3 NextUInt3() => currentSequence.NextUInt3();
         public uint4 NextUInt4() => currentSequence.NextUInt4();
-        public uint NextUInt(uint min, uint max) => currentSequence.NextUInt(min, max);
-        public uint2 NextUInt2(uint2 min, uint2 max) => currentSequence.NextUInt2( min, max);
-        public uint3 NextUInt3(uint3 min, uint3 max) => currentSequence.NextUInt3( min, max);
-        public uint4 NextUInt4(uint4 min, uint4 max) => currentSequence.NextUInt4( min, max);
+        public uint NextUInt(uint minInclusive, uint maxExclusive) => currentSequence.NextUInt(minInclusive, maxExclusive);
+        public uint2 NextUInt2(uint2 minInclusive, uint2 maxExclusive) => currentSequence.NextUInt2( minInclusive, maxExclusive);
+        public uint3 NextUInt3(uint3 minInclusive, uint3 maxExclusive) => currentSequence.NextUInt3( minInclusive, maxExclusive);
+        public uint4 NextUInt4(uint4 minInclusive, uint4 maxExclusive) => currentSequence.NextUInt4( minInclusive, maxExclusive);
 
         public int NextInt() => currentSequence.NextInt();
         public int2 NextInt2() => currentSequence.NextInt2();
         public int3 NextInt3() => currentSequence.NextInt3();
         public int4 NextInt4() => currentSequence.NextInt4();
-        public int NextInt(int min, int max) => currentSequence.NextInt(min, max);
-        public int2 NextInt2(int2 min, int2 max) => currentSequence.NextInt2( min, max);
-        public int3 NextInt3(int3 min, int3 max) => currentSequence.NextInt3( min, max);
-        public int4 NextInt4(int4 min, int4 max) => currentSequence.NextInt4(min, max);
+        public int NextInt(int minInclusive, int maxExclusive) => currentSequence.NextInt(minInclusive, maxExclusive);
+        public int2 NextInt2(int2 minInclusive, int2 maxExclusive) => currentSequence.NextInt2( minInclusive, maxExclusive);
+        public int3 NextInt3(int3 minInclusive, int3 maxExclusive) => currentSequence.NextInt3( minInclusive, maxExclusive);
+        public int4 NextInt4(int4 minInclusive, int4 maxExclusive) => currentSequence.NextInt4(minInclusive, maxExclusive);
 
         public float NextFloat() => currentSequence.NextFloat();
         public float2 NextFloat2() => currentSequence.NextFloat2();
         public float3 NextFloat3() => currentSequence.NextFloat3();
         public float4 NextFloat4() => currentSequence.NextFloat4();
-        public float NextFloat(float min, float max) => currentSequence.NextFloat(min, max);
-        public float2 NextFloat2(float2 min, float2 max) => currentSequence.NextFloat2( min, max);
-        public float3 NextFloat3(float3 min, float3 max) => currentSequence.NextFloat3( min, max);
-        public float4 NextFloat4(float4 min, float4 max) => currentSequence.NextFloat4( min, max);
+        public float NextFloat(float minInclusive, float maxExclusive) => currentSequence.NextFloat(minInclusive, maxExclusive);
+        public float2 NextFloat2(float2 minInclusive, float2 maxExclusive) => currentSequence.NextFloat2( minInclusive, maxExclusive);
+        public float3 NextFloat3(float3 minInclusive, float3 maxExclusive) => currentSequence.NextFloat3( minInclusive, maxExclusive);
+        public float4 NextFloat4(float4 minInclusive, float4 maxExclusive) => currentSequence.NextFloat4( minInclusive, maxExclusive);
 
         public float2 NextFloat2Direction() => currentSequence.NextFloat2Direction();
         public float3 NextFloat3Direction() => currentSequence.NextFloat3Direction();
         public quaternion NextQuaternionRotation() => currentSequence.NextQuaternionRotation();
+
+        public void ShuffleElements<T>(NativeArray<T> array) where T : unmanaged => currentSequence.ShuffleElements(array);
+        public void ShuffleElements<T, U>(T list) where T : unmanaged, INativeList<U> where U : unmanaged => currentSequence.ShuffleElements<T, U>(list);
     }
 }
 

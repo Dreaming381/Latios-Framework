@@ -8,6 +8,9 @@ using Unity.Mathematics;
 
 namespace Latios.Calligraphics
 {
+    /// <summary>
+    /// A Burst-compatible string type that wraps a DynamicBuffer of bytes
+    /// </summary>
     public struct CalliString :
         INativeList<byte>,
             IUTF8Bytes,

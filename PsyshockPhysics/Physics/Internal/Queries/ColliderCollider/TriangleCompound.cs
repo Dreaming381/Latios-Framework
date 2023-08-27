@@ -39,7 +39,7 @@ namespace Latios.Psyshock
                                                  in TriangleCollider triangle,
                                                  in RigidTransform triangleTransform,
                                                  float maxDistance,
-                                                 ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+                                                 ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
             ref var blob = ref compound.compoundColliderBlob.Value;
             for (int i = 0; i < blob.colliders.Length; i++)

@@ -167,6 +167,68 @@ namespace Latios.Transforms
         public bool isInitialized => version != 0;
     }
 
+    /// <summary>
+    /// The mode flags that the transforms use to update the hierarchy.
+    /// When the hierarchy updates, each entity can choose to keep the local transform properties
+    /// and update the world transform properties, or keep the world transform properties and update
+    /// the local transform properties. The entity may also choose a mix of the two.
+    /// If this component is not present, the hierarchy updates as if no flags are set.
+    /// </summary>
+    public struct HierarchyUpdateMode : IComponentData
+    {
+        public enum Flags : byte
+        {
+            /// <summary>
+            /// If the enum is equal to this, then normal hierarchy update rules apply, and all values are affected by the parent.
+            /// </summary>
+            Normal = 0x0,
+            /// <summary>
+            /// When present, the world-space x-axis position is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldX = 0x1,
+            /// <summary>
+            /// When present, the world-space y-axis position is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldY = 0x2,
+            /// <summary>
+            /// When present, the world-space z-axis position is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldZ = 0x4,
+            /// <summary>
+            /// When present, the world-space forward direction is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldForward = 0x8,
+            /// <summary>
+            /// When present, the world-space up direction is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldUp = 0x10,
+            /// <summary>
+            /// If only one of WorldForward or WorldUp is set, then if this flag is set, the up-direction is used and
+            /// the forward-direction is approximated as best as possible. Otherwise, the forward-direction is used and
+            /// the up-direction is approximated as best as possible.
+            /// </summary>
+            StrictUp = 0x20,
+            /// <summary>
+            /// When present, the world-space scale is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldScale = 0x40,
+            /// <summary>
+            /// When present, the world-space position is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldPosition = WorldX | WorldY | WorldZ,
+            /// <summary>
+            /// When present, the world-space orientation is preserved. Otherwise, the value is affected by the parent.
+            /// </summary>
+            WorldRotation = WorldForward | WorldUp,
+            /// <summary>
+            /// When present, the world-space transform is preserved and the local-space transform is updated.
+            /// </summary>
+            WorldAll = WorldPosition | WorldRotation | WorldScale,
+        }
+
+        public Flags modeFlags;
+    }
+
     internal struct Depth : IComponentData
     {
         public byte depth;

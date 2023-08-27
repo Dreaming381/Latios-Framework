@@ -47,72 +47,72 @@ namespace Latios
             return math.asint(u);
         }
 
-        public static int AsInt(uint u, int min, int max)
+        public static int AsInt(uint u, int minInclusive, int maxExclusive)
         {
-            CheckIntMinMax(min, max);
-            uint range = (uint)(max - min);
-            return (int)(u * (ulong)range >> 32) + min;
+            CheckIntMinMax(minInclusive, maxExclusive);
+            uint range = (uint)(maxExclusive - minInclusive);
+            return (int)(u * (ulong)range >> 32) + minInclusive;
         }
 
-        public static int2 AsInt2(uint2 u, int2 min, int2 max)
+        public static int2 AsInt2(uint2 u, int2 minInclusive, int2 maxExclusive)
         {
-            CheckIntMinMax(min.xyxy, max.xyxy);
-            uint2 range = (uint2)(max - min);
+            CheckIntMinMax(minInclusive.xyxy, maxExclusive.xyxy);
+            uint2 range = (uint2)(maxExclusive - minInclusive);
             return new int2((int)(u.x * (ulong)range.x >> 32),
-                            (int)(u.y * (ulong)range.y >> 32)) + min;
+                            (int)(u.y * (ulong)range.y >> 32)) + minInclusive;
         }
 
-        public static int3 AsInt3(uint3 u, int3 min, int3 max)
+        public static int3 AsInt3(uint3 u, int3 minInclusive, int3 maxExclusive)
         {
-            CheckIntMinMax(min.xyzx, max.xyzx);
-            uint3 range = (uint3)(max - min);
+            CheckIntMinMax(minInclusive.xyzx, maxExclusive.xyzx);
+            uint3 range = (uint3)(maxExclusive - minInclusive);
             return new int3((int)(u.x * (ulong)range.x >> 32),
                             (int)(u.y * (ulong)range.y >> 32),
-                            (int)(u.z * (ulong)range.z >> 32)) + min;
+                            (int)(u.z * (ulong)range.z >> 32)) + minInclusive;
         }
 
-        public static int4 AsInt4(uint4 u, int4 min, int4 max)
+        public static int4 AsInt4(uint4 u, int4 minInclusive, int4 maxExclusive)
         {
-            CheckIntMinMax(min, max);
-            uint4 range = (uint4)(max - min);
+            CheckIntMinMax(minInclusive, maxExclusive);
+            uint4 range = (uint4)(maxExclusive - minInclusive);
             return new int4((int)(u.x * (ulong)range.x >> 32),
                             (int)(u.y * (ulong)range.y >> 32),
                             (int)(u.z * (ulong)range.z >> 32),
-                            (int)(u.w * (ulong)range.w >> 32)) + min;
+                            (int)(u.w * (ulong)range.w >> 32)) + minInclusive;
         }
 
-        public static uint AsUInt(uint u, uint min, uint max)
+        public static uint AsUInt(uint u, uint minInclusive, uint maxExclusive)
         {
-            CheckUIntMinMax(min, max);
-            uint range = max - min;
-            return (uint)(u * (ulong)range >> 32) + min;
+            CheckUIntMinMax(minInclusive, maxExclusive);
+            uint range = maxExclusive - minInclusive;
+            return (uint)(u * (ulong)range >> 32) + minInclusive;
         }
 
-        public static uint2 AsUInt2(uint2 u, uint2 min, uint2 max)
+        public static uint2 AsUInt2(uint2 u, uint2 minInclusive, uint2 maxExclusive)
         {
-            CheckUIntMinMax(min.xyxy, max.xyxy);
-            uint2 range = max - min;
+            CheckUIntMinMax(minInclusive.xyxy, maxExclusive.xyxy);
+            uint2 range = maxExclusive - minInclusive;
             return new uint2((uint)(u.x * (ulong)range.x >> 32),
-                             (uint)(u.y * (ulong)range.y >> 32)) + min;
+                             (uint)(u.y * (ulong)range.y >> 32)) + minInclusive;
         }
 
-        public static uint3 AsUInt3(uint3 u, uint3 min, uint3 max)
+        public static uint3 AsUInt3(uint3 u, uint3 minInclusive, uint3 maxExclusive)
         {
-            CheckUIntMinMax(min.xyzx, max.xyzx);
-            uint3 range = max - min;
+            CheckUIntMinMax(minInclusive.xyzx, maxExclusive.xyzx);
+            uint3 range = maxExclusive - minInclusive;
             return new uint3((uint)(u.x * (ulong)range.x >> 32),
                              (uint)(u.y * (ulong)range.y >> 32),
-                             (uint)(u.z * (ulong)range.z >> 32)) + min;
+                             (uint)(u.z * (ulong)range.z >> 32)) + minInclusive;
         }
 
-        public static uint4 AsUInt4(uint4 u, uint4 min, uint4 max)
+        public static uint4 AsUInt4(uint4 u, uint4 minInclusive, uint4 maxExclusive)
         {
-            CheckUIntMinMax(min, max);
-            uint4 range = max - min;
+            CheckUIntMinMax(minInclusive, maxExclusive);
+            uint4 range = maxExclusive - minInclusive;
             return new uint4((uint)(u.x * (ulong)range.x >> 32),
                              (uint)(u.y * (ulong)range.y >> 32),
                              (uint)(u.z * (ulong)range.z >> 32),
-                             (uint)(u.w * (ulong)range.w >> 32)) + min;
+                             (uint)(u.w * (ulong)range.w >> 32)) + minInclusive;
         }
 
         public static float AsFloat(uint u)
@@ -135,28 +135,28 @@ namespace Latios
             return math.asfloat(0x3f800000 | (u >> 9)) - 1.0f;
         }
 
-        public static float AsFloat(uint u, float min, float max)
+        public static float AsFloat(uint u, float minInclusive, float maxExclusive)
         {
-            CheckFloatMinMax(min, max);
-            return AsFloat(u) * (max - min) + min;
+            CheckFloatMinMax(minInclusive, maxExclusive);
+            return AsFloat(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
-        public static float2 AsFloat2(uint2 u, float2 min, float2 max)
+        public static float2 AsFloat2(uint2 u, float2 minInclusive, float2 maxExclusive)
         {
-            CheckFloatMinMax(min.xyxy, max.xyxy);
-            return AsFloat2(u) * (max - min) + min;
+            CheckFloatMinMax(minInclusive.xyxy, maxExclusive.xyxy);
+            return AsFloat2(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
-        public static float3 AsFloat3(uint3 u, float3 min, float3 max)
+        public static float3 AsFloat3(uint3 u, float3 minInclusive, float3 maxExclusive)
         {
-            CheckFloatMinMax(min.xyzx, max.xyzx);
-            return AsFloat3(u) * (max - min) + min;
+            CheckFloatMinMax(minInclusive.xyzx, maxExclusive.xyzx);
+            return AsFloat3(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
-        public static float4 AsFloat4(uint4 u, float4 min, float4 max)
+        public static float4 AsFloat4(uint4 u, float4 minInclusive, float4 maxExclusive)
         {
-            CheckFloatMinMax(min, max);
-            return AsFloat4(u) * (max - min) + min;
+            CheckFloatMinMax(minInclusive, maxExclusive);
+            return AsFloat4(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
         // Todo: There has to be a way to avoid trig in these
@@ -195,29 +195,29 @@ namespace Latios
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void CheckIntMinMax(int4 min, int4 max)
+        private static void CheckIntMinMax(int4 minInclusive, int4 maxExclusive)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (math.any(min > max))
-                throw new System.ArgumentException("min must be less than or equal to max");
+            if (math.any(minInclusive > maxExclusive))
+                throw new System.ArgumentException("minInclusive must be less than or equal to maxExclusive");
 #endif
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void CheckUIntMinMax(uint4 min, uint4 max)
+        private static void CheckUIntMinMax(uint4 minInclusive, uint4 maxExclusive)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (math.any(min > max))
-                throw new System.ArgumentException("min must be less than or equal to max");
+            if (math.any(minInclusive > maxExclusive))
+                throw new System.ArgumentException("minInclusive must be less than or equal to maxExclusive");
 #endif
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void CheckFloatMinMax(float4 min, float4 max)
+        private static void CheckFloatMinMax(float4 minInclusive, float4 maxExclusive)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (math.any(min > max))
-                throw new System.ArgumentException("min must be less than or equal to max");
+            if (math.any(minInclusive > maxExclusive))
+                throw new System.ArgumentException("minInclusive must be less than or equal to maxExclusive");
 #endif
         }
     }

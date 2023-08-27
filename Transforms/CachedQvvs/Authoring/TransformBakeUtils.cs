@@ -24,6 +24,9 @@ namespace Latios.Transforms.Authoring
 
         public static TransformQvvs GetQvvsRelativeTo(this Transform current, Transform targetSpace)
         {
+            if (current == targetSpace)
+                return TransformQvvs.identity;
+
             var original = current;
             GetScaleAndStretch(current.localScale, out var scale, out var stretch);
             var currentQvvs = new TransformQvvs(current.position, current.rotation, scale, stretch);

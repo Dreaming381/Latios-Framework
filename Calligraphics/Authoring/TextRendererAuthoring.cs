@@ -65,8 +65,8 @@ namespace Latios.Calligraphics.Authoring
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
 
+            //Fonts
             AddFontRendering(entity, authoring.fontsAndMaterials[0]);
-
             if (authoring.fontsAndMaterials.Count > 1)
             {
                 var additionalEntities = AddBuffer<AdditionalFontMaterialEntity>(entity).Reinterpret<Entity>();
@@ -78,6 +78,7 @@ namespace Latios.Calligraphics.Authoring
                 }
             }
 
+            //Text Content
             var calliString = new CalliString(AddBuffer<CalliByte>(entity));
             calliString.Append(authoring.text);
             AddComponent(entity, new TextBaseConfiguration

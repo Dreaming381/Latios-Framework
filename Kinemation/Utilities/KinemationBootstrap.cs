@@ -61,7 +61,7 @@ namespace Latios.Kinemation
         /// <param name="world"></param>
         public static void InstallMecanimFeatures(World world)
         {
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationAnimatorStateMachineSuperSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<MecanimSuperSystem>(), world);
         }
     }
 }

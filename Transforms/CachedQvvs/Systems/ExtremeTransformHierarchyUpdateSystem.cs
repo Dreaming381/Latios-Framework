@@ -41,7 +41,7 @@ namespace Latios.Transforms.Systems
             var worldTransformLookup = GetComponentLookup<WorldTransform>(false);
             var depthHandle          = GetComponentTypeHandle<Depth>(true);
             var depthMaskHandle      = GetComponentTypeHandle<ChunkDepthMask>(false);
-            var localTransformHandle = GetComponentTypeHandle<LocalTransform>(true);
+            var localTransformHandle = GetComponentTypeHandle<LocalTransform>(false);
             var parentHandle         = GetComponentTypeHandle<PreviousParent>(true);
             var worldTransformHandle = GetComponentTypeHandle<WorldTransform>(false);
 
@@ -83,6 +83,7 @@ namespace Latios.Transforms.Systems
                 worldTransformHandle         = worldTransformHandle,
                 parentHandle                 = parentHandle,
                 parentToWorldTransformHandle = GetComponentTypeHandle<ParentToWorldTransform>(false),
+                hierarchyUpdateModeHandle    = GetComponentTypeHandle<HierarchyUpdateMode>(true)
             };
 
             for (int i = 0; i < kMaxDepthIterations; i++)
@@ -100,17 +101,18 @@ namespace Latios.Transforms.Systems
 
             state.Dependency = new UpdateMatricesOfDeepChildrenJob
             {
-                childLookup          = GetBufferLookup<Child>(true),
-                childHandle          = GetBufferTypeHandle<Child>(true),
-                chunkList            = finalChunkList.AsDeferredJobArray(),
-                depthHandle          = depthHandle,
-                depthLevel           = kMaxDepthIterations - 1,
-                lastSystemVersion    = state.LastSystemVersion,
-                localTransformLookup = GetComponentLookup<LocalTransform>(true),
-                worldTransformLookup = worldTransformLookup,
-                worldTransformHandle = worldTransformHandle,
-                parentLookup         = GetComponentLookup<PreviousParent>(true),
-                parentToWorldLookup  = GetComponentLookup<ParentToWorldTransform>(false)
+                childLookup               = GetBufferLookup<Child>(true),
+                childHandle               = GetBufferTypeHandle<Child>(true),
+                chunkList                 = finalChunkList.AsDeferredJobArray(),
+                depthHandle               = depthHandle,
+                depthLevel                = kMaxDepthIterations - 1,
+                lastSystemVersion         = state.LastSystemVersion,
+                localTransformLookup      = GetComponentLookup<LocalTransform>(false),
+                worldTransformLookup      = worldTransformLookup,
+                worldTransformHandle      = worldTransformHandle,
+                parentLookup              = GetComponentLookup<PreviousParent>(true),
+                parentToWorldLookup       = GetComponentLookup<ParentToWorldTransform>(false),
+                hierarchyUpdateModeLookup = GetComponentLookup<HierarchyUpdateMode>(true)
             }.Schedule(finalChunkList, 1, state.Dependency);
         }
 
@@ -306,11 +308,12 @@ namespace Latios.Transforms.Systems
             [ReadOnly] public NativeArray<ArchetypeChunk>                                        chunkList;
             [NativeDisableContainerSafetyRestriction] public ComponentTypeHandle<WorldTransform> worldTransformHandle;
             public ComponentTypeHandle<ParentToWorldTransform>                                   parentToWorldTransformHandle;
+            public ComponentTypeHandle<LocalTransform>                                           localTransformHandle;
 
-            [ReadOnly] public ComponentTypeHandle<LocalTransform> localTransformHandle;
-            [ReadOnly] public ComponentTypeHandle<PreviousParent> parentHandle;
-            [ReadOnly] public ComponentTypeHandle<Depth>          depthHandle;
-            [ReadOnly] public ComponentLookup<WorldTransform>     worldTransformLookup;
+            [ReadOnly] public ComponentTypeHandle<PreviousParent>      parentHandle;
+            [ReadOnly] public ComponentTypeHandle<Depth>               depthHandle;
+            [ReadOnly] public ComponentTypeHandle<HierarchyUpdateMode> hierarchyUpdateModeHandle;
+            [ReadOnly] public ComponentLookup<WorldTransform>          worldTransformLookup;
 
             [ReadOnly] public ComponentTypeHandle<ChunkDepthMask> depthMaskHandle;
 
@@ -328,14 +331,30 @@ namespace Latios.Transforms.Systems
 
                 if (chunk.Has(ref localTransformHandle))
                 {
-                    var localTransforms  = chunk.GetNativeArray(ref localTransformHandle);
-                    var parentTransforms = chunk.GetNativeArray(ref parentToWorldTransformHandle);
+                    var flags           = chunk.GetComponentDataPtrRO(ref hierarchyUpdateModeHandle);
+                    var hasFlags        = flags != null;
+                    var localTransforms = (TransformQvs*)(hasFlags ? chunk.GetRequiredComponentDataPtrRW(ref localTransformHandle) :
+                                                          chunk.GetRequiredComponentDataPtrRO(ref localTransformHandle));
+                    var parentTransforms = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRW(ref parentToWorldTransformHandle);
 
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         if (depth == depths[i].depth)
                         {
-                            qvvs.mul(ref worldTransforms[i], worldTransformLookup[parents[i].previousParent].worldTransform, localTransforms[i].localTransform);
+                            ref readonly var parentWorldTransform = ref worldTransformLookup.GetRefRO(parents[i].previousParent).ValueRO.worldTransform;
+                            parentTransforms[i]                   = parentWorldTransform;
+
+                            if (hasFlags)
+                            {
+                                HierarchyInternalUtilities.UpdateTransform(ref worldTransforms[i],
+                                                                           ref localTransforms[i],
+                                                                           in parentWorldTransform,
+                                                                           flags[i].modeFlags);
+                            }
+                            else
+                            {
+                                qvvs.mul(ref worldTransforms[i], in parentWorldTransform, in localTransforms[i]);
+                            }
                         }
                     }
                 }
@@ -359,11 +378,12 @@ namespace Latios.Transforms.Systems
             [ReadOnly] public NativeArray<ArchetypeChunk> chunkList;
             [ReadOnly] public ComponentTypeHandle<Depth>  depthHandle;
 
-            [ReadOnly] public ComponentTypeHandle<WorldTransform> worldTransformHandle;
-            [ReadOnly] public BufferTypeHandle<Child>             childHandle;
-            [ReadOnly] public BufferLookup<Child>                 childLookup;
-            [ReadOnly] public ComponentLookup<LocalTransform>     localTransformLookup;
-            [ReadOnly] public ComponentLookup<PreviousParent>     parentLookup;
+            [ReadOnly] public ComponentTypeHandle<WorldTransform>  worldTransformHandle;
+            [ReadOnly] public BufferTypeHandle<Child>              childHandle;
+            [ReadOnly] public BufferLookup<Child>                  childLookup;
+            [ReadOnly] public ComponentLookup<LocalTransform>      localTransformLookup;
+            [ReadOnly] public ComponentLookup<PreviousParent>      parentLookup;
+            [ReadOnly] public ComponentLookup<HierarchyUpdateMode> hierarchyUpdateModeLookup;
 
             [NativeDisableParallelForRestriction] public ComponentLookup<ParentToWorldTransform> parentToWorldLookup;
             [NativeDisableContainerSafetyRestriction] public ComponentLookup<WorldTransform>     worldTransformLookup;
@@ -431,7 +451,17 @@ namespace Latios.Transforms.Systems
                     {
                         parentToWorldLookup[entity] = new ParentToWorldTransform { parentToWorldTransform = parentWorldTransform };
                         ref var worldTransform                                                            = ref worldTransformLookup.GetRefRW(entity).ValueRW;
-                        qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, localTransformLookup[entity].localTransform);
+                        if (hierarchyUpdateModeLookup.TryGetComponent(entity, out var flags))
+                        {
+                            HierarchyInternalUtilities.UpdateTransform(ref worldTransform.worldTransform,
+                                                                       ref localTransformLookup.GetRefRW(entity).ValueRW.localTransform,
+                                                                       in parentWorldTransform,
+                                                                       flags.modeFlags);
+                        }
+                        else
+                        {
+                            qvvs.mul(ref worldTransform.worldTransform, in parentWorldTransform, in localTransformLookup.GetRefRO(entity).ValueRO.localTransform);
+                        }
                         worldTransformToPropagate = worldTransform.worldTransform;
                     }
                     else

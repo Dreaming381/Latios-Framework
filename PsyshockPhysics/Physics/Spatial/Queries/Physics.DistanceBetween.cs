@@ -134,14 +134,6 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
-        /// An interface whose Execute method is invoked for each primitive pair found in a DistanceBetweenAll operation.
-        /// </summary>
-        public interface IDistanceBetweenAllProcessor
-        {
-            void Execute(in ColliderDistanceResult result);
-        }
-
-        /// <summary>
         /// Checks if the distance between the surfaces of all subcolliders between two colliders are within maxDistance. If the colliders are overlapping, the determined
         /// distance is negative. If the signed distance is less than maxDistance, info about the pair of surface points, one for each subcollider, is generated and
         /// dispatched to the processor.
@@ -270,5 +262,15 @@ namespace Latios.Psyshock
         }
         #endregion
     }
+
+    #region Interfaces
+    /// <summary>
+    /// An interface whose Execute method is invoked for each primitive pair found in a DistanceBetweenAll operation.
+    /// </summary>
+    public interface IDistanceBetweenAllProcessor
+    {
+        void Execute(in ColliderDistanceResult result);
+    }
+    #endregion
 }
 

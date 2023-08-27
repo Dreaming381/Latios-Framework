@@ -93,6 +93,9 @@ namespace Latios.Kinemation.Authoring
         /// <summary>
         /// Allows changing the root motion mode when sampling the source clip.
         /// This affects which bone inherits root motion data and in what form.
+        /// Normally, if the clip contains root motion, you want to bake it with
+        /// root motion enabled, even if you intend to not use root motion at
+        /// runtime. Doing so avoids the artifact of characters teleporting.
         /// </summary>
         public RootMotionOverrideMode rootMotionOverrideMode;
 
@@ -107,7 +110,8 @@ namespace Latios.Kinemation.Authoring
             maxDistanceError             = 0.0001f,
             sampledErrorDistanceFromBone = 0.03f,
             maxUniformScaleError         = 0.00001f,
-            copyFirstKeyAtEnd            = false
+            copyFirstKeyAtEnd            = false,
+            rootMotionOverrideMode       = RootMotionOverrideMode.EnableRootMotion
         };
 
         /// <summary>

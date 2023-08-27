@@ -41,7 +41,7 @@ namespace Latios.Psyshock
                                                         in SphereCollider sphere,
                                                         in RigidTransform sphereTransform,
                                                         float maxDistance,
-                                                        ref T processor) where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+                                                        ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
             var sphereInTriMeshTransform = math.mul(math.inverse(triMeshTransform), sphereTransform);
             var aabb                     = Physics.AabbFrom(sphere, sphereInTriMeshTransform);
@@ -161,7 +161,7 @@ namespace Latios.Psyshock
             return true;
         }
 
-        unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, Physics.IDistanceBetweenAllProcessor
+        unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, IDistanceBetweenAllProcessor
         {
             public TriMeshCollider triMesh;
             public RigidTransform  triMeshTransform;
