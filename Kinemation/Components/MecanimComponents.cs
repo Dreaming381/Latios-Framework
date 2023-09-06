@@ -136,7 +136,9 @@ namespace Latios.Kinemation
     [InternalBufferCapacity(0)]
     public struct MecanimActiveClipEvent : IBufferElementData
     {
-        public int   clipIndex;
+        public int   nameHash;
+        public int   parameter;
+        public short clipIndex;
         public short eventIndex;
     }
 

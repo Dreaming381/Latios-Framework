@@ -1,4 +1,5 @@
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+using Latios.Systems;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -47,6 +48,24 @@ namespace Latios.Transforms.Systems
         protected override void CreateSystems()
         {
             EnableSystemSorting = true;
+
+            GetOrCreateAndAddUnmanagedSystem<CopyGameObjectTransformToEntitySystem>();
+        }
+    }
+
+    /// <summary>
+    /// This group is updated inside the LatiosWorldSyncGroup and handles registration of GameObjectEntity bindings.
+    /// If you create GameObjectEntities at runtime, make sure such systems update before this system.
+    /// </summary>
+    [UpdateInGroup(typeof(LatiosWorldSyncGroup))]
+    [DisableAutoCreation]
+    public partial class HybridTransformsSyncPointSuperSystem : SuperSystem
+    {
+        protected override void CreateSystems()
+        {
+            EnableSystemSorting = true;
+
+            GetOrCreateAndAddManagedSystem<GameObjectEntityBindingSystem>();
         }
     }
 
@@ -65,6 +84,7 @@ namespace Latios.Transforms.Systems
 #if !UNITY_DISABLE_MANAGED_COMPONENTS
             GetOrCreateAndAddUnmanagedSystem<CompanionGameObjectUpdateTransformSystem>();
 #endif
+            GetOrCreateAndAddUnmanagedSystem<CopyGameObjectTransformFromEntitySystem>();
         }
     }
 

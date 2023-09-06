@@ -136,7 +136,6 @@ namespace Latios
         internal void ResumeNextFrame() => m_resumeNextFrame = true;
         internal bool paused => m_paused;
         internal bool willResumeNextFrame => m_resumeNextFrame;
-        internal bool autoGenerateSceneBlackboardEntity = true;
 
         internal void FrameStart()
         {
@@ -144,12 +143,6 @@ namespace Latios
             {
                 m_paused          = false;
                 m_resumeNextFrame = false;
-            }
-
-            if (autoGenerateSceneBlackboardEntity)
-            {
-                CreateNewSceneBlackboardEntity();
-                autoGenerateSceneBlackboardEntity = false;
             }
         }
 
@@ -165,56 +158,59 @@ namespace Latios
             if (!existsAndIsValid)
             {
                 m_unmanaged.CreateSceneBlackboardEntity();
-
-                foreach (var system in Systems)
-                {
-                    if (system is ILatiosSystem latiosSystem)
-                    {
-                        m_unmanaged.m_impl->BeginDependencyTracking(system.SystemHandle);
-                        bool hadError = false;
-                        try
-                        {
-                            latiosSystem.OnNewScene();
-                        }
-                        catch (Exception e)
-                        {
-                            hadError = true;
-                            Debug.LogException(e);
-                        }
-                        finally
-                        {
-                            m_unmanaged.m_impl->EndDependencyTracking(system.SystemHandle, hadError);
-                        }
-                    }
-                }
-
-                var unmanaged        = Unmanaged;
-                var unmanagedSystems = unmanaged.GetAllUnmanagedSystems(Allocator.TempJob);
-                for (int i = 0; i < unmanagedSystems.Length; i++)
-                {
-                    ref var systemState = ref unmanaged.ResolveSystemStateRef(unmanagedSystems[i]);
-                    var     dispatcher  = m_interfacesDispatcher.GetDispatch(ref systemState);
-                    if (dispatcher != null)
-                    {
-                        m_unmanaged.m_impl->BeginDependencyTracking(systemState.SystemHandle);
-                        bool hadError = false;
-                        try
-                        {
-                            dispatcher.OnNewScene(ref systemState);
-                        }
-                        catch (Exception e)
-                        {
-                            hadError = true;
-                            Debug.LogException(e);
-                        }
-                        finally
-                        {
-                            m_unmanaged.m_impl->EndDependencyTracking(systemState.SystemHandle, hadError);
-                        }
-                    }
-                }
-                unmanagedSystems.Dispose();
             }
+        }
+
+        internal unsafe void DispatchNewSceneCallbacks()
+        {
+            foreach (var system in Systems)
+            {
+                if (system is ILatiosSystem latiosSystem)
+                {
+                    m_unmanaged.m_impl->BeginDependencyTracking(system.SystemHandle);
+                    bool hadError = false;
+                    try
+                    {
+                        latiosSystem.OnNewScene();
+                    }
+                    catch (Exception e)
+                    {
+                        hadError = true;
+                        Debug.LogException(e);
+                    }
+                    finally
+                    {
+                        m_unmanaged.m_impl->EndDependencyTracking(system.SystemHandle, hadError);
+                    }
+                }
+            }
+
+            var unmanaged        = Unmanaged;
+            var unmanagedSystems = unmanaged.GetAllUnmanagedSystems(Allocator.TempJob);
+            for (int i = 0; i < unmanagedSystems.Length; i++)
+            {
+                ref var systemState = ref unmanaged.ResolveSystemStateRef(unmanagedSystems[i]);
+                var     dispatcher  = m_interfacesDispatcher.GetDispatch(ref systemState);
+                if (dispatcher != null)
+                {
+                    m_unmanaged.m_impl->BeginDependencyTracking(systemState.SystemHandle);
+                    bool hadError = false;
+                    try
+                    {
+                        dispatcher.OnNewScene(ref systemState);
+                    }
+                    catch (Exception e)
+                    {
+                        hadError = true;
+                        Debug.LogException(e);
+                    }
+                    finally
+                    {
+                        m_unmanaged.m_impl->EndDependencyTracking(systemState.SystemHandle, hadError);
+                    }
+                }
+            }
+            unmanagedSystems.Dispose();
         }
     }
 }

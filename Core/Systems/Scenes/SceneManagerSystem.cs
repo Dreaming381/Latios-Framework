@@ -36,8 +36,6 @@ namespace Latios.Systems
             };
             worldBlackboardEntity.AddComponentData(curr);
 
-            latiosWorld.autoGenerateSceneBlackboardEntity = false;
-
             m_unitySubsceneLoadQuery        = Fluent.WithAll<Unity.Entities.RequestSceneLoaded>().Build();
             m_dontDestroyOnSceneChangeQuery = Fluent.WithAll<Unity.Entities.SceneTag>().WithAll<DontDestroyOnSceneChangeTag>().IncludeDisabledEntities().IncludePrefabs().Build();
         }
@@ -91,7 +89,6 @@ namespace Latios.Systems
                 currentScene.currentScene      = SceneManager.GetActiveScene().name;
                 currentScene.isSceneFirstFrame = true;
                 worldBlackboardEntity.SetComponentData(currentScene);
-                latiosWorld.CreateNewSceneBlackboardEntity();
             }
             else if (m_paused)
             {

@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Collections.LowLevel.Unsafe;
@@ -27,7 +29,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// The CollisionLayer queried. Can be used for additional immediate queries directly inside the processor.
         /// </summary>
-        public CollisionLayer layer => m_layer;
+        public unsafe ref readonly CollisionLayer layer => ref UnsafeUtility.AsRef<CollisionLayer>(UnsafeUtility.AddressOf(ref m_layer));
         /// <summary>
         /// The full ColliderBody of the collider
         /// </summary>
@@ -128,6 +130,19 @@ namespace Latios.Psyshock
                 disableEntityAliasChecks = false
             };
         }
+
+        /// <summary>
+        /// Searches the CollisionLayer for all colliders whose Aabbs overlap with the queried Aabb and returns each result via Enumerator.
+        /// Use this in a foreach loop expression to iterate all found objects. Note: For better performance, receive each results as a
+        /// ref readonly FindObjectsResult.
+        /// </summary>
+        /// <param name="aabb">The queried Aabb</param>
+        /// <param name="layer">The CollisionLayer to find colliders whose Aabbs overlap the queried Aabb</param>
+        /// <returns>An enumerator that searches for the next result.</returns>
+        public static FindObjectsEnumerator FindObjects(in Aabb aabb, in CollisionLayer layer)
+        {
+            return new FindObjectsEnumerator(in aabb, layer);
+        }
     }
 
     /// <summary>
@@ -191,6 +206,22 @@ namespace Latios.Psyshock
             }.Schedule(inputDeps);
         }
         #endregion Schedulers
+    }
+
+    public unsafe partial struct FindObjectsEnumerator : IEnumerable<FindObjectsResult>
+    {
+        // Warning: This is only valid when the enumerator itself is valid.
+        public ref readonly FindObjectsResult Current => ref UnsafeUtility.AsRef<FindObjectsResult>(UnsafeUtility.AddressOf(ref m_result));
+
+        public void Dispose()
+        {
+        }
+
+        public FindObjectsEnumerator GetEnumerator() => this;
+
+        IEnumerator IEnumerable.GetEnumerator() => throw new NotImplementedException();
+
+        IEnumerator<FindObjectsResult> IEnumerable<FindObjectsResult>.GetEnumerator() => throw new NotImplementedException();
     }
 }
 

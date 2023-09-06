@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
@@ -61,7 +63,7 @@ namespace Latios.Psyshock
             SearchTreeLooped(ref context, ref processor);
         }
 
-        private static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
+        internal static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
         {
             return BinarySearchFirstGreaterOrEqual((float*)array.GetUnsafeReadOnlyPtr(), array.Length, searchValue);
         }
@@ -144,11 +146,11 @@ namespace Latios.Psyshock
             SearchTree(GetRightChildIndex(currentIndex), ref context, ref processor);
         }
 
-        private static uint GetLeftChildIndex(uint currentIndex) => 2 * currentIndex + 1;
-        private static uint GetRightChildIndex(uint currentIndex) => 2 * currentIndex + 2;
-        private static uint GetParentIndex(uint currentIndex) => (currentIndex - 1) / 2;
+        internal static uint GetLeftChildIndex(uint currentIndex) => 2 * currentIndex + 1;
+        internal static uint GetRightChildIndex(uint currentIndex) => 2 * currentIndex + 2;
+        internal static uint GetParentIndex(uint currentIndex) => (currentIndex - 1) / 2;
 
-        struct StackFrame
+        internal struct StackFrame
         {
             public uint currentIndex;
             public uint checkpoint;
@@ -216,6 +218,183 @@ namespace Latios.Psyshock
                     currentFrameIndex--;
                 }
             }
+        }
+    }
+
+    public unsafe partial struct FindObjectsEnumerator : IEnumerable<FindObjectsResult>
+    {
+        FindObjectsResult m_result;
+
+        int3         m_bucketIjk;
+        int3         m_minBucket;
+        int3         m_maxBucket;
+        BucketSlices m_bucket;
+
+        float4 m_qyzMinMax;
+        float  m_qxmin;
+        float  m_qxmax;
+
+        int        m_indexInBucket;
+        uint       m_currentFrameIndex;
+        fixed uint m_stackData[64];
+        LayerQuerySweepMethods.StackFrame* m_stack
+        {
+            get
+            {
+                fixed (void* ptr = m_stackData)
+                {
+                    return (LayerQuerySweepMethods.StackFrame*)ptr;
+                }
+            }
+        }
+
+        public FindObjectsEnumerator(in Aabb aabb, in CollisionLayer layer)
+        {
+            if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
+            {
+                m_maxBucket         = 0;
+                m_minBucket         = 0;
+                m_bucketIjk         = 1;
+                m_result            = default;
+                m_bucket            = layer.GetBucketSlices(0);
+                m_indexInBucket     = m_bucket.count;
+                m_qyzMinMax         = default;
+                m_qxmin             = default;
+                m_qxmax             = default;
+                m_currentFrameIndex = 33;
+            }
+            else
+            {
+                m_minBucket = math.int3(math.floor((aabb.min - layer.worldMin) / layer.worldAxisStride));
+                m_maxBucket = math.int3(math.floor((aabb.max - layer.worldMin) / layer.worldAxisStride));
+                m_minBucket = math.clamp(m_minBucket, 0, layer.worldSubdivisionsPerAxis - 1);
+                m_maxBucket = math.clamp(m_maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
+                m_bucketIjk = m_minBucket;
+                m_bucket    = layer.GetBucketSlices(0);
+                m_result    = new FindObjectsResult(in layer, in m_bucket, 0, false);
+
+                m_qxmin     = aabb.min.x;
+                m_qxmax     = aabb.max.x;
+                m_qyzMinMax = new float4(aabb.max.yz, -aabb.min.yz);
+
+                m_indexInBucket     = LayerQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
+                m_currentFrameIndex = 0;
+                m_stack[0]          = new LayerQuerySweepMethods.StackFrame { currentIndex = 0, checkpoint = 0 };
+            }
+        }
+
+        public bool MoveNext()
+        {
+            while (math.all(m_bucketIjk <= m_maxBucket))
+            {
+                if (StepBucket())
+                    return true;
+
+                m_bucketIjk.z++;
+                if (m_bucketIjk.z > m_maxBucket.z)
+                {
+                    m_bucketIjk.y++;
+                    m_bucketIjk.z = m_minBucket.z;
+                    if (m_bucketIjk.y > m_maxBucket.y)
+                    {
+                        m_bucketIjk.x++;
+                        m_bucketIjk.y = m_minBucket.y;
+                        if (m_bucketIjk.x > m_maxBucket.x)
+                        {
+                            // Set the target bucket to the cross bucket by adding one to the max bucket
+                            m_bucketIjk = m_maxBucket;
+                            m_bucketIjk.z++;
+                        }
+                    }
+                }
+
+                var bucketIndex = (m_bucketIjk.x * m_result.layer.worldSubdivisionsPerAxis.y + m_bucketIjk.y) * m_result.layer.worldSubdivisionsPerAxis.z + m_bucketIjk.z;
+                m_bucket        = m_result.layer.GetBucketSlices(bucketIndex);
+                m_result        = new FindObjectsResult(in m_result.layer, in m_bucket, bucketIndex, false);
+
+                m_indexInBucket     = LayerQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
+                m_currentFrameIndex = 0;
+                m_stack[0]          = new LayerQuerySweepMethods.StackFrame { currentIndex = 0, checkpoint = 0 };
+            }
+
+            return StepBucket();
+        }
+
+        public void Reset()
+        {
+            throw new NotImplementedException();
+        }
+
+        bool StepBucket()
+        {
+            while (m_indexInBucket < m_bucket.count && m_bucket.xmins[m_indexInBucket] <= m_qxmax)
+            {
+                if (Hint.Unlikely(math.bitmask(m_qyzMinMax < m_bucket.yzminmaxs[m_indexInBucket]) == 0))
+                {
+                    m_result.SetBucketRelativeIndex(m_indexInBucket);
+                    m_indexInBucket++;
+                    return true;
+                }
+                m_indexInBucket++;
+            }
+
+            while (m_currentFrameIndex < 32)
+            {
+                var currentFrame = m_stack[m_currentFrameIndex];
+                if (currentFrame.checkpoint == 0)
+                {
+                    if (currentFrame.currentIndex >= m_bucket.count)
+                    {
+                        m_currentFrameIndex--;
+                        continue;
+                    }
+
+                    var node = m_bucket.intervalTree[(int)currentFrame.currentIndex];
+                    if (m_qxmin >= node.subtreeXmax)
+                    {
+                        m_currentFrameIndex--;
+                        continue;
+                    }
+
+                    currentFrame.checkpoint      = 1;
+                    m_stack[m_currentFrameIndex] = currentFrame;
+                    m_currentFrameIndex++;
+                    m_stack[m_currentFrameIndex].currentIndex = LayerQuerySweepMethods.GetLeftChildIndex(currentFrame.currentIndex);
+                    m_stack[m_currentFrameIndex].checkpoint   = 0;
+                    continue;
+                }
+                else if (currentFrame.checkpoint == 1)
+                {
+                    var node = m_bucket.intervalTree[(int)currentFrame.currentIndex];
+                    if (m_qxmin < node.xmin)
+                    {
+                        m_currentFrameIndex--;
+                        continue;
+                    }
+
+                    currentFrame.checkpoint      = 2;
+                    m_stack[m_currentFrameIndex] = currentFrame;
+                    m_currentFrameIndex++;
+                    m_stack[m_currentFrameIndex].currentIndex = LayerQuerySweepMethods.GetRightChildIndex(currentFrame.currentIndex);
+                    m_stack[m_currentFrameIndex].checkpoint   = 0;
+
+                    if (m_qxmin > node.xmin && m_qxmin <= node.xmax)
+                    {
+                        if (Hint.Unlikely(math.bitmask(m_qyzMinMax < m_bucket.yzminmaxs[node.bucketRelativeBodyIndex]) == 0))
+                        {
+                            m_result.SetBucketRelativeIndex(node.bucketRelativeBodyIndex);
+                            return true;
+                        }
+                    }
+                    continue;
+                }
+                else
+                {
+                    m_currentFrameIndex--;
+                }
+            }
+
+            return false;
         }
     }
 }

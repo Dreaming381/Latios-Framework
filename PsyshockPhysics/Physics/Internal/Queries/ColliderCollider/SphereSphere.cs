@@ -63,6 +63,18 @@ namespace Latios.Psyshock
             return false;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in SphereCollider sphereA,
+                                                                          in RigidTransform aTransform,
+                                                                          in SphereCollider sphereB,
+                                                                          in RigidTransform bTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            UnitySim.ContactsBetweenResult result = default;
+            result.contactNormal                  = distanceResult.normalB;
+            result.Add(distanceResult.hitpointB, distanceResult.distance);
+            return result;
+        }
+
         internal static bool SphereSphereDistance(in SphereCollider sphereA,
                                                   in SphereCollider sphereB,
                                                   float maxDistance,

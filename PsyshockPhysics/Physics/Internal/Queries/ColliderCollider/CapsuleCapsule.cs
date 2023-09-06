@@ -67,6 +67,20 @@ namespace Latios.Psyshock
             return false;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in CapsuleCollider capsuleA,
+                                                                          in RigidTransform aTransform,
+                                                                          in CapsuleCollider capsuleB,
+                                                                          in RigidTransform bTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            // As of Unity Physics 1.0.14, only a single contact is generated for this case,
+            // and there is a todo for making it multi-contact.
+            UnitySim.ContactsBetweenResult result = default;
+            result.contactNormal                  = distanceResult.normalB;
+            result.Add(distanceResult.hitpointB, distanceResult.distance);
+            return result;
+        }
+
         internal static bool CapsuleCapsuleDistance(in CapsuleCollider capsuleA, in CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 edgeA = capsuleA.pointB - capsuleA.pointA;

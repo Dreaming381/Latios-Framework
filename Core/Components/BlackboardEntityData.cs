@@ -50,5 +50,7 @@ namespace Latios
         public BlackboardScope blackboardScope;
         public MergeMethod     mergeMethod;
     }
+
+    internal struct DispatchedNewSceneTag : IComponentData { }
 }
 

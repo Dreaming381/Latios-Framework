@@ -102,6 +102,18 @@ namespace Latios.Psyshock
             return false;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in CapsuleCollider capsule,
+                                                                          in RigidTransform capsuleTransform,
+                                                                          in SphereCollider sphere,
+                                                                          in RigidTransform sphereTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            UnitySim.ContactsBetweenResult result = default;
+            result.contactNormal                  = distanceResult.normalB;
+            result.Add(distanceResult.hitpointB, distanceResult.distance);
+            return result;
+        }
+
         private static bool CapsuleSphereDistance(in CapsuleCollider capsule, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere

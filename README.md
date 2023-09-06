@@ -1,16 +1,15 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.0-alpha.7]
+# Latios Framework for Unity ECS – [0.8.0-beta.1]
 
 **This is a prerelease version of the Latios Framework version 0.8 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, have not been updated to reflect the new features and changes in
-0.8. Git hashes may not be preserved after official release.**
+still under development. Changelogs and Documentation are currently being
+updated to reflect the new features and changes in 0.8.**
 
 **You are still welcome to submit bug reports and PRs for this and future
 prerelease versions!**
 
-**This version of the alpha uses Unity 2022.3.0 with Entities 1.0.11.**
+**This version of the beta uses Unity 2022.3.0 with Entities 1.0.14.**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -45,11 +44,7 @@ rendering features.
 This version targets Entities 1.0.14. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
 
-**Note: This release is not compatible with Unity Transforms.** Compatibility
-will be added in 0.8 via an ongoing community effort. See the prerelease branch
-for more details.
-
-*[0.6.x] users, please read the* [*Upgrade
+*[0.7.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
@@ -73,12 +68,13 @@ problem in ECS, there’s a good chance Core has a tool to address it.
 
 QVVS Transforms provide custom transforms systems based on the concept of QVVS
 transforms, which are vector-based transforms that can represent non-uniform
-scale without ever creating shear. There are three modes: Cached QVVS, Uncached
-QVVS, and Unity Compatibility. Currently only Cached QVVS is implemented.
+scale without ever creating shear. This module comes with a fully functional
+custom transform system with automatic baking and systems, offering more
+features, performance, and determinism than what is shipped with Unity.
 
-Along with QVVS representations, this module contains replacements for baking
-and systems that offer more performance and determinism than what is shipped
-with Unity.
+If you wish to use Unity Transforms instead, you can enable a compatibility mode
+for all other modules using the scripting define LATIOS_TRANSFORMS_UNITY. Some
+features in the other modules will be disabled when you do this.
 
 ### Psyshock
 
@@ -103,16 +99,24 @@ amounts of sources at once. Playing audio is as simple as instantiating prefabs.
 ### Kinemation
 
 [Kinemation](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Kinemation%20Animation%20and%20Rendering/README.md)
-Animation and Renderering provides authored animation, simulated animation, and
+Animation and Rendering provides authored animation, simulated animation, and
 everything in between. It includes an overhauled Entities Graphics for
-significantly improved performance of both skinned and non-skinned entities, and
-also provides extra features such as enabled bit toggled rendering and mesh
-modifications in Burst jobs.
+significantly improved performance of both skinned and non-skinned entities
+including true frustum culling and LOD support. It also provides extra features
+such as enabled bit toggled rendering and mesh modifications in Burst jobs.
 
 On the animation side, Kinemation supports bone entity and optimized bone buffer
 configurations. It includes utilities for inertial blending. And for animation
 clips it leverages ACL, a powerful high quality animation compression solution
 used in AAA titles such as Rise of the Tomb Raider and Valorant.
+
+### Caligraphics
+
+Caligraphics is a world-space text rendering module. It uses TextCore fonts and
+formats text to be rendered via the Kinemation rending pipeline, complete with
+custom ECS material property support. The text can be animated with the built-in
+tweening engine, or you can make your own animations with the glyph mapping API.
+A subset of rich text tags is also supported.
 
 ### Future Modules
 
@@ -141,7 +145,7 @@ control. If not, there’s likely an issue worth bringing to attention.
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
 in Unity ECS such as audio and animation. Current Phase III development focuses
-on modernizing the technology for Entities 1.0.
+on modernizing the technology for Entities 1.0 and facilitating gameplay design.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.
@@ -171,6 +175,7 @@ Getting Started pages and documentation are provided with each module.
     -   [Forum Thread](https://forum.unity.com/threads/797685/)
 -   [Documentation (Click on any .md
     file)](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)
+-   [Mini Demos](https://github.com/Dreaming381/LatiosFrameworkMiniDemos)
 
 ## Proud Users of Latios Framework
 
@@ -254,13 +259,23 @@ last feature release.
 While I will provide tips and suggestions if you use older releases, I will not
 publish patch releases for older versions.
 
+### Free Parking for All of the Above
+
+If you are experimenting with features, vouching for a new feature, wish to
+collaborate, or are trying to hunt down a troublesome issue, the best way to
+ensure success is to make a dev dungeon in Free Parking. This provides an
+easy-to-access collaborative space for fast iteration, and can also serve as a
+regression test for further development.
+
 ## Special Thanks To These Awesome Contributors
 
 If you would like to be added to this list, see
 [Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
 for how to get started.
 
--   Dechichi01 – various fixes and improvements for Core, Psyshock, and
+-   Sovogal – Significant contributions to Kinemation’s Mecanim controller and
+    the Caligraphics module (including the name)
+-   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support
 -   canmom – Kinemation baking and build fixes

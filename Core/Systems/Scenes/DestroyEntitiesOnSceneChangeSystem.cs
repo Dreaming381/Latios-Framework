@@ -15,12 +15,15 @@ namespace Latios.Systems
     [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]  //Doesn't matter, but good for visualization
     public partial class DestroyEntitiesOnSceneChangeSystem : SubSystem
     {
-        private EntityQuery m_destroyQuery = default;
+        EntityQuery m_destroyQuery;
+        EntityQuery m_unitySubsceneLoadQuery;
 
         protected override void OnCreate()
         {
             m_destroyQuery = Fluent.WithAll<LatiosSceneChangeDummyTag>().Without<WorldBlackboardTag>().Without<DontDestroyOnSceneChangeTag>().Without<RequestSceneLoaded>()
                              .IncludePrefabs().IncludeDisabledEntities().Build();
+
+            m_unitySubsceneLoadQuery         = Fluent.WithAll<Unity.Entities.RequestSceneLoaded>().Build();
             SceneManager.activeSceneChanged += RealUpdateOnSceneChange;
         }
 
@@ -42,7 +45,6 @@ namespace Latios.Systems
             EntityManager.AddComponent<LatiosSceneChangeDummyTag>(EntityManager.UniversalQuery);
             EntityManager.DestroyEntity(m_destroyQuery);
             EntityManager.RemoveComponent<LatiosSceneChangeDummyTag>(EntityManager.UniversalQuery);
-            latiosWorld.CreateNewSceneBlackboardEntity();
         }
     }
 }

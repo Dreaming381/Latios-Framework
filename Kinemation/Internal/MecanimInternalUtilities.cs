@@ -37,7 +37,9 @@ namespace Latios.Kinemation
                     {
                         clipEvents.Add(new MecanimActiveClipEvent
                         {
-                            clipIndex  = clipWeight.mecanimClipIndex,
+                            nameHash   = clip.events.nameHashes[j],
+                            parameter  = clip.events.parameters[j],
+                            clipIndex  = (short)clipWeight.mecanimClipIndex,
                             eventIndex = (short)j,
                         });
                     }
@@ -67,7 +69,9 @@ namespace Latios.Kinemation
                     {
                         clipEvents.Add(new MecanimActiveClipEvent
                         {
-                            clipIndex  = clipWeight.mecanimClipIndex,
+                            nameHash   = clip.events.nameHashes[j],
+                            parameter  = clip.events.parameters[j],
+                            clipIndex  = (short)clipWeight.mecanimClipIndex,
                             eventIndex = (short)j,
                         });
                     }
