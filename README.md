@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.0-beta.1]
+# Latios Framework for Unity ECS – [0.8.0-beta.2]
 
 **This is a prerelease version of the Latios Framework version 0.8 which is
 still under development. Changelogs and Documentation are currently being
@@ -110,10 +110,10 @@ configurations. It includes utilities for inertial blending. And for animation
 clips it leverages ACL, a powerful high quality animation compression solution
 used in AAA titles such as Rise of the Tomb Raider and Valorant.
 
-### Caligraphics
+### Calligraphics
 
-Caligraphics is a world-space text rendering module. It uses TextCore fonts and
-formats text to be rendered via the Kinemation rending pipeline, complete with
+Calligraphics is a world-space text rendering module. It uses TextCore fonts and
+formats text to be rendered via the Kinemation rendering pipeline, complete with
 custom ECS material property support. The text can be animated with the built-in
 tweening engine, or you can make your own animations with the glyph mapping API.
 A subset of rich text tags is also supported.
@@ -125,7 +125,6 @@ A subset of rich text tags is also supported.
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
--   Calligraphics – World-space text rendering and related utilities
 
 ## Why Use the Latios Framework?
 

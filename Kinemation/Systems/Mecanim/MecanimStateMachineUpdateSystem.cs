@@ -21,11 +21,11 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent()
-                .WithAll<MecanimController>(false)
-                .WithAll<MecanimLayerStateMachineStatus>(false)
-                .WithAll<MecanimParameter>(false)
-                .WithAll<TimedMecanimClipInfo>(false)
-                .WithAll<MecanimControllerEnabledFlag>(true).Build();
+                      .WithAll<MecanimController>(             false)
+                      .WithAll<MecanimLayerStateMachineStatus>(false)
+                      .WithAll<MecanimParameter>(              false)
+                      .WithAll<TimedMecanimClipInfo>(          false)
+                      .WithAll<MecanimControllerEnabledFlag>(  true).Build();
         }
 
         [BurstCompile]
@@ -38,10 +38,10 @@ namespace Latios.Kinemation.Systems
         {
             state.Dependency = new Job
             {
-                deltaTime        = Time.DeltaTime,
-                controllerHandle = GetComponentTypeHandle<MecanimController>(false),
-                parameterHandle  = GetBufferTypeHandle<MecanimParameter>(false),
-                layerHandle      = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(false),
+                deltaTime                   = Time.DeltaTime,
+                controllerHandle            = GetComponentTypeHandle<MecanimController>(false),
+                parameterHandle             = GetBufferTypeHandle<MecanimParameter>(false),
+                layerHandle                 = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(false),
                 previousFrameClipInfoHandle = GetBufferTypeHandle<TimedMecanimClipInfo>(false)
             }.ScheduleParallel(m_query, state.Dependency);
         }
@@ -59,21 +59,21 @@ namespace Latios.Kinemation.Systems
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var controllers      = chunk.GetNativeArray(ref controllerHandle);
-                var layersBuffers    = chunk.GetBufferAccessor(ref layerHandle);
-                var parametersBuffers = chunk.GetBufferAccessor(ref parameterHandle);
-                var previousFrameClipInfoBuffers =  chunk.GetBufferAccessor(ref previousFrameClipInfoHandle);
-                
+                var controllers                  = chunk.GetNativeArray(ref controllerHandle);
+                var layersBuffers                = chunk.GetBufferAccessor(ref layerHandle);
+                var parametersBuffers            = chunk.GetBufferAccessor(ref parameterHandle);
+                var previousFrameClipInfoBuffers = chunk.GetBufferAccessor(ref previousFrameClipInfoHandle);
+
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 while (enumerator.NextEntityIndex(out var indexInChunk))
                 {
-                    var     controller     = controllers[indexInChunk];
-                    ref var controllerBlob = ref controller.controller.Value;
-                    var     parameters     = parametersBuffers[indexInChunk].AsNativeArray();
-                    ref var parameterBlobs = ref controllerBlob.parameters;
-                    var     layers         = layersBuffers[indexInChunk].AsNativeArray();
+                    var     controller            = controllers[indexInChunk];
+                    ref var controllerBlob        = ref controller.controller.Value;
+                    var     parameters            = parametersBuffers[indexInChunk].AsNativeArray();
+                    ref var parameterBlobs        = ref controllerBlob.parameters;
+                    var     layers                = layersBuffers[indexInChunk].AsNativeArray();
                     var     previousFrameClipInfo = previousFrameClipInfoBuffers[indexInChunk].AsNativeArray();
-                    
+
                     var   deltaTime            = this.deltaTime * controller.speed;
                     float inertialBlendMaxTime = float.MaxValue;
                     bool  needsInertialBlend   = false;
@@ -93,13 +93,13 @@ namespace Latios.Kinemation.Systems
                                 var clipInfo = previousFrameClipInfo[i];
                                 if (clipInfo.layerIndex == layerIndex && clipInfo.stateIndex == layer.previousStateIndex)
                                 {
-                                    clipInfo.timeFragment = layer.timeInState - layer.transitionEndTimeInState;
+                                    clipInfo.timeFragment    = layer.timeInState - layer.transitionEndTimeInState;
                                     previousFrameClipInfo[i] = clipInfo;
                                 }
                             }
 
-                            layer.previousStateIndex = -1;
-                            layer.currentTransitionIndex = -1;
+                            layer.previousStateIndex          = -1;
+                            layer.currentTransitionIndex      = -1;
                             layer.currentTransitionIsAnyState = false;
                         }
                         else
@@ -109,7 +109,7 @@ namespace Latios.Kinemation.Systems
                                 var clipInfo = previousFrameClipInfo[i];
                                 if (clipInfo.layerIndex == layerIndex)
                                 {
-                                    clipInfo.timeFragment = deltaTime;
+                                    clipInfo.timeFragment    = deltaTime;
                                     previousFrameClipInfo[i] = clipInfo;
                                 }
                             }
@@ -127,8 +127,8 @@ namespace Latios.Kinemation.Systems
                                 ref var transition = ref currentState.transitions[i];
 
                                 // Early out if we have an exit time and we haven't reached it yet
-                                ref var state = ref layerBlob.states[layer.currentStateIndex];
-                                float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
+                                ref var state                 = ref layerBlob.states[layer.currentStateIndex];
+                                float   normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
                                 if (transition.hasExitTime && transition.exitTime > normalizedTimeInState)
                                     continue;
 
@@ -315,7 +315,7 @@ namespace Latios.Kinemation.Systems
                 layer.previousStateExitTime       = layer.timeInState;
                 layer.currentTransitionIndex      = stateTransitionIndex;
                 layer.currentTransitionIsAnyState = isAnyStateTransition;
-                layer.currentStateIndex           = transitionBlob.destinationStateIndex;
+                layer.currentStateIndex           = transitionBlob.destinationStateIndex != -1 ? transitionBlob.destinationStateIndex : layerBlob.defaultStateIndex;  // "Exit" state
                 layer.timeInState                 = transitionBlob.offset;
                 ref var lastState                 = ref layerBlob.states[layer.previousStateIndex];
                 layer.transitionEndTimeInState    = transitionBlob.hasFixedDuration ?
@@ -404,9 +404,9 @@ namespace Latios.Kinemation.Systems
                 if (transitionBlob.hasExitTime)
                 {
                     ref var state = ref layerBlob.states[layer.currentStateIndex];
-                    
+
                     float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
-                    var normalizedDeltaTime = deltaTime / state.averageDuration;
+                    var   normalizedDeltaTime   = deltaTime / state.averageDuration;
 
                     conditionsMet &= transitionBlob.exitTime > normalizedTimeInState - normalizedDeltaTime && transitionBlob.exitTime <= normalizedTimeInState;
                 }
