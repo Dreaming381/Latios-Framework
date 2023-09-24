@@ -84,9 +84,9 @@ namespace Latios.Calligraphics.Editor
             };
             endBehaviorField.RegisterValueChangeCallback(e =>
             {
-                hideShowLoopFields(e.changedProperty.enumValueIndex);
+                hideShowLoopFields(e.changedProperty.enumValueFlag);
             });
-            hideShowLoopFields(endBehaviorProperty.enumValueIndex);
+            hideShowLoopFields(endBehaviorProperty.enumValueFlag);
 
             Action<int> hideShowAnimationStyleFields = (enumValue) =>
             {

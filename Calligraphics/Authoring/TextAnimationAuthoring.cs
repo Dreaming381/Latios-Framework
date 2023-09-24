@@ -8,6 +8,8 @@ using UnityEngine.Serialization;
 
 namespace Latios.Calligraphics.Authoring
 {
+    [DisallowMultipleComponent]
+    [AddComponentMenu("Latios/Calligraphics/Text Animation")]
     [RequireComponent(typeof(TextRendererAuthoring))]
     public class TextAnimationAuthoring : MonoBehaviour
     {
@@ -17,32 +19,32 @@ namespace Latios.Calligraphics.Authoring
     [Serializable]
     public class GlyphAnimation
     {
-        public GlyphProperty       glyphProperty;
-        public AnimationStyle        animationStyle;
-        public InterpolationType     interpolation;
-        public TransitionTextUnitScope             unitScope;
-        public int                   startIndex;
-        public int                   endIndex;
-        public TransitionEndBehavior endBehavior;
-        public int                   loopCount;
-        public float                 loopDelay;
-        public float                 transitionTimeOffset;
-        public float                 transitionDuration    = .5f;
-        public float                 progressiveTimeOffset = .1f;
-        public byte                  startValueByte        = Byte.MinValue;
-        public byte                  endValueByte          = Byte.MaxValue;
-        public float                 startValueFloat       = float.MinValue;
-        public float                 endValueFloat         = float.MaxValue;
-        public Color32               startValueColor       = UnityEngine.Color.white;
-        public Color32               endValueColor         = UnityEngine.Color.black;
-        public float2                startValueFloat2      = float2.zero;
-        public float2                endValueFloat2        = float2.zero;
-        public float                 noiseScaleFloat       = 1;
-        public float2                noiseScaleFloat2      = float2.zero;
-        public float3                startValueFloat3      = float3.zero;
-        public float3                endValueFloat3        = float3.zero;
-        public Gradient              startValueGradient    = new Gradient();
-        public Gradient              endValueGradient      = new Gradient();
+        public GlyphProperty           glyphProperty;
+        public AnimationStyle          animationStyle;
+        public InterpolationType       interpolation;
+        public TransitionTextUnitScope unitScope;
+        public int                     startIndex;
+        public int                     endIndex;
+        public TransitionEndBehavior   endBehavior;
+        public int                     loopCount;
+        public float                   loopDelay;
+        public float                   transitionTimeOffset;
+        public float                   transitionDuration    = .5f;
+        public float                   progressiveTimeOffset = .1f;
+        public byte                    startValueByte        = Byte.MinValue;
+        public byte                    endValueByte          = Byte.MaxValue;
+        public float                   startValueFloat       = float.MinValue;
+        public float                   endValueFloat         = float.MaxValue;
+        public Color32                 startValueColor       = UnityEngine.Color.white;
+        public Color32                 endValueColor         = UnityEngine.Color.black;
+        public float2                  startValueFloat2      = float2.zero;
+        public float2                  endValueFloat2        = float2.zero;
+        public float                   noiseScaleFloat       = 1;
+        public float2                  noiseScaleFloat2      = float2.zero;
+        public float3                  startValueFloat3      = float3.zero;
+        public float3                  endValueFloat3        = float3.zero;
+        public Gradient                startValueGradient    = new Gradient();
+        public Gradient                endValueGradient      = new Gradient();
     }
 
     public enum AnimationStyle
@@ -78,15 +80,15 @@ namespace Latios.Calligraphics.Authoring
                         var transition = new TextAnimationTransition
                         {
                             glyphProperty      = glyphAnimation.glyphProperty,
-                            interpolation        = glyphAnimation.interpolation,
-                            scope                = glyphAnimation.unitScope,
-                            startIndex           = startIndex,
-                            endIndex             = endIndex,
-                            transitionDuration   = glyphAnimation.transitionDuration,
-                            transitionDelay = glyphAnimation.transitionTimeOffset,
-                            endBehavior          = glyphAnimation.endBehavior,
-                            loopCount            = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopCount : 0,
-                            loopDelay            = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopDelay : 0,
+                            interpolation      = glyphAnimation.interpolation,
+                            scope              = glyphAnimation.unitScope,
+                            startIndex         = startIndex,
+                            endIndex           = endIndex,
+                            transitionDuration = glyphAnimation.transitionDuration,
+                            transitionDelay    = glyphAnimation.transitionTimeOffset,
+                            endBehavior        = glyphAnimation.endBehavior,
+                            loopCount          = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopCount : 0,
+                            loopDelay          = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopDelay : 0,
                         };
                         SetValue(glyphAnimation, ref transition);
                         AppendToBuffer(entity, transition);
@@ -99,17 +101,17 @@ namespace Latios.Calligraphics.Authoring
                             var transition = new TextAnimationTransition
                             {
                                 glyphProperty = glyphAnimation.glyphProperty,
-                                interpolation   = glyphAnimation.interpolation,
-                                scope           = glyphAnimation.unitScope == TransitionTextUnitScope.All ?
-                                                  TransitionTextUnitScope.Glyph :
-                                                  glyphAnimation.unitScope,
-                                startIndex           = i,
-                                endIndex             = i,
-                                transitionDuration   = glyphAnimation.transitionDuration,
-                                transitionDelay = glyphAnimation.transitionTimeOffset + elementCount * glyphAnimation.progressiveTimeOffset,
-                                endBehavior          = glyphAnimation.endBehavior,
-                                loopCount            = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopCount : 0,
-                                loopDelay            = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopDelay : 0,
+                                interpolation = glyphAnimation.interpolation,
+                                scope         = glyphAnimation.unitScope == TransitionTextUnitScope.All ?
+                                                TransitionTextUnitScope.Glyph :
+                                                glyphAnimation.unitScope,
+                                startIndex         = i,
+                                endIndex           = i,
+                                transitionDuration = glyphAnimation.transitionDuration,
+                                transitionDelay    = glyphAnimation.transitionTimeOffset + elementCount * glyphAnimation.progressiveTimeOffset,
+                                endBehavior        = glyphAnimation.endBehavior,
+                                loopCount          = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopCount : 0,
+                                loopDelay          = (glyphAnimation.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop ? glyphAnimation.loopDelay : 0,
                             };
                             SetValue(glyphAnimation, ref transition);
 

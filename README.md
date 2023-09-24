@@ -1,15 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.0-beta.2]
-
-**This is a prerelease version of the Latios Framework version 0.8 which is
-still under development. Changelogs and Documentation are currently being
-updated to reflect the new features and changes in 0.8.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**This version of the beta uses Unity 2022.3.0 with Entities 1.0.14.**
+# Latios Framework for Unity ECS – [0.8.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -41,7 +32,7 @@ The Latios Framework is best-known in the community for Kinemation, a module
 which provides extremely high-performance CPU animation and GPU skinned mesh
 rendering features.
 
-This version targets Entities 1.0.14. If you are still using Entities 0.51.1,
+This version targets Entities 1.0.16. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
 
 *[0.7.x] users, please read the* [*Upgrade
@@ -66,11 +57,13 @@ problem in ECS, there’s a good chance Core has a tool to address it.
 
 ### QVVS Transforms
 
-QVVS Transforms provide custom transforms systems based on the concept of QVVS
-transforms, which are vector-based transforms that can represent non-uniform
-scale without ever creating shear. This module comes with a fully functional
-custom transform system with automatic baking and systems, offering more
-features, performance, and determinism than what is shipped with Unity.
+[QVVS
+Transforms](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Transforms/README.md)
+provide custom transforms systems based on the concept of QVVS transforms, which
+are vector-based transforms that can represent non-uniform scale without ever
+creating shear. This module comes with a fully functional custom transform
+system with automatic baking and systems, offering more features, performance,
+and determinism than what is shipped with Unity.
 
 If you wish to use Unity Transforms instead, you can enable a compatibility mode
 for all other modules using the scripting define LATIOS_TRANSFORMS_UNITY. Some
@@ -112,11 +105,12 @@ used in AAA titles such as Rise of the Tomb Raider and Valorant.
 
 ### Calligraphics
 
-Calligraphics is a world-space text rendering module. It uses TextCore fonts and
-formats text to be rendered via the Kinemation rendering pipeline, complete with
-custom ECS material property support. The text can be animated with the built-in
-tweening engine, or you can make your own animations with the glyph mapping API.
-A subset of rich text tags is also supported.
+[Calligraphics](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Calligraphics/README.md)
+is a world-space text rendering module. It uses TextCore fonts and formats text
+to be rendered via the Kinemation rendering pipeline, complete with custom ECS
+material property support. The text can be animated with the built-in tweening
+engine, or you can make your own animations with the glyph mapping API. A subset
+of rich text tags is also supported.
 
 ### Future Modules
 
@@ -180,8 +174,8 @@ Getting Started pages and documentation are provided with each module.
 
 ### Tools
 
--   [DMotion](https://github.com/gamedev-pro/dmotion) – Open source animation
-    state machine powered by Kinemation
+-   [DMotion](https://github.com/gamedev-pro/dmotion) – Alternative open source
+    animation state machine powered by Kinemation
 
 ### Open Projects
 
@@ -252,7 +246,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.7.X) will always preserve backwards compatibility back to the
+Patch releases (0.8.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
@@ -273,7 +267,7 @@ If you would like to be added to this list, see
 for how to get started.
 
 -   Sovogal – Significant contributions to Kinemation’s Mecanim controller and
-    the Caligraphics module (including the name)
+    the Calligraphics module (including the name)
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support
@@ -286,6 +280,11 @@ Companion License, my understanding is that any modifications, including new
 inventions inserted, will belong to Unity as per the terms described by the
 license.
 
-Personally, I do not have an issue with this license as it permits me to always
-be able to use my inventions in Unity projects and I have no issue if Unity
-wants to adopt anything here.
+This license is subject to change to one that allows pieces of the Latios
+Framework not developed by Unity to be used in other ecosystems. If this is
+something you desire, feel free to discuss in the Latios Framework Discord.
+
+If anyone at Unity sees this, know that you have full permission to use anything
+in here without attribution unless the code falls under one of the third-party
+licenses (which will be documented via comments directly next to the relevant
+code).

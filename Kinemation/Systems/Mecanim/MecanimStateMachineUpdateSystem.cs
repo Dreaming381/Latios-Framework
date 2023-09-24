@@ -148,8 +148,18 @@ namespace Latios.Kinemation.Systems
                                 for (short i = 0; i < layerBlob.anyStateTransitions.Length; i++)
                                 {
                                     ref var transition = ref layerBlob.anyStateTransitions[i];
-
-                                    if (ConditionsMet(layer, ref layerBlob, ref transition, parameters, ref parameterBlobs, deltaTime))
+                                    
+                                    // If we have no conditions, we can only transition if we are done
+                                    if (transition.conditions.Length == 0)
+                                    {
+                                        if (layer.currentStateIndex == -1)
+                                        {
+                                            PerformTransition(ref layer, ref layerBlob, ref transition, i, true);
+                                            ConsumeTriggers(ref transition, ref parameters, ref parameterBlobs);
+                                            break;
+                                        }
+                                    }
+                                    else if (ConditionsMet(layer, ref layerBlob, ref transition, parameters, ref parameterBlobs, deltaTime))
                                     {
                                         PerformTransition(ref layer, ref layerBlob, ref transition, i, true);
                                         ConsumeTriggers(ref transition, ref parameters, ref parameterBlobs);

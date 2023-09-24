@@ -89,6 +89,11 @@ namespace Latios.Calligraphics
                     new NoisePositionTransitionProvider().DisposeTransition(ref transition);
                     break;
                 }
+                case GlyphProperty.RotationNoise:
+                {
+                    new NoiseRotationTransitionProvider().DisposeTransition(ref transition);
+                    break;
+                }
             }
         }
     }

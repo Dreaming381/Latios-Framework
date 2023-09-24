@@ -180,7 +180,7 @@ namespace Latios.Kinemation.Systems
                             continue;
 
                         ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
-                        
+
                         var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
                         clipSet.clips[clipWeights[i].mecanimClipIndex].SamplePose(ref blender, time, blendWeight);
                     }
@@ -267,6 +267,10 @@ namespace Latios.Kinemation.Systems
 
                             ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
                             var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
+                            var stateSpeed = state.speedMultiplierParameterIndex != -1 ?
+                                parameters[state.speedMultiplierParameterIndex].floatParam * state.speed :
+                                state.speed;
+                            var speedModifiedDeltaTime = deltaTime * stateSpeed;
                             var deltaTransform = TransformQvvs.identity;
                             var hasLooped = state.isLooping && time - deltaTime < 0f;
 
@@ -274,9 +278,11 @@ namespace Latios.Kinemation.Systems
                             if (hasLooped)
                             {
                                 deltaTransform = clip.SampleBone(0, time);
-                                var previousClipSample = clip.SampleBone(0, clipWeight.motionTime - deltaTime);
-                                var endClipSample = clip.SampleBone(0, clip.duration);
-
+                                var previousClipSample = clip.SampleBone(0, time - speedModifiedDeltaTime);
+                                
+                                var sampleEnd = math.select(clip.duration, -clip.duration, stateSpeed < 0f);
+                                var endClipSample = clip.SampleBone(0, sampleEnd);
+                                
                                 deltaTransform.position += endClipSample.position - previousClipSample.position;
                                 deltaTransform.rotation = math.mul(deltaTransform.rotation, math.mul(math.inverse(endClipSample.rotation), previousClipSample.rotation));
                             }
@@ -284,7 +290,7 @@ namespace Latios.Kinemation.Systems
                             {
                                 //Get the delta as normal
                                 var currentClipSample = clip.SampleBone(0, time);
-                                var previousClipSample = clip.SampleBone(0, time - deltaTime);
+                                var previousClipSample = clip.SampleBone(0, time - speedModifiedDeltaTime);
                                 
                                 deltaTransform.position += currentClipSample.position - previousClipSample.position;
                                 deltaTransform.rotation = math.mul(math.inverse(currentClipSample.rotation), previousClipSample.rotation);
@@ -313,6 +319,11 @@ namespace Latios.Kinemation.Systems
                     
                             ref var state = ref controllerBlob.layers[clipWeight.layerIndex].states[clipWeight.stateIndex];
                             var time = state.isLooping ? clip.LoopToClipTime(clipWeight.motionTime) : math.min(clipWeight.motionTime, clip.duration);
+                            var stateSpeed = state.speedMultiplierParameterIndex != -1 ?
+                                parameters[state.speedMultiplierParameterIndex].floatParam * state.speed :
+                                state.speed;
+                            var speedModifiedDeltaTime = deltaTime * stateSpeed;
+
                             var sampleTransform = clip.SampleBone(0, time);
                     
                             //If the clip has looped, we need the previous sample to capture the delta of the clip end

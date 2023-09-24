@@ -95,19 +95,28 @@ namespace Latios.Calligraphics.Systems
                         var transition = transitions[i];
 
                         //Loop if appropriate
-                        if ((transition.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop &&
-                            transition.currentTime >= transition.transitionDelay + transition.transitionDuration &&
-                            transition.currentTime >= transition.loopDelay)
+                        if ((transition.endBehavior & TransitionEndBehavior.Loop) == TransitionEndBehavior.Loop)
                         {
-                            transition.currentIteration++;
-                            transition.currentTime = 0f;
-
-                            if (transition.currentIteration > transition.loopCount && (transition.endBehavior & TransitionEndBehavior.Revert) == TransitionEndBehavior.Revert)
+                            if (transition.currentTime >= transition.transitionDelay + transition.transitionDuration &&
+                                transition.currentTime >= transition.loopDelay)
                             {
-                                AnimationResolver.DisposeTransition(ref transition);
-                                transitions.RemoveAtSwapBack(i);
-                                i--;
-                                continue;
+                                transition.currentIteration++;
+                                transition.currentTime = 0f;
+
+                                if (transition.currentIteration > transition.loopCount &&
+                                    (transition.endBehavior & TransitionEndBehavior.Revert) ==
+                                    TransitionEndBehavior.Revert)
+                                {
+                                    AnimationResolver.DisposeTransition(ref transition);
+                                    transitions.RemoveAtSwapBack(i);
+                                    i--;
+                                    continue;
+                                }
+                            }
+
+                            if (transition.currentIteration > transition.loopCount)
+                            {
+                                transition.currentTime = 0f;
                             }
                         }
 
