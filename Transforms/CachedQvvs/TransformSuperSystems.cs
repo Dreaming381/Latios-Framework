@@ -56,6 +56,7 @@ namespace Latios.Transforms.Systems
     /// <summary>
     /// This group is updated inside the LatiosWorldSyncGroup and handles registration of GameObjectEntity bindings.
     /// If you create GameObjectEntities at runtime, make sure such systems update before this system.
+    /// This system also updates Disabled statuses for Unity's built-in Companion GameObjects.
     /// </summary>
     [UpdateInGroup(typeof(LatiosWorldSyncGroup))]
     [DisableAutoCreation]
@@ -66,6 +67,7 @@ namespace Latios.Transforms.Systems
             EnableSystemSorting = true;
 
             GetOrCreateAndAddManagedSystem<GameObjectEntityBindingSystem>();
+            GetOrCreateAndAddManagedSystem<CompanionGameObjectUpdateSystem>();
         }
     }
 

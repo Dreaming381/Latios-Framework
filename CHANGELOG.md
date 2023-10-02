@@ -10,6 +10,14 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.8.1] – 2023-10-2
+
+Officially supports Entities [1.0.16]
+
+### Changed
+
+-   Updated QVVS Transforms to v0.8.1
+
 ## [0.8.0] – 2023-9-23
 
 Officially supports Entities [1.0.16]
