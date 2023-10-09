@@ -681,7 +681,7 @@ namespace Latios.Kinemation.Systems
                     var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
                     var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
 
-                    TransformQvvs* postProcessDepthSortingTransformsPtr = null;
+                    float4x4* postProcessDepthSortingTransformsPtr = null;
                     if (isDepthSorted && hasPostProcess)
                     {
                         // In this case, we don't actually have a component that represents the rendered position.
@@ -690,7 +690,7 @@ namespace Latios.Kinemation.Systems
                         // We compute them in the inner loop since only the visible instances are read from later,
                         // and it is a lot cheaper to only compute the visible instances.
                         var allocator = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
-                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<TransformQvvs>(allocator, chunk.Count);
+                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<float4x4>(allocator, chunk.Count);
                     }
 
                     for (int j = 0; j < 2; j++)
@@ -758,9 +758,8 @@ namespace Latios.Kinemation.Systems
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
-                                    postProcessDepthSortingTransformsPtr[index].position = math.transform(f4x4, worldTransforms[index].Position);
-                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
-                                                                      (float4x4*)postProcessDepthSortingTransformsPtr);
+                                    postProcessDepthSortingTransformsPtr[index].c3.xyz = math.transform(f4x4, worldTransforms[index].Position);
+                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex, postProcessDepthSortingTransformsPtr);
                                 }
                                 else
                                 {

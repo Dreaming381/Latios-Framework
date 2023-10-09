@@ -112,6 +112,7 @@ namespace Latios.Myri.Authoring.Systems
                 {
                     clips[i]    = pair.Value.bakeData.clip;
                     builders[i] = new AudioClipBuilder { numVoices = pair.Value.bakeData.numVoices };
+                    i++;
                 }
             }).Schedule();
 
