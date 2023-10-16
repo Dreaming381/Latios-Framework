@@ -9,15 +9,6 @@ namespace Latios.Kinemation
 {
     #region All Meshes
     /// <summary>
-    /// An optional component that allows for quickly toggling the visibility of the entity
-    /// from all cameras, including probes and shadows. If you need control over the visibility
-    /// for cameras, probes, and shadows individually, it is recommended you build your own
-    /// flags and culling systems using the culling mask components.
-    /// Usage: Add, remove, or change the enabled state as you deem necessary.
-    /// </summary>
-    public struct RenderQuickToggleEnableFlag : IComponentData, IEnableableComponent { }
-
-    /// <summary>
     /// An optional component that when present will be enabled for the duration of the frame
     /// following a frame it was rendered by some view (including shadows), and disabled otherwise.
     /// Usage: Add, remove, and read the enabled state.

@@ -1,4 +1,5 @@
 using Latios.Transforms;
+using Unity.Assertions;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -10,6 +11,8 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
 using Unity.Rendering;
+using Unity.Transforms;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 using static Unity.Entities.SystemAPI;
@@ -30,8 +33,8 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkPerCameraCullingMask>(true).WithAll<ChunkPerCameraCullingSplitsMask>(true)
-                          .WithAll<ChunkPerFrameCullingMask>(false).WithAll<EntitiesGraphicsChunkInfo>(true).Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkPerCameraCullingMask>(true).With<ChunkPerCameraCullingSplitsMask>(true)
+                          .With<ChunkPerFrameCullingMask>(false).With<EntitiesGraphicsChunkInfo>(true).Build();
 
             m_findJob = new FindChunksWithVisibleJob
             {
@@ -325,7 +328,7 @@ namespace Latios.Kinemation.Systems
                     var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
                     var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
 
-                    TransformQvvs* postProcessDepthSortingTransformsPtr = null;
+                    TransformQvvs* depthSortingTransformsPtr = null;
                     if (isDepthSorted && hasPostProcess)
                     {
                         // In this case, we don't actually have a component that represents the rendered position.
@@ -333,8 +336,12 @@ namespace Latios.Kinemation.Systems
                         // so that the read pointer looks the same as our WorldTransforms.
                         // We compute them in the inner loop since only the visible instances are read from later,
                         // and it is a lot cheaper to only compute the visible instances.
-                        var allocator                        = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
-                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<TransformQvvs>(allocator, chunk.Count);
+                        var allocator             = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
+                        depthSortingTransformsPtr = AllocatorManager.Allocate<TransformQvvs>(allocator, chunk.Count);
+                    }
+                    else if (isDepthSorted)
+                    {
+                        depthSortingTransformsPtr = (TransformQvvs*)worldTransforms.GetUnsafeReadOnlyPtr();
                     }
 
                     for (int j = 0; j < 2; j++)
@@ -350,49 +357,27 @@ namespace Latios.Kinemation.Systems
                             // Clear the bit first in case we early out from the loop
                             visibleWord ^= entityMask;
 
-                            var materialMeshInfo = materialMeshInfos[entityIndex];
+                            MaterialMeshInfo materialMeshInfo = materialMeshInfos[entityIndex];
+                            BatchID          batchID          = new BatchID { value = (uint)batchIndex };
+                            ushort           splitMask        = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0;  // Todo: Should the default be 1 instead of 0?
+                            bool             flipWinding      = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
 
-                            BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
-                                                         materialMeshInfo.MaterialID :
-                                                         brgRenderMeshArray.GetMaterialID(materialMeshInfo);
-
-                            BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
-                                                 materialMeshInfo.MeshID :
-                                                 brgRenderMeshArray.GetMeshID(materialMeshInfo);
-
-                            // Null materials are handled internally by Unity using the error material if available.
-                            // Invalid meshes at this point will be skipped.
-                            if (materialMeshInfo.Mesh <= 0)
-                                if (meshID == BatchMeshID.Null)
-                                    continue;
-
-                            bool flipWinding = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
-
-                            var settings = new DrawCommandSettings
-                            {
-                                FilterIndex  = filterIndex,
-                                BatchID      = new BatchID { value = (uint)batchIndex },
-                                MaterialID   = materialID,
-                                MeshID       = meshID,
-                                SplitMask    = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0,  // Todo: Should the default be 1 instead of 0?
-                                SubmeshIndex = (ushort)materialMeshInfo.Submesh,
-                                Flags        = 0
-                            };
+                            BatchDrawCommandFlags drawCommandFlags = 0;
 
                             if (flipWinding)
-                                settings.Flags |= BatchDrawCommandFlags.FlipWinding;
+                                drawCommandFlags |= BatchDrawCommandFlags.FlipWinding;
 
                             if (hasMotion)
-                                settings.Flags |= BatchDrawCommandFlags.HasMotion;
+                                drawCommandFlags |= BatchDrawCommandFlags.HasMotion;
 
                             if (isLightMapped)
-                                settings.Flags |= BatchDrawCommandFlags.IsLightMapped;
+                                drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
 
                             // Depth sorted draws are emitted with access to entity transforms,
                             // so they can also be written out for sorting
                             if (isDepthSorted)
                             {
-                                settings.Flags |= BatchDrawCommandFlags.HasSortingPosition;
+                                drawCommandFlags |= BatchDrawCommandFlags.HasSortingPosition;
                                 // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
                                 // We also customize the code where this pointer is read.
                                 if (hasPostProcess)
@@ -402,22 +387,82 @@ namespace Latios.Kinemation.Systems
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
-                                    postProcessDepthSortingTransformsPtr[index].position = math.transform(f4x4, worldTransforms[index].position);
-                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
-                                                                      (float4x4*)postProcessDepthSortingTransformsPtr);
+                                    depthSortingTransformsPtr[index].position = math.transform(f4x4, worldTransforms[index].position);
                                 }
-                                else
+                            }
+
+                            if (materialMeshInfo.HasMaterialMeshIndexRange)
+                            {
+                                RangeInt matMeshIndexRange = materialMeshInfo.MaterialMeshIndexRange;
+
+                                for (int i = 0; i < matMeshIndexRange.length; i++)
                                 {
-                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
-                                                                      (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr());
+                                    int matMeshSubMeshIndex = matMeshIndexRange.start + i;
+
+                                    // Drop the draw command if OOB. Errors should have been reported already so no need to log anything
+                                    if (matMeshSubMeshIndex >= brgRenderMeshArray.MaterialMeshSubMeshes.Length)
+                                        continue;
+
+                                    BatchMaterialMeshSubMesh matMeshSubMesh = brgRenderMeshArray.MaterialMeshSubMeshes[matMeshSubMeshIndex];
+
+                                    DrawCommandSettings settings = new DrawCommandSettings
+                                    {
+                                        FilterIndex  = filterIndex,
+                                        BatchID      = batchID,
+                                        MaterialID   = matMeshSubMesh.Material,
+                                        MeshID       = matMeshSubMesh.Mesh,
+                                        SplitMask    = splitMask,
+                                        SubMeshIndex = (ushort)matMeshSubMesh.SubMeshIndex,
+                                        Flags        = drawCommandFlags
+                                    };
+
+                                    EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
                                 }
                             }
                             else
                             {
-                                DrawCommandOutput.Emit(settings, j, bitIndex, chunkStartIndex);
+                                BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
+                                                     materialMeshInfo.MeshID :
+                                                     brgRenderMeshArray.GetMeshID(materialMeshInfo);
+
+                                // Invalid meshes at this point will be skipped.
+                                if (meshID == BatchMeshID.Null)
+                                    continue;
+
+                                // Null materials are handled internally by Unity using the error material if available.
+                                BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
+                                                             materialMeshInfo.MaterialID :
+                                                             brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                                var settings = new DrawCommandSettings
+                                {
+                                    FilterIndex  = filterIndex,
+                                    BatchID      = batchID,
+                                    MaterialID   = materialID,
+                                    MeshID       = meshID,
+                                    SplitMask    = splitMask,
+                                    SubMeshIndex = (ushort)materialMeshInfo.SubMesh,
+                                    Flags        = drawCommandFlags
+                                };
+
+                                EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
                             }
                         }
                     }
+                }
+            }
+
+            private void EmitDrawCommand(in DrawCommandSettings settings, int entityQword, int entityBit, int chunkStartIndex, void* depthSortingPtr)
+            {
+                // Depth sorted draws are emitted with access to entity transforms,
+                // so they can also be written out for sorting
+                if (settings.HasSortingPosition)
+                {
+                    DrawCommandOutput.EmitDepthSorted(settings, entityQword, entityBit, chunkStartIndex, (float4x4*)depthSortingPtr);
+                }
+                else
+                {
+                    DrawCommandOutput.Emit(settings, entityQword, entityBit, chunkStartIndex);
                 }
             }
         }
@@ -460,7 +505,7 @@ namespace Latios.Kinemation.Systems
                 {
                     while (header != null)
                     {
-                        UnityEngine.Debug.Assert(transformHeader != null);
+                        Assert.IsTrue(transformHeader != null);
 
                         int instanceOffset = binInstanceOffset + workItemInstanceOffset + headerInstanceOffset;
                         int positionOffset = binPositionOffset + workItemInstanceOffset + headerInstanceOffset;
@@ -491,7 +536,7 @@ namespace Latios.Kinemation.Systems
                 {
                     var visibility   = *header->Element(i);
                     int numInstances = ExpandVisibility(visibleInstances + instanceOffset, visibility);
-                    UnityEngine.Debug.Assert(numInstances > 0);
+                    Assert.IsTrue(numInstances > 0);
                     instanceOffset += numInstances;
                 }
 
@@ -517,7 +562,7 @@ namespace Latios.Kinemation.Systems
                         sortingPositions + positionOffset,
                         visibility,
                         transforms);
-                    UnityEngine.Debug.Assert(numInstances > 0);
+                    Assert.IsTrue(numInstances > 0);
                     instanceOffset += numInstances;
                     positionOffset += numInstances;
                 }
@@ -681,7 +726,7 @@ namespace Latios.Kinemation.Systems
                     var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
                     var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
 
-                    float4x4* postProcessDepthSortingTransformsPtr = null;
+                    float4x4* depthSortingTransformsPtr = null;
                     if (isDepthSorted && hasPostProcess)
                     {
                         // In this case, we don't actually have a component that represents the rendered position.
@@ -690,7 +735,11 @@ namespace Latios.Kinemation.Systems
                         // We compute them in the inner loop since only the visible instances are read from later,
                         // and it is a lot cheaper to only compute the visible instances.
                         var allocator = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
-                        postProcessDepthSortingTransformsPtr = AllocatorManager.Allocate<float4x4>(allocator, chunk.Count);
+                        depthSortingTransformsPtr = AllocatorManager.Allocate<float4x4>(allocator, chunk.Count);
+                    }
+                    else if (isDepthSorted)
+                    {
+                        depthSortingTransformsPtr = (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr();
                     }
 
                     for (int j = 0; j < 2; j++)
@@ -706,49 +755,27 @@ namespace Latios.Kinemation.Systems
                             // Clear the bit first in case we early out from the loop
                             visibleWord ^= entityMask;
 
-                            var materialMeshInfo = materialMeshInfos[entityIndex];
+                            MaterialMeshInfo materialMeshInfo = materialMeshInfos[entityIndex];
+                            BatchID batchID          = new BatchID { value = (uint)batchIndex };
+                            ushort splitMask        = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0;  // Todo: Should the default be 1 instead of 0?
+                            bool flipWinding      = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
 
-                            BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
-                                                         materialMeshInfo.MaterialID :
-                                                         brgRenderMeshArray.GetMaterialID(materialMeshInfo);
-
-                            BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
-                                                 materialMeshInfo.MeshID :
-                                                 brgRenderMeshArray.GetMeshID(materialMeshInfo);
-
-                            // Null materials are handled internally by Unity using the error material if available.
-                            // Invalid meshes at this point will be skipped.
-                            if (materialMeshInfo.Mesh <= 0)
-                                if (meshID == BatchMeshID.Null)
-                                    continue;
-
-                            bool flipWinding = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
-
-                            var settings = new DrawCommandSettings
-                            {
-                                FilterIndex  = filterIndex,
-                                BatchID      = new BatchID { value = (uint)batchIndex },
-                                MaterialID   = materialID,
-                                MeshID       = meshID,
-                                SplitMask    = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0,  // Todo: Should the default be 1 instead of 0?
-                                SubmeshIndex = (ushort)materialMeshInfo.Submesh,
-                                Flags        = 0
-                            };
+                            BatchDrawCommandFlags drawCommandFlags = 0;
 
                             if (flipWinding)
-                                settings.Flags |= BatchDrawCommandFlags.FlipWinding;
+                                drawCommandFlags |= BatchDrawCommandFlags.FlipWinding;
 
                             if (hasMotion)
-                                settings.Flags |= BatchDrawCommandFlags.HasMotion;
+                                drawCommandFlags |= BatchDrawCommandFlags.HasMotion;
 
                             if (isLightMapped)
-                                settings.Flags |= BatchDrawCommandFlags.IsLightMapped;
+                                drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
 
                             // Depth sorted draws are emitted with access to entity transforms,
                             // so they can also be written out for sorting
                             if (isDepthSorted)
                             {
-                                settings.Flags |= BatchDrawCommandFlags.HasSortingPosition;
+                                drawCommandFlags |= BatchDrawCommandFlags.HasSortingPosition;
                                 // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
                                 // We also customize the code where this pointer is read.
                                 if (hasPostProcess)
@@ -758,21 +785,82 @@ namespace Latios.Kinemation.Systems
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
-                                    postProcessDepthSortingTransformsPtr[index].c3.xyz = math.transform(f4x4, worldTransforms[index].Position);
-                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex, postProcessDepthSortingTransformsPtr);
+                                    depthSortingTransformsPtr[index].c3.xyz = math.transform(f4x4, worldTransforms[index].Position);
                                 }
-                                else
+                            }
+
+                            if (materialMeshInfo.HasMaterialMeshIndexRange)
+                            {
+                                RangeInt matMeshIndexRange = materialMeshInfo.MaterialMeshIndexRange;
+
+                                for (int i = 0; i < matMeshIndexRange.length; i++)
                                 {
-                                    DrawCommandOutput.EmitDepthSorted(settings, j, bitIndex, chunkStartIndex,
-                                                                      (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr());
+                                    int matMeshSubMeshIndex = matMeshIndexRange.start + i;
+
+                                    // Drop the draw command if OOB. Errors should have been reported already so no need to log anything
+                                    if (matMeshSubMeshIndex >= brgRenderMeshArray.MaterialMeshSubMeshes.Length)
+                                        continue;
+
+                                    BatchMaterialMeshSubMesh matMeshSubMesh = brgRenderMeshArray.MaterialMeshSubMeshes[matMeshSubMeshIndex];
+
+                                    DrawCommandSettings settings = new DrawCommandSettings
+                                    {
+                                        FilterIndex  = filterIndex,
+                                        BatchID      = batchID,
+                                        MaterialID   = matMeshSubMesh.Material,
+                                        MeshID       = matMeshSubMesh.Mesh,
+                                        SplitMask    = splitMask,
+                                        SubMeshIndex = (ushort)matMeshSubMesh.SubMeshIndex,
+                                        Flags        = drawCommandFlags
+                                    };
+
+                                    EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
                                 }
                             }
                             else
                             {
-                                DrawCommandOutput.Emit(settings, j, bitIndex, chunkStartIndex);
+                                BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
+                                                     materialMeshInfo.MeshID :
+                                                     brgRenderMeshArray.GetMeshID(materialMeshInfo);
+
+                                // Invalid meshes at this point will be skipped.
+                                if (meshID == BatchMeshID.Null)
+                                    continue;
+
+                                // Null materials are handled internally by Unity using the error material if available.
+                                BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
+                                                             materialMeshInfo.MaterialID :
+                                                             brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                                var settings = new DrawCommandSettings
+                                {
+                                    FilterIndex  = filterIndex,
+                                    BatchID      = batchID,
+                                    MaterialID   = materialID,
+                                    MeshID       = meshID,
+                                    SplitMask    = splitMask,
+                                    SubMeshIndex = (ushort)materialMeshInfo.SubMesh,
+                                    Flags        = drawCommandFlags
+                                };
+
+                                EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
                             }
                         }
                     }
+                }
+            }
+
+            private void EmitDrawCommand(in DrawCommandSettings settings, int entityQword, int entityBit, int chunkStartIndex, void* depthSortingPtr)
+            {
+                // Depth sorted draws are emitted with access to entity transforms,
+                // so they can also be written out for sorting
+                if (settings.HasSortingPosition)
+                {
+                    DrawCommandOutput.EmitDepthSorted(settings, entityQword, entityBit, chunkStartIndex, (float4x4*)depthSortingPtr);
+                }
+                else
+                {
+                    DrawCommandOutput.Emit(settings, entityQword, entityBit, chunkStartIndex);
                 }
             }
         }
@@ -811,7 +899,7 @@ namespace Latios.Kinemation.Systems
                         batchID             = settings.BatchID,
                         materialID          = settings.MaterialID,
                         meshID              = settings.MeshID,
-                        submeshIndex        = (ushort)settings.SubmeshIndex,
+                        submeshIndex        = (ushort)settings.SubMeshIndex,
                         splitVisibilityMask = settings.SplitMask,
                         flags               = settings.Flags,
                         sortingPosition     = hasSortingPosition ?
@@ -885,7 +973,7 @@ namespace Latios.Kinemation.Systems
                     }
                 }
 
-                UnityEngine.Debug.Assert(rangeCount <= output->drawCommandCount);
+                Assert.IsTrue(rangeCount <= output->drawCommandCount);
             }
 
             private void AccumulateDrawRange(

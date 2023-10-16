@@ -6,19 +6,14 @@ using Latios.Compatibility.UnityNetCode;
 using Unity.Entities;
 
 [UnityEngine.Scripting.Preserve]
-public class NetCodeLatiosBootstrap : LatiosClientServerBootstrapBase
+public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
 {
-    public override bool Initialize(string defaultWorldName)
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
     {
-        AutoConnectPort = 7979;  // Enable auto connect
-        return base.Initialize(defaultWorldName);
-    }
+        var world = new LatiosWorld(defaultWorldName, worldFlags);
 
-    public override World CreateCustomClientWorld(string worldName)
-    {
-        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Client);
-
-        BootstrapTools.InjectSystems(ClientSystems, world, world.simulationSystemGroup, ClientGroupRemap);
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
@@ -26,16 +21,61 @@ public class NetCodeLatiosBootstrap : LatiosClientServerBootstrapBase
 
         return world;
     }
+}
 
-    public override World CreateCustomServerWorld(string worldName)
+[UnityEngine.Scripting.Preserve]
+public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
     {
-        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Server);
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Client);
 
-        BootstrapTools.InjectSystems(ServerSystems, world, world.simulationSystemGroup, ServerGroupRemap);
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+        world.presentationSystemGroup.SortSystems();
+
+        return world;
+    }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeServerLatiosBootrap : ICustomServerWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
+    {
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Server);
+
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
 
         return world;
     }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeThinClientLatiosBootrap : ICustomThinClientWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
+    {
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.ThinClient);
+
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+
+        return world;
+    }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeLatiosBootstrap : LatiosClientServerBootstrap
+{
 }

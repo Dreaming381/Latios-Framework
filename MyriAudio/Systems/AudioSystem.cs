@@ -74,11 +74,11 @@ namespace Latios.Myri.Systems
             });
 
             // Create queries
-            m_aliveListenersQuery                = state.Fluent().WithAll<AudioListener>(true).Build();
-            m_deadListenersQuery                 = state.Fluent().Without<AudioListener>().WithAll<ListenerGraphState>().Build();
-            m_oneshotsToDestroyWhenFinishedQuery = state.Fluent().WithAll<AudioSourceOneShot>().WithAll<AudioSourceDestroyOneShotWhenFinished>(true).Build();
-            m_oneshotsQuery                      = state.Fluent().WithAll<AudioSourceOneShot>().Build();
-            m_loopedQuery                        = state.Fluent().WithAll<AudioSourceLooped>().Build();
+            m_aliveListenersQuery                = state.Fluent().With<AudioListener>(true).Build();
+            m_deadListenersQuery                 = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
+            m_oneshotsToDestroyWhenFinishedQuery = state.Fluent().With<AudioSourceOneShot>().With<AudioSourceDestroyOneShotWhenFinished>(true).Build();
+            m_oneshotsQuery                      = state.Fluent().With<AudioSourceOneShot>().Build();
+            m_loopedQuery                        = state.Fluent().With<AudioSourceLooped>().Build();
 
             m_entityHandle         = state.GetEntityTypeHandle();
             m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);

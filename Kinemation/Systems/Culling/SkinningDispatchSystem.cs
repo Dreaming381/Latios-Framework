@@ -68,9 +68,9 @@ namespace Latios.Kinemation.Systems
             m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref CheckedStateRef);
             m_worldTransformLookup = new WorldTransformReadOnlyAspect.Lookup(ref CheckedStateRef);
 
-            m_skeletonQuery        = Fluent.WithAll<DependentSkinnedMesh>(true).WithAll<ChunkPerCameraSkeletonCullingMask>(true, true).Build();
-            m_skinnedMeshQuery     = Fluent.WithAll<SkeletonDependent>(true).WithAll<ChunkPerCameraCullingMask>(true, true).Build();
-            m_skinnedMeshMetaQuery = Fluent.WithAll<ChunkHeader>(true).WithAll<ChunkPerCameraCullingMask>(true).Build();
+            m_skeletonQuery        = Fluent.With<DependentSkinnedMesh>(true).With<ChunkPerCameraSkeletonCullingMask>(true, true).Build();
+            m_skinnedMeshQuery     = Fluent.With<SkeletonDependent>(true).With<ChunkPerCameraCullingMask>(true, true).Build();
+            m_skinnedMeshMetaQuery = Fluent.With<ChunkHeader>(true).With<ChunkPerCameraCullingMask>(true).Build();
 
             RequireForUpdate(m_skeletonQuery);
             RequireForUpdate(m_skinnedMeshQuery);

@@ -12,21 +12,19 @@ namespace Latios
         /// </summary>
         internal static unsafe FluentQuery Fluent(this ILatiosSystem system)
         {
-            var                b        = system as SystemBase;
-            fixed(SystemState* statePtr = &b.CheckedStateRef)
+            var                 b        = system as SystemBase;
+            fixed (SystemState* statePtr = &b.CheckedStateRef)
             return new FluentQuery
             {
-                m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
-                m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
-                m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
-                m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
-                m_targetState          = statePtr,
-                m_targetManager        = default,
-                m_anyIsSatisfiedByAll  = false,
-                m_options              = EntityQueryOptions.Default
+                m_with           = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withEnabled    = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withDisabled   = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyEnabled     = new NativeList<ComponentType>(Allocator.TempJob),
+                m_without        = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withoutEnabled = new NativeList<ComponentType>(Allocator.TempJob),
+                m_targetState    = statePtr,
+                m_targetManager  = default,
+                m_options        = EntityQueryOptions.Default
             };
         }
 
@@ -37,17 +35,15 @@ namespace Latios
         {
             return new FluentQuery
             {
-                m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
-                m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
-                m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
-                m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
-                m_targetState          = default,
-                m_targetManager        = em,
-                m_anyIsSatisfiedByAll  = false,
-                m_options              = EntityQueryOptions.Default
+                m_with           = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withEnabled    = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withDisabled   = new NativeList<ComponentType>(Allocator.TempJob),
+                m_anyEnabled     = new NativeList<ComponentType>(Allocator.TempJob),
+                m_without        = new NativeList<ComponentType>(Allocator.TempJob),
+                m_withoutEnabled = new NativeList<ComponentType>(Allocator.TempJob),
+                m_targetState    = default,
+                m_targetManager  = em,
+                m_options        = EntityQueryOptions.Default
             };
         }
 
@@ -60,17 +56,15 @@ namespace Latios
             {
                 return new FluentQuery
                 {
-                    m_all                  = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_any                  = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_none                 = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyIfNotExcluded     = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_allWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyWeak              = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_anyIfNotExcludedWeak = new NativeList<ComponentType>(Allocator.TempJob),
-                    m_targetState          = statePtr,
-                    m_targetManager        = default,
-                    m_anyIsSatisfiedByAll  = false,
-                    m_options              = EntityQueryOptions.Default
+                    m_with           = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_withEnabled    = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_withDisabled   = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_anyEnabled     = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_without        = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_withoutEnabled = new NativeList<ComponentType>(Allocator.TempJob),
+                    m_targetState    = statePtr,
+                    m_targetManager  = default,
+                    m_options        = EntityQueryOptions.Default
                 };
             }
         }
@@ -81,151 +75,267 @@ namespace Latios
     /// </summary>
     public unsafe struct FluentQuery
     {
-        internal NativeList<ComponentType> m_all;
-        internal NativeList<ComponentType> m_any;
-        internal NativeList<ComponentType> m_none;
-        internal NativeList<ComponentType> m_anyIfNotExcluded;
-        internal NativeList<ComponentType> m_allWeak;
-        internal NativeList<ComponentType> m_anyWeak;
-        internal NativeList<ComponentType> m_anyIfNotExcludedWeak;
+        internal NativeList<ComponentType> m_with;
+        internal NativeList<ComponentType> m_withEnabled;
+        internal NativeList<ComponentType> m_withDisabled;
+        internal NativeList<ComponentType> m_anyEnabled;
+        internal NativeList<ComponentType> m_without;
+        internal NativeList<ComponentType> m_withoutEnabled;
 
         internal SystemState*  m_targetState;
         internal EntityManager m_targetManager;
 
-        internal bool m_anyIsSatisfiedByAll;
-
         internal EntityQueryOptions m_options;
 
         /// <summary>
-        /// Adds a required component to the query with the specified access
+        /// Adds a required component to the query with the specified access. Enabled state is ignored.
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
         /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
         /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
-        public FluentQuery WithAll<T>(bool readOnly = false, bool isChunkComponent = false)
+        public FluentQuery With<T>(bool readOnly = false, bool isChunkComponent = false)
         {
             if (isChunkComponent)
             {
                 if (readOnly)
-                    m_all.Add(ComponentType.ChunkComponentReadOnly<T>());
+                    m_with.Add(ComponentType.ChunkComponentReadOnly<T>());
                 else
-                    m_all.Add(ComponentType.ChunkComponent<T>());
+                    m_with.Add(ComponentType.ChunkComponent<T>());
             }
             else
             {
                 if (readOnly)
-                    m_all.Add(ComponentType.ReadOnly<T>());
+                    m_with.Add(ComponentType.ReadOnly<T>());
                 else
-                    m_all.Add(ComponentType.ReadWrite<T>());
+                    m_with.Add(ComponentType.ReadWrite<T>());
             }
             return this;
         }
 
         /// <summary>
-        /// Adds a required component to the query as ReadOnly unless the component has already been added (or added subsequently)
+        /// Adds required components to the query with the specified access. Enabled state is ignored.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        /// <param name="isChunkComponent">Are the components chunk components for the query?</param>
+        public FluentQuery With<T0, T1>(bool readOnly = false, bool isChunkComponent = false)
+        {
+            return With<T0>(readOnly, isChunkComponent).With<T1>(readOnly, isChunkComponent);
+        }
+
+        /// <summary>
+        /// Adds required components to the query with the specified access. Enabled state is ignored.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <typeparam name="T2">The third type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        /// <param name="isChunkComponent">Are the components chunk components for the query?</param>
+        public FluentQuery With<T0, T1, T2>(bool readOnly = false, bool isChunkComponent = false)
+        {
+            return With<T0, T1>(readOnly, isChunkComponent).With<T2>(readOnly, isChunkComponent);
+        }
+
+        /// <summary>
+        /// Adds a required component to the query with the specified access. The component must be enabled.
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
-        /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
-        public FluentQuery WithAllWeak<T>(bool isChunkComponent = false)
+        /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
+        public FluentQuery WithEnabled<T>(bool readOnly = false) where T : IEnableableComponent
         {
-            if (isChunkComponent)
-                m_allWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
+            if (readOnly)
+                m_withEnabled.Add(ComponentType.ReadOnly<T>());
             else
-                m_allWeak.Add(ComponentType.ReadOnly<T>());
+                m_withEnabled.Add(ComponentType.ReadWrite<T>());
             return this;
         }
 
         /// <summary>
-        /// Adds a component to the WithAny category of the query using the specified access unless the component has already been added to the All category (or added subsequently) in which case the WithAny category is dropped
+        /// Adds required components to the query with the specified access. The components must be enabled.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        public FluentQuery WithEnabled<T0, T1>(bool readOnly = false) where T0 : IEnableableComponent where T1 : IEnableableComponent
+        {
+            return WithEnabled<T0>(readOnly).WithEnabled<T1>(readOnly);
+        }
+
+        /// <summary>
+        /// Adds required components to the query with the specified access. The components must be enabled.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <typeparam name="T2">The third type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        public FluentQuery WithEnabled<T0, T1, T2>(bool readOnly = false) where T0 : IEnableableComponent where T1 : IEnableableComponent where T2 : IEnableableComponent
+        {
+            return WithEnabled<T0, T1>(readOnly).WithEnabled<T2>(readOnly);
+        }
+
+        /// <summary>
+        /// Adds a required component to the query with the specified access. The component must be disabled.
+        /// </summary>
+        /// <typeparam name="T">The type of component to add</typeparam>
+        /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
+        public FluentQuery WithDisabled<T>(bool readOnly = false) where T : IEnableableComponent
+        {
+            if (readOnly)
+                m_withDisabled.Add(ComponentType.ReadOnly<T>());
+            else
+                m_withDisabled.Add(ComponentType.ReadWrite<T>());
+            return this;
+        }
+
+        /// <summary>
+        /// Adds required components to the query with the specified access. The components must be disabled.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        public FluentQuery WithDisabled<T0, T1>(bool readOnly = false) where T0 : IEnableableComponent where T1 : IEnableableComponent
+        {
+            return WithDisabled<T0>(readOnly).WithDisabled<T1>(readOnly);
+        }
+
+        /// <summary>
+        /// Adds required components to the query with the specified access. The components must be disabled.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <typeparam name="T2">The third type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        public FluentQuery WithDisabled<T0, T1, T2>(bool readOnly = false) where T0 : IEnableableComponent where T1 : IEnableableComponent where T2 : IEnableableComponent
+        {
+            return WithDisabled<T0, T1>(readOnly).WithDisabled<T2>(readOnly);
+        }
+
+        /// <summary>
+        /// Adds a component to the WithAnyEnabled category of the query using the specified access unless the component
+        /// has already been added to the With or WithEnabled categories (or added subsequently) in which case the WithAny category is dropped.
+        /// Excluded or forced disabled categories with this same component will also cause this component to be removed
+        /// from the WithAnyEnabled category.
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
         /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
         /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
-        public FluentQuery WithAny<T>(bool readOnly = false, bool isChunkComponent = false)
+        public FluentQuery WithAnyEnabled<T>(bool readOnly = false, bool isChunkComponent = false)
         {
             if (isChunkComponent)
             {
                 if (readOnly)
-                    m_any.Add(ComponentType.ChunkComponentReadOnly<T>());
+                    m_anyEnabled.Add(ComponentType.ChunkComponentReadOnly<T>());
                 else
-                    m_any.Add(ComponentType.ChunkComponent<T>());
+                    m_anyEnabled.Add(ComponentType.ChunkComponent<T>());
             }
             else
             {
                 if (readOnly)
-                    m_any.Add(ComponentType.ReadOnly<T>());
+                    m_anyEnabled.Add(ComponentType.ReadOnly<T>());
                 else
-                    m_any.Add(ComponentType.ReadWrite<T>());
+                    m_anyEnabled.Add(ComponentType.ReadWrite<T>());
             }
             return this;
         }
 
         /// <summary>
-        /// Adds a component to the WithAny category of the query marked as ReadOnly unless the component has already been added (or added subsequently) with WithAny write access or added to the All category (or added subsequently) in which case the WithAny category is dropped
+        /// Adds the components to the WithAnyEnabled category of the query using the specified access unless any of these components
+        /// have already been added to the With or WithEnabled categories (or added subsequently) in which case the WithAny category is dropped.
+        /// Excluded or forced disabled categories with this same components will also cause these components to be removed
+        /// from the WithAnyEnabled category on a per-component basis.
         /// </summary>
-        /// <typeparam name="T">The type of component to add</typeparam>
-        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
-        public FluentQuery WithAnyWeak<T>(bool isChunkComponent = false)
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        /// <param name="isChunkComponent">Are the components chunk components for the query?</param>
+        public FluentQuery WithAnyEnabled<T0, T1>(bool readOnly = false, bool isChunkComponent = false)
         {
-            if (isChunkComponent)
-                m_anyWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
-            else
-                m_anyWeak.Add(ComponentType.ReadOnly<T>());
-            return this;
+            return WithAnyEnabled<T0>(readOnly, isChunkComponent).WithAnyEnabled<T1>(readOnly, isChunkComponent);
         }
 
         /// <summary>
-        /// Same as WithAny except if the component was added using "Without" (or added subsequently) the component is not added
+        /// Adds the components to the WithAnyEnabled category of the query using the specified access unless any of these components
+        /// have already been added to the With or WithEnabled categories (or added subsequently) in which case the WithAny category is dropped.
+        /// Excluded or forced disabled categories with this same components will also cause these components to be removed
+        /// from the WithAnyEnabled category on a per-component basis.
         /// </summary>
-        /// <typeparam name="T">The type of component to add</typeparam>
-        /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
-        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
-        public FluentQuery WithAnyNotExcluded<T>(bool readOnly = false, bool isChunkComponent = false)
+        /// <typeparam name="T0">The first type of component to add</typeparam>
+        /// <typeparam name="T1">The second type of component to add</typeparam>
+        /// <typeparam name="T2">The third type of component to add</typeparam>
+        /// <param name="readOnly">Should the components be marked as ReadOnly?</param>
+        /// <param name="isChunkComponent">Are the components chunk components for the query?</param>
+        public FluentQuery WithAnyEnabled<T0, T1, T2>(bool readOnly = false, bool isChunkComponent = false)
         {
-            if (isChunkComponent)
-            {
-                if (readOnly)
-                    m_anyIfNotExcluded.Add(ComponentType.ChunkComponentReadOnly<T>());
-                else
-                    m_anyIfNotExcluded.Add(ComponentType.ChunkComponent<T>());
-            }
-            else
-            {
-                if (readOnly)
-                    m_anyIfNotExcluded.Add(ComponentType.ReadOnly<T>());
-                else
-                    m_anyIfNotExcluded.Add(ComponentType.ReadWrite<T>());
-            }
-            return this;
+            return WithAnyEnabled<T0, T1>(readOnly, isChunkComponent).WithAnyEnabled<T2>(readOnly, isChunkComponent);
         }
 
         /// <summary>
-        /// Same as WithAnyWeak except if the component was added using "Without" (or added subsequently) the component is not added
-        /// </summary>
-        /// <typeparam name="T">The type of component to add</typeparam>
-        /// <param name="isChunkComponent">Is the component a chunk component of the query?</param>
-        public FluentQuery WithAnyNotExcludedWeak<T>(bool isChunkComponent = false)
-        {
-            if (isChunkComponent)
-                m_anyIfNotExcludedWeak.Add(ComponentType.ChunkComponentReadOnly<T>());
-            else
-                m_anyIfNotExcludedWeak.Add(ComponentType.ReadOnly<T>());
-            return this;
-        }
-
-        /// <summary>
-        /// Adds a component to be explicitly excluded from the query
+        /// Adds a component to be explicitly excluded from the query. A disabled component is not excluded.
         /// </summary>
         /// <typeparam name="T">The type of component to exclude</typeparam>
         /// <param name="isChunkComponent">Is the component excluded a chunk component?</param>
         public FluentQuery Without<T>(bool isChunkComponent = false)
         {
-            //m_none.Add(ComponentType.Exclude<T>());
             if (isChunkComponent)
-                m_none.Add(ComponentType.ChunkComponentReadOnly<T>());
+                m_without.Add(ComponentType.ChunkComponentReadOnly<T>());
             else
-                m_none.Add(ComponentType.ReadOnly<T>());
+                m_without.Add(ComponentType.ReadOnly<T>());
             return this;
+        }
+
+        /// <summary>
+        /// Adds required components to be explicitly excluded from the query. Disabled components are not excluded.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to exclude</typeparam>
+        /// <typeparam name="T1">The second type of component to exclude</typeparam>
+        /// <param name="isChunkComponent">Are the components exclude chunk components?</param>
+        public FluentQuery Without<T0, T1>(bool isChunkComponent = false)
+        {
+            return Without<T0>(isChunkComponent).Without<T1>(isChunkComponent);
+        }
+
+        /// <summary>
+        /// Adds required components to be explicitly excluded from the query. Disabled components are not excluded.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to exclude</typeparam>
+        /// <typeparam name="T1">The second type of component to exclude</typeparam>
+        /// <typeparam name="T2">The third type of component to exclude</typeparam>
+        /// <param name="isChunkComponent">Are the components exclude chunk components?</param>
+        public FluentQuery Without<T0, T1, T2>(bool isChunkComponent = false)
+        {
+            return Without<T0, T1>(isChunkComponent).Without<T2>(isChunkComponent);
+        }
+
+        /// <summary>
+        /// Adds a component to be explicitly excluded from the query. A disabled component is excluded.
+        /// </summary>
+        /// <typeparam name="T">The type of component to exclude</typeparam>
+        public FluentQuery WithoutEnabled<T>() where T : IEnableableComponent
+        {
+            m_withoutEnabled.Add(ComponentType.ReadOnly<T>());
+            return this;
+        }
+
+        /// <summary>
+        /// Adds required components to be explicitly excluded from the query. Disabled components are excluded.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to exclude</typeparam>
+        /// <typeparam name="T1">The second type of component to exclude</typeparam>
+        public FluentQuery WithoutEnabled<T0, T1>() where T0 : IEnableableComponent where T1 : IEnableableComponent
+        {
+            return WithoutEnabled<T0>().WithoutEnabled<T1>();
+        }
+
+        /// <summary>
+        /// Adds required components to be explicitly excluded from the query. Disabled components are excluded.
+        /// </summary>
+        /// <typeparam name="T0">The first type of component to exclude</typeparam>
+        /// <typeparam name="T1">The second type of component to exclude</typeparam>
+        /// <typeparam name="T2">The third type of component to exclude</typeparam>
+        public FluentQuery WithoutEnabled<T0, T1, T2>() where T0 : IEnableableComponent where T1 : IEnableableComponent where T2 : IEnableableComponent
+        {
+            return WithoutEnabled<T0, T1>().WithoutEnabled<T2>();
         }
 
         /// <summary>
@@ -288,131 +398,81 @@ namespace Latios
         /// <returns></returns>
         public EntityQuery Build()
         {
-            m_anyIsSatisfiedByAll = (m_any.Length + m_anyWeak.Length + m_anyIfNotExcluded.Length + m_anyIfNotExcludedWeak.Length) == 0;
-
-            //Filter and merge "ifNotExcluded"
-            RemoveDuplicates(m_none);
-            RemoveDuplicates(m_anyIfNotExcluded);
-            RemoveDuplicates(m_anyIfNotExcludedWeak);
-
-            RemoveIfInList(m_anyIfNotExcluded,     m_none);
-            RemoveIfInList(m_anyIfNotExcludedWeak, m_none);
-
-            m_any.AddRange(m_anyIfNotExcluded.AsArray());
-            m_anyWeak.AddRange(m_anyIfNotExcludedWeak.AsArray());
-
-            //Cleanup
-            RemoveDuplicates(m_all);
-            RemoveDuplicates(m_any);
-            RemoveDuplicates(m_allWeak);
-            RemoveDuplicates(m_anyWeak);
-
-            //throw cases:
-            //any is in all and access mismatch
-
-            //If a component in the any group is also in the all group with the same permissions, upgrade it to all and mark the flag.
-            for (int i = 0; i < m_any.Length; i++)
+            if ((m_options & EntityQueryOptions.IgnoreComponentEnabledState) == EntityQueryOptions.IgnoreComponentEnabledState)
             {
-                for (int j = 0; j < m_all.Length; j++)
+                // Move any WithEnabled to With
+                m_with.AddRange(m_withEnabled.AsArray());
+                m_withEnabled.Clear();
+                m_with.AddRange(m_withDisabled.AsArray());
+                m_withDisabled.Clear();
+                m_with.AddRange(m_withoutEnabled.AsArray());
+                m_withoutEnabled.Clear();
+            }
+
+            // Remove all duplicates
+            RemoveDuplicates(m_with);
+            RemoveDuplicates(m_withEnabled);
+            RemoveDuplicates(m_anyEnabled);
+            RemoveDuplicates(m_without);
+            RemoveDuplicates(m_withoutEnabled);
+            RemoveDuplicates(m_withDisabled);
+
+            // Filter and merge WithoutEnabled
+            RemoveIfInList(m_withoutEnabled, m_without,      false);
+            RemoveIfInList(m_withoutEnabled, m_withDisabled, false);
+
+            // Filter and merge With
+            RemoveEnableableIfInList(m_with, m_withEnabled,  true);
+            RemoveEnableableIfInList(m_with, m_withDisabled, true);
+
+            // Do WithAnyEnabled filtering
+            if (!m_anyEnabled.IsEmpty)
+            {
+                var originalAnyCount = m_anyEnabled.Length;
+                if ((m_options & EntityQueryOptions.IgnoreComponentEnabledState) == EntityQueryOptions.IgnoreComponentEnabledState)
+                    RemoveIfInList(m_anyEnabled, m_with, true);
+                else
                 {
-                    var a = m_any[i];
-                    var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
-                    {
-                        if (a.AccessModeType != b.AccessModeType)
-                        {
-                            throw new System.InvalidOperationException($"Cannot build an EntityQuery with type {a} given as both {a.AccessModeType} and {b.AccessModeType}");
-                        }
-                        else
-                        {
-                            m_anyIsSatisfiedByAll = true;
-                        }
-                    }
+                    RemoveEnableableIfInList(m_anyEnabled, m_withEnabled, true);
+                    RemoveNotEnableableIfInList(m_anyEnabled, m_with, true);
+                }
+                if (originalAnyCount != m_anyEnabled.Length)
+                {
+                    m_anyEnabled.Clear();
+                }
+                else
+                {
+                    RemoveEnableableIfInList(m_anyEnabled, m_withDisabled, false);
+                    RemoveIfInList(m_anyEnabled, m_without,        false);
+                    RemoveIfInList(m_anyEnabled, m_withoutEnabled, false);
+                    if (m_anyEnabled.IsEmpty)
+                        throw new System.InvalidOperationException(
+                            $"Cannot build an EntityQuery when all types specified as WithAnyEnabled() are also excluded by WithDisabled(), Without(), and WithoutEnabled().");
                 }
             }
 
-            //Merge allWeak
-            for (int i = 0; i < m_allWeak.Length; i++)
+            // Migrate special component types from Present to All to work around Unity bug:
+            var disabledTypeIndex = TypeManager.GetTypeIndex<Disabled>();
+            var prefabTypeIndex   = TypeManager.GetTypeIndex<Prefab>();
+            //var systemInstanceTypeIndex = TypeManager.GetTypeIndex<SystemInstance>();
+            var chunkHeaderTypeIndex = TypeManager.GetTypeIndex<ChunkHeader>();
+            for (int i = 0; i < m_with.Length; i++)
             {
-                bool found = false;
-                for (int j = 0; j < m_all.Length; j++)
+                if (m_with[i].TypeIndex == disabledTypeIndex || m_with[i].TypeIndex == prefabTypeIndex || m_with[i].TypeIndex == chunkHeaderTypeIndex)
                 {
-                    var a = m_allWeak[i];
-                    var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
-                    {
-                        found = true;
-                    }
-                }
-                if (!found)
-                {
-                    for (int j = 0; j < m_any.Length; j++)
-                    {
-                        var a = m_allWeak[i];
-                        var b = m_any[j];
-                        if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
-                        {
-                            a.AccessModeType      = ComponentType.AccessMode.ReadWrite;
-                            m_allWeak[i]          = a;
-                            m_anyIsSatisfiedByAll = true;
-                        }
-                    }
-                    m_all.Add(m_allWeak[i]);
+                    m_withEnabled.Add(m_with[i]);
+                    m_with.RemoveAtSwapBack(i);
+                    i--;
                 }
             }
 
-            //Merge anyWeak
-            for (int i = 0; i < m_anyWeak.Length; i++)
-            {
-                bool found = false;
-                for (int j = 0; j < m_all.Length; j++)
-                {
-                    var a = m_anyWeak[i];
-                    var b = m_all[j];
-                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
-                    {
-                        found                 = true;
-                        m_anyIsSatisfiedByAll = true;
-                    }
-                }
-                if (!found)
-                {
-                    for (int j = 0; j < m_any.Length; j++)
-                    {
-                        var a = m_anyWeak[i];
-                        var b = m_any[j];
-                        if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent && b.AccessModeType == ComponentType.AccessMode.ReadWrite)
-                        {
-                            a.AccessModeType = ComponentType.AccessMode.ReadWrite;
-                            m_anyWeak[i]     = a;
-                        }
-                    }
-                    m_any.Add(m_anyWeak[i]);
-                }
-            }
-
-            if (m_anyIsSatisfiedByAll)
-                m_any.Clear();
-
-            //EntityQueryDescBuilder desc = new EntityQueryDescBuilder(Allocator.Temp);
-            //for (int i = 0; i < m_all.Length; i++)
-            //    desc.AddAll(m_all[i]);
-            //for (int i = 0; i < m_any.Length; i++)
-            //    desc.AddAny(m_any[i]);
-            //for (int i = 0; i < m_none.Length; i++)
-            //    desc.AddNone(m_none[i]);
-            //desc.Options(m_options);
-            //desc.FinalizeQuery();
-
-            var builder = new EntityQueryBuilder(Allocator.Temp).WithAll(ref m_all).WithAny(ref m_any).WithNone(ref m_none).WithOptions(m_options);
-
-            //var desc = new EntityQueryDesc()
-            //{
-            //    All     = m_all.ToArrayNBC(),
-            //    Any     = m_any.ToArrayNBC(),
-            //    None    = m_none.ToArrayNBC(),
-            //    Options = m_options
-            //};
+            var builder = new EntityQueryBuilder(Allocator.Temp).WithPresent(ref m_with)
+                          .WithAll(ref m_withEnabled)
+                          .WithDisabled(ref m_withDisabled)
+                          .WithAny(ref m_anyEnabled)
+                          .WithAbsent(ref m_without)
+                          .WithNone(ref m_withoutEnabled)
+                          .WithOptions(m_options);
 
             DisposeArrays();
             EntityQuery query;
@@ -434,13 +494,12 @@ namespace Latios
 
         private void DisposeArrays()
         {
-            m_all.Dispose();
-            m_any.Dispose();
-            m_none.Dispose();
-            m_anyWeak.Dispose();
-            m_allWeak.Dispose();
-            m_anyIfNotExcluded.Dispose();
-            m_anyIfNotExcludedWeak.Dispose();
+            m_with.Dispose();
+            m_withEnabled.Dispose();
+            m_withDisabled.Dispose();
+            m_anyEnabled.Dispose();
+            m_without.Dispose();
+            m_withoutEnabled.Dispose();
         }
 
         private void RemoveDuplicates(NativeList<ComponentType> list)
@@ -456,26 +515,83 @@ namespace Latios
                     {
                         if (a.AccessModeType != b.AccessModeType)
                         {
-                            throw new System.InvalidOperationException($"Cannot build an EntityQuery with type {a} given as both {a.AccessModeType} and {b.AccessModeType}");
+                            a.AccessModeType = ComponentType.AccessMode.ReadWrite;
+                            list[i]          = a;
                         }
-                        else
-                        {
-                            list.RemoveAtSwapBack(j);
-                            j--;
-                        }
+                        list.RemoveAtSwapBack(j);
+                        j--;
                     }
                 }
             }
         }
 
-        private void RemoveIfInList(NativeList<ComponentType> listToFilter, NativeList<ComponentType> typesToRemove)
+        private void RemoveIfInList(NativeList<ComponentType> listToFilter, NativeList<ComponentType> typesToRemove, bool writePromote)
         {
             for (int i = 0; i < listToFilter.Length; i++)
             {
+                var a = listToFilter[i];
                 for (int j = 0; j < typesToRemove.Length; j++)
                 {
-                    if (listToFilter[i].TypeIndex == typesToRemove[j].TypeIndex && listToFilter[i].IsChunkComponent == typesToRemove[j].IsChunkComponent)
+                    var b = typesToRemove[j];
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
                     {
+                        if (writePromote && a.AccessModeType != b.AccessModeType)
+                        {
+                            b.AccessModeType = ComponentType.AccessMode.ReadWrite;
+                            typesToRemove[i] = b;
+                        }
+                        listToFilter.RemoveAtSwapBack(i);
+                        i--;
+                        j = typesToRemove.Length;
+                    }
+                }
+            }
+        }
+
+        private void RemoveEnableableIfInList(NativeList<ComponentType> listToFilter, NativeList<ComponentType> typesToRemove, bool writePromote)
+        {
+            for (int i = 0; i < listToFilter.Length; i++)
+            {
+                var a = listToFilter[i];
+                if (!a.IsEnableable)
+                    continue;
+
+                for (int j = 0; j < typesToRemove.Length; j++)
+                {
+                    var b = typesToRemove[j];
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
+                    {
+                        if (writePromote && a.AccessModeType != b.AccessModeType)
+                        {
+                            b.AccessModeType = ComponentType.AccessMode.ReadWrite;
+                            typesToRemove[i] = b;
+                        }
+                        listToFilter.RemoveAtSwapBack(i);
+                        i--;
+                        j = typesToRemove.Length;
+                    }
+                }
+            }
+        }
+
+        private void RemoveNotEnableableIfInList(NativeList<ComponentType> listToFilter, NativeList<ComponentType> typesToRemove, bool writePromote)
+        {
+            for (int i = 0; i < listToFilter.Length; i++)
+            {
+                var a = listToFilter[i];
+                if (a.IsEnableable)
+                    continue;
+
+                for (int j = 0; j < typesToRemove.Length; j++)
+                {
+                    var b = typesToRemove[j];
+                    if (a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
+                    {
+                        if (writePromote && a.AccessModeType != b.AccessModeType)
+                        {
+                            b.AccessModeType = ComponentType.AccessMode.ReadWrite;
+                            typesToRemove[i] = b;
+                        }
                         listToFilter.RemoveAtSwapBack(i);
                         i--;
                         j = typesToRemove.Length;

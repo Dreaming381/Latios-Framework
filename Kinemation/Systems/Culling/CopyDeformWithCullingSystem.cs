@@ -26,8 +26,8 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkCopyDeformTag>(true).WithAll<ChunkPerFrameCullingMask>(true)
-                          .WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkCopyDeformTag>(true).With<ChunkPerFrameCullingMask>(true)
+                          .With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
         }
 
         [BurstCompile]

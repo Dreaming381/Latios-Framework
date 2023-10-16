@@ -32,8 +32,8 @@ namespace Latios.Kinemation.TextBackend.Systems
 
         protected override void OnCreate()
         {
-            m_query = Fluent.WithAll<RenderGlyph>(true).WithAll<TextRenderControl>(true).WithAll<RenderBounds>(true)
-                      .WithAll<ChunkPerCameraCullingMask>(false, true).WithAll<ChunkPerFrameCullingMask>(true, true).Build();
+            m_query = Fluent.With<RenderGlyph>(true).With<TextRenderControl>(true).With<RenderBounds>(true)
+                      .With<ChunkPerCameraCullingMask>(false, true).With<ChunkPerFrameCullingMask>(true, true).Build();
 
             m_uploadShader    = Resources.Load<ComputeShader>("UploadGlyphs");
             _src              = Shader.PropertyToID("_src");

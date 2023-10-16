@@ -68,28 +68,6 @@ namespace Unity.Entities.Exposed
             return true;
         }
     }
-
-    public struct SystemSortingTracker
-    {
-        int  lastSystemCount;
-        bool lastEnableSortingSetting;
-
-        public void CheckAndSortSystems(ComponentSystemGroup group)
-        {
-            int  systemCount        = group.m_MasterUpdateList.Length;
-            bool enableSorting      = group.EnableSystemSorting;
-            bool hasSystemsToRemove = group.m_managedSystemsToRemove.Count > 0 || !group.m_UnmanagedSystemsToRemove.IsEmpty;
-            bool sortingTurnedOn    = lastEnableSortingSetting == false && enableSorting == true;
-
-            if ((systemCount != lastSystemCount && enableSorting) || sortingTurnedOn || hasSystemsToRemove)
-            {
-                group.SortSystems();
-            }
-
-            lastSystemCount          = systemCount;
-            lastEnableSortingSetting = enableSorting;
-        }
-    }
 }
 
 namespace Unity.Entities.Exposed.Dangerous
@@ -118,6 +96,22 @@ namespace Unity.Entities
     [DisableAutoCreation]
     public partial class PresentationSystemGroup : ComponentSystemGroup
     {
+    }
+
+    public abstract partial class ComponentSystemGroup
+    {
+        public bool isSystemListSortDirty => m_systemSortDirty;
+
+        public delegate void UpdateDelegate(ComponentSystemGroup group);
+        public static UpdateDelegate s_globalUpdateDelegate;
+
+        void RunDelegateOrDefaultLatiosInjected()
+        {
+            if (s_globalUpdateDelegate == null)
+                UpdateAllSystems();
+            else
+                s_globalUpdateDelegate(this);
+        }
     }
 }
 

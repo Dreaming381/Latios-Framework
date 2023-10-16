@@ -23,7 +23,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
+            m_query = state.Fluent().With<PostProcessMatrix>(true).With<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
         }
 
         [BurstCompile]
@@ -87,7 +87,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<LocalToWorld>(true).WithAll<BuiltinMaterialPropertyUnity_MatrixPreviousM>().IncludeDisabledEntities().Build();
+            m_query = state.Fluent().With<LocalToWorld>(true).With<BuiltinMaterialPropertyUnity_MatrixPreviousM>().IncludeDisabledEntities().Build();
         }
 
         [BurstCompile]

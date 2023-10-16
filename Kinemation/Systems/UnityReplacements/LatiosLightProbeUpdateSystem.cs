@@ -39,7 +39,7 @@ namespace Latios.Kinemation
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
             m_probeGridQuery =
-                state.Fluent().WithAll<BuiltinMaterialPropertyUnity_SHCoefficients>(false).WithWorldTransformReadOnlyWeak().WithAll<BlendProbeTag>(true).Build();
+                state.Fluent().With<BuiltinMaterialPropertyUnity_SHCoefficients>(false).WithWorldTransformReadOnly().With<BlendProbeTag>(true).Build();
 
             state.EntityManager.AddComponentData(state.SystemHandle, new RequiresFullRebuild { requiresFullRebuild = true });
             state.EntityManager.AddComponentObject(state.SystemHandle, new TetrahedralizationChangeCallbackReceiver(ref state));

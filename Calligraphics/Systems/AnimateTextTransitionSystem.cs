@@ -27,10 +27,10 @@ namespace Latios.Calligraphics.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent()
-                      .WithAll<TextAnimationTransition>( false)
-                      .WithAll<RenderGlyph>(             false)
-                      .WithAll<TextRenderControl>(       false)
-                      .WithAll<GlyphMappingElement>(     true)
+                      .With<TextAnimationTransition>( false)
+                      .With<RenderGlyph>(             false)
+                      .With<TextRenderControl>(       false)
+                      .With<GlyphMappingElement>(     true)
                       .Build();
 
             m_rng = new Rng(new FixedString128Bytes("AnimateTextTransitionSystem"));

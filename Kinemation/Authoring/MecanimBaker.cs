@@ -42,9 +42,8 @@ namespace Latios.Kinemation.Authoring
             baker.AddBuffer<MecanimActiveClipEvent>(entity);
 
             // Bake controller
-            baker.AddComponent(                              entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
-            baker.AddComponent<MecanimControllerEnabledFlag>(entity);
-            baker.SetComponentEnabled<MecanimControllerEnabledFlag>(entity, authoring.enabled);
+            baker.AddComponent( entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
+            baker.SetComponentEnabled<MecanimController>(entity, authoring.enabled);
 
             AnimatorController animatorController = baker.FindAnimatorController(runtimeAnimatorController);
 

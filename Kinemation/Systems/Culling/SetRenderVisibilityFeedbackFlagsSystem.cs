@@ -20,7 +20,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<RenderVisibilityFeedbackFlag>(false).WithAll<ChunkPerFrameCullingMask>(true, true).IgnoreEnableableBits().Build();
+            m_query = state.Fluent().With<RenderVisibilityFeedbackFlag>(false).With<ChunkPerFrameCullingMask>(true, true).Build();
         }
 
         [BurstCompile]

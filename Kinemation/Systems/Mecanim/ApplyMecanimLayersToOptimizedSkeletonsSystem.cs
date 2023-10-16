@@ -24,7 +24,6 @@ namespace Latios.Kinemation.Systems
         {
             var builder = new EntityQueryBuilder(Allocator.Temp)
                           .WithAllRW<MecanimController>()
-                          .WithAll<MecanimControllerEnabledFlag>()
                           .WithAll<MecanimLayerStateMachineStatus>()
                           .WithAll<MecanimLayerStateMachineStatus>()
                           .WithAllRW<TimedMecanimClipInfo>()

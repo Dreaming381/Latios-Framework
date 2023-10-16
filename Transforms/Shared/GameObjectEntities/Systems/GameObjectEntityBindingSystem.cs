@@ -24,15 +24,15 @@ namespace Latios.Transforms.Systems
 
         protected override void OnCreate()
         {
-            m_clientsQuery              = Fluent.WithAll<GameObjectEntity.ExistComponent>(true).WithAll<GameObjectEntityBindClient>().IncludeDisabledEntities().Build();
-            m_hostsQuery                = Fluent.WithAll<GameObjectEntityHost>().IncludeDisabledEntities().Build();
+            m_clientsQuery              = Fluent.With<GameObjectEntity.ExistComponent>(true).With<GameObjectEntityBindClient>().IncludeDisabledEntities().Build();
+            m_hostsQuery                = Fluent.With<GameObjectEntityHost>().IncludeDisabledEntities().Build();
             m_newTransformToEntityQuery =
-                Fluent.WithAll<GameObjectEntity.ExistComponent>(true).WithAll<CopyTransformToEntity>(true).Without<CopyTransformToEntityCleanupTag>().Build();
-            m_deadTransformToEntityQuery  = Fluent.WithAll<CopyTransformToEntityCleanupTag>(true).Without<CopyTransformToEntity>().Build();
+                Fluent.With<GameObjectEntity.ExistComponent>(true).With<CopyTransformToEntity>(true).Without<CopyTransformToEntityCleanupTag>().Build();
+            m_deadTransformToEntityQuery  = Fluent.With<CopyTransformToEntityCleanupTag>(true).Without<CopyTransformToEntity>().Build();
             m_newTransformFromEntityQuery =
-                Fluent.WithAll<GameObjectEntity.ExistComponent>(true).WithAll<CopyTransformFromEntityTag>(true).Without<CopyTransformFromEntityCleanupTag>().Build();
-            m_deadTransformFromEntityQuery        = Fluent.WithAll<CopyTransformFromEntityCleanupTag>(true).Without<CopyTransformFromEntityTag>().Build();
-            m_removeDontDestroyOnSceneChangeQuery = Fluent.WithAll<DontDestroyOnSceneChangeTag>(true).WithAll<RemoveDontDestroyOnSceneChangeTag>().Build();
+                Fluent.With<GameObjectEntity.ExistComponent>(true).With<CopyTransformFromEntityTag>(true).Without<CopyTransformFromEntityCleanupTag>().Build();
+            m_deadTransformFromEntityQuery        = Fluent.With<CopyTransformFromEntityCleanupTag>(true).Without<CopyTransformFromEntityTag>().Build();
+            m_removeDontDestroyOnSceneChangeQuery = Fluent.With<DontDestroyOnSceneChangeTag>(true).With<RemoveDontDestroyOnSceneChangeTag>().Build();
 
             worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new CopyTransformToEntityMapping
             {

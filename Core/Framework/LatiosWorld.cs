@@ -44,7 +44,7 @@ namespace Latios
         /// </summary>
         public SimulationSystemGroup simulationSystemGroup => m_simulationSystemGroup;
         /// <summary>
-        /// The PresentationsystemGroup of this world for convenience. It is null for NetCode server worlds.
+        /// The PresentationsystemGroup of this world for convenience. It is null for NetCode server and thin client worlds.
         /// </summary>
         public PresentationSystemGroup presentationSystemGroup => m_presentationSystemGroup;
 
@@ -76,7 +76,8 @@ namespace Latios
         {
             Default,
             Client,
-            Server
+            Server,
+            ThinClient
         }
 
         /// <summary>
@@ -87,6 +88,8 @@ namespace Latios
         /// <param name="role">The role of the world. Leave at default unless this is a NetCode project.</param>
         public unsafe LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation, WorldRole role = WorldRole.Default) : base(name, flags)
         {
+            ComponentSystemGroup.s_globalUpdateDelegate = SuperSystem.DoLatiosFrameworkComponentSystemGroupUpdate;
+
             m_interfacesDispatcher = new UnmanagedExtraInterfacesDispatcher();
 
             m_latiosWorldUnmanagedSystem = this.GetOrCreateSystem<LatiosWorldUnmanagedSystem>();
@@ -94,30 +97,18 @@ namespace Latios
             m_unmanaged                                               = Unmanaged.GetLatiosWorldUnmanaged();
             m_unmanaged.m_impl->m_unmanagedSystemInterfacesDispatcher = GCHandle.Alloc(m_interfacesDispatcher, GCHandleType.Normal);
 
-            if (role == WorldRole.Default)
+            if (role == WorldRole.Default || role == WorldRole.Client)
             {
-                m_initializationSystemGroup             = GetOrCreateSystemManaged<InitializationSystemGroup>();
-                m_simulationSystemGroup                 = GetOrCreateSystemManaged<SimulationSystemGroup>();
-                m_presentationSystemGroup               = GetOrCreateSystemManaged<PresentationSystemGroup>();
-                m_initializationSystemGroup.RateManager = new LatiosInitializationSystemGroupManager(this, m_initializationSystemGroup);
-                m_simulationSystemGroup.RateManager     = new LatiosSimulationSystemGroupManager();
-                m_presentationSystemGroup.RateManager   = new LatiosPresentationSystemGroupManager();
+                m_initializationSystemGroup = GetOrCreateSystemManaged<InitializationSystemGroup>();
+                m_simulationSystemGroup     = GetOrCreateSystemManaged<SimulationSystemGroup>();
+                m_presentationSystemGroup   = GetOrCreateSystemManaged<PresentationSystemGroup>();
             }
-            else if (role == WorldRole.Client)
+            else if (role == WorldRole.Server || role == WorldRole.ThinClient)
             {
-#if NETCODE_PROJECT
-                m_initializationSystemGroup = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientInitializationSystemGroup>();
-                m_simulationSystemGroup     = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientSimulationSystemGroup>();
-                m_presentationSystemGroup   = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosClientPresentationSystemGroup>();
-#endif
+                m_initializationSystemGroup = GetOrCreateSystemManaged<InitializationSystemGroup>();
+                m_simulationSystemGroup     = GetOrCreateSystemManaged<SimulationSystemGroup>();
             }
-            else if (role == WorldRole.Server)
-            {
-#if NETCODE_PROJECT
-                m_initializationSystemGroup = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosServerInitializationSystemGroup>();
-                m_simulationSystemGroup     = GetOrCreateSystem<Compatibility.UnityNetCode.LatiosServerSimulationSystemGroup>();
-#endif
-            }
+            m_initializationSystemGroup.RateManager = new LatiosInitializationSystemGroupManager(this, m_initializationSystemGroup);
         }
 
         /// <summary>

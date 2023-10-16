@@ -29,8 +29,8 @@ namespace Latios.Kinemation
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_WorldRenderBounds = state.Fluent().WithAll<ChunkWorldRenderBounds>(false, true).WithAll<WorldRenderBounds>(false).WithAll<RenderBounds>(true)
-                                  .WithWorldTransformReadOnlyWeak().Without<ChunkSkinningCullingTag>(true).Build();
+            m_WorldRenderBounds = state.Fluent().With<ChunkWorldRenderBounds>(false, true).With<WorldRenderBounds>(false).With<RenderBounds>(true)
+                                  .WithWorldTransformReadOnly().Without<ChunkSkinningCullingTag>(true).Build();
             m_WorldRenderBounds.AddChangedVersionFilter(ComponentType.ReadOnly<RenderBounds>());
             m_WorldRenderBounds.AddWorldTranformChangeFilter();
             m_WorldRenderBounds.AddOrderVersionFilter();

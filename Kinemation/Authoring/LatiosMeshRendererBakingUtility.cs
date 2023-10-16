@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using Latios.Transforms;
 using Latios.Transforms.Authoring;
 using Unity.Collections;
@@ -19,7 +18,7 @@ namespace Latios.Kinemation.Authoring
         {
             public LODGroup LodGroup;
             public Entity   LodGroupEntity;
-            public int      LodGroupIndex;
+            public int      LodGroupMask;
         }
 
         static void CreateLODState(IBaker baker, Renderer authoringSource, out LODState lodState)
@@ -28,7 +27,7 @@ namespace Latios.Kinemation.Authoring
             lodState                = new LODState();
             lodState.LodGroup       = baker.GetComponentInParent<LODGroup>();
             lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup, TransformUsageFlags.Renderable);
-            lodState.LodGroupIndex  = FindInLODs(lodState.LodGroup, authoringSource);
+            lodState.LodGroupMask   = FindInLODs(lodState.LodGroup, authoringSource);
         }
 
         private static int FindInLODs(LODGroup lodGroup, Renderer authoring)
@@ -37,6 +36,8 @@ namespace Latios.Kinemation.Authoring
             {
                 var lodGroupLODs = lodGroup.GetLODs();
 
+                int lodGroupMask = 0;
+
                 // Find the renderer inside the LODGroup
                 for (int i = 0; i < lodGroupLODs.Length; ++i)
                 {
@@ -44,10 +45,11 @@ namespace Latios.Kinemation.Authoring
                     {
                         if (renderer == authoring)
                         {
-                            return i;
+                            lodGroupMask |= (1 << i);
                         }
                     }
                 }
+                return lodGroupMask > 0 ? lodGroupMask : -1;
             }
             return -1;
         }
@@ -57,25 +59,15 @@ namespace Latios.Kinemation.Authoring
 
         private static void AddRendererComponents(Entity entity, IBaker baker, in RenderMeshDescription renderMeshDescription, RenderMesh renderMesh)
         {
-            // Entities with Static are never rendered with motion vectors
-            bool inMotionPass = RenderMeshUtility.kUseHybridMotionPass &&
-                                renderMeshDescription.FilterSettings.IsInMotionPass &&
-                                !baker.IsStatic();
-
-            RenderMeshUtility.EntitiesGraphicsComponentFlags flags = RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking;
-            if (inMotionPass)
-                flags |= RenderMeshUtility.EntitiesGraphicsComponentFlags.InMotionPass;
-            flags     |= RenderMeshUtility.LightProbeFlags(renderMeshDescription.LightProbeUsage);
-            flags     |= RenderMeshUtility.DepthSortedFlags(renderMesh.material);
-
             // Add all components up front using as few calls as possible.
-            var componentTypes = RenderMeshUtility.s_EntitiesGraphicsComponentTypes.GetComponentTypes(flags);
-            baker.AddComponent(entity, componentTypes);
-            for (int i = 0; i < componentTypes.Length; i++)
+            var componentSet = RenderMeshUtility.ComputeComponentTypes(RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking,
+                                                                       renderMeshDescription, baker.IsStatic(), renderMesh.materials);
+            baker.AddComponent(entity, componentSet);
+            for (int i = 0; i < componentSet.Length; i++)
             {
                 // Todo: What to do for Unity Transforms?
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-                if (componentTypes.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
+                if (componentSet.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
                     baker.AddComponent<RequestPreviousTag>(entity);
 #endif
             }
@@ -87,14 +79,18 @@ namespace Latios.Kinemation.Authoring
             baker.SetComponent(entity, new RenderBounds { Value = localBounds });
         }
 
+#if !ENABLE_MESH_RENDERER_SUBMESH_DATA_SHARING
+#error Latios Framework requires ENABLE_MESH_RENDERER_SUBMESH_DATA_SHARING to be defined in your scripting define symbols.
+#endif
+
         internal static void Convert(IBaker baker,
                                      Renderer authoring,
                                      Mesh mesh,
                                      List<Material>   sharedMaterials,
-                                     bool attachToPrimaryEntityForSingleMaterial,
-                                     out List<Entity> additionalEntities)
+                                     out List<Entity> additionalEntities,
+                                     int firstUniqueSubmeshIndex = int.MaxValue)
         {
-            additionalEntities = new List<Entity>();
+            additionalEntities = default;
 
             if (mesh == null || sharedMaterials.Count == 0)
             {
@@ -103,6 +99,11 @@ namespace Latios.Kinemation.Authoring
                     authoring);
                 return;
             }
+
+            firstUniqueSubmeshIndex = math.clamp(firstUniqueSubmeshIndex, 1, sharedMaterials.Count);
+
+            if (sharedMaterials.Count > firstUniqueSubmeshIndex)
+                additionalEntities = new List<Entity>();
 
             // Takes a dependency on the material
             foreach (var material in sharedMaterials)
@@ -123,8 +124,11 @@ namespace Latios.Kinemation.Authoring
             // RenderMeshDescription accesses the GameObject layer.
             // Declaring the dependency on the GameObject with GetLayer, so the baker rebakes if the layer changes
             baker.GetLayer(authoring);
-            var desc       = new RenderMeshDescription(authoring);
-            var renderMesh = new RenderMesh(authoring, mesh, sharedMaterials);
+            var desc             = new RenderMeshDescription(authoring);
+            var batchedMaterials = new List<Material>(firstUniqueSubmeshIndex);
+            for (int i = 0; i < firstUniqueSubmeshIndex; i++)
+                batchedMaterials.Add(sharedMaterials[i]);
+            var renderMesh = new RenderMesh(authoring, mesh, batchedMaterials);
 
             // Always disable per-object motion vectors for static objects
             if (baker.IsStatic())
@@ -133,90 +137,52 @@ namespace Latios.Kinemation.Authoring
                     desc.FilterSettings.MotionMode = MotionVectorGenerationMode.Camera;
             }
 
-            if (attachToPrimaryEntityForSingleMaterial && sharedMaterials.Count == 1)
+            CreateLODState(baker, authoring, out var lodState);
+
+            var entity = baker.GetEntity(authoring, TransformUsageFlags.Renderable);
+
+            AddRendererComponents(entity, baker, desc, renderMesh);
+
+            if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
             {
-                ConvertToSingleEntity(
-                    baker,
-                    desc,
-                    renderMesh,
-                    authoring);
-            }
-            else
-            {
-                ConvertToMultipleEntities(
-                    baker,
-                    desc,
-                    renderMesh,
-                    authoring,
-                    sharedMaterials,
-                    out additionalEntities);
-            }
-        }
-
-#pragma warning restore CS0162
-
-        static void ConvertToSingleEntity(
-            IBaker baker,
-            RenderMeshDescription renderMeshDescription,
-            RenderMesh renderMesh,
-            Renderer renderer)
-        {
-            CreateLODState(baker, renderer, out var lodState);
-
-            var entity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
-
-            AddRendererComponents(entity, baker, renderMeshDescription, renderMesh);
-
-            if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupIndex != -1)
-            {
-                var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
+                var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
                 baker.AddComponent(entity, lodComponent);
             }
-        }
 
-        internal static void ConvertToMultipleEntities(
-            IBaker baker,
-            RenderMeshDescription renderMeshDescription,
-            RenderMesh renderMesh,
-            Renderer renderer,
-            List<Material>        sharedMaterials,
-            out List<Entity>      additionalEntities)
-        {
-            CreateLODState(baker, renderer, out var lodState);
-
-            int materialCount  = sharedMaterials.Count;
-            additionalEntities = new List<Entity>();
-
-            for (var m = 0; m != materialCount; m++)
+            if (additionalEntities != null)
             {
-                Entity meshEntity;
-                meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
-
-                // Update Transform components:
-                baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
-                if (!baker.IsStatic())
-                    baker.AddComponent<CopyParentRequestTag>(meshEntity);
-
-                additionalEntities.Add(meshEntity);
-
-                var material = sharedMaterials[m];
-
-                renderMesh.subMesh  = m;
-                renderMesh.material = material;
-
-                AddRendererComponents(
-                    meshEntity,
-                    baker,
-                    renderMeshDescription,
-                    renderMesh);
-
-                if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupIndex != -1)
+                for (int m = firstUniqueSubmeshIndex; m < sharedMaterials.Count; m++)
                 {
-                    var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
-                    baker.AddComponent(meshEntity, lodComponent);
+                    Entity meshEntity;
+                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
+
+                    // Update Transform components:
+                    baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
+                    if (!baker.IsStatic())
+                        baker.AddComponent<CopyParentRequestTag>(meshEntity);
+
+                    additionalEntities.Add(meshEntity);
+
+                    var material = sharedMaterials[m];
+
+                    renderMesh.subMesh  = m;
+                    renderMesh.material = material;
+
+                    AddRendererComponents(
+                        meshEntity,
+                        baker,
+                        desc,
+                        renderMesh);
+
+                    if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
+                    {
+                        var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
+                        baker.AddComponent(meshEntity, lodComponent);
+                    }
                 }
             }
         }
+#pragma warning restore CS0162
     }
 }
 

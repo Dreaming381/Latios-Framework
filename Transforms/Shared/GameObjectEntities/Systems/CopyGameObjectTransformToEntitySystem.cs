@@ -28,8 +28,8 @@ namespace Latios.Transforms
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             transformLookup = new TransformAspect.Lookup(ref state);
 #endif
-            state.Fluent().WithAll<GameObjectEntity.ExistComponent>(true).WithAll<CopyTransformToEntity>(true).WithAll<CopyTransformToEntityCleanupTag>(true)
-            .WithWorldTransformReadOnlyWeak().Build();
+            state.Fluent().With<GameObjectEntity.ExistComponent>(true).With<CopyTransformToEntity>(true).With<CopyTransformToEntityCleanupTag>(true)
+            .WithWorldTransformReadOnly().Build();
         }
 
         [BurstCompile]

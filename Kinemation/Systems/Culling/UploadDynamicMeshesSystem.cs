@@ -29,8 +29,8 @@ namespace Latios.Kinemation
 
         protected override void OnCreate()
         {
-            m_query = Fluent.WithAll<DynamicMeshVertex>(true).WithAll<DynamicMeshState>(true).WithAll<BoundMesh>(true)
-                      .WithAll<ChunkPerCameraCullingMask>(true, true).WithAll<ChunkPerFrameCullingMask>(true, true).Build();
+            m_query = Fluent.With<DynamicMeshVertex>(true).With<DynamicMeshState>(true).With<BoundMesh>(true)
+                      .With<ChunkPerCameraCullingMask>(true, true).With<ChunkPerFrameCullingMask>(true, true).Build();
 
             m_uploadShader                 = Resources.Load<ComputeShader>("UploadVertices");
             _src                           = Shader.PropertyToID("_src");

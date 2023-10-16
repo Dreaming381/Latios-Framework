@@ -21,7 +21,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<BoundMesh>(true).Build();
+            m_query = state.Fluent().With<BoundMesh>(true).Build();
         }
 
         [BurstCompile]

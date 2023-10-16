@@ -444,8 +444,8 @@ namespace Latios
 
                     public int3 GetKey3()
                     {
-                        var c = elic.Chunk.GetChunkPtrAsUlong();
-                        int x = (int)(c >> 32);
+                        var c = elic.Chunk.GetChunkIndexAsUint();
+                        int x = 0;  // Todo: Optimize this.
                         int y = (int)(c & 0xFFFFFFFF);
                         int z = elic.IndexInChunk;
                         return new int3(x, y, z);

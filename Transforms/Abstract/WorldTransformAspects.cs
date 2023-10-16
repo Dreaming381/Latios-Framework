@@ -112,12 +112,12 @@ namespace Latios.Transforms.Abstract
 {
     public static class QueryExtensions
     {
-        public static FluentQuery WithWorldTransformReadOnlyWeak(this FluentQuery query)
+        public static FluentQuery WithWorldTransformReadOnly(this FluentQuery query)
         {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-            return query.WithAllWeak<WorldTransform>();
+            return query.With<WorldTransform>(true);
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-            return query.WithAllWeak<LocalToWorld>();
+            return query.With<LocalToWorld>(true);
 #else
             throw new System.NotImplementedException();
 #endif

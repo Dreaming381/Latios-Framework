@@ -23,8 +23,8 @@ namespace Latios.Kinemation
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_query = state.Fluent().WithAll<WorldRenderBounds>(false).WithAll<PostProcessMatrix>(true).WithAll<SkeletonDependent>(true)
-                      .WithAll<ChunkWorldRenderBounds>(false, true).WithAll<ChunkSkinningCullingTag>(true, true).Build();
+            m_query = state.Fluent().With<WorldRenderBounds>(false).With<PostProcessMatrix>(true).With<SkeletonDependent>(true)
+                      .With<ChunkWorldRenderBounds>(false, true).With<ChunkSkinningCullingTag>(true, true).Build();
         }
 
         [BurstCompile]

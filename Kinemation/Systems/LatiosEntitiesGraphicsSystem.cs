@@ -72,12 +72,12 @@ using UnityEditor;
 
 using System.Runtime.InteropServices;
 using Latios.Transforms.Abstract;
-using MaterialPropertyType = Unity.Rendering.MaterialPropertyType;
 using Unity.Entities.Exposed;
 using Unity.Rendering;
 using Unity.Transforms;
-
 #endregion
+
+using MaterialPropertyType = Unity.Rendering.MaterialPropertyType;
 
 namespace Latios.Kinemation.Systems
 {
@@ -300,7 +300,7 @@ namespace Latios.Kinemation.Systems
 
             // Globally allocate a single zero matrix at offset zero, so loads from zero return zero
             m_SharedZeroAllocation = m_GPUPersistentAllocator.Allocate((ulong)sizeof(float4x4));
-            Debug.Assert(!m_SharedZeroAllocation.Empty, "Allocation of constant-zero data failed");
+            Assert.IsTrue(!m_SharedZeroAllocation.Empty, "Allocation of constant-zero data failed");
             // Make sure the global zero is actually zero.
             m_ValueBlits.Add(new ValueBlitDescriptor
             {
@@ -309,7 +309,7 @@ namespace Latios.Kinemation.Systems
                 ValueSizeBytes    = (uint)sizeof(float4x4),
                 Count             = 1,
             });
-            Debug.Assert(m_SharedZeroAllocation.begin == 0, "Global zero allocation should have zero address");
+            Assert.IsTrue(m_SharedZeroAllocation.begin == 0, "Global zero allocation should have zero address");
 
             ResetIds();
 
@@ -513,6 +513,7 @@ namespace Latios.Kinemation.Systems
             worldBlackboardEntity.SetComponentData(new CullingContext
             {
                 cullIndexThisFrame                          = m_cullPassIndexThisFrame,
+                cullingFlags                                = batchCullingContext.cullingFlags,
                 globalSystemVersionOfLatiosEntitiesGraphics = m_globalSystemVersionAtLastUpdate,
                 lastSystemVersionOfLatiosEntitiesGraphics   = m_LastSystemVersionAtLastUpdate,
                 cullingLayerMask                            = batchCullingContext.cullingLayerMask,
@@ -571,8 +572,8 @@ namespace Latios.Kinemation.Systems
         /// <param name="overrideTypeSizeGPU">An optional size of the type on the GPU.</param>
         public static void RegisterMaterialPropertyType(Type type, string propertyName, short overrideTypeSizeGPU = -1)
         {
-            Debug.Assert(type != null,                        "type must be non-null");
-            Debug.Assert(!string.IsNullOrEmpty(propertyName), "Property name must be valid");
+            Assert.IsTrue(type != null,                        "type must be non-null");
+            Assert.IsTrue(!string.IsNullOrEmpty(propertyName), "Property name must be valid");
 
             short typeSizeCPU = (short)UnsafeUtility.SizeOf(type);
             if (overrideTypeSizeGPU == -1)
@@ -584,9 +585,9 @@ namespace Latios.Kinemation.Systems
             if (s_TypeToPropertyMappings.ContainsKey(type))
             {
                 string prevPropertyName = s_TypeToPropertyMappings[type].Name;
-                Debug.Assert(propertyName.Equals(
-                                 prevPropertyName),
-                             $"Attempted to register type {type.Name} with multiple different property names. Registered with \"{propertyName}\", previously registered with \"{prevPropertyName}\".");
+                Assert.IsTrue(propertyName.Equals(
+                                  prevPropertyName),
+                              $"Attempted to register type {type.Name} with multiple different property names. Registered with \"{propertyName}\", previously registered with \"{prevPropertyName}\".");
             }
             else
             {
@@ -729,8 +730,8 @@ namespace Latios.Kinemation.Systems
             if (currentCapacity >= neededCapacity)
                 return;
 
-            Debug.Assert(kMaxBatchGrowFactor >= 1f,
-                         "Grow factor should always be greater or equal to 1");
+            Assert.IsTrue(kMaxBatchGrowFactor >= 1f,
+                          "Grow factor should always be greater or equal to 1");
 
             var newCapacity = (int)(kMaxBatchGrowFactor * neededCapacity);
 
@@ -739,7 +740,7 @@ namespace Latios.Kinemation.Systems
 
         private void AddBatchIndex(int id)
         {
-            Debug.Assert(!m_SortedBatchIds.Contains(id), "New batch ID already marked as used");
+            Assert.IsTrue(!m_SortedBatchIds.Contains(id), "New batch ID already marked as used");
             m_SortedBatchIds.Add(id);
             m_ExistingBatchIndices.Add(id);
             EnsureHaveSpaceForNewBatch();
@@ -748,7 +749,7 @@ namespace Latios.Kinemation.Systems
         private void RemoveBatchIndex(int id)
         {
             if (!m_SortedBatchIds.Contains(id))
-                Debug.Assert(false, $"Attempted to release an unused id {id}");
+                Assert.IsTrue(false, $"Attempted to release an unused id {id}");
             m_SortedBatchIds.Remove(id);
             m_ExistingBatchIndices.Remove(id);
         }
@@ -871,7 +872,7 @@ namespace Latios.Kinemation.Systems
                         BatchID      = cmd.batchID,
                         MaterialID   = cmd.materialID,
                         MeshID       = cmd.meshID,
-                        SubmeshIndex = cmd.submeshIndex,
+                        SubMeshIndex = cmd.submeshIndex,
                         Flags        = cmd.flags,
                     };
                     Debug.Log($"Draw Command #{i}: {settings} visibleOffset: {cmd.visibleOffset} visibleCount: {cmd.visibleCount}");
@@ -906,9 +907,9 @@ namespace Latios.Kinemation.Systems
 
             Profiler.EndSample();
 
-            var numNewChunksArray = new NativeArray<int>(1, Allocator.TempJob);
+            var numNewChunksArray = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
             totalChunks           = m_EntitiesGraphicsRenderedQuery.CalculateChunkCount();
-            var newChunks         = new NativeArray<ArchetypeChunk>(totalChunks, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+            var newChunks         = CollectionHelper.CreateNativeArray<ArchetypeChunk>(totalChunks, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
             var classifyNewChunksJob = new ClassifyNewChunksJobLatiosVersion
             {
@@ -922,16 +923,17 @@ namespace Latios.Kinemation.Systems
             JobHandle entitiesGraphicsCompleted = new JobHandle();
 
             const int kNumBitsPerLong          = sizeof(long) * 8;
-            var       unreferencedBatchIndices = new NativeArray<long>((BatchIndexRange + kNumBitsPerLong) / kNumBitsPerLong, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+            var       unreferencedBatchIndices = CollectionHelper.CreateNativeArray<long>((BatchIndexRange + kNumBitsPerLong) / kNumBitsPerLong,
+                                                                                    WorldUpdateAllocator,
+                                                                                    NativeArrayOptions.ClearMemory);
 
             JobHandle initializedUnreferenced = default;
-            var       existingKeys            = m_ExistingBatchIndices.ToNativeArray(Allocator.TempJob);
+            var       existingKeys            = m_ExistingBatchIndices.ToNativeArray(WorldUpdateAllocator);
             initializedUnreferenced           = new InitializeUnreferencedIndicesScatterJob
             {
                 ExistingBatchIndices     = existingKeys,
                 UnreferencedBatchIndices = unreferencedBatchIndices,
             }.Schedule(existingKeys.Length, kNumScatteredIndicesPerThread);
-            existingKeys.Dispose(initializedUnreferenced);
 
             inputDependencies = JobHandle.CombineDependencies(inputDependencies, initializedUnreferenced);
 
@@ -986,7 +988,6 @@ namespace Latios.Kinemation.Systems
                 WorldTransform               = GetDynamicComponentTypeHandle(QueryExtensions.GetAbstractWorldTransformROComponentType()),
                 LodRange                     = lodRangesRO,
                 RootLodRange                 = rootLodRangesRO,
-                RenderMeshArray              = renderMeshArrays,
                 MaterialMeshInfo             = materialMeshInfosRO,
                 EntitiesGraphicsChunkUpdater = entitiesGraphicsChunkUpdater,
             };
@@ -1022,9 +1023,6 @@ namespace Latios.Kinemation.Systems
                 entitiesGraphicsCompleted = updateNewChunksJob.Schedule(numValidNewChunks, kNumNewChunksPerThread);
             }
 
-            newChunks.Dispose(entitiesGraphicsCompleted);
-            numNewChunksArray.Dispose(entitiesGraphicsCompleted);
-
             var drawCommandFlagsUpdated = new UpdateDrawCommandFlagsJob
             {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
@@ -1057,8 +1055,6 @@ namespace Latios.Kinemation.Systems
             Profiler.BeginSample("UpdateGlobalAABB");
             UpdateGlobalAABB();
             Profiler.EndSample();
-
-            unreferencedBatchIndices.Dispose();
 
             JobHandle outputDeps = drawCommandFlagsUpdated;
 
@@ -1179,7 +1175,7 @@ namespace Latios.Kinemation.Systems
         {
             int numValidNewChunks = 0;
 
-            Debug.Assert(newChunks.Length > 0, "Attempted to add new chunks, but list of new chunks was empty");
+            Assert.IsTrue(newChunks.Length > 0, "Attempted to add new chunks, but list of new chunks was empty");
 
             var batchCreationTypeHandles = new BatchCreationTypeHandles(this);
 
@@ -1196,8 +1192,8 @@ namespace Latios.Kinemation.Systems
             CreateBatchCreateInfo(ref batchCreateInfoFactory, ref newChunks, ref sortedNewChunks, out var failureProperty);
             if (failureProperty.TypeIndex >= 0)
             {
-                Debug.Assert(false,
-                             $"TypeIndex mismatch between key and stored property, Type: {failureProperty.TypeName} ({failureProperty.TypeIndex:x8}), Property: {failureProperty.PropertyName} ({failureProperty.NameID:x8})");
+                Assert.IsTrue(false,
+                              $"TypeIndex mismatch between key and stored property, Type: {failureProperty.TypeName} ({failureProperty.TypeIndex:x8}), Property: {failureProperty.PropertyName} ({failureProperty.NameID:x8})");
             }
 
             int batchBegin          = 0;
@@ -1289,9 +1285,9 @@ namespace Latios.Kinemation.Systems
 
             int numProperties = overrides.Length;
 
-            Debug.Assert(numProperties > 0,      "No overridden properties, expected at least one");
-            Debug.Assert(numInstances > 0,       "No instances, expected at least one");
-            Debug.Assert(batchChunks.Length > 0, "No chunks, expected at least one");
+            Assert.IsTrue(numProperties > 0,      "No overridden properties, expected at least one");
+            Assert.IsTrue(numInstances > 0,       "No instances, expected at least one");
+            Assert.IsTrue(batchChunks.Length > 0, "No chunks, expected at least one");
 
             int batchSizeBytes = 0;
             // Every chunk has the same graphics archetype, so each requires the same amount
@@ -1312,13 +1308,13 @@ namespace Latios.Kinemation.Systems
 
             batchInfo.ChunkMetadataAllocation = m_ChunkMetadataAllocator.Allocate((ulong)batchTotalChunkMetadata);
             if (batchInfo.ChunkMetadataAllocation.Empty)
-                Debug.Assert(false,
-                             $"Out of memory in the Entities Graphics chunk metadata buffer. Attempted to allocate {batchTotalChunkMetadata} elements, buffer size: {m_ChunkMetadataAllocator.Size}, free size left: {m_ChunkMetadataAllocator.FreeSpace}.");
+                Assert.IsTrue(false,
+                              $"Out of memory in the Entities Graphics chunk metadata buffer. Attempted to allocate {batchTotalChunkMetadata} elements, buffer size: {m_ChunkMetadataAllocator.Size}, free size left: {m_ChunkMetadataAllocator.FreeSpace}.");
 
             batchInfo.GPUMemoryAllocation = m_GPUPersistentAllocator.Allocate((ulong)batchSizeBytes, BatchAllocationAlignment);
             if (batchInfo.GPUMemoryAllocation.Empty)
-                Debug.Assert(false,
-                             $"Out of memory in the Entities Graphics GPU instance data buffer. Attempted to allocate {batchSizeBytes}, buffer size: {m_GPUPersistentAllocator.Size}, free size left: {m_GPUPersistentAllocator.FreeSpace}.");
+                Assert.IsTrue(false,
+                              $"Out of memory in the Entities Graphics GPU instance data buffer. Attempted to allocate {batchSizeBytes}, buffer size: {m_GPUPersistentAllocator.Size}, free size left: {m_GPUPersistentAllocator.FreeSpace}.");
 
             // Physical offset inside the buffer, always the same on all platforms.
             int allocationBegin = (int)batchInfo.GPUMemoryAllocation.begin;
@@ -1364,7 +1360,7 @@ namespace Latios.Kinemation.Systems
 #endif
 
             if (batchIndex == 0)
-                Debug.Assert(false, "Failed to add new BatchRendererGroup batch.");
+                Assert.IsTrue(false, "Failed to add new BatchRendererGroup batch.");
 
             AddBatchIndex(batchIndex);
             m_BatchInfos[batchIndex] = batchInfo;
@@ -1384,7 +1380,7 @@ namespace Latios.Kinemation.Systems
             };
             SetBatchChunkData(ref args, ref overrides);
 
-            Debug.Assert(args.ChunkOffsetInBatch == numInstances, "Batch instance count mismatch");
+            Assert.IsTrue(args.ChunkOffsetInBatch == numInstances, "Batch instance count mismatch");
 
             return true;
         }
@@ -1667,7 +1663,7 @@ namespace Latios.Kinemation.Systems
 
                 AtomicHelpers.IndexToQwIndexAndMask(batchIndex, out int qw, out long mask);
 
-                Debug.Assert(qw < unreferencedBatchIndices.Length, "Batch index out of bounds");
+                Assert.IsTrue(qw < unreferencedBatchIndices.Length, "Batch index out of bounds");
 
                 AtomicHelpers.AtomicAnd(
                     (long*)unreferencedBatchIndices.GetUnsafePtr(),
@@ -1771,7 +1767,7 @@ namespace Latios.Kinemation.Systems
                 int* numNewChunks = (int*)NumNewChunks.GetUnsafePtr();
                 int  iPlus1       = System.Threading.Interlocked.Add(ref numNewChunks[0], 1);
                 int  i            = iPlus1 - 1;  // C# Interlocked semantics are weird
-                Debug.Assert(i < NewChunks.Length, "Out of space in the NewChunks buffer");
+                Assert.IsTrue(i < NewChunks.Length, "Out of space in the NewChunks buffer");
                 NewChunks[i] = chunk;
             }
         }
@@ -1779,14 +1775,13 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         internal struct UpdateOldEntitiesGraphicsChunksJob : IJobChunk
         {
-            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>        EntitiesGraphicsChunkInfo;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>           ChunkHeader;
-            [ReadOnly] public DynamicComponentTypeHandle                 WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<LODRange>              LodRange;
-            [ReadOnly] public ComponentTypeHandle<RootLODRange>          RootLodRange;
-            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>      MaterialMeshInfo;
-            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray> RenderMeshArray;
-            public EntitiesGraphicsChunkUpdater                          EntitiesGraphicsChunkUpdater;
+            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>   EntitiesGraphicsChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>      ChunkHeader;
+            [ReadOnly] public DynamicComponentTypeHandle            WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<LODRange>         LodRange;
+            [ReadOnly] public ComponentTypeHandle<RootLODRange>     RootLodRange;
+            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo> MaterialMeshInfo;
+            public EntitiesGraphicsChunkUpdater                     EntitiesGraphicsChunkUpdater;
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -1807,11 +1802,10 @@ namespace Latios.Kinemation.Systems
                     // Skip chunks that for some reason have EntitiesGraphicsChunkInfo, but don't have the
                     // other required components. This should normally not happen, but can happen
                     // if the user manually deletes some components after the fact.
-                    bool hasRenderMeshArray  = chunk.Has(RenderMeshArray);
                     bool hasMaterialMeshInfo = chunk.Has(ref MaterialMeshInfo);
                     bool hasWorldTransform   = chunk.Has(ref WorldTransform);
 
-                    if (!math.all(new bool3(hasRenderMeshArray, hasMaterialMeshInfo, hasWorldTransform)))
+                    if (!math.all(new bool2(hasMaterialMeshInfo, hasWorldTransform)))
                         continue;
 
                     // When LOD ranges change, we must reset the movement grace to avoid using stale data
@@ -1844,7 +1838,7 @@ namespace Latios.Kinemation.Systems
                 var chunk     = NewChunks[index];
                 var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
 
-                Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
+                Assert.IsTrue(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
                 EntitiesGraphicsChunkUpdater.ProcessValidChunk(in chunkInfo, in chunk, true);
             }
         }
@@ -1877,7 +1871,7 @@ namespace Latios.Kinemation.Systems
                 Assert.IsFalse(useEnabledMask);
 
                 var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
-                Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
+                Assert.IsTrue(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
 
                 // This job runs for all chunks that have structural changes, so if different
                 // RenderFilterSettings get set on entities, they should be picked up by
@@ -1972,7 +1966,7 @@ namespace Latios.Kinemation.Systems
                 Assert.IsFalse(useEnabledMask);
 
                 var chunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
-                Debug.Assert(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
+                Assert.IsTrue(chunkInfo.Valid, "Attempted to process a chunk with uninitialized Hybrid chunk info");
 
                 // This job runs for all chunks that have structural changes, so if different
                 // RenderFilterSettings get set on entities, they should be picked up by

@@ -22,7 +22,7 @@ namespace Latios.Transforms.Authoring.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<TransformAuthoring>(true).IncludeDisabledEntities().IncludePrefabs().Build();
+            m_query = state.Fluent().With<TransformAuthoring>(true).IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         [BurstCompile]

@@ -1,6 +1,17 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.6]
+# Latios Framework for Unity ECS – [0.9.0-alpha.1]
+
+**This is a prerelease version of the Latios Framework version 0.9 which is
+still under development. Changelogs and Documentation, including the remainder
+of this README, have not been updated to reflect the new features and changes in
+0.9. Git hashes may not be preserved on transition to beta or  official
+release.**
+
+**You are still welcome to submit bug reports and PRs for this and future
+prerelease versions!**
+
+**This version of the alpha uses Unity 2022.3.10 with Entities 1.1.0-exp.1.**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -34,9 +45,6 @@ rendering features.
 
 This version targets Entities 1.0.16. If you are still using Entities 0.51.1,
 please use the framework version 0.5.8 instead.
-
-The minimum required Unity Editor version is 2022.3.13f1. For earlier editor
-versions, you might have a better experience with 0.8.3 instead.
 
 *[0.7.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*

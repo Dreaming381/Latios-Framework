@@ -32,14 +32,14 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_initSkeletonsQuery = state.Fluent().WithAll<OptimizedSkeletonState>(true).WithAll<OptimizedBoneTransform>(false)
-                                   .WithAll<OptimizedSkeletonHierarchyBlobReference>(true).IncludeDisabledEntities().Build();
-            m_initBlendShapesQuery   = state.Fluent().WithAll<BlendShapeState>(true).WithAll<BlendShapeWeight>(false).WithAll<BoundMesh>(true).Build();
-            m_initDynamicMeshesQuery = state.Fluent().WithAll<DynamicMeshState>(true).WithAll<DynamicMeshVertex>(false).WithAll<BoundMesh>(true).Build();
+            m_initSkeletonsQuery = state.Fluent().With<OptimizedSkeletonState>(true).With<OptimizedBoneTransform>(false)
+                                   .With<OptimizedSkeletonHierarchyBlobReference>(true).IncludeDisabledEntities().Build();
+            m_initBlendShapesQuery   = state.Fluent().With<BlendShapeState>(true).With<BlendShapeWeight>(false).With<BoundMesh>(true).Build();
+            m_initDynamicMeshesQuery = state.Fluent().With<DynamicMeshState>(true).With<DynamicMeshVertex>(false).With<BoundMesh>(true).Build();
 
-            m_skeletonsQuery     = state.Fluent().WithAll<OptimizedSkeletonState>().WithAll<OptimizedBoneTransform>(true).IncludeDisabledEntities().Build();
-            m_blendShapesQuery   = state.Fluent().WithAll<BlendShapeState>().WithAll<BlendShapeWeight>(true).IncludeDisabledEntities().Build();
-            m_dynamicMeshesQuery = state.Fluent().WithAll<DynamicMeshState>().WithAll<DynamicMeshVertex>(true).IncludeDisabledEntities().Build();
+            m_skeletonsQuery     = state.Fluent().With<OptimizedSkeletonState>().With<OptimizedBoneTransform>(true).IncludeDisabledEntities().Build();
+            m_blendShapesQuery   = state.Fluent().With<BlendShapeState>().With<BlendShapeWeight>(true).IncludeDisabledEntities().Build();
+            m_dynamicMeshesQuery = state.Fluent().With<DynamicMeshState>().With<DynamicMeshVertex>(true).IncludeDisabledEntities().Build();
 
             ignoreChangeFilters = (state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None;
         }

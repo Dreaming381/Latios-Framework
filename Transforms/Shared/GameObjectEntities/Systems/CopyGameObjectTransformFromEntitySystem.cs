@@ -22,8 +22,8 @@ namespace Latios.Transforms
 
             transformLookup = new WorldTransformReadOnlyAspect.Lookup(ref state);
 
-            state.Fluent().WithAll<GameObjectEntity.ExistComponent>(true).WithAll<CopyTransformFromEntityTag>(true).WithAll<CopyTransformFromEntityCleanupTag>(true)
-            .WithWorldTransformReadOnlyWeak().Build();
+            state.Fluent().With<GameObjectEntity.ExistComponent>(true).With<CopyTransformFromEntityTag>(true).With<CopyTransformFromEntityCleanupTag>(true)
+            .WithWorldTransformReadOnly().Build();
         }
 
         [BurstCompile]

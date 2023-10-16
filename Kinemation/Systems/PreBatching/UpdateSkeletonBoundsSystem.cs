@@ -26,14 +26,14 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_skeletonsQuery = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<SkeletonBoundsOffsetFromMeshes>(false).Build();
+            m_skeletonsQuery = state.Fluent().With<DependentSkinnedMesh>(true).With<SkeletonBoundsOffsetFromMeshes>(false).Build();
 
-            m_exposedBonesQuery = state.Fluent().WithAll<BoneBounds>(true).WithAll<BoneWorldBounds>(false).WithAll<ChunkBoneWorldBounds>(false, true)
-                                  .WithWorldTransformReadOnlyWeak().Build();
+            m_exposedBonesQuery = state.Fluent().With<BoneBounds>(true).With<BoneWorldBounds>(false).With<ChunkBoneWorldBounds>(false, true)
+                                  .WithWorldTransformReadOnly().Build();
 
-            m_optimizedSkeletonsQuery = state.Fluent().WithAll<OptimizedBoneBounds>(true).WithAll<OptimizedBoneTransform>(false).WithAll<OptimizedSkeletonWorldBounds>(false)
-                                        .WithAll<OptimizedSkeletonState>(        false).WithAll<ChunkOptimizedSkeletonWorldBounds>(false, true)
-                                        .WithAll<SkeletonBoundsOffsetFromMeshes>(true).WithWorldTransformReadOnlyWeak().Build();
+            m_optimizedSkeletonsQuery = state.Fluent().With<OptimizedBoneBounds>(true).With<OptimizedBoneTransform>(false).With<OptimizedSkeletonWorldBounds>(false)
+                                        .With<OptimizedSkeletonState>(        false).With<ChunkOptimizedSkeletonWorldBounds>(false, true)
+                                        .With<SkeletonBoundsOffsetFromMeshes>(true).WithWorldTransformReadOnly().Build();
 
             m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
         }

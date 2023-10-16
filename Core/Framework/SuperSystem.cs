@@ -97,12 +97,6 @@ namespace Latios
                 base.EnableSystemSorting = !latiosWorld.useExplicitSystemOrdering;
         }
 
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        protected override void OnUpdate()
-        {
-            DoSuperSystemUpdate(this, ref m_systemSortingTracker);
-        }
-
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
         public EntityQuery GetEntityQuery(EntityQueryBuilder desc) => GetEntityQuery(desc);
 
@@ -217,7 +211,92 @@ namespace Latios
             }
         }
 
+        /// <summary>
+        /// Updates an entire ComponentSystemGroup while supporting full Latios Framework features.
+        /// This is assigned to the static ComponentSystemGroup delegate when a LatiosWorld is created.
+        /// </summary>
+        /// <param name="group">The ComponentSystemGroup to update</param>
+        public static unsafe void DoLatiosFrameworkComponentSystemGroupUpdate(ComponentSystemGroup group)
+        {
+            if (group.isSystemListSortDirty)
+                group.SortSystems();
+
+            LatiosWorld lw = group.World as LatiosWorld;
+
+            if (lw == null)
+            {
+                DoUnityUpdateAllSystems(group);
+                return;
+            }
+
+            // Update all unmanaged and managed systems together, in the correct sort order.
+            var world      = lw.latiosWorldUnmanaged;
+            var enumerator = group.GetSystemEnumerator();
+            while (enumerator.MoveNext())
+            {
+                if (lw.paused)
+                    break;
+
+                try
+                {
+                    if (!enumerator.IsCurrentManaged)
+                    {
+                        // Update unmanaged (burstable) code.
+                        var handle = enumerator.current;
+                        UpdateUnmanagedSystem(world.m_impl, handle);
+                    }
+                    else
+                    {
+                        // Update managed code.
+                        UpdateManagedSystem(world.m_impl, enumerator.currentManaged);
+                    }
+                }
+                catch (Exception e)
+                {
+                    UnityEngine.Debug.LogException(e);
+#if UNITY_DOTSRUNTIME
+                    // When in a DOTS Runtime build, throw this upstream -- continuing after silently eating an exception
+                    // is not what you'll want, except maybe once we have LiveLink.  If you're looking at this code
+                    // because your LiveLink dots runtime build is exiting when you don't want it to, feel free
+                    // to remove this block, or guard it with something to indicate the player is not for live link.
+                    throw;
+#endif
+                }
+
+                if (group.World.QuitUpdate)
+                    break;
+            }
+        }
+
         #endregion API
+
+        internal static void DoUnityUpdateAllSystems(ComponentSystemGroup group)
+        {
+            var worldUnmanaged = group.World.Unmanaged;
+            var enumerator     = group.GetSystemEnumerator();
+            while (enumerator.MoveNext())
+            {
+                try
+                {
+                    if (!enumerator.IsCurrentManaged)
+                    {
+                        // Update unmanaged (burstable) code.
+                        enumerator.current.Update(worldUnmanaged);
+                    }
+                    else
+                    {
+                        enumerator.currentManaged.Update();
+                    }
+                }
+                catch (Exception e)
+                {
+                    UnityEngine.Debug.LogException(e);
+                }
+
+                if (group.World.QuitUpdate)
+                    break;
+            }
+        }
 
         internal static unsafe void UpdateUnmanagedSystem(LatiosWorldUnmanagedImpl* impl, SystemHandle system)
         {
@@ -298,72 +377,6 @@ namespace Latios
                 throw;
             }
             impl->EndDependencyTracking(system.SystemHandle, false);
-        }
-
-        SystemSortingTracker m_systemSortingTracker;
-
-        internal static unsafe void UpdateAllSystems(ComponentSystemGroup group, ref SystemSortingTracker tracker)
-        {
-            tracker.CheckAndSortSystems(group);
-
-            LatiosWorld lw = group.World as LatiosWorld;
-
-            // Update all unmanaged and managed systems together, in the correct sort order.
-            var world      = group.World.Unmanaged.GetLatiosWorldUnmanaged();
-            var enumerator = group.GetSystemEnumerator();
-            while (enumerator.MoveNext())
-            {
-                if (lw.paused)
-                    break;
-
-                try
-                {
-                    if (!enumerator.IsCurrentManaged)
-                    {
-                        // Update unmanaged (burstable) code.
-                        var handle = enumerator.current;
-                        UpdateUnmanagedSystem(world.m_impl, handle);
-                    }
-                    else
-                    {
-                        // Update managed code.
-                        UpdateManagedSystem(world.m_impl, enumerator.currentManaged);
-                    }
-                }
-                catch (Exception e)
-                {
-                    UnityEngine.Debug.LogException(e);
-#if UNITY_DOTSRUNTIME
-                    // When in a DOTS Runtime build, throw this upstream -- continuing after silently eating an exception
-                    // is not what you'll want, except maybe once we have LiveLink.  If you're looking at this code
-                    // because your LiveLink dots runtime build is exiting when you don't want it to, feel free
-                    // to remove this block, or guard it with something to indicate the player is not for live link.
-                    throw;
-#endif
-                }
-
-                if (group.World.QuitUpdate)
-                    break;
-            }
-        }
-
-        internal static void DoSuperSystemUpdate(ComponentSystemGroup group, ref SystemSortingTracker tracker)
-        {
-            if (!group.Created)
-                throw new InvalidOperationException(
-                    $"Group of type {group.GetType()} has not been created, either the derived class forgot to call base.OnCreate(), or it has been destroyed");
-
-            if (group.RateManager == null)
-            {
-                UpdateAllSystems(group, ref tracker);
-            }
-            else
-            {
-                while (group.RateManager.ShouldGroupUpdate(group))
-                {
-                    UpdateAllSystems(group, ref tracker);
-                }
-            }
         }
     }
 }

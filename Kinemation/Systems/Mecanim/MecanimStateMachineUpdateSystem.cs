@@ -21,11 +21,10 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent()
-                      .WithAll<MecanimController>(             false)
-                      .WithAll<MecanimLayerStateMachineStatus>(false)
-                      .WithAll<MecanimParameter>(              false)
-                      .WithAll<TimedMecanimClipInfo>(          false)
-                      .WithAll<MecanimControllerEnabledFlag>(  true).Build();
+                      .With<MecanimController>(             false)
+                      .With<MecanimLayerStateMachineStatus>(false)
+                      .With<MecanimParameter>(              false)
+                      .With<TimedMecanimClipInfo>(          false).Build();
         }
 
         [BurstCompile]
@@ -148,7 +147,7 @@ namespace Latios.Kinemation.Systems
                                 for (short i = 0; i < layerBlob.anyStateTransitions.Length; i++)
                                 {
                                     ref var transition = ref layerBlob.anyStateTransitions[i];
-                                    
+
                                     // If we have no conditions, we can only transition if we are done
                                     if (transition.conditions.Length == 0)
                                     {

@@ -36,8 +36,8 @@ namespace Latios.Systems
             };
             worldBlackboardEntity.AddComponentData(curr);
 
-            m_unitySubsceneLoadQuery        = Fluent.WithAll<Unity.Entities.RequestSceneLoaded>().Build();
-            m_dontDestroyOnSceneChangeQuery = Fluent.WithAll<Unity.Entities.SceneTag>().WithAll<DontDestroyOnSceneChangeTag>().IncludeDisabledEntities().IncludePrefabs().Build();
+            m_unitySubsceneLoadQuery        = Fluent.With<Unity.Entities.RequestSceneLoaded>().Build();
+            m_dontDestroyOnSceneChangeQuery = Fluent.With<Unity.Entities.SceneTag>().With<DontDestroyOnSceneChangeTag>().IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         protected override void OnUpdate()

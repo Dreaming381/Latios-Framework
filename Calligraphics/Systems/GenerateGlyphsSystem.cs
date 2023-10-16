@@ -28,11 +28,11 @@ namespace Latios.Calligraphics.Systems
         public void OnCreate(ref SystemState state)
         {
             m_singleFontQuery = state.Fluent()
-                                .WithAll<FontBlobReference>(    true)
-                                .WithAll<RenderGlyph>(          false)
-                                .WithAll<CalliByte>(            true)
-                                .WithAll<TextBaseConfiguration>(true)
-                                .WithAll<TextRenderControl>(    false)
+                                .With<FontBlobReference>(    true)
+                                .With<RenderGlyph>(          false)
+                                .With<CalliByte>(            true)
+                                .With<TextBaseConfiguration>(true)
+                                .With<TextRenderControl>(    false)
                                 .Build();
         }
 

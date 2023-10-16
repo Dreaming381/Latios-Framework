@@ -9,6 +9,8 @@ using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine.Rendering;
 
+using static Unity.Entities.SystemAPI;
+
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
@@ -17,25 +19,18 @@ namespace Latios.Kinemation.Systems
     public partial struct InitializeAndFilterPerCameraSystem : ISystem
     {
         EntityQuery m_metaQuery;
-        Job         m_job;
 
-        LatiosWorldUnmanaged latiosWorld;
+        LatiosWorldUnmanaged       latiosWorld;
+        DynamicComponentTypeHandle m_materialMeshInfoHandle;
 
         public void OnCreate(ref SystemState state)
         {
-            latiosWorld = state.GetLatiosWorldUnmanaged();
-            m_metaQuery = state.Fluent().WithAll<ChunkPerFrameCullingMask>(false).WithAll<ChunkHeader>(true).WithAll<EntitiesGraphicsChunkInfo>(true).Build();
-
-            m_job = new Job
-            {
-                chunkInfoHandle = state.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                headerHandle    = state.GetComponentTypeHandle<ChunkHeader>(true),
-                maskHandle      = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(),
-                filterHandle    = state.GetSharedComponentTypeHandle<RenderFilterSettings>()
-            };
+            latiosWorld              = state.GetLatiosWorldUnmanaged();
+            m_metaQuery              = state.Fluent().With<ChunkPerCameraCullingMask>(false).With<ChunkHeader>(true).With<EntitiesGraphicsChunkInfo>(true).Build();
+            m_materialMeshInfoHandle = state.GetDynamicComponentTypeHandle(ComponentType.ReadOnly<MaterialMeshInfo>());
 
 #if UNITY_EDITOR
-            DynamicSharedComponentTypeHandle dynamicHandle = default;
+            m_dynamicEditorHandle = default;
             foreach (var t in TypeManager.AllTypes)
             {
                 if (t.Category != TypeManager.TypeCategory.ISharedComponentData)
@@ -47,43 +42,42 @@ namespace Latios.Kinemation.Systems
                     continue;
                 if (type.Name.Contains("EditorRenderData"))
                 {
-                    dynamicHandle = state.GetDynamicSharedComponentTypeHandle(ComponentType.ReadOnly(t.TypeIndex));
+                    m_dynamicEditorHandle = state.GetDynamicSharedComponentTypeHandle(ComponentType.ReadOnly(t.TypeIndex));
                 }
             }
-
-            m_editorJob = new EditorJob
-            {
-                headerHandle              = m_job.headerHandle,
-                maskHandle                = m_job.maskHandle,
-                editorDataComponentHandle = dynamicHandle,
-                entityHandle              = state.GetEntityTypeHandle()
-            };
 #endif
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            m_job.chunkInfoHandle.Update(ref state);
-            m_job.filterHandle.Update(ref state);
-            m_job.headerHandle.Update(ref state);
-            m_job.maskHandle.Update(ref state);
-
-            m_job.cullingContext = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
-
-            state.Dependency = m_job.ScheduleParallelByRef(m_metaQuery, state.Dependency);
+            m_materialMeshInfoHandle.Update(ref state);
+            var cullingContext = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
+            state.Dependency   = new Job
+            {
+                chunkInfoHandle        = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                headerHandle           = GetComponentTypeHandle<ChunkHeader>(true),
+                maskHandle             = GetComponentTypeHandle<ChunkPerCameraCullingMask>(),
+                filterHandle           = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                lightMapsHandle        = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                materialMeshInfoHandle = m_materialMeshInfoHandle,
+                cullingContext         = cullingContext
+            }.ScheduleParallel(m_metaQuery, state.Dependency);
 
 #if UNITY_EDITOR
-            m_editorJob.editorDataComponentHandle.Update(ref state);
-            m_editorJob.headerHandle.Update(ref state);
-            m_editorJob.maskHandle.Update(ref state);
-            m_editorJob.entityHandle.Update(ref state);
+            m_dynamicEditorHandle.Update(ref state);
 
             var engineContext = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(true);
-            m_editorJob.sceneCullingMask     = m_job.cullingContext.sceneCullingMask;
-            m_editorJob.includeExcludeFilter = engineContext.includeExcludeListFilter;
 
-            state.Dependency = m_editorJob.ScheduleParallelByRef(m_metaQuery, state.Dependency);
+            state.Dependency = new EditorJob
+            {
+                headerHandle              = GetComponentTypeHandle<ChunkHeader>(true),
+                maskHandle                = GetComponentTypeHandle<ChunkPerCameraCullingMask>(),
+                editorDataComponentHandle = m_dynamicEditorHandle,
+                entityHandle              = GetEntityTypeHandle(),
+                sceneCullingMask          = cullingContext.sceneCullingMask,
+                includeExcludeFilter      = engineContext.includeExcludeListFilter
+            }.ScheduleParallel(m_metaQuery, state.Dependency);
 #endif
         }
 
@@ -99,6 +93,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> filterHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>                headerHandle;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>  chunkInfoHandle;
+            [ReadOnly] public SharedComponentTypeHandle<LightMaps>            lightMapsHandle;
+            [ReadOnly] public DynamicComponentTypeHandle                      materialMeshInfoHandle;
 
             public CullingContext cullingContext;
 
@@ -113,6 +109,8 @@ namespace Latios.Kinemation.Systems
                 var chunkInfos   = (EntitiesGraphicsChunkInfo*)metaChunk.GetComponentDataPtrRO(ref chunkInfoHandle);
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
+                    chunkPerCameraMasks[i] = default;
+
                     if (!chunkInfos[i].Valid)
                         continue;
 
@@ -128,19 +126,21 @@ namespace Latios.Kinemation.Systems
                     if ((cullingContext.cullingLayerMask & (1 << filter.Layer)) == 0)
                         continue;
 
+                    if ((cullingContext.cullingFlags & BatchCullingFlags.CullLightmappedShadowCasters) == BatchCullingFlags.CullLightmappedShadowCasters &&
+                        chunk.GetSharedComponentIndex(lightMapsHandle) >= 0)
+                        continue;
+
                     // sceneCullingMask gets handled in a separate Editor-only job
 
-                    int lowBitCount  = math.min(64, chunk.Count);
-                    int highBitCount = chunk.Count - 64;
-                    chunkPerCameraMasks[i].lower.SetBits(0, true, lowBitCount);
-                    if (highBitCount > 0)
-                        chunkPerCameraMasks[i].upper.SetBits(0, true, highBitCount);
+                    var enabled                        = chunk.GetEnableableBits(ref materialMeshInfoHandle);
+                    chunkPerCameraMasks[i].lower.Value = enabled.ULong0;
+                    chunkPerCameraMasks[i].upper.Value = enabled.ULong1;
                 }
             }
         }
 
 #if UNITY_EDITOR
-        EditorJob m_editorJob;
+        DynamicSharedComponentTypeHandle m_dynamicEditorHandle;
 
         [BurstCompile]
         struct EditorJob : IJobChunk
@@ -193,11 +193,8 @@ namespace Latios.Kinemation.Systems
                             upper |= math.select(0ul, 1ul, includeExcludeFilter.EntityPassesFilter(entities[j].Index)) << (j - 64);
                         }
 
-                        chunkPerCameraMasks[i] = new ChunkPerCameraCullingMask
-                        {
-                            lower = new BitField64(lower),
-                            upper = new BitField64(upper)
-                        };
+                        chunkPerCameraMasks[i].lower.Value &= lower;
+                        chunkPerCameraMasks[i].upper.Value &= upper;
                     }
                 }
             }

@@ -67,28 +67,9 @@ namespace Latios.Authoring
         public BakingOverride()
         {
 #if UNITY_EDITOR
-            IEnumerable<System.Type> bootstrapTypes;
-
-            bootstrapTypes = UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(ICustomBakingBootstrap));
-
-            System.Type selectedType = null;
-
-            foreach (var bootType in bootstrapTypes)
-            {
-                if (bootType.IsAbstract || bootType.ContainsGenericParameters)
-                    continue;
-
-                if (selectedType == null)
-                    selectedType = bootType;
-                else if (selectedType.IsAssignableFrom(bootType))
-                    selectedType = bootType;
-                else if (!bootType.IsAssignableFrom(selectedType))
-                    UnityEngine.Debug.LogError("Multiple custom ICustomConversionBootstrap exist in the project, ignoring " + bootType);
-            }
-            if (selectedType == null)
+            ICustomBakingBootstrap bootstrap = BootstrapTools.TryCreateCustomBootstrap<ICustomBakingBootstrap>();
+            if (bootstrap == null)
                 return;
-
-            ICustomBakingBootstrap bootstrap = System.Activator.CreateInstance(selectedType) as ICustomBakingBootstrap;
 
             var candidateBakers = OverrideBakers.GetDefaultBakerTypes();
 

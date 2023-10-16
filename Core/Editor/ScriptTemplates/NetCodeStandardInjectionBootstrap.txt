@@ -6,37 +6,48 @@ using Latios.Compatibility.UnityNetCode;
 using Unity.Entities;
 
 [UnityEngine.Scripting.Preserve]
-public class LatiosConversionBootstrap : ICustomConversionBootstrap
+public class LatiosBakingBootstrap : ICustomBakingBootstrap
 {
-    public bool InitializeConversion(World conversionWorldWithGroupsAndMappingSystems, CustomConversionSettings settings, ref List<Type> filteredSystems)
+    public void InitializeBakingForAllWorlds(ref CustomBakingBootstrapContext context)
     {
-        var defaultGroup = conversionWorldWithGroupsAndMappingSystems.GetExistingSystem<GameObjectConversionGroup>();
-        BootstrapTools.InjectSystems(filteredSystems, conversionWorldWithGroupsAndMappingSystems, defaultGroup);
-
-        Latios.Psyshock.Authoring.PsyshockConversionBootstrap.InstallLegacyColliderConversion(conversionWorldWithGroupsAndMappingSystems);
-        Latios.Kinemation.Authoring.KinemationConversionBootstrap.InstallKinemationConversion(conversionWorldWithGroupsAndMappingSystems);
-        return true;
+        Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
+        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemationBakersAndSystems(ref context);
+        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallMecanimBakersAndSystems(ref context);
     }
 }
 
 [UnityEngine.Scripting.Preserve]
-public class NetCodeLatiosBootstrap : LatiosClientServerBootstrapBase
+public class LatiosEditorBootstrap : ICustomEditorBootstrap
 {
-    public override bool Initialize(string defaultWorldName)
+    public World InitializeOrModify(World defaultEditorWorld)
     {
-        AutoConnectPort = 7979;  // Enable auto connect
-        return base.Initialize(defaultWorldName);
+        var world = new LatiosWorld(defaultEditorWorld.Name);
+
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default, true);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+
+        Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
+
+        return world;
     }
+}
 
-    public override World CreateCustomClientWorld(string worldName)
+[UnityEngine.Scripting.Preserve]
+public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
     {
-        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Client);
+        var world = new LatiosWorld(defaultWorldName, worldFlags);
 
-        BootstrapTools.InjectSystems(ClientSystems, world, world.simulationSystemGroup, ClientGroupRemap);
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
-        CoreBootstrap.InstallImprovedTransforms(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        Latios.Kinemation.KinemationBootstrap.InstallMecanimFeatures(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
@@ -44,18 +55,67 @@ public class NetCodeLatiosBootstrap : LatiosClientServerBootstrapBase
 
         return world;
     }
+}
 
-    public override World CreateCustomServerWorld(string worldName)
+[UnityEngine.Scripting.Preserve]
+public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
     {
-        var world = new LatiosWorld(worldName, WorldFlags.Game, LatiosWorld.WorldRole.Server);
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Client);
 
-        BootstrapTools.InjectSystems(ServerSystems, world, world.simulationSystemGroup, ServerGroupRemap);
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
-        CoreBootstrap.InstallImprovedTransforms(world);
+        Latios.Myri.MyriBootstrap.InstallMyri(world);
+        Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        Latios.Kinemation.KinemationBootstrap.InstallMecanimFeatures(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
+        Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+        world.presentationSystemGroup.SortSystems();
+
+        return world;
+    }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeServerLatiosBootrap : ICustomServerWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
+    {
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Server);
+
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
 
         return world;
     }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeThinClientLatiosBootrap : ICustomThinClientWorldBootstrap
+{
+    public World Initialize(string defaultWorldName, WorldFlags worldFlags, WorldSystemFilterFlags worldSystemFilterFlags)
+    {
+        var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.ThinClient);
+
+        var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
+        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+
+        world.initializationSystemGroup.SortSystems();
+        world.simulationSystemGroup.SortSystems();
+
+        return world;
+    }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeLatiosBootstrap : LatiosClientServerBootstrap
+{
 }

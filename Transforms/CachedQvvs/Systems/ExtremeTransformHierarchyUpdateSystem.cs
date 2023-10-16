@@ -28,7 +28,7 @@ namespace Latios.Transforms.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkDepthMask>().Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkDepthMask>().Build();
         }
 
         [BurstCompile]

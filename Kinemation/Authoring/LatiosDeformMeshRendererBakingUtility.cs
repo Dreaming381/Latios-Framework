@@ -33,7 +33,7 @@ namespace Latios.Kinemation.Authoring
         {
             public LODGroup LodGroup;
             public Entity   LodGroupEntity;
-            public int      LodGroupIndex;
+            public int      LodGroupMask;
         }
 
         public static bool CheckHasDeformMaterialProperty(Material material)
@@ -71,7 +71,7 @@ namespace Latios.Kinemation.Authoring
             lodState                = new LODState();
             lodState.LodGroup       = baker.GetComponentInParent<LODGroup>();
             lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup, TransformUsageFlags.Renderable);
-            lodState.LodGroupIndex  = FindInLODs(lodState.LodGroup, authoringSource);
+            lodState.LodGroupMask   = FindInLODs(lodState.LodGroup, authoringSource);
         }
 
         private static int FindInLODs(LODGroup lodGroup, Renderer authoring)
@@ -80,6 +80,8 @@ namespace Latios.Kinemation.Authoring
             {
                 var lodGroupLODs = lodGroup.GetLODs();
 
+                int lodGroupMask = 0;
+
                 // Find the renderer inside the LODGroup
                 for (int i = 0; i < lodGroupLODs.Length; ++i)
                 {
@@ -87,10 +89,11 @@ namespace Latios.Kinemation.Authoring
                     {
                         if (renderer == authoring)
                         {
-                            return i;
+                            lodGroupMask |= (1 << i);
                         }
                     }
                 }
+                return lodGroupMask > 0 ? lodGroupMask : -1;
             }
             return -1;
         }
@@ -100,25 +103,15 @@ namespace Latios.Kinemation.Authoring
 
         private static void AddRendererComponents(Entity entity, IBaker baker, in RenderMeshDescription renderMeshDescription, RenderMesh renderMesh)
         {
-            // Entities with Static are never rendered with motion vectors
-            bool inMotionPass = RenderMeshUtility.kUseHybridMotionPass &&
-                                renderMeshDescription.FilterSettings.IsInMotionPass &&
-                                !baker.IsStatic();
-
-            RenderMeshUtility.EntitiesGraphicsComponentFlags flags = RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking;
-            if (inMotionPass)
-                flags |= RenderMeshUtility.EntitiesGraphicsComponentFlags.InMotionPass;
-            flags     |= RenderMeshUtility.LightProbeFlags(renderMeshDescription.LightProbeUsage);
-            flags     |= RenderMeshUtility.DepthSortedFlags(renderMesh.material);
-
             // Add all components up front using as few calls as possible.
-            var componentTypes = RenderMeshUtility.s_EntitiesGraphicsComponentTypes.GetComponentTypes(flags);
-            baker.AddComponent(entity, componentTypes);
-            for (int i = 0; i < componentTypes.Length; i++)
+            var componentSet = RenderMeshUtility.ComputeComponentTypes(RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking,
+                                                                       renderMeshDescription, baker.IsStatic(), renderMesh.materials);
+            baker.AddComponent(entity, componentSet);
+            for (int i = 0; i < componentSet.Length; i++)
             {
                 // Todo: What to do for Unity Transforms?
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-                if (componentTypes.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
+                if (componentSet.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
                     baker.AddComponent<RequestPreviousTag>(entity);
 #endif
             }
@@ -134,7 +127,8 @@ namespace Latios.Kinemation.Authoring
                                      Mesh mesh,
                                      List<Material>     sharedMaterials,
                                      NativeList<Entity> additionalEntities,
-                                     int firstValidMaterialIndex)
+                                     int firstValidMaterialIndex,
+                                     int firstUniqueSubmeshIndex = int.MaxValue)
         {
             // Takes a dependency on the material
             foreach (var material in sharedMaterials)
@@ -158,7 +152,7 @@ namespace Latios.Kinemation.Authoring
 
             if (sharedMaterials.Count == 1)
             {
-                ConvertToSingleEntity(
+                ConvertSingleMaterial(
                     baker,
                     desc,
                     renderMesh,
@@ -166,20 +160,21 @@ namespace Latios.Kinemation.Authoring
             }
             else
             {
-                ConvertToMultipleEntities(
+                ConvertMultipleMaterials(
                     baker,
                     desc,
                     renderMesh,
                     authoring,
                     sharedMaterials,
                     additionalEntities,
-                    firstValidMaterialIndex);
+                    firstValidMaterialIndex,
+                    firstUniqueSubmeshIndex);
             }
         }
 
 #pragma warning restore CS0162
 
-        static void ConvertToSingleEntity(
+        static void ConvertSingleMaterial(
             IBaker baker,
             RenderMeshDescription renderMeshDescription,
             RenderMesh renderMesh,
@@ -191,9 +186,9 @@ namespace Latios.Kinemation.Authoring
 
             AddRendererComponents(entity, baker, renderMeshDescription, renderMesh);
 
-            if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupIndex != -1)
+            if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
             {
-                var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
+                var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupMask };
                 baker.AddComponent(entity, lodComponent);
             }
 
@@ -236,61 +231,31 @@ namespace Latios.Kinemation.Authoring
             }
         }
 
-        internal static void ConvertToMultipleEntities(
+        static void ConvertMultipleMaterials(
             IBaker baker,
             RenderMeshDescription renderMeshDescription,
             RenderMesh renderMesh,
             Renderer renderer,
             List<Material>        sharedMaterials,
             NativeList<Entity>    additionalEntities,
-            int firstValidMaterialIndex)
+            int firstValidMaterialIndex,
+            int firstUniqueSubmeshIndex = int.MaxValue)
         {
             CreateLODState(baker, renderer, out var lodState);
 
-            int                  materialCount                  = sharedMaterials.Count;
+            int materialCount                                   = sharedMaterials.Count;
+            firstUniqueSubmeshIndex                             = math.clamp(firstUniqueSubmeshIndex, firstValidMaterialIndex, materialCount);
             Entity               referenceEntity                = default;
+            var                  materialsList                  = new List<Material>(materialCount);
             DeformClassification requiredPropertiesForReference = DeformClassification.None;
             for (var m = firstValidMaterialIndex; m != materialCount; m++)
             {
-                Entity meshEntity;
-                if (m == firstValidMaterialIndex)
-                {
-                    meshEntity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
-
-                    referenceEntity = meshEntity;
-                    // Other transforms are handled in baking system once we know the animator wants the smr
-                }
-                else if (sharedMaterials[m] == null)
+                if (sharedMaterials[m] == null)
                 {
                     continue;
                 }
-                else
-                {
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-CopySkinSubMeshEntity{m}");
 
-                    baker.AddComponent<CopyParentRequestTag>(meshEntity);
-                    baker.AddComponent(                      meshEntity, new CopyDeformFromEntity { sourceDeformedEntity = referenceEntity });
-
-                    additionalEntities.Add(meshEntity);
-                }
-
-                var material = sharedMaterials[m];
-
-                renderMesh.subMesh  = m;
-                renderMesh.material = material;
-
-                AddRendererComponents(
-                    meshEntity,
-                    baker,
-                    renderMeshDescription,
-                    renderMesh);
-
-                if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupIndex != -1)
-                {
-                    var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = 1 << lodState.LodGroupIndex };
-                    baker.AddComponent(meshEntity, lodComponent);
-                }
-
+                var                  material       = sharedMaterials[m];
                 DeformClassification classification = DeformClassification.None;
                 if (material.HasProperty(s_legacyLbsProperty))
                     classification |= DeformClassification.LegacyLbs;
@@ -315,7 +280,39 @@ namespace Latios.Kinemation.Authoring
                 if (material.HasProperty(s_previousDeformProperty))
                     classification |= DeformClassification.PreviousDeform;
                 if (material.HasProperty(s_twoAgoDeformProperty))
-                    classification |= DeformClassification.TwoAgoDeform;
+                    classification             |= DeformClassification.TwoAgoDeform;
+                requiredPropertiesForReference |= classification;
+
+                Entity meshEntity;
+                if (m == firstValidMaterialIndex)
+                {
+                    meshEntity = baker.GetEntity(renderer, TransformUsageFlags.Renderable);
+
+                    referenceEntity = meshEntity;
+                    // Other transforms are handled in baking system once we know the animator wants the smr
+
+                    materialsList.Add(material);
+                }
+                else if (m < firstUniqueSubmeshIndex)
+                {
+                    materialsList.Add(material);
+                    continue;
+                }
+                else
+                {
+                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-CopySkinSubMeshEntity{m}");
+
+                    baker.AddComponent<CopyParentRequestTag>(meshEntity);
+                    baker.AddComponent(                      meshEntity, new CopyDeformFromEntity { sourceDeformedEntity = referenceEntity });
+
+                    additionalEntities.Add(meshEntity);
+                }
+
+                if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
+                {
+                    var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
+                    baker.AddComponent(meshEntity, lodComponent);
+                }
 
                 if (classification == DeformClassification.None)
                 {
@@ -326,8 +323,14 @@ namespace Latios.Kinemation.Authoring
                 {
                     AddMaterialPropertiesFromDeformClassification(baker, meshEntity, classification);
                 }
-                requiredPropertiesForReference |= classification;
             }
+
+            renderMesh.subMesh   = 0;
+            renderMesh.materials = materialsList;
+            AddRendererComponents(referenceEntity,
+                                  baker,
+                                  renderMeshDescription,
+                                  renderMesh);
 
             if (requiredPropertiesForReference != DeformClassification.None)
                 AddMaterialPropertiesFromDeformClassification(baker, referenceEntity, requiredPropertiesForReference);

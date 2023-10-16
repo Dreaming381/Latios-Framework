@@ -26,8 +26,8 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_query     = state.Fluent().WithAll<ChunkDeformPrefixSums>(false, true).WithAll<BoundMesh>(true).Without<ChunkCopyDeformTag>(true).Build();
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkDeformPrefixSums>().Without<ChunkCopyDeformTag>().Build();
+            m_query     = state.Fluent().With<ChunkDeformPrefixSums>(false, true).With<BoundMesh>(true).Without<ChunkCopyDeformTag>(true).Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkDeformPrefixSums>().Without<ChunkCopyDeformTag>().Build();
         }
 
         [BurstCompile]

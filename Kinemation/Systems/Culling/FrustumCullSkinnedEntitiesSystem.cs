@@ -30,10 +30,10 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_metaQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkSkinningCullingTag>(true).WithAll<ChunkPerFrameCullingMask>(true)
-                          .WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
-            m_postProcessMatrixQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<ChunkSkinningCullingTag>(true, true)
-                                       .WithAll<ChunkPerFrameCullingMask>( true).WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkPerCameraCullingSplitsMask>(false).Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkSkinningCullingTag>(true).With<ChunkPerFrameCullingMask>(true)
+                          .With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
+            m_postProcessMatrixQuery = state.Fluent().With<PostProcessMatrix>(true).With<ChunkSkinningCullingTag>(true, true)
+                                       .With<ChunkPerFrameCullingMask>( true).With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).Build();
 
             m_findJob = new FindChunksNeedingFrustumCullingJob
             {

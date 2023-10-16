@@ -66,35 +66,35 @@ namespace Latios.Kinemation.Systems
 
             m_parentLookup = new ParentReadWriteAspect.Lookup(ref state);
 
-            m_newMeshesQuery                    = state.Fluent().WithAll<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).Build();
-            m_deadMeshesQuery                   = state.Fluent().WithAll<ChunkPerFrameCullingMask>(false, true).Without<MaterialMeshInfo>().Build();
-            m_newPreviousPostProcessMatrixQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<PreviousTransform>(true)
+            m_newMeshesQuery                    = state.Fluent().With<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).Build();
+            m_deadMeshesQuery                   = state.Fluent().With<ChunkPerFrameCullingMask>(false, true).Without<MaterialMeshInfo>().Build();
+            m_newPreviousPostProcessMatrixQuery = state.Fluent().With<PostProcessMatrix>(true).With<PreviousTransform>(true)
                                                   .Without<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
-            m_deadPreviousPostProcessMatrixQuery = state.Fluent().WithAll<PreviousPostProcessMatrix>(true).Without<PostProcessMatrix>().Build();
+            m_deadPreviousPostProcessMatrixQuery = state.Fluent().With<PreviousPostProcessMatrix>(true).Without<PostProcessMatrix>().Build();
 
-            m_newDeformMeshesQuery  = state.Fluent().WithAll<MeshDeformDataBlobReference>(true).Without<BoundMesh>().Build();
-            m_bindableMeshesQuery   = state.Fluent().WithAll<NeedsBindingFlag>().WithAll<MeshDeformDataBlobReference>(true).WithAll<BoundMesh>().Build();
-            m_deadDeformMeshesQuery = state.Fluent().WithAll<BoundMesh>().Without<MeshDeformDataBlobReference>().Build();
+            m_newDeformMeshesQuery  = state.Fluent().With<MeshDeformDataBlobReference>(true).Without<BoundMesh>().Build();
+            m_bindableMeshesQuery   = state.Fluent().With<NeedsBindingFlag>().With<MeshDeformDataBlobReference>(true).With<BoundMesh>().Build();
+            m_deadDeformMeshesQuery = state.Fluent().With<BoundMesh>().Without<MeshDeformDataBlobReference>().Build();
 
-            m_newSkinnedMeshesQuery = state.Fluent().WithAll<BindSkeletonRoot>(true).WithAll<MeshDeformDataBlobReference>(true)
+            m_newSkinnedMeshesQuery = state.Fluent().With<BindSkeletonRoot>(true).With<MeshDeformDataBlobReference>(true)
                                       .Without<SkeletonDependent>()
-                                      .WithAny<MeshBindingPathsBlobReference>(true).WithAny<OverrideSkinningBoneIndex>(true).Build();
+                                      .WithAnyEnabled<MeshBindingPathsBlobReference>(true).WithAnyEnabled<OverrideSkinningBoneIndex>(true).Build();
 
-            m_deadSkinnedMeshesQuery = state.Fluent().WithAll<SkeletonDependent>().Without<MeshDeformDataBlobReference>().Build();
-            m_newCopyDeformQuery     = state.Fluent().WithAll<CopyDeformFromEntity>(true).Without<ChunkCopyDeformTag>(true).Build();
-            m_deadCopyDeformQuery    = state.Fluent().WithAll<ChunkCopyDeformTag>(false, true).Without<CopyDeformFromEntity>().Build();
+            m_deadSkinnedMeshesQuery = state.Fluent().With<SkeletonDependent>().Without<MeshDeformDataBlobReference>().Build();
+            m_newCopyDeformQuery     = state.Fluent().With<CopyDeformFromEntity>(true).Without<ChunkCopyDeformTag>(true).Build();
+            m_deadCopyDeformQuery    = state.Fluent().With<ChunkCopyDeformTag>(false, true).Without<CopyDeformFromEntity>().Build();
 
-            m_newSkeletonsQuery             = state.Fluent().WithAll<SkeletonRootTag>(true).Without<DependentSkinnedMesh>().Build();
-            m_deadSkeletonsQuery            = state.Fluent().WithAll<DependentSkinnedMesh>().Without<SkeletonRootTag>().Build();
-            m_aliveSkeletonsQuery           = state.Fluent().WithAll<SkeletonRootTag>(true).Build();
-            m_newExposedSkeletonsQuery      = state.Fluent().WithAll<SkeletonRootTag>(true).Without<ExposedSkeletonCullingIndex>().WithAll<BoneReference>(true).Build();
-            m_syncableExposedSkeletonsQuery = state.Fluent().WithAll<ExposedSkeletonCullingIndex>(true).WithAll<BoneReferenceIsDirtyFlag>(true).Build();
-            m_deadExposedSkeletonsQuery     = state.Fluent().Without<BoneReference>().WithAll<ExposedSkeletonCullingIndex>().Build();
-            m_deadExposedSkeletonsQuery2    = state.Fluent().Without<SkeletonRootTag>().WithAll<ExposedSkeletonCullingIndex>().Build();
-            m_newOptimizedSkeletonsQuery    = state.Fluent().WithAll<SkeletonRootTag>(true).WithAll<OptimizedBoneTransform>(true).Without<OptimizedSkeletonTag>().Build();
-            m_deadOptimizedSkeletonsQuery   = state.Fluent().WithAll<OptimizedSkeletonTag>(true).Without<OptimizedBoneTransform>().Build();
-            m_deadOptimizedSkeletonsQuery2  = state.Fluent().WithAll<OptimizedSkeletonTag>(true).Without<SkeletonRootTag>().Build();
-            m_cullableExposedBonesQuery     = state.Fluent().WithAll<BoneCullingIndex>().Build();
+            m_newSkeletonsQuery             = state.Fluent().With<SkeletonRootTag>(true).Without<DependentSkinnedMesh>().Build();
+            m_deadSkeletonsQuery            = state.Fluent().With<DependentSkinnedMesh>().Without<SkeletonRootTag>().Build();
+            m_aliveSkeletonsQuery           = state.Fluent().With<SkeletonRootTag>(true).Build();
+            m_newExposedSkeletonsQuery      = state.Fluent().With<SkeletonRootTag>(true).Without<ExposedSkeletonCullingIndex>().With<BoneReference>(true).Build();
+            m_syncableExposedSkeletonsQuery = state.Fluent().With<ExposedSkeletonCullingIndex>(true).With<BoneReferenceIsDirtyFlag>(true).Build();
+            m_deadExposedSkeletonsQuery     = state.Fluent().Without<BoneReference>().With<ExposedSkeletonCullingIndex>().Build();
+            m_deadExposedSkeletonsQuery2    = state.Fluent().Without<SkeletonRootTag>().With<ExposedSkeletonCullingIndex>().Build();
+            m_newOptimizedSkeletonsQuery    = state.Fluent().With<SkeletonRootTag>(true).With<OptimizedBoneTransform>(true).Without<OptimizedSkeletonTag>().Build();
+            m_deadOptimizedSkeletonsQuery   = state.Fluent().With<OptimizedSkeletonTag>(true).Without<OptimizedBoneTransform>().Build();
+            m_deadOptimizedSkeletonsQuery2  = state.Fluent().With<OptimizedSkeletonTag>(true).Without<SkeletonRootTag>().Build();
+            m_cullableExposedBonesQuery     = state.Fluent().With<BoneCullingIndex>().Build();
 
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new MeshGpuManager
             {

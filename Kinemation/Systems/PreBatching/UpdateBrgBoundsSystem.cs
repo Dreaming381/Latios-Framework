@@ -32,13 +32,14 @@ namespace Latios.Kinemation
             latiosWorld = state.GetLatiosWorldUnmanaged();
             latiosWorld.worldBlackboardEntity.AddComponent<BrgAabb>();
 
-            m_metaSkeletonsQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAny<ChunkOptimizedSkeletonWorldBounds>(true).WithAny<ChunkBoneWorldBounds>(true).Build();
+            m_metaSkeletonsQuery =
+                state.Fluent().With<ChunkHeader>(true).WithAnyEnabled<ChunkOptimizedSkeletonWorldBounds>(true).WithAnyEnabled<ChunkBoneWorldBounds>(true).Build();
 
-            m_metaMeshesQuery = state.Fluent().WithAll<ChunkHeader>(true).WithAll<ChunkWorldRenderBounds>(true).Without<ChunkSkinningCullingTag>().Build();
+            m_metaMeshesQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkWorldRenderBounds>(true).Without<ChunkSkinningCullingTag>().Build();
 
-            m_postProcessMatricesQuery = state.Fluent().WithAll<PostProcessMatrix>(true).WithAll<ChunkSkinningCullingTag>(true, true).Build();
+            m_postProcessMatricesQuery = state.Fluent().With<PostProcessMatrix>(true).With<ChunkSkinningCullingTag>(true, true).Build();
 
-            m_exposedSkeletonBoundsOffsetsQuery = state.Fluent().WithAll<ExposedSkeletonCullingIndex>(true).WithAll<SkeletonBoundsOffsetFromMeshes>(true).Build();
+            m_exposedSkeletonBoundsOffsetsQuery = state.Fluent().With<ExposedSkeletonCullingIndex>(true).With<SkeletonBoundsOffsetFromMeshes>(true).Build();
         }
 
         [BurstCompile]

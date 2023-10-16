@@ -16,12 +16,6 @@ namespace Latios.Systems
     [UpdateAfter(typeof(Unity.Scenes.SceneSystemGroup))]
     public partial class LatiosWorldSyncGroup : ComponentSystemGroup
     {
-        SystemSortingTracker m_tracker;
-
-        protected override void OnUpdate()
-        {
-            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
-        }
     }
 
     /// <summary>
@@ -35,12 +29,6 @@ namespace Latios.Systems
     [UpdateBefore(typeof(SyncPointPlaybackSystemDispatch))]
     public partial class PreSyncPointGroup : ComponentSystemGroup
     {
-        SystemSortingTracker m_tracker;
-
-        protected override void OnUpdate()
-        {
-            SuperSystem.DoSuperSystemUpdate(this, ref m_tracker);
-        }
     }
 
     // This used to be a subclass of InitializationSystemGroup, but due to a bug with subclassing and system sorting,
@@ -66,8 +54,6 @@ namespace Latios.Systems
             syncGroup.AddSystemToUpdateList(managedStructReactive);
         }
 
-        SystemSortingTracker m_tracker;
-
         public bool ShouldGroupUpdate(ComponentSystemGroup group)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS && !UNITY_DOTSRUNTIME
@@ -75,35 +61,7 @@ namespace Latios.Systems
 #endif
 
             m_latiosWorld.FrameStart();
-            SuperSystem.UpdateAllSystems(group, ref m_tracker);
-            return false;
-        }
-
-        public float Timestep { get; set; }
-    }
-
-    internal class LatiosSimulationSystemGroupManager : IRateManager
-    {
-        SystemSortingTracker m_tracker;
-        internal bool        skipInDeferred = false;
-
-        public bool ShouldGroupUpdate(ComponentSystemGroup group)
-        {
-            if (!skipInDeferred)
-                SuperSystem.UpdateAllSystems(group, ref m_tracker);
-            return false;
-        }
-
-        public float Timestep { get; set; }
-    }
-
-    internal class LatiosPresentationSystemGroupManager : IRateManager
-    {
-        SystemSortingTracker m_tracker;
-
-        public bool ShouldGroupUpdate(ComponentSystemGroup group)
-        {
-            SuperSystem.UpdateAllSystems(group, ref m_tracker);
+            SuperSystem.DoLatiosFrameworkComponentSystemGroupUpdate(group);
             return false;
         }
 

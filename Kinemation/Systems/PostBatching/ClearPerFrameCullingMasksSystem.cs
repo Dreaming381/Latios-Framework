@@ -17,7 +17,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_metaQuery = state.Fluent().WithAll<ChunkPerFrameCullingMask>(false).WithAll<ChunkPerCameraCullingMask>(false).WithAll<ChunkHeader>(true).Build();
+            m_metaQuery = state.Fluent().With<ChunkPerFrameCullingMask>(false).With<ChunkPerCameraCullingMask>(false).With<ChunkHeader>(true).Build();
             m_handle    = state.GetComponentTypeHandle<ChunkPerFrameCullingMask>(false);
         }
 

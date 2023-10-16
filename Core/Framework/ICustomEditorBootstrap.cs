@@ -49,60 +49,9 @@ namespace Latios
             if (World.DefaultGameObjectInjectionWorld != defaultEditorWorld || !defaultEditorWorld.Flags.HasFlag(WorldFlags.Editor))
                 return;
 
-            IEnumerable<System.Type> bootstrapTypes;
-#if UNITY_EDITOR
-            bootstrapTypes = UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(ICustomEditorBootstrap));
-#else
-
-            var types = new List<System.Type>();
-            var type  = typeof(ICustomEditorBootstrap);
-            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!BootstrapTools.IsAssemblyReferencingLatios(assembly))
-                    continue;
-
-                try
-                {
-                    var assemblyTypes = assembly.GetTypes();
-                    foreach (var t in assemblyTypes)
-                    {
-                        if (type.IsAssignableFrom(t))
-                            types.Add(t);
-                    }
-                }
-                catch (System.Reflection.ReflectionTypeLoadException e)
-                {
-                    foreach (var t in e.Types)
-                    {
-                        if (t != null && type.IsAssignableFrom(t))
-                            types.Add(t);
-                    }
-
-                    UnityEngine.Debug.LogWarning($"EditorWorldBootstrap failed loading assembly: {(assembly.IsDynamic ? assembly.ToString() : assembly.Location)}");
-                }
-            }
-
-            bootstrapTypes = types;
-#endif
-
-            System.Type selectedType = null;
-
-            foreach (var bootType in bootstrapTypes)
-            {
-                if (bootType.IsAbstract || bootType.ContainsGenericParameters)
-                    continue;
-
-                if (selectedType == null)
-                    selectedType = bootType;
-                else if (selectedType.IsAssignableFrom(bootType))
-                    selectedType = bootType;
-                else if (!bootType.IsAssignableFrom(selectedType))
-                    UnityEngine.Debug.LogError("Multiple custom ICustomEditorBootstrap exist in the project, ignoring " + bootType);
-            }
-            if (selectedType == null)
+            ICustomEditorBootstrap bootstrap = BootstrapTools.TryCreateCustomBootstrap<ICustomEditorBootstrap>();
+            if (bootstrap == null)
                 return;
-
-            ICustomEditorBootstrap bootstrap = System.Activator.CreateInstance(selectedType) as ICustomEditorBootstrap;
 
             var newWorld = bootstrap.InitializeOrModify(defaultEditorWorld);
             if (newWorld != defaultEditorWorld && newWorld != null)

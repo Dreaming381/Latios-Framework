@@ -25,7 +25,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<TransformAuthoring>().Build();
+            m_query = state.Fluent().With<TransformAuthoring>().Build();
         }
 
         [BurstCompile]

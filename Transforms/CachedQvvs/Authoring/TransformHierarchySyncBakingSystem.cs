@@ -26,8 +26,8 @@ namespace Latios.Transforms.Authoring.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_childQuery  = state.Fluent().WithAll<Parent>().WithAll<WorldTransform>().IncludeDisabledEntities().IncludePrefabs().Build();
-            m_parentQuery = state.Fluent().WithAll<WorldTransform>().Without<Parent>().IncludeDisabledEntities().IncludePrefabs().Build();
+            m_childQuery  = state.Fluent().With<Parent>().With<WorldTransform>().IncludeDisabledEntities().IncludePrefabs().Build();
+            m_parentQuery = state.Fluent().With<WorldTransform>().Without<Parent>().IncludeDisabledEntities().IncludePrefabs().Build();
 
             state.RequireForUpdate(m_childQuery);
         }

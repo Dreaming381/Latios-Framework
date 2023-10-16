@@ -27,8 +27,8 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_query = state.Fluent().WithAll<DependentSkinnedMesh>(true).WithAll<ChunkOptimizedSkeletonWorldBounds>(true, true).WithAll<OptimizedSkeletonWorldBounds>(true)
-                      .WithAll<ChunkPerCameraSkeletonCullingMask>(false, true).WithAll<ChunkPerCameraSkeletonCullingSplitsMask>(false, true).Build();
+            m_query = state.Fluent().With<DependentSkinnedMesh>(true).With<ChunkOptimizedSkeletonWorldBounds>(true, true).With<OptimizedSkeletonWorldBounds>(true)
+                      .With<ChunkPerCameraSkeletonCullingMask>(false, true).With<ChunkPerCameraSkeletonCullingSplitsMask>(false, true).Build();
 
             m_singleJob = new SingleSplitCullingJob
             {

@@ -97,7 +97,7 @@ namespace Latios.Psyshock
         /// </summary>
         public static FluentQuery PatchQueryForBuildingCollisionLayer(this FluentQuery fluent)
         {
-            return fluent.WithAllWeak<Collider>().WithWorldTransformReadOnlyWeak();
+            return fluent.With<Collider>(true).WithWorldTransformReadOnly();
         }
 
         #region Starters

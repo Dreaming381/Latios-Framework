@@ -24,7 +24,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query           = state.Fluent().WithAll<LocalTransform>(false).WithAll<CopyLocalToParentFromBone>(true).WithAll<BoneOwningSkeletonReference>(true).Build();
+            m_query           = state.Fluent().With<LocalTransform>(false).With<CopyLocalToParentFromBone>(true).With<BoneOwningSkeletonReference>(true).Build();
             m_transformHandle = new TransformAspect.TypeHandle(ref state);
         }
 
@@ -128,7 +128,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<LocalTransform>(false).WithAll<CopyLocalToParentFromBone>(true).WithAll<BoneOwningSkeletonReference>(true).Build();
+            m_query = state.Fluent().With<LocalTransform>(false).With<CopyLocalToParentFromBone>(true).With<BoneOwningSkeletonReference>(true).Build();
         }
 
         [BurstCompile]

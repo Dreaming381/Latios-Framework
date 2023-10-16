@@ -22,16 +22,18 @@ namespace Latios.Kinemation.Authoring
         /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
         /// <param name="mesh">The mesh to use</param>
         /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
-        public static void BakeMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials)
+        public static void BakeMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials, int firstUniqueSubmeshIndex = int.MaxValue)
         {
-            MeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, true, out var additionalEntities);
+            MeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, out var additionalEntities, firstUniqueSubmeshIndex);
 
-            if (additionalEntities.Count == 0)
-                baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
+            baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
 
-            foreach (var entity in additionalEntities)
+            if (additionalEntities != null)
             {
-                baker.AddComponent(entity, new MeshRendererBakingData { MeshRenderer = renderer });
+                foreach (var entity in additionalEntities)
+                {
+                    baker.AddComponent(entity, new MeshRendererBakingData { MeshRenderer = renderer });
+                }
             }
         }
 
@@ -42,7 +44,7 @@ namespace Latios.Kinemation.Authoring
         /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
         /// <param name="mesh">The mesh to use</param>
         /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
-        public static void BakeDeformMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials)
+        public static void BakeDeformMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials, int firstUniqueSubmeshIndex = int.MaxValue)
         {
             var sharedMesh = mesh;
             if (sharedMesh == null)
@@ -85,7 +87,7 @@ namespace Latios.Kinemation.Authoring
             }
 
             var additionalEntities = new NativeList<Entity>(Allocator.Temp);
-            LatiosDeformMeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, additionalEntities, knownValidMaterialIndex);
+            LatiosDeformMeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, additionalEntities, knownValidMaterialIndex, firstUniqueSubmeshIndex);
 
             var primaryEntity = baker.GetEntity(TransformUsageFlags.Renderable);
             if (renderer is SkinnedMeshRenderer smr)

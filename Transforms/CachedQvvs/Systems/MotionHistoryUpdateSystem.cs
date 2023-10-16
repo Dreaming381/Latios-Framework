@@ -20,7 +20,7 @@ namespace Latios.Transforms.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<WorldTransform>(true).WithAll<PreviousTransform>(false).IncludeDisabledEntities().Build();
+            m_query = state.Fluent().With<WorldTransform>(true).With<PreviousTransform>(false).IncludeDisabledEntities().Build();
         }
 
         [BurstCompile]

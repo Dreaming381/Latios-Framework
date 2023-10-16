@@ -29,8 +29,8 @@ namespace Latios.Kinemation
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_boneQuery     = state.Fluent().WithAll<BoneWorldBounds>(true).WithAll<BoneCullingIndex>(true).Build();
-            m_skeletonQuery = state.Fluent().WithAll<ExposedSkeletonCullingIndex>(true).WithAll<SkeletonBoundsOffsetFromMeshes>(true).Build();
+            m_boneQuery     = state.Fluent().With<BoneWorldBounds>(true).With<BoneCullingIndex>(true).Build();
+            m_skeletonQuery = state.Fluent().With<ExposedSkeletonCullingIndex>(true).With<SkeletonBoundsOffsetFromMeshes>(true).Build();
 
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new ExposedSkeletonBoundsArrays
             {

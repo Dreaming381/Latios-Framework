@@ -21,7 +21,7 @@ namespace Latios.Transforms.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<WorldTransform>(true).WithAll<Child>(true).Without<PreviousParent>().Build();
+            m_query = state.Fluent().With<WorldTransform>(true).With<Child>(true).Without<PreviousParent>().Build();
         }
 
         [BurstCompile]

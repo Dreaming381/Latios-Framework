@@ -82,6 +82,7 @@ namespace Latios.Kinemation
         public float4x4                   localToWorldMatrix;
         public BatchCullingViewType       viewType;
         public BatchCullingProjectionType projectionType;
+        public BatchCullingFlags          cullingFlags;
         public BatchPackedCullingViewID   viewID;
         public ulong                      sceneCullingMask;
         public uint                       cullingLayerMask;

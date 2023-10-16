@@ -31,7 +31,7 @@ namespace Latios.Transforms.Systems
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().WithAll<Parent>(true).WithAll<Depth>(false).WithAll<ChunkDepthMask>(false, true).Build();
+            m_query = state.Fluent().With<Parent>(true).With<Depth>(false).With<ChunkDepthMask>(false, true).Build();
 
             m_previousParentHandle = state.GetComponentTypeHandle<PreviousParent>(true);
             m_childHandle          = state.GetBufferTypeHandle<Child>(true);

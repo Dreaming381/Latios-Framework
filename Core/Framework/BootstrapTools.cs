@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Latios.Systems;
 using Unity.Collections;
 using Unity.Entities;
@@ -401,14 +402,15 @@ namespace Latios
             {
                 InjectSystem(TypeManager.GetSystemTypeIndex<DeferredSimulationEndFrameControllerSystem>(), world);
 
-                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<InitializationSystemGroup>(), ref playerLoop, typeof(Initialization));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<InitializationSystemGroup>(), ref playerLoop,
+                                                                    typeof(Initialization));
                 // We add it here for visibility in tools. But really we don't update until EndOfFrame
-                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<SimulationSystemGroup>(),     ref playerLoop, typeof(PostLateUpdate));
-                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<PresentationSystemGroup>(),   ref playerLoop, typeof(PreLateUpdate));
+                WorldExposedExtensions.AddDummyRootLevelSystemToPlayerLoop(world.GetExistingSystemManaged<SimulationSystemGroup>(), ref playerLoop);
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<PresentationSystemGroup>(), ref playerLoop,
+                                                                    typeof(PreLateUpdate));
             }
             PlayerLoop.SetPlayerLoop(playerLoop);
         }
-
         #endregion
 
         #region TypeManager
@@ -427,6 +429,64 @@ namespace Latios
                 if (referenced.Name.Contains(nameSubstring))
                     return true;
             return false;
+        }
+
+        internal static T TryCreateCustomBootstrap<T>()
+        {
+            IEnumerable<System.Type> bootstrapTypes;
+#if UNITY_EDITOR
+            bootstrapTypes = UnityEditor.TypeCache.GetTypesDerivedFrom(typeof(T));
+#else
+
+            var types = new List<System.Type>();
+            var type  = typeof(ICustomEditorBootstrap);
+            foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!BootstrapTools.IsAssemblyReferencingLatios(assembly))
+                    continue;
+
+                try
+                {
+                    var assemblyTypes = assembly.GetTypes();
+                    foreach (var t in assemblyTypes)
+                    {
+                        if (type.IsAssignableFrom(t))
+                            types.Add(t);
+                    }
+                }
+                catch (System.Reflection.ReflectionTypeLoadException e)
+                {
+                    foreach (var t in e.Types)
+                    {
+                        if (t != null && type.IsAssignableFrom(t))
+                            types.Add(t);
+                    }
+
+                    UnityEngine.Debug.LogWarning($"{nameof(T)} failed loading assembly: {(assembly.IsDynamic ? assembly.ToString() : assembly.Location)}");
+                }
+            }
+
+            bootstrapTypes = types;
+#endif
+
+            System.Type selectedType = null;
+
+            foreach (var bootType in bootstrapTypes)
+            {
+                if (bootType.IsAbstract || bootType.ContainsGenericParameters)
+                    continue;
+
+                if (selectedType == null)
+                    selectedType = bootType;
+                else if (selectedType.IsAssignableFrom(bootType))
+                    selectedType = bootType;
+                else if (!bootType.IsAssignableFrom(selectedType))
+                    UnityEngine.Debug.LogError($"Multiple custom {nameof(T)} exist in the project, ignoring {bootType}");
+            }
+            if (selectedType == null)
+                return default;
+
+            return (T)System.Activator.CreateInstance(selectedType);
         }
         #endregion
     }

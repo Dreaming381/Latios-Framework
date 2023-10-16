@@ -10,8 +10,8 @@ namespace Unity.Entities.Exposed
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckWriteAndThrow(chunkComponentTypeHandle.m_Safety);
 #endif
-            chunk.m_EntityComponentStore->AssertEntityHasComponent(chunk.m_Chunk->metaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
-            var ptr = chunk.m_EntityComponentStore->GetComponentDataWithTypeRW(chunk.m_Chunk->metaChunkEntity,
+            chunk.m_EntityComponentStore->AssertEntityHasComponent(chunk.m_Chunk.MetaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
+            var ptr = chunk.m_EntityComponentStore->GetComponentDataWithTypeRW(chunk.m_Chunk.MetaChunkEntity,
                                                                                chunkComponentTypeHandle.m_TypeIndex,
                                                                                chunkComponentTypeHandle.GlobalSystemVersion);
             return ref UnsafeUtility.AsRef<T>(ptr);
@@ -23,8 +23,8 @@ namespace Unity.Entities.Exposed
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             AtomicSafetyHandle.CheckReadAndThrow(chunkComponentTypeHandle.m_Safety);
 #endif
-            chunk.m_EntityComponentStore->AssertEntityHasComponent(chunk.m_Chunk->metaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
-            var ptr = chunk.m_EntityComponentStore->GetComponentDataWithTypeRO(chunk.m_Chunk->metaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
+            chunk.m_EntityComponentStore->AssertEntityHasComponent(chunk.m_Chunk.MetaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
+            var ptr = chunk.m_EntityComponentStore->GetComponentDataWithTypeRO(chunk.m_Chunk.MetaChunkEntity, chunkComponentTypeHandle.m_TypeIndex);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             return new RefRO<T>(ptr, chunkComponentTypeHandle.m_Safety);
 #else
@@ -34,12 +34,12 @@ namespace Unity.Entities.Exposed
 
         public static unsafe Entity GetMetaEntity(in this ArchetypeChunk chunk)
         {
-            return chunk.m_Chunk->metaChunkEntity;
+            return chunk.m_Chunk.MetaChunkEntity;
         }
 
-        public static unsafe ulong GetChunkPtrAsUlong(in this ArchetypeChunk chunk)
+        public static unsafe uint GetChunkIndexAsUint(in this ArchetypeChunk chunk)
         {
-            return (ulong)chunk.m_Chunk;
+            return Mathematics.math.asuint(chunk.m_Chunk);
         }
     }
 }

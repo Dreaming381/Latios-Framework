@@ -20,7 +20,7 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
-            m_query     = state.Fluent().WithAll<ChunkHeader>(true).WithAny<ChunkDeformPrefixSums>(true).WithAny<ChunkCopyDeformTag>(true).Build();
+            m_query     = state.Fluent().With<ChunkHeader>(true).WithAnyEnabled<ChunkDeformPrefixSums>(true).WithAnyEnabled<ChunkCopyDeformTag>(true).Build();
 
             latiosWorld.worldBlackboardEntity.AddComponent<MaxRequiredDeformData>();
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new DeformClassificationMap());
