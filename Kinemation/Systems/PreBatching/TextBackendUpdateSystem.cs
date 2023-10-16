@@ -11,6 +11,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Kinemation.TextBackend.Systems
 {
+    [DisableAutoCreation]
     [RequireMatchingQueriesForUpdate]
     [BurstCompile]
     public partial struct TextBackendUpdateSystem : ISystem

@@ -105,6 +105,22 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Creates an empty CollisionLayer. This is useful when you just need an empty layer in order to reuse some other codepath.
+        /// However, if you need a normal layer, you should use Physics.BuildCollisionLayer() instead.
+        /// </summary>
+        /// <param name="settings">The settings to use for the layer. You typically want to match this with other layers when using FindPairs.</param>
+        /// <param name="allocator">The Allocator to use for this layer. Despite being empty, this layer is still allocated and may require disposal.</param>
+        /// <returns>A CollisionLayer with zero bodies, but with the bucket distribution matching the specified settings</returns>
+        public static CollisionLayer CreateEmptyCollisionLayer(CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
+        {
+            var layer = new CollisionLayer(0, settings, allocator);
+            for (int i = 0; i < layer.bucketStartsAndCounts.Length; i++)
+                layer.bucketStartsAndCounts[i] = 0;
+            layer.worldSubdivisionsPerAxis.x   = math.max(1, layer.worldSubdivisionsPerAxis.x);  // Ensure IsCreated is true.
+            return layer;
+        }
+
+        /// <summary>
         /// Disposes the layer immediately
         /// </summary>
         public void Dispose()
