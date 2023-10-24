@@ -31,7 +31,8 @@ namespace Latios.Kinemation
         protected override void OnCreate()
         {
             m_query = Fluent.With<BlendShapeWeight>(true).With<BlendShapeState>(true).With<BoundMesh>(true)
-                      .With<ChunkPerCameraCullingMask>(true, true).With<ChunkPerFrameCullingMask>(true, true).Build();
+                      .With<ChunkPerCameraCullingMask>(true, true).With<ChunkPerFrameCullingMask>(true, true)
+                      .Without<DisableComputeShaderProcessingTag>().Build();
 
             m_dispatchShader = Resources.Load<ComputeShader>("ShapeBlending");
 

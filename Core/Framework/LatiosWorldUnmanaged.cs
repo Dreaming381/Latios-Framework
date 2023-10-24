@@ -455,6 +455,10 @@ namespace Latios
         public void UpdateCollectionComponentDependency<T>(Entity entity, JobHandle handle, bool isReadOnlyHandle) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
             m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
 
             if (!m_impl->m_collectionComponentStorage.TryGetCollectionComponent<T>(entity, out var storedRef))
@@ -501,6 +505,21 @@ namespace Latios
                 storedRef.writeHandle = default;
                 storedRef.readHandles.Clear();
             }
+        }
+
+        /// <summary>
+        /// Gets an instance of the Collection Aspect from the entity.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionAspect</typeparam>
+        /// <param name="entity">The entity that has the underlying components the ICollectionAspect expects</param>
+        /// <returns>The Collection Aspect instance</returns>
+        public T GetCollectionAspect<T>(Entity entity) where T : unmanaged, ICollectionAspect<T>
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
+            return default(T).CreateCollectionAspect(this, m_impl->m_worldUnmanaged.EntityManager, entity);
         }
         #endregion
     }

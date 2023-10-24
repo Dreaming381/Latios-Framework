@@ -1,4 +1,4 @@
-using System;
+using Latios.Kinemation.InternalSourceGen;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -6,7 +6,6 @@ using Unity.Entities;
 using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Rendering;
 using UnityEngine.Rendering;
 
 using static Unity.Entities.SystemAPI;
@@ -19,7 +18,6 @@ namespace Latios.Kinemation.Systems
     public partial struct FrustumCullSkinnedEntitiesSystem : ISystem
     {
         EntityQuery          m_metaQuery;
-        EntityQuery          m_postProcessMatrixQuery;
         LatiosWorldUnmanaged latiosWorld;
 
         FindChunksNeedingFrustumCullingJob m_findJob;
@@ -32,8 +30,6 @@ namespace Latios.Kinemation.Systems
 
             m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkSkinningCullingTag>(true).With<ChunkPerFrameCullingMask>(true)
                           .With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
-            m_postProcessMatrixQuery = state.Fluent().With<PostProcessMatrix>(true).With<ChunkSkinningCullingTag>(true, true)
-                                       .With<ChunkPerFrameCullingMask>( true).With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).Build();
 
             m_findJob = new FindChunksNeedingFrustumCullingJob
             {

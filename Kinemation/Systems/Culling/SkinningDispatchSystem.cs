@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Latios.Kinemation.InternalSourceGen;
 using Latios.Psyshock;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
@@ -9,12 +10,8 @@ using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
-using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
-using Unity.Rendering;
-using UnityEngine.Profiling;
 
 namespace Latios.Kinemation.Systems
 {

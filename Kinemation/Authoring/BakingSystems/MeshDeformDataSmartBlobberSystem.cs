@@ -251,8 +251,13 @@ namespace Latios.Kinemation.Authoring.Systems
             {
                 if (!context.vector3Cache.IsCreated)
                 {
-                    context.vector3Cache = new NativeList<Vector3>(Allocator.Temp);
-                    context.vector4Cache = new NativeList<Vector4>(Allocator.Temp);
+                    context.vector2Cache         = new NativeList<Vector2>(Allocator.Temp);
+                    context.vector3Cache         = new NativeList<Vector3>(Allocator.Temp);
+                    context.vector4Cache         = new NativeList<Vector4>(Allocator.Temp);
+                    context.intCache             = new NativeList<int>(Allocator.Temp);
+                    context.positionHashMapCache = new NativeHashMap<float3, int>(1, Allocator.Temp);
+                    context.normalHashMapCache   = new NativeHashMap<float3x2, int>(1, Allocator.Temp);
+                    context.tangentHashMapCache  = new NativeHashMap<float3x3, int>(1, Allocator.Temp);
                 }
 
                 var builder = new BlobBuilder(Allocator.Temp);
@@ -463,6 +468,327 @@ namespace Latios.Kinemation.Authoring.Systems
                 }
                 builder.ConstructFromNativeArray(ref blobRoot.blendShapesData.gpuData, allShapeVerticesAsArray);
 
+                // Normalization
+                context.positionHashMapCache.Clear();
+                context.normalHashMapCache.Clear();
+                context.tangentHashMapCache.Clear();
+                context.positionHashMapCache.Capacity = math.max(context.positionHashMapCache.Capacity, mesh.vertexCount);
+                context.normalHashMapCache.Capacity   = math.max(context.normalHashMapCache.Capacity, mesh.vertexCount);
+                context.tangentHashMapCache.Capacity  = math.max(context.tangentHashMapCache.Capacity, mesh.vertexCount);
+                var duplicatesBitsLength              = mesh.vertexCount / 32 + math.select(0, 1, (mesh.vertexCount % 32) != 0);
+                var positionDuplicatesBits            =
+                    (MeshNormalizationBlob.BitFieldPrefixSumPair*)builder.Allocate(ref blobRoot.normalizationData.positionDuplicates, duplicatesBitsLength).GetUnsafePtr();
+                var normalDuplicatesBits =
+                    (MeshNormalizationBlob.BitFieldPrefixSumPair*)builder.Allocate(ref blobRoot.normalizationData.normalDuplicates, duplicatesBitsLength).GetUnsafePtr();
+                var tangentDuplicatesBits =
+                    (MeshNormalizationBlob.BitFieldPrefixSumPair*)builder.Allocate(ref blobRoot.normalizationData.tangentDuplicates, duplicatesBitsLength).GetUnsafePtr();
+                for (int i = 0; i < duplicatesBitsLength; i++)
+                {
+                    positionDuplicatesBits[i] = default;
+                    normalDuplicatesBits[i]   = default;
+                    tangentDuplicatesBits[i]  = default;
+                }
+                int positionDuplicateCount = 0;
+                int normalDuplicateCount   = 0;
+                int tangentDuplicateCount  = 0;
+                for (int i = 0; i < mesh.vertexCount; i++)
+                {
+                    var pos = verticesToSkin[i].position;
+                    var nrm = new float3x2(pos, verticesToSkin[i].normal);
+                    var tan = new float3x3(pos, nrm.c1, verticesToSkin[i].tangent);
+                    if (context.positionHashMapCache.ContainsKey(pos))
+                    {
+                        positionDuplicatesBits[i / 32].bitfield.SetBits(i % 32, true);
+                        positionDuplicateCount++;
+                        if (context.normalHashMapCache.ContainsKey(nrm))
+                        {
+                            normalDuplicatesBits[i / 32].bitfield.SetBits(i % 32, true);
+                            normalDuplicateCount++;
+                            if (context.tangentHashMapCache.ContainsKey(tan))
+                            {
+                                tangentDuplicatesBits[i / 32].bitfield.SetBits(i % 32, true);
+                                tangentDuplicateCount++;
+                            }
+                            else
+                                context.tangentHashMapCache.Add(tan, i);
+                        }
+                        else
+                        {
+                            context.normalHashMapCache.Add(nrm, i);
+                            context.tangentHashMapCache.Add(tan, i);
+                        }
+                    }
+                    else
+                    {
+                        context.positionHashMapCache.Add(pos, i);
+                        context.normalHashMapCache.Add(nrm, i);
+                        context.tangentHashMapCache.Add(tan, i);
+                    }
+                }
+                blobRoot.normalizationData.duplicatePositionCount = positionDuplicateCount;
+                blobRoot.normalizationData.duplicateNormalCount   = normalDuplicateCount;
+                blobRoot.normalizationData.duplicateTangentCount  = tangentDuplicateCount;
+                int duplicatePositionPairUintsToAllocate          = 0;
+                int duplicateNormalPairUintsToAllocate            = 0;
+                int duplicateTangentPairUintsToAllocate           = 0;
+                if (mesh.vertexCount <= 1024)
+                {
+                    duplicatePositionPairUintsToAllocate = (positionDuplicateCount * 2 / 3) + math.select(0, 1, (positionDuplicateCount * 2 % 3) != 0);
+                    duplicateNormalPairUintsToAllocate   = (normalDuplicateCount * 2 / 3) + math.select(0, 1, (normalDuplicateCount * 2 % 3) != 0);
+                    duplicateTangentPairUintsToAllocate  = (tangentDuplicateCount * 2 / 3) + math.select(0, 1, (tangentDuplicateCount * 2 % 3) != 0);
+                    blobRoot.normalizationData.packMode  = MeshNormalizationBlob.IndicesPackMode.Bits10;
+                }
+                else if (mesh.vertexCount <= ushort.MaxValue)
+                {
+                    duplicatePositionPairUintsToAllocate = positionDuplicateCount;
+                    duplicateNormalPairUintsToAllocate   = normalDuplicateCount;
+                    duplicateTangentPairUintsToAllocate  = tangentDuplicateCount;
+                    blobRoot.normalizationData.packMode  = MeshNormalizationBlob.IndicesPackMode.Bits16;
+                }
+                else if (mesh.vertexCount < (1 << 21))
+                {
+                    duplicatePositionPairUintsToAllocate = ((positionDuplicateCount * 2 / 3) + math.select(0, 1, (positionDuplicateCount * 2 % 3) != 0)) * 2;  // We cast to ulong so need even count.
+                    duplicateNormalPairUintsToAllocate   = ((normalDuplicateCount * 2 / 3) + math.select(0, 1, (normalDuplicateCount * 2 % 3) != 0)) * 2;  // We cast to ulong so need even count.
+                    duplicateTangentPairUintsToAllocate  = ((tangentDuplicateCount * 2 / 3) + math.select(0, 1, (tangentDuplicateCount * 2 % 3) != 0)) * 2;  // We cast to ulong so need even count.
+                    blobRoot.normalizationData.packMode  = MeshNormalizationBlob.IndicesPackMode.Bits21;
+                }
+                else
+                {
+                    duplicatePositionPairUintsToAllocate = positionDuplicateCount * 2;
+                    duplicateNormalPairUintsToAllocate   = normalDuplicateCount * 2;
+                    duplicateTangentPairUintsToAllocate  = tangentDuplicateCount * 2;
+                    blobRoot.normalizationData.packMode  = MeshNormalizationBlob.IndicesPackMode.Bits32;
+                }
+                var duplicatePositionPairs = builder.Allocate(ref blobRoot.normalizationData.packedPositionDuplicateReferencePairs, duplicatePositionPairUintsToAllocate);
+                var duplicateNormalPairs   = builder.Allocate(ref blobRoot.normalizationData.packedNormalDuplicateReferencePairs, duplicateNormalPairUintsToAllocate);
+                var duplicateTangentPairs  = builder.Allocate(ref blobRoot.normalizationData.packedTangentDuplicateReferencePairs, duplicateTangentPairUintsToAllocate);
+                int positionPairsAdded     = 0;
+                int normalPairsAdded       = 0;
+                int tangentPairsAdded      = 0;
+                for (int element = 0; element < duplicatesBitsLength; element++)
+                {
+                    positionDuplicatesBits[element].prefixSum = positionPairsAdded;
+                    if (positionDuplicatesBits[element].bitfield.Value != 0)
+                    {
+                        var bits = positionDuplicatesBits[element].bitfield;
+                        for (int b = bits.CountTrailingZeros(); b < 32; bits.SetBits(b, false), b = bits.CountTrailingZeros())
+                        {
+                            int  duplicateIndex = element * 32 + b;
+                            int  referenceIndex = context.positionHashMapCache[verticesToSkin[duplicateIndex].position];
+                            int2 i              = 2 * positionPairsAdded;
+                            i.y                 = i.x + 1;
+                            switch (blobRoot.normalizationData.packMode)
+                            {
+                                case MeshNormalizationBlob.IndicesPackMode.Bits10:
+                                {
+                                    var loadIndex                        = i / 3;
+                                    var shift                            = 10 * (i % 3);
+                                    duplicatePositionPairs[loadIndex.x] |= (uint)duplicateIndex << shift.x;
+                                    duplicatePositionPairs[loadIndex.y] |= (uint)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits16:
+                                {
+                                    duplicatePositionPairs[positionPairsAdded] = (((uint)referenceIndex) << 16) | ((uint)duplicateIndex);
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits21:
+                                {
+                                    var loadIndex     = i / 3;
+                                    var shift         = 21 * (i % 3);
+                                    var ptr           = (ulong*)duplicatePositionPairs.GetUnsafePtr();
+                                    ptr[loadIndex.x] |= (ulong)duplicateIndex << shift.x;
+                                    ptr[loadIndex.y] |= (ulong)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits32:
+                                {
+                                    duplicatePositionPairs[i.x] = (uint)duplicateIndex;
+                                    duplicatePositionPairs[i.y] = (uint)referenceIndex;
+                                    break;
+                                }
+                            }
+                            positionPairsAdded++;
+                        }
+                    }
+                    normalDuplicatesBits[element].prefixSum = normalPairsAdded;
+                    if (normalDuplicatesBits[element].bitfield.Value != 0)
+                    {
+                        var bits = normalDuplicatesBits[element].bitfield;
+                        for (int b = bits.CountTrailingZeros(); b < 32; bits.SetBits(b, false), b = bits.CountTrailingZeros())
+                        {
+                            int  duplicateIndex = element * 32 + b;
+                            int  referenceIndex = context.normalHashMapCache[new float3x2(verticesToSkin[duplicateIndex].position, verticesToSkin[duplicateIndex].normal)];
+                            int2 i              = 2 * normalPairsAdded;
+                            i.y                 = i.x + 1;
+                            switch (blobRoot.normalizationData.packMode)
+                            {
+                                case MeshNormalizationBlob.IndicesPackMode.Bits10:
+                                {
+                                    var loadIndex                      = i / 3;
+                                    var shift                          = 10 * (i % 3);
+                                    duplicateNormalPairs[loadIndex.x] |= (uint)duplicateIndex << shift.x;
+                                    duplicateNormalPairs[loadIndex.y] |= (uint)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits16:
+                                {
+                                    duplicateNormalPairs[normalPairsAdded] = (((uint)referenceIndex) << 16) | ((uint)duplicateIndex);
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits21:
+                                {
+                                    var loadIndex     = i / 3;
+                                    var shift         = 21 * (i % 3);
+                                    var ptr           = (ulong*)duplicateNormalPairs.GetUnsafePtr();
+                                    ptr[loadIndex.x] |= (ulong)duplicateIndex << shift.x;
+                                    ptr[loadIndex.y] |= (ulong)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits32:
+                                {
+                                    duplicateNormalPairs[i.x] = (uint)duplicateIndex;
+                                    duplicateNormalPairs[i.y] = (uint)referenceIndex;
+                                    break;
+                                }
+                            }
+                            normalPairsAdded++;
+                        }
+                    }
+                    tangentDuplicatesBits[element].prefixSum = tangentPairsAdded;
+                    if (tangentDuplicatesBits[element].bitfield.Value != 0)
+                    {
+                        var bits = tangentDuplicatesBits[element].bitfield;
+                        for (int b = bits.CountTrailingZeros(); b < 32; bits.SetBits(b, false), b = bits.CountTrailingZeros())
+                        {
+                            int duplicateIndex = element * 32 + b;
+                            int referenceIndex =
+                                context.tangentHashMapCache[new float3x3(verticesToSkin[duplicateIndex].position, verticesToSkin[duplicateIndex].normal,
+                                                                         verticesToSkin[duplicateIndex].tangent)];
+                            int2 i = 2 * tangentPairsAdded;
+                            i.y    = i.x + 1;
+                            switch (blobRoot.normalizationData.packMode)
+                            {
+                                case MeshNormalizationBlob.IndicesPackMode.Bits10:
+                                {
+                                    var loadIndex                       = i / 3;
+                                    var shift                           = 10 * (i % 3);
+                                    duplicateTangentPairs[loadIndex.x] |= (uint)duplicateIndex << shift.x;
+                                    duplicateTangentPairs[loadIndex.y] |= (uint)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits16:
+                                {
+                                    duplicateTangentPairs[tangentPairsAdded] = (((uint)referenceIndex) << 16) | ((uint)duplicateIndex);
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits21:
+                                {
+                                    var loadIndex     = i / 3;
+                                    var shift         = 21 * (i % 3);
+                                    var ptr           = (ulong*)duplicateTangentPairs.GetUnsafePtr();
+                                    ptr[loadIndex.x] |= (ulong)duplicateIndex << shift.x;
+                                    ptr[loadIndex.y] |= (ulong)referenceIndex << shift.y;
+                                    break;
+                                }
+                                case MeshNormalizationBlob.IndicesPackMode.Bits32:
+                                {
+                                    duplicateTangentPairs[i.x] = (uint)duplicateIndex;
+                                    duplicateTangentPairs[i.y] = (uint)referenceIndex;
+                                    break;
+                                }
+                            }
+                            tangentPairsAdded++;
+                        }
+                    }
+                }
+
+                if (mesh.HasVertexAttribute(UnityEngine.Rendering.VertexAttribute.TexCoord0))
+                {
+                    context.vector2Cache.ResizeUninitialized(mesh.vertexCount);
+                    mesh.GetUVs(0, context.vector2Cache.AsArray());
+                    builder.ConstructFromNativeArray(ref blobRoot.normalizationData.uvs, context.vector2Cache.AsArray().Reinterpret<float2>());
+                }
+
+                // We need the meshes with absolute indices. But we also need the number of indices to size our buffer accordingly.
+                // Hence these weird gymnastics.
+                int indicesCount = 0;
+                if (mesh.indexFormat == UnityEngine.Rendering.IndexFormat.UInt16)
+                    indicesCount = mesh.GetIndexData<ushort>().Length;
+                else
+                    indicesCount = mesh.GetIndexData<int>().Length;
+                context.intCache.ResizeUninitialized(indicesCount);
+                bool normalizationIsValid = true;
+                for (int i = 0; i < mesh.subMeshCount; i++)
+                {
+                    var submesh = mesh.GetSubMesh(i);
+                    if (submesh.topology != MeshTopology.Triangles)
+                    {
+                        normalizationIsValid = false;
+                        break;
+                    }
+
+                    mesh.GetIndices(context.intCache.AsArray().GetSubArray(submesh.indexStart, submesh.indexCount), i, true);
+                }
+
+                if (normalizationIsValid)
+                {
+                    blobRoot.normalizationData.triangleCount = indicesCount / 3;
+                    int indicesUintToAllocate                = 0;
+                    switch (blobRoot.normalizationData.packMode)
+                    {
+                        case MeshNormalizationBlob.IndicesPackMode.Bits10:
+                            indicesUintToAllocate = indicesCount;
+                            break;
+                        case MeshNormalizationBlob.IndicesPackMode.Bits16:
+                            indicesUintToAllocate = indicesCount * 3 / 2 + (indicesCount * 3 / 2) % 2;
+                            break;
+                        case MeshNormalizationBlob.IndicesPackMode.Bits21:
+                            indicesUintToAllocate = indicesCount * 2;
+                            break;
+                        case MeshNormalizationBlob.IndicesPackMode.Bits32:
+                            indicesUintToAllocate = indicesCount * 3;
+                            break;
+                    }
+                    var packedIndices = builder.Allocate(ref blobRoot.normalizationData.packedIndicesByTriangle, indicesUintToAllocate);
+                    for (int i = 0; i < indicesCount / 3; i++)
+                    {
+                        int indexA = context.intCache[3 * i];
+                        int indexB = context.intCache[3 * i + 1];
+                        int indexC = context.intCache[3 * i + 2];
+
+                        switch (blobRoot.normalizationData.packMode)
+                        {
+                            case MeshNormalizationBlob.IndicesPackMode.Bits10:
+                                packedIndices[i] = (uint)((indexC << 20) | (indexB << 10) | indexA);
+                                break;
+                            case MeshNormalizationBlob.IndicesPackMode.Bits16:
+                            {
+                                var ptr        = (ushort*)packedIndices.GetUnsafePtr();
+                                ptr[i * 3]     = (ushort)indexA;
+                                ptr[i * 3 + 1] = (ushort)indexB;
+                                ptr[i * 3 + 2] = (ushort)indexC;
+                                break;
+                            }
+                            case MeshNormalizationBlob.IndicesPackMode.Bits21:
+                            {
+                                var ptr = (ulong*)packedIndices.GetUnsafePtr();
+                                ptr[i]  = ((ulong)indexC << 42) | ((ulong)indexB << 21) | (uint)indexA;
+                                break;
+                            }
+                            case MeshNormalizationBlob.IndicesPackMode.Bits32:
+                            {
+                                packedIndices[i * 3]     = (uint)indexA;
+                                packedIndices[i * 3 + 1] = (uint)indexB;
+                                packedIndices[i * 3 + 2] = (uint)indexC;
+                                break;
+                            }
+                        }
+                    }
+                }
+                else
+                    blobRoot.normalizationData.triangleCount = 0;
+
                 // Finish
                 resultBlob = builder.CreateBlobAssetReference<MeshDeformDataBlob>(Allocator.Persistent);
 
@@ -487,8 +813,13 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             [ReadOnly] public Mesh.MeshDataArray meshes;
 
-            [NativeDisableContainerSafetyRestriction] public NativeList<Vector3> vector3Cache;
-            [NativeDisableContainerSafetyRestriction] public NativeList<Vector4> vector4Cache;
+            [NativeDisableContainerSafetyRestriction] public NativeList<Vector2>          vector2Cache;
+            [NativeDisableContainerSafetyRestriction] public NativeList<Vector3>          vector3Cache;
+            [NativeDisableContainerSafetyRestriction] public NativeList<Vector4>          vector4Cache;
+            [NativeDisableContainerSafetyRestriction] public NativeList<int>              intCache;
+            [NativeDisableContainerSafetyRestriction] public NativeHashMap<float3, int>   positionHashMapCache;
+            [NativeDisableContainerSafetyRestriction] public NativeHashMap<float3x2, int> normalHashMapCache;
+            [NativeDisableContainerSafetyRestriction] public NativeHashMap<float3x3, int> tangentHashMapCache;
 
             public void Dispose() => meshes.Dispose();
         }

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using Latios.Kinemation.InternalSourceGen;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
 using Latios.Unsafe;
@@ -34,6 +34,8 @@ namespace Latios.Kinemation.Systems
         EntityQuery m_deadSkinnedMeshesQuery;
         EntityQuery m_newCopyDeformQuery;
         EntityQuery m_deadCopyDeformQuery;
+        EntityQuery m_disableComputeDeformQuery;
+        EntityQuery m_enableComputeDeformQuery;
 
         EntityQuery m_newSkeletonsQuery;
         EntityQuery m_deadSkeletonsQuery;
@@ -83,6 +85,9 @@ namespace Latios.Kinemation.Systems
             m_deadSkinnedMeshesQuery = state.Fluent().With<SkeletonDependent>().Without<MeshDeformDataBlobReference>().Build();
             m_newCopyDeformQuery     = state.Fluent().With<CopyDeformFromEntity>(true).Without<ChunkCopyDeformTag>(true).Build();
             m_deadCopyDeformQuery    = state.Fluent().With<ChunkCopyDeformTag>(false, true).Without<CopyDeformFromEntity>().Build();
+
+            m_disableComputeDeformQuery = state.Fluent().With<DisableComputeShaderProcessingTag>(true).With<ChunkSkinningCullingTag>(false, true).Build();
+            m_enableComputeDeformQuery  = state.Fluent().With<SkeletonDependent>(true).Without<DisableComputeShaderProcessingTag>().Without<ChunkSkinningCullingTag>(true).Build();
 
             m_newSkeletonsQuery             = state.Fluent().With<SkeletonRootTag>(true).Without<DependentSkinnedMesh>().Build();
             m_deadSkeletonsQuery            = state.Fluent().With<DependentSkinnedMesh>().Without<SkeletonRootTag>().Build();
@@ -374,9 +379,11 @@ namespace Latios.Kinemation.Systems
 
                 state.EntityManager.RemoveComponent(m_deadDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
                                                                                                   ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
-                state.EntityManager.AddComponent(                           m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
-                                                                                                                         ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
+                state.EntityManager.AddComponent( m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
+                                                                                               ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
+                state.EntityManager.AddChunkComponentData<ChunkSkinningCullingTag>(m_enableComputeDeformQuery, default);
+                state.EntityManager.RemoveChunkComponentData<ChunkSkinningCullingTag>(m_disableComputeDeformQuery);
                 state.EntityManager.AddComponent<PreviousPostProcessMatrix>(m_newPreviousPostProcessMatrixQuery);
 
                 state.EntityManager.RemoveComponent(m_deadCopyDeformQuery, ComponentType.ChunkComponent<ChunkCopyDeformTag>());

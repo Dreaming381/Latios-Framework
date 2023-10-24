@@ -339,6 +339,15 @@ namespace Latios
         }
 
         /// <summary>
+        /// Adds required components to the query to ensure valid access to a collection aspect.
+        /// </summary>
+        /// <typeparam name="T">The type of collection aspect to support</typeparam>
+        public FluentQuery WithCollectionAspect<T>() where T : unmanaged, ICollectionAspect<T>
+        {
+            return default(T).AppendToQuery(this);
+        }
+
+        /// <summary>
         /// Allows disabled entities to be included in the query
         /// </summary>
         /// <returns></returns>

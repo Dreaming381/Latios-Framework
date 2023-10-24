@@ -1,4 +1,5 @@
 using System;
+using Latios.Kinemation.InternalSourceGen;
 using Latios.Psyshock;
 using Unity.Collections;
 using Unity.Entities;
@@ -10,7 +11,9 @@ using UnityEngine.Rendering;
 namespace Latios.Kinemation
 {
     #region Meshes
-    internal struct SkeletonDependent : ICleanupComponentData
+namespace InternalSourceGen
+{
+    public struct SkeletonDependent : ICleanupComponentData
     {
         public EntityWith<SkeletonRootTag>                  root;
         public BlobAssetReference<MeshBindingPathsBlob>     meshBindingBlob;
@@ -18,6 +21,7 @@ namespace Latios.Kinemation
         public int                                          boneOffsetEntryIndex;
         public int                                          indexInDependentSkinnedMeshesBuffer;
     }
+}
 
     internal struct BoundMesh : ICleanupComponentData
     {
@@ -69,10 +73,11 @@ namespace Latios.Kinemation
     #endregion
 
     #region Skeletons
-    // All skeletons
+namespace InternalSourceGen
+{
     // This is system state to prevent copies on instantiate
     [InternalBufferCapacity(1)]
-    internal struct DependentSkinnedMesh : ICleanupBufferElementData
+    public struct DependentSkinnedMesh : ICleanupBufferElementData
     {
         public EntityWith<SkeletonDependent> skinnedMesh;
         // Todo: Store entry indices instead?
@@ -83,6 +88,7 @@ namespace Latios.Kinemation
         public uint  boneOffsetsStart;
         public float meshRadialOffset;
     }
+}
 
     internal struct SkeletonBoundsOffsetFromMeshes : IComponentData
     {
