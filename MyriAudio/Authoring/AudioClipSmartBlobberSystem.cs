@@ -156,7 +156,7 @@ namespace Latios.Myri.Authoring.Systems
 
         #region Cache
         float[] m_cache1;
-        float[] m_cache4;
+        float[] m_cache2;
         float[] m_cache16;
         float[] m_cache64;
         float[] m_cache256;
@@ -166,7 +166,7 @@ namespace Latios.Myri.Authoring.Systems
         float[] m_cache65536;
 
         void* m_cache1Ptr;
-        void* m_cache4Ptr;
+        void* m_cache2Ptr;
         void* m_cache16Ptr;
         void* m_cache64Ptr;
         void* m_cache256Ptr;
@@ -176,7 +176,7 @@ namespace Latios.Myri.Authoring.Systems
         void* m_cache65536Ptr;
 
         ulong m_cache1Handle;
-        ulong m_cache4Handle;
+        ulong m_cache2Handle;
         ulong m_cache16Handle;
         ulong m_cache64Handle;
         ulong m_cache256Handle;
@@ -321,21 +321,24 @@ namespace Latios.Myri.Authoring.Systems
                     mergedSamplesAccumulated += stride;
                 }
             }
-            if (sampleCountRemaining / 4 > 0)
+            if (sampleCountRemaining / 2 > 0)
             {
-                if (m_cache4 == null)
+                // We break pattern here and do 2 samples instead of 4 because otherwise
+                // we run into an issue where stride becomes 0 if there's exactly 2 stereo
+                // samples remaining.
+                if (m_cache2 == null)
                 {
-                    m_cache4    = new float[4];
-                    m_cache4Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache4, out m_cache4Handle);
+                    m_cache2    = new float[2];
+                    m_cache2Ptr = UnsafeUtility.PinGCArrayAndGetDataAddress(m_cache2, out m_cache2Handle);
                 }
 
-                int stride = 4 / clip.channels;
+                int stride = 2 / clip.channels;
 
-                while (sampleCountRemaining / 4 > 0)
+                while (sampleCountRemaining / 2 > 0)
                 {
-                    clip.GetData(m_cache4, mergedSamplesAccumulated);
-                    samples.AddRangeNoResize(m_cache4Ptr, 4);
-                    sampleCountRemaining     -= 4;
+                    clip.GetData(m_cache2, mergedSamplesAccumulated);
+                    samples.AddRangeNoResize(m_cache2Ptr, 2);
+                    sampleCountRemaining     -= 2;
                     mergedSamplesAccumulated += stride;
                 }
             }
@@ -363,8 +366,8 @@ namespace Latios.Myri.Authoring.Systems
         {
             if (m_cache1Ptr != null)
                 UnsafeUtility.ReleaseGCObject(m_cache1Handle);
-            if (m_cache4Ptr != null)
-                UnsafeUtility.ReleaseGCObject(m_cache4Handle);
+            if (m_cache2Ptr != null)
+                UnsafeUtility.ReleaseGCObject(m_cache2Handle);
             if (m_cache16Ptr != null)
                 UnsafeUtility.ReleaseGCObject(m_cache16Handle);
             if (m_cache64Ptr != null)

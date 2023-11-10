@@ -10,6 +10,16 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.8.4] – 2023-11-10
+
+Officially supports Entities [1.0.16]
+
+### Changed
+
+-   The minimum Editor version has been increased to 2022.3.13f1
+-   Updated Myri to v0.8.4
+-   Updated Calligraphics to v0.8.4
+
 ## [0.8.3] – 2023-10-15
 
 Officially supports Entities [1.0.16]
