@@ -326,7 +326,7 @@ namespace Latios.Kinemation.Systems
                 layer.currentTransitionIndex      = stateTransitionIndex;
                 layer.currentTransitionIsAnyState = isAnyStateTransition;
                 layer.currentStateIndex           = transitionBlob.destinationStateIndex != -1 ? transitionBlob.destinationStateIndex : layerBlob.defaultStateIndex;  // "Exit" state
-                layer.timeInState                 = transitionBlob.offset;
+                layer.timeInState                 = transitionBlob.hasExitTime ? math.max(layer.timeInState - transitionBlob.exitTime, 0) + transitionBlob.offset : transitionBlob.offset;
                 ref var lastState                 = ref layerBlob.states[layer.previousStateIndex];
                 layer.transitionEndTimeInState    = transitionBlob.hasFixedDuration ?
                                                     transitionBlob.duration :

@@ -21,6 +21,14 @@ namespace Latios.Kinemation.Systems
     [DisableAutoCreation]
     public partial class SkinningDispatchSystem : CullingComputeDispatchSubSystemBase
     {
+#if UNITY_ANDROID
+        // Android devices often have buggy drivers that struggle with groupshared memory.
+        // They may also not have enough memory for our compute shaders.
+        const int kBatchThreshold = 0;
+#else
+        const int kBatchThreshold = 682;
+#endif
+
         WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
         WorldTransformReadOnlyAspect.Lookup     m_worldTransformLookup;
 
@@ -1033,14 +1041,14 @@ namespace Latios.Kinemation.Systems
 
                 if (hasMultipleMeshes)
                 {
-                    if (maxMeshBoneCount > 682)
+                    if (maxMeshBoneCount > kBatchThreshold)
                         BuildCommandsMultiMeshExpanded(requests, meshes, indexInChunk, skeletonBonesCount);
                     else
                         BuildCommandsMultiMeshBatched(requests, meshes, indexInChunk, skeletonBonesCount);
                 }
                 else
                 {
-                    if (maxMeshBoneCount > 682)
+                    if (maxMeshBoneCount > kBatchThreshold)
                         BuildCommandsSingleMeshExpanded(requests, meshes, indexInChunk, skeletonBonesCount);
                     else
                         BuildCommandsSingleMeshBatched(requests, meshes, indexInChunk, skeletonBonesCount);
@@ -2339,9 +2347,9 @@ namespace Latios.Kinemation.Systems
                                                    mesh.meshVerticesStart,
                                                    mesh.meshWeightsStart,
                                                    command.largeSkeletonMeshDstStart);
-                    metaBuffer[(int)(prefixSums.meshSkinningCommandsCount * 2 + layouts.meshSkinningCommandsStart)]      = meshCommandA;
-                    metaBuffer[(int)(prefixSums.meshSkinningCommandsCount * 2 + 1 + layouts.meshSkinningCommandsStart)]  = meshCommandB;
-                    prefixSums.meshSkinningCommandsCount                                                                += 2u;
+                    metaBuffer[(int)(prefixSums.meshSkinningCommandsCount * 2 + layouts.meshSkinningCommandsStart)]     = meshCommandA;
+                    metaBuffer[(int)(prefixSums.meshSkinningCommandsCount * 2 + 1 + layouts.meshSkinningCommandsStart)] = meshCommandB;
+                    prefixSums.meshSkinningCommandsCount++;
                 }
             }
         }
