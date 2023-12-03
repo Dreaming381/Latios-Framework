@@ -264,7 +264,7 @@ namespace Latios.Psyshock
 
         // Mostly from Unity.Physics but handles more edge cases
         // Todo: Reduce branches
-        public static bool RaycastTriangle(in Ray ray, in simdFloat3 triPoints, out float fraction, out float3 outNormal)
+        internal static bool RaycastTriangle(in Ray ray, in simdFloat3 triPoints, out float fraction, out float3 outNormal)
         {
             simdFloat3 abbcca = triPoints.bcaa - triPoints;
             float3     ab     = abbcca.a;
@@ -372,7 +372,7 @@ namespace Latios.Psyshock
             }
         }
 
-        public static bool RaycastRoundedTriangle(in Ray ray, in simdFloat3 triPoints, float radius, out float fraction, out float3 normal)
+        internal static bool RaycastRoundedTriangle(in Ray ray, in simdFloat3 triPoints, float radius, out float fraction, out float3 normal)
         {
             // Make sure the ray doesn't start inside.
             if (PointTriangleDistance(ray.start, new TriangleCollider(triPoints.a, triPoints.b, triPoints.c), radius, out _))
@@ -406,7 +406,7 @@ namespace Latios.Psyshock
 
         // Mostly from Unity.Physics but handles more edge cases
         // Todo: Reduce branches
-        public static bool RaycastQuad(in Ray ray, in simdFloat3 quadPoints, out float fraction)
+        internal static bool RaycastQuad(in Ray ray, in simdFloat3 quadPoints, out float fraction)
         {
             simdFloat3 abbccdda = quadPoints.bcda - quadPoints;
             float3     ab       = abbccdda.a;
@@ -505,7 +505,7 @@ namespace Latios.Psyshock
             }
         }
 
-        public static bool RaycastRoundedQuad(in Ray ray, in simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
+        internal static bool RaycastRoundedQuad(in Ray ray, in simdFloat3 quadPoints, float radius, out float fraction, out float3 normal)
         {
             // Make sure the ray doesn't start inside.
             if (PointQuadDistance(ray.start, in quadPoints, radius, out _))
@@ -535,6 +535,24 @@ namespace Latios.Psyshock
             normal                   = math.select(normal, quadNormal, quadFraction < fraction);
             fraction                 = math.select(fraction, quadFraction, quadFraction < fraction);
             return fraction <= 1f;
+        }
+
+        internal static void BestFacePlanesAndVertices(in TriangleCollider triangle,
+                                                       float3 localDirectionToAlign,
+                                                       out simdFloat3 edgePlaneOutwardNormals,
+                                                       out float4 edgePlaneDistances,
+                                                       out Plane plane,
+                                                       out simdFloat3 vertices)
+        {
+            vertices = triangle.AsSimdFloat3();
+            plane    = mathex.PlaneFrom(triangle.pointA, triangle.pointB - triangle.pointA, triangle.pointC - triangle.pointA);
+            if (math.dot(plane.normal, localDirectionToAlign) < 0f)
+                plane = mathex.Flip(plane);
+
+            edgePlaneOutwardNormals = simd.cross(vertices.bcab - vertices, localDirectionToAlign);  // These normals are perpendicular to the contact normal, not the plane.
+            if (math.dot(edgePlaneOutwardNormals.a, vertices.c - vertices.a) > 0f)
+                edgePlaneOutwardNormals = -edgePlaneOutwardNormals;
+            edgePlaneDistances          = simd.dot(edgePlaneOutwardNormals, vertices.bcab);
         }
     }
 }

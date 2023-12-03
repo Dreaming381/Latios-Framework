@@ -580,21 +580,21 @@ namespace Latios.Kinemation
         /// </summary>
         public int GetDuplicatePositionReferenceIndex(int positionDuplicatingVertex)
         {
-            return GetDuplicateReferenceIndex(positionDuplicatingVertex, ref packedPositionDuplicateReferencePairs);
+            return GetDuplicateReferenceIndex(positionDuplicatingVertex, ref positionDuplicates, ref packedPositionDuplicateReferencePairs);
         }
         /// <summary>
         /// Gets the duplicate position and normal vertex's reference vertex index.
         /// </summary>
         public int GetDuplicateNormalReferenceIndex(int normalDuplicatingVertex)
         {
-            return GetDuplicateReferenceIndex(normalDuplicatingVertex, ref packedNormalDuplicateReferencePairs);
+            return GetDuplicateReferenceIndex(normalDuplicatingVertex, ref normalDuplicates, ref packedNormalDuplicateReferencePairs);
         }
         /// <summary>
         /// Gets the duplicate position, normal, and tangent vertex's reference vertex index.
         /// </summary>
         public int GetDuplicateTangentReferenceIndex(int tangentDuplicatingVertex)
         {
-            return GetDuplicateReferenceIndex(tangentDuplicatingVertex, ref packedTangentDuplicateReferencePairs);
+            return GetDuplicateReferenceIndex(tangentDuplicatingVertex, ref tangentDuplicates, ref packedTangentDuplicateReferencePairs);
         }
 
         private void GetDuplicateAtRawIndex(int rawIndex, out int duplicateIndex, out int referenceIndex, ref BlobArray<uint> packed)
@@ -636,9 +636,9 @@ namespace Latios.Kinemation
                 }
             }
         }
-        private int GetDuplicateReferenceIndex(int duplicatingVertex, ref BlobArray<uint> packed)
+        private int GetDuplicateReferenceIndex(int duplicatingVertex, ref BlobArray<BitFieldPrefixSumPair> lookup, ref BlobArray<uint> packed)
         {
-            var element  = positionDuplicates[duplicatingVertex >> 5];
+            var element  = lookup[duplicatingVertex >> 5];
             var bit      = duplicatingVertex & 0x1f;
             var mask     = math.select(0xffffffff >> 32 - bit, 0, bit == 0);
             var rawIndex = element.prefixSum + math.countbits(element.bitfield.Value & mask);
@@ -656,7 +656,7 @@ namespace Latios.Kinemation
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckDuplicateIndex(int rawDuplicate, int duplicateCount)
         {
-            if (math.clamp(rawDuplicate, 0, triangleCount) != duplicateCount)
+            if (math.clamp(rawDuplicate, 0, duplicateCount) != rawDuplicate)
                 throw new ArgumentOutOfRangeException($"Duplicate index {rawDuplicate} is out of range of MeshNormalizationBlob with {duplicateCount} duplicate vertices.");
         }
 

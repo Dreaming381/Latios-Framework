@@ -255,6 +255,51 @@ namespace Latios.Psyshock
             return false;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in BoxCollider box,
+                                                                          in RigidTransform boxTransform,
+                                                                          in CapsuleCollider capsule,
+                                                                          in RigidTransform capsuleTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            UnitySim.ContactsBetweenResult result = default;
+            result.contactNormal                  = distanceResult.normalB;
+
+            var boxLocalContactNormal = math.InverseRotateFast(boxTransform.rot, -distanceResult.normalB);
+            PointRayBox.BestFacePlanesAndVertices(in box, boxLocalContactNormal, out var edgePlaneNormals, out var edgePlaneDistances, out var plane, out _);
+
+            var  bInATransform     = math.mul(math.inverse(boxTransform), capsuleTransform);
+            var  rayStart          = math.transform(bInATransform, capsule.pointA);
+            var  rayDisplacement   = math.transform(bInATransform, capsule.pointB) - rayStart;
+            var  rayRelativeStarts = simd.dot(rayStart, edgePlaneNormals) - edgePlaneDistances;
+            var  relativeDiffs     = simd.dot(rayDisplacement, edgePlaneNormals);
+            var  rayRelativeEnds   = rayRelativeStarts + relativeDiffs;
+            var  rayFractions      = math.select(-rayRelativeStarts / relativeDiffs, float4.zero, relativeDiffs == float4.zero);
+            var  startsInside      = rayRelativeStarts <= 0f;
+            var  endsInside        = rayRelativeEnds <= 0f;
+            var  projectsOnFace    = startsInside | endsInside;
+            var  enterFractions    = math.select(float4.zero, rayFractions, !startsInside & rayFractions > float4.zero);
+            var  exitFractions     = math.select(1f, rayFractions, !endsInside & rayFractions < 1f);
+            var  fractionA         = math.cmax(enterFractions);
+            var  fractionB         = math.cmin(exitFractions);
+            bool needsClosestPoint = true;
+            if (math.all(projectsOnFace) && fractionA < fractionB)
+            {
+                // Add the two contacts from the possibly clipped segment
+                var distanceScalarAlongContactNormal = math.rcp(math.dot(boxLocalContactNormal, plane.normal));
+                var clippedSegmentA                  = rayStart + fractionA * rayDisplacement;
+                var clippedSegmentB                  = rayStart + fractionB * rayDisplacement;
+                var aDistance                        = mathex.SignedDistance(plane, clippedSegmentA) * distanceScalarAlongContactNormal;
+                var bDistance                        = mathex.SignedDistance(plane, clippedSegmentB) * distanceScalarAlongContactNormal;
+                result.Add(math.transform(boxTransform, clippedSegmentA), aDistance - capsule.radius);
+                result.Add(math.transform(boxTransform, clippedSegmentB), bDistance - capsule.radius);
+                needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
+            }
+
+            if (needsClosestPoint)
+                result.Add(distanceResult.hitpointB, distanceResult.distance);
+            return result;
+        }
+
         private static bool BoxCapsuleDistance(in BoxCollider box, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
         {
             float3 osPointA = capsule.pointA - box.center;  //os = origin space
@@ -398,9 +443,9 @@ namespace Latios.Psyshock
                 normalB      = capsuleNormal,
                 distance     = math.sign(bestSignedDistanceSq) * math.sqrt(math.abs(bestSignedDistanceSq)) - capsule.radius,
                 featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(boxNormal),
-                featureCodeB =
-                    (ushort)math.select(0x4000, math.select(0, 1, math.all(bestPointOnSegment == osPointB)),
-                                        math.all(bestPointOnSegment == osPointA) && math.all(bestPointOnSegment == osPointB))
+                featureCodeB = (ushort)math.select(0x4000,
+                                                   math.select(0, 1, math.all(bestPointOnSegment == osPointB)),
+                                                   bestPointOnSegment.Equals(osPointA) || bestPointOnSegment.Equals(osPointB))
             };
 
             if (Hint.Likely(!capsuleDegenerate))

@@ -473,12 +473,7 @@ namespace Latios.Kinemation
                     }
                     else
                     {
-                        meshVertices[dst] = new DynamicMeshVertex
-                        {
-                            position = uniquePositions[normalizationBlob.GetDuplicatePositionReferenceIndex(src)],
-                            normal   = 0f,
-                            tangent  = 0f,
-                        };
+                        meshVertices[dst] = meshVertices[normalizationBlob.GetDuplicatePositionReferenceIndex(dst)];
                     }
                 }
                 else
@@ -561,7 +556,6 @@ namespace Latios.Kinemation
                 var b = meshVertices[indexB].position;
                 var c = meshVertices[indexC].position;
 
-                // Todo: Switch to SIMD version to improve acos performance.
                 var triNormal = GetTriangleAngleWeightedNormal(a, b, c, out var triNormalScales);
 
                 float3 uDir = 0f;
@@ -583,12 +577,12 @@ namespace Latios.Kinemation
                 vb.normal            += triNormal * triNormalScales.y;
                 if (indexB == indices.y)
                     vb.tangent       += uDir;
-                meshVertices[indexA]  = vb;
+                meshVertices[indexB]  = vb;
                 var vc                = meshVertices[indexC];
                 vc.normal            += triNormal * triNormalScales.z;
                 if (indexC == indices.z)
                     vc.tangent       += uDir;
-                meshVertices[indexA]  = vc;
+                meshVertices[indexC]  = vc;
 
                 if (new int3(indexA, indexB, indexC).Equals(indices))
                     continue;

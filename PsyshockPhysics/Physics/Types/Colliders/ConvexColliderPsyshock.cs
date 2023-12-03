@@ -69,6 +69,10 @@ namespace Latios.Psyshock
         public BlobArray<int>  edgeIndicesInFaces;
         public BlobArray<int2> edgeIndicesInFacesStartsAndCounts;
 
+        public BlobArray<int2> faceIndicesByEdge;
+        public BlobArray<int>  faceIndicesByVertex;
+        public BlobArray<int2> faceIndicesByVertexStartsAndCounts;
+
         public Aabb localAabb;
 
         public FixedString128Bytes meshName;

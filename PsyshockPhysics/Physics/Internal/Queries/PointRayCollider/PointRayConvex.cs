@@ -247,7 +247,7 @@ namespace Latios.Psyshock
             }
         }
 
-        private static bool RaycastConvex(in Ray ray, in ConvexCollider convex, out float fraction, out float3 normal)
+        internal static bool RaycastConvex(in Ray ray, in ConvexCollider convex, out float fraction, out float3 normal)
         {
             ref var blob       = ref convex.convexColliderBlob.Value;
             var     scaledAabb = new Aabb(blob.localAabb.min * convex.scale, blob.localAabb.max * convex.scale);
@@ -330,22 +330,36 @@ namespace Latios.Psyshock
             {
                 // From the AABB check we know the ray crosses the plane. So now we just need to figure out if the ray hits
                 // the geometry.
-                var hitPoint = ray.start + ray.displacement * aabbFraction;
 
-                var mask      = math.select(1f, 0f, math.isfinite(invScale));
-                var diff      = blob.localAabb.max - blob.localAabb.min;
-                diff         *= mask;
-                var rayStart  = hitPoint - diff + blob.localAabb.min * mask;
+                // If the ray comes in colinear with the plane, the following won't work.
+                // So we check to make sure that doesn't happen
 
-                var inflateRay      = new Ray(rayStart, rayStart + diff * 3f);
-                var inflateConvex   = convex;
-                inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
-                if (RaycastConvex(in inflateRay, in inflateConvex, out _, out _))
+                var mask = math.select(1f, 0f, math.isfinite(invScale));
+                if (!math.all(mask * ray.displacement < math.EPSILON))
                 {
-                    fraction = aabbFraction;
-                    normal   = math.normalize(mask * ray.displacement);
-                    return true;
+                    var hitPoint = ray.start + ray.displacement * aabbFraction;
+
+                    var diff      = blob.localAabb.max - blob.localAabb.min;
+                    diff         *= mask;
+                    var rayStart  = hitPoint - diff + blob.localAabb.min * mask;
+
+                    var inflateRay      = new Ray(rayStart, rayStart + diff * 3f);
+                    var inflateConvex   = convex;
+                    inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
+                    if (RaycastConvex(in inflateRay, in inflateConvex, out _, out _))
+                    {
+                        fraction = aabbFraction;
+                        normal   = math.normalize(mask * ray.displacement);
+                        return true;
+                    }
                 }
+
+                // Backup is to inflate the convex collider by a small radius and try again.
+                var hit        = RaycastRoundedConvex(in ray, in convex, math.EPSILON, out fraction);
+                var queryPoint = ray.start + ray.displacement * (fraction - 1e-4f);
+                PointConvexDistance(queryPoint, in convex, 1f, out var normalResult);
+                normal = normalResult.normal;
+                return hit;
             }
             fraction = 2f;
             normal   = default;
@@ -353,7 +367,7 @@ namespace Latios.Psyshock
         }
 
         // Scale is applied before radius
-        public static bool RaycastRoundedConvex(in Ray ray, in ConvexCollider convex, float radius, out float fraction)
+        internal static bool RaycastRoundedConvex(in Ray ray, in ConvexCollider convex, float radius, out float fraction)
         {
             ref var blob       = ref convex.convexColliderBlob.Value;
             var     scale      = convex.scale;
@@ -519,6 +533,63 @@ namespace Latios.Psyshock
             }
             fraction = 2f;
             return false;
+        }
+
+        internal static void BestFacePlane(ref ConvexColliderBlob blob, float3 localDirectionToAlign, ushort featureCode, out Plane facePlane, out int faceIndex, out int edgeCount)
+        {
+            var featureType = featureCode >> 14;
+            if (featureType == 2)
+            {
+                // Feature is face. Grab the face.
+                faceIndex = featureCode & 0x3fff;
+                facePlane = new Plane(new float3(blob.facePlaneX[faceIndex], blob.facePlaneY[faceIndex], blob.facePlaneZ[faceIndex]), blob.facePlaneDist[faceIndex]);
+                edgeCount = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].y;
+            }
+            else if (featureType == 1)
+            {
+                // Feature is edge. One of two faces is best.
+                var edgeIndex   = featureCode & 0x3fff;
+                var faceIndices = blob.faceIndicesByEdge[edgeIndex];
+                var facePlaneA  =
+                    new Plane(new float3(blob.facePlaneX[faceIndices.x], blob.facePlaneY[faceIndices.x], blob.facePlaneZ[faceIndices.x]), blob.facePlaneDist[faceIndices.x]);
+                var facePlaneB =
+                    new Plane(new float3(blob.facePlaneX[faceIndices.y], blob.facePlaneY[faceIndices.y], blob.facePlaneZ[faceIndices.y]), blob.facePlaneDist[faceIndices.y]);
+                if (math.dot(localDirectionToAlign, facePlaneA.normal) >= math.dot(localDirectionToAlign, facePlaneB.normal))
+                {
+                    faceIndex = faceIndices.x;
+                    facePlane = facePlaneA;
+                    edgeCount = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].y;
+                }
+                else
+                {
+                    faceIndex = faceIndices.y;
+                    facePlane = facePlaneB;
+                    edgeCount = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].y;
+                }
+            }
+            else
+            {
+                // Feature is vertex. One of adjacent faces is best.
+                var vertexIndex        = featureCode & 0x3fff;
+                var facesStartAndCount = blob.faceIndicesByVertexStartsAndCounts[vertexIndex];
+                faceIndex              = blob.faceIndicesByVertex[facesStartAndCount.x];
+                facePlane              = new Plane(new float3(blob.facePlaneX[faceIndex], blob.facePlaneY[faceIndex], blob.facePlaneZ[faceIndex]), blob.facePlaneDist[faceIndex]);
+                float bestDot          = math.dot(localDirectionToAlign, facePlane.normal);
+                for (int i = 1; i < facesStartAndCount.y; i++)
+                {
+                    var otherFaceIndex = blob.faceIndicesByVertex[facesStartAndCount.x + i];
+                    var otherPlane     = new Plane(new float3(blob.facePlaneX[otherFaceIndex], blob.facePlaneY[otherFaceIndex], blob.facePlaneZ[otherFaceIndex]),
+                                                   blob.facePlaneDist[otherFaceIndex]);
+                    var otherDot = math.dot(localDirectionToAlign, otherPlane.normal);
+                    if (otherDot > bestDot)
+                    {
+                        bestDot   = otherDot;
+                        faceIndex = otherFaceIndex;
+                        facePlane = otherPlane;
+                    }
+                }
+                edgeCount = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].y;
+            }
         }
     }
 }

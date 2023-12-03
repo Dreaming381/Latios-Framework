@@ -125,11 +125,11 @@ namespace Latios.Authoring
         /// components and then returns a valid SmartBlobberHandle. If Filter()
         /// returns false, returns an invalid SmartBlobberHandle.
         /// </summary>
-        /// <typeparam name="TBlobType"></typeparam>
-        /// <typeparam name="TInputType"></typeparam>
-        /// <param name="baker"></param>
-        /// <param name="input"></param>
-        /// <returns></returns>
+        /// <typeparam name="TBlobType">The type of blob asset to request input for</typeparam>
+        /// <typeparam name="TInputType">The type of self-filteringinput configuration</typeparam>
+        /// <param name="baker">The IBaker this method extends</param>
+        /// <param name="input">The input self-filtering configuration</param>
+        /// <returns>A smart blobber handle that can be resolved later in the baking process</returns>
         public static SmartBlobberHandle<TBlobType> RequestCreateBlobAsset<TBlobType, TInputType>(
             this IBaker baker,
             TInputType input)
@@ -152,6 +152,30 @@ namespace Latios.Authoring
             {
                 return new SmartBlobberHandle<TBlobType> { entityWithResultBlob = Entity.Null, wasFiltered = true };
             }
+        }
+
+        /// <summary>
+        /// Creates an additional entity to hold the Smart Blobber request and returns a SmartBlobberHandle.
+        /// This method also returns the blob baking entity for the caller to add configurations to.
+        /// This overload is only suited for end-user code and should not be used in this framework or other
+        /// third-party library directly.
+        /// </summary>
+        /// <typeparam name="TBlobType">The type of blob asset to request input for</typeparam>
+        /// <param name="baker">The IBaker this method extends</param>
+        /// <param name="blobBakingOnlyEntity">The generated baking only entity the caller should add blob baking components to</param>
+        /// <returns>A smart blobber handle that can be resolved later in the baking process</returns>
+        public static SmartBlobberHandle<TBlobType> RequestCreateBlobAsset<TBlobType>(this IBaker baker, out Entity blobBakingOnlyEntity) where TBlobType: unmanaged
+        {
+            var entity = baker.CreateAdditionalEntity(TransformUsageFlags.None, true);
+            MakeComponentTypeSet(out var typesToAdd);
+            baker.AddComponent(entity, typesToAdd);
+            baker.SetComponent(entity, new SmartBlobberTrackingData
+            {
+                isFinalized = false
+            });
+            baker.AddSharedComponent(entity, new SmartBlobberBlobTypeHash { hash = BurstRuntime.GetHashCode64 < TBlobType>() });
+            blobBakingOnlyEntity = entity;
+            return new SmartBlobberHandle<TBlobType> { entityWithResultBlob = entity, wasFiltered = false };
         }
 
         [BurstCompile]

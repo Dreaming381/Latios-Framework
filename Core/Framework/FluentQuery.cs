@@ -350,7 +350,6 @@ namespace Latios
         /// <summary>
         /// Allows disabled entities to be included in the query
         /// </summary>
-        /// <returns></returns>
         public FluentQuery IncludeDisabledEntities()
         {
             m_options |= EntityQueryOptions.IncludeDisabledEntities;
@@ -360,7 +359,6 @@ namespace Latios
         /// <summary>
         /// Allows prefab entities to be included in the query
         /// </summary>
-        /// <returns></returns>
         public FluentQuery IncludePrefabs()
         {
             m_options |= EntityQueryOptions.IncludePrefab;
@@ -368,9 +366,26 @@ namespace Latios
         }
 
         /// <summary>
+        /// Allows system entities to be included in the query
+        /// </summary>
+        public FluentQuery IncludeSystemEntities()
+        {
+            m_options |= EntityQueryOptions.IncludeSystems;
+            return this;
+        }
+
+        /// <summary>
+        /// Allows entities belonging to meta chunks to be included in the query
+        /// </summary>
+        public FluentQuery IncludeMetaEntities()
+        {
+            m_options |= EntityQueryOptions.IncludeMetaChunks;
+            return this;
+        }
+
+        /// <summary>
         /// Turns on write group filtering for this query
         /// </summary>
-        /// <returns></returns>
         public FluentQuery UseWriteGroups()
         {
             m_options |= EntityQueryOptions.FilterWriteGroup;
@@ -381,7 +396,6 @@ namespace Latios
         /// Causes the EntityQuery to only check for the presence of components in the archetype
         /// and assumes that disabled components are included.
         /// </summary>
-        /// <returns></returns>
         public FluentQuery IgnoreEnableableBits()
         {
             m_options |= EntityQueryOptions.IgnoreComponentEnabledState;

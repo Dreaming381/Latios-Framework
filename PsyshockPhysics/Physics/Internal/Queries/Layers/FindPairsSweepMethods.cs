@@ -1,5 +1,7 @@
-﻿using Unity.Burst;
+﻿using System.Net.Sockets;
+using Unity.Burst;
 using Unity.Burst.CompilerServices;
+using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
@@ -9,8 +11,15 @@ namespace Latios.Psyshock
     internal static class FindPairsSweepMethods
     {
         #region Production Sweeps
-        public static void SelfSweep<T>(CollisionLayer layer, BucketSlices bucket, int jobIndex, ref T processor, bool isThreadSafe = true) where T : struct, IFindPairsProcessor
+        public static void SelfSweep<T>(in CollisionLayer layer, in BucketSlices bucket, int jobIndex, ref T processor, bool isThreadSafe = true) where T : struct,
+        IFindPairsProcessor
         {
+            if (X86.Avx.IsAvxSupported)
+            {
+                SelfSweepAvx(layer, bucket, jobIndex, ref processor, isThreadSafe);
+                return;
+            }
+
             Hint.Assume(bucket.xmins.Length == bucket.xmaxs.Length);
             Hint.Assume(bucket.xmins.Length == bucket.yzminmaxs.Length);
             Hint.Assume(bucket.xmins.Length == bucket.bodies.Length);
@@ -21,7 +30,8 @@ namespace Latios.Psyshock
             for (int i = 0; i < count - 1; i++)
             {
                 var current = -bucket.yzminmaxs[i].zwxy;
-                for (int j = i + 1; j < count && bucket.xmins[j] <= bucket.xmaxs[i]; j++)
+                var xmax    = bucket.xmaxs[i];
+                for (int j = i + 1; j < count && bucket.xmins[j] <= xmax; j++)
                 {
                     if (math.bitmask(current < bucket.yzminmaxs[j]) == 0)
                     {
@@ -32,13 +42,137 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void BipartiteSweep<T>(CollisionLayer layerA,
-                                             CollisionLayer layerB,
-                                             BucketSlices bucketA,
-                                             BucketSlices bucketB,
+        static unsafe void SelfSweepAvx<T>(in CollisionLayer layer, in BucketSlices bucket, int jobIndex, ref T processor, bool isThreadSafe = true) where T : struct,
+        IFindPairsProcessor
+        {
+            Hint.Assume(bucket.xmins.Length == bucket.xmaxs.Length);
+            Hint.Assume(bucket.xmins.Length == bucket.yzminmaxs.Length);
+            Hint.Assume(bucket.xmins.Length == bucket.bodies.Length);
+
+            var result = new FindPairsResult(in layer, in layer, in bucket, in bucket, jobIndex, isThreadSafe);
+
+            int count = bucket.xmins.Length;
+            for (int i = 0; i < count - 1; i++)
+            {
+                var   current        = -bucket.yzminmaxs[i].zwxy;
+                v256  current256     = new v256(current.x, current.y, current.z, current.w, current.x, current.y, current.z, current.w);
+                float xmax           = bucket.xmaxs[i];
+                var   xminsPtr       = (byte*)bucket.xmins.GetUnsafeReadOnlyPtr() + 4 * i + 4;
+                var   flippedPtr     = (byte*)bucket.yzminmaxs.GetUnsafeReadOnlyPtr() + 16 * i + 16;
+                var   countRemaining = 4 * (ulong)(count - (i + 1));
+
+                ulong j = 0;
+                for (; Hint.Likely(j < (countRemaining & ~0x7ul) && *(float*)(xminsPtr + j + 4) <= xmax); j += 8)
+                {
+                    v256 otherPairs = X86.Avx.mm256_loadu_ps(flippedPtr + 4 * j);
+                    var  cmpBools   = X86.Avx.mm256_cmp_ps(current256, otherPairs, (int)X86.Avx.CMP.LT_OQ);
+                    var  cmpResult  = X86.Avx.mm256_movemask_ps(cmpBools);
+                    if (Hint.Unlikely((cmpResult & 0xf) == 0))
+                    {
+                        result.SetBucketRelativePairIndices(i, i + (int)(j >> RuntimeConstants.two.Data) + 1);
+                        processor.Execute(in result);
+                    }
+                    if (Hint.Unlikely((cmpResult & 0xf0) == 0))
+                    {
+                        result.SetBucketRelativePairIndices(i, i + (int)(j >> RuntimeConstants.two.Data) + 2);
+                        processor.Execute(in result);
+                    }
+                }
+                if (j < countRemaining && *(float*)(xminsPtr + j) <= xmax)
+                {
+                    if (Hint.Unlikely(math.bitmask(current < *(float4*)(flippedPtr + 4 * j)) == 0))
+                    {
+                        result.SetBucketRelativePairIndices(i, i + (int)(j >> RuntimeConstants.two.Data) + 1);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+        }
+
+        public static void BipartiteSweep<T>(in CollisionLayer layerA,
+                                             in CollisionLayer layerB,
+                                             in BucketSlices bucketA,
+                                             in BucketSlices bucketB,
                                              int jobIndex,
                                              ref T processor,
                                              bool isThreadSafe = true) where T : struct,
+        IFindPairsProcessor
+        {
+            if (X86.Avx.IsAvxSupported)
+            {
+                BipartiteSweepAvx(in layerA, in layerB, in bucketA, in bucketB, jobIndex, ref processor, isThreadSafe);
+                return;
+            }
+
+            int countA = bucketA.xmins.Length;
+            int countB = bucketB.xmins.Length;
+            if (countA == 0 || countB == 0)
+                return;
+
+            Hint.Assume(bucketA.xmins.Length == bucketA.xmaxs.Length);
+            Hint.Assume(bucketA.xmins.Length == bucketA.yzminmaxs.Length);
+            Hint.Assume(bucketA.xmins.Length == bucketA.bodies.Length);
+
+            Hint.Assume(bucketB.xmins.Length == bucketB.xmaxs.Length);
+            Hint.Assume(bucketB.xmins.Length == bucketB.yzminmaxs.Length);
+            Hint.Assume(bucketB.xmins.Length == bucketB.bodies.Length);
+
+            var result = new FindPairsResult(in layerA, in layerB, in bucketA, in bucketB, jobIndex, isThreadSafe);
+
+            //Check for b starting in a's x range
+            int bstart = 0;
+            for (int i = 0; i < countA; i++)
+            {
+                //Advance to b.xmin >= a.xmin
+                //Include equals case by stopping when equal
+                while (bstart < countB && bucketB.xmins[bstart] < bucketA.xmins[i])
+                    bstart++;
+                if (bstart >= countB)
+                    break;
+
+                var current = -bucketA.yzminmaxs[i].zwxy;
+                var xmax    = bucketA.xmaxs[i];
+                for (int j = bstart; j < countB && bucketB.xmins[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < bucketB.yzminmaxs[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(i, j);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+
+            //Check for a starting in b's x range
+            int astart = 0;
+            for (int i = 0; i < countB; i++)
+            {
+                //Advance to a.xmin > b.xmin
+                //Exclude equals case this time by continuing if equal
+                while (astart < countA && bucketA.xmins[astart] <= bucketB.xmins[i])
+                    astart++;
+                if (astart >= countA)
+                    break;
+
+                var current = -bucketB.yzminmaxs[i].zwxy;
+                var xmax    = bucketB.xmaxs[i];
+                for (int j = astart; j < countA && bucketA.xmins[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < bucketA.yzminmaxs[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(j, i);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+        }
+
+        static unsafe void BipartiteSweepAvx<T>(in CollisionLayer layerA,
+                                                in CollisionLayer layerB,
+                                                in BucketSlices bucketA,
+                                                in BucketSlices bucketB,
+                                                int jobIndex,
+                                                ref T processor,
+                                                bool isThreadSafe = true) where T : struct,
         IFindPairsProcessor
         {
             int countA = bucketA.xmins.Length;
@@ -56,11 +190,6 @@ namespace Latios.Psyshock
 
             var result = new FindPairsResult(in layerA, in layerB, in bucketA, in bucketB, jobIndex, isThreadSafe);
 
-            //var outer0Marker = new Unity.Profiling.ProfilerMarker("Outer0");
-            //var outer1Marker = new Unity.Profiling.ProfilerMarker("Outer1");
-
-            //outer0Marker.Begin();
-
             //Check for b starting in a's x range
             int bstart = 0;
             for (int i = 0; i < countA; i++)
@@ -72,19 +201,38 @@ namespace Latios.Psyshock
                 if (bstart >= countB)
                     break;
 
-                var current = -bucketA.yzminmaxs[i].zwxy;
-                for (int j = bstart; j < countB && bucketB.xmins[j] <= bucketA.xmaxs[i]; j++)
+                var   current        = -bucketA.yzminmaxs[i].zwxy;
+                v256  current256     = new v256(current.x, current.y, current.z, current.w, current.x, current.y, current.z, current.w);
+                var   xmax           = bucketA.xmaxs[i];
+                var   xminsPtr       = (byte*)bucketB.xmins.GetUnsafeReadOnlyPtr() + 4 * bstart;
+                var   flippedPtr     = (byte*)bucketB.yzminmaxs.GetUnsafeReadOnlyPtr() + 16 * bstart;
+                var   countRemaining = 4 * (ulong)(countB - bstart);
+                ulong j              = 0;
+                for (; j < (countRemaining & ~0x7ul) && *(float*)(xminsPtr + j + 4) <= xmax; j += 8)
                 {
-                    if (math.bitmask(current < bucketB.yzminmaxs[j]) == 0)
+                    v256 otherPairs = X86.Avx.mm256_loadu_ps(flippedPtr + 4 * j);
+                    var  cmpBools   = X86.Avx.mm256_cmp_ps(current256, otherPairs, (int)X86.Avx.CMP.LT_OQ);
+                    var  cmpResult  = X86.Avx.mm256_movemask_ps(cmpBools);
+                    if (Hint.Unlikely((cmpResult & 0xf) == 0))
                     {
-                        result.SetBucketRelativePairIndices(i, j);
+                        result.SetBucketRelativePairIndices(i, (int)(j >> RuntimeConstants.two.Data) + bstart);
+                        processor.Execute(in result);
+                    }
+                    if (Hint.Unlikely((cmpResult & 0xf0) == 0))
+                    {
+                        result.SetBucketRelativePairIndices(i, (int)(j >> RuntimeConstants.two.Data) + 1 + bstart);
+                        processor.Execute(in result);
+                    }
+                }
+                if (j < countRemaining && *(float*)(xminsPtr + j) <= xmax)
+                {
+                    if (Hint.Unlikely(math.bitmask(current < *(float4*)(flippedPtr + 4 * j)) == 0))
+                    {
+                        result.SetBucketRelativePairIndices(i, (int)(j >> RuntimeConstants.two.Data) + bstart);
                         processor.Execute(in result);
                     }
                 }
             }
-
-            //outer0Marker.End();
-            //outer1Marker.Begin();
 
             //Check for a starting in b's x range
             int astart = 0;
@@ -97,18 +245,38 @@ namespace Latios.Psyshock
                 if (astart >= countA)
                     break;
 
-                var current = -bucketB.yzminmaxs[i].zwxy;
-                for (int j = astart; j < countA && bucketA.xmins[j] <= bucketB.xmaxs[i]; j++)
+                var   current        = -bucketB.yzminmaxs[i].zwxy;
+                v256  current256     = new v256(current.x, current.y, current.z, current.w, current.x, current.y, current.z, current.w);
+                var   xmax           = bucketB.xmaxs[i];
+                var   xminsPtr       = (byte*)bucketA.xmins.GetUnsafeReadOnlyPtr() + 4 * astart;
+                var   flippedPtr     = (byte*)bucketA.yzminmaxs.GetUnsafeReadOnlyPtr() + 16 * astart;
+                var   countRemaining = 4 * (ulong)(countA - astart);
+                ulong j              = 0;
+                for (; j < (countRemaining & ~0x7ul) && *(float*)(xminsPtr + j + 4) <= xmax; j += 8)
                 {
-                    if (math.bitmask(current < bucketA.yzminmaxs[j]) == 0)
+                    v256 otherPairs = X86.Avx.mm256_loadu_ps(flippedPtr + 4 * j);
+                    var  cmpBools   = X86.Avx.mm256_cmp_ps(current256, otherPairs, (int)X86.Avx.CMP.LT_OQ);
+                    var  cmpResult  = X86.Avx.mm256_movemask_ps(cmpBools);
+                    if (Hint.Unlikely((cmpResult & 0xf) == 0))
                     {
-                        result.SetBucketRelativePairIndices(j, i);
+                        result.SetBucketRelativePairIndices((int)(j >> RuntimeConstants.two.Data) + astart, i);
+                        processor.Execute(in result);
+                    }
+                    if (Hint.Unlikely((cmpResult & 0xf0) == 0))
+                    {
+                        result.SetBucketRelativePairIndices((int)(j >> RuntimeConstants.two.Data) + 1 + astart, i);
+                        processor.Execute(in result);
+                    }
+                }
+                if (j < countRemaining && *(float*)(xminsPtr + j) <= xmax)
+                {
+                    if (Hint.Unlikely(math.bitmask(current < *(float4*)(flippedPtr + 4 * j)) == 0))
+                    {
+                        result.SetBucketRelativePairIndices((int)(j >> RuntimeConstants.two.Data) + astart, i);
                         processor.Execute(in result);
                     }
                 }
             }
-
-            //outer1Marker.End();
         }
         #endregion
 

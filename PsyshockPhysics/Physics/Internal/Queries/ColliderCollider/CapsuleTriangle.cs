@@ -145,6 +145,56 @@ namespace Latios.Psyshock
             return false;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in TriangleCollider triangle,
+                                                                          in RigidTransform triangleTransform,
+                                                                          in CapsuleCollider capsule,
+                                                                          in RigidTransform capsuleTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            UnitySim.ContactsBetweenResult result = default;
+            result.contactNormal                  = distanceResult.normalB;
+
+            var triangleLocalContactNormal = math.InverseRotateFast(triangleTransform.rot, -distanceResult.normalB);
+            PointRayTriangle.BestFacePlanesAndVertices(in triangle, triangleLocalContactNormal, out var edgePlaneNormals, out var edgePlaneDistances, out var plane, out _);
+
+            bool needsClosestPoint = math.abs(math.dot(triangleLocalContactNormal, plane.normal)) < 0.05f;
+
+            if (!needsClosestPoint)
+            {
+                var bInATransform     = math.mul(math.inverse(triangleTransform), capsuleTransform);
+                var rayStart          = math.transform(bInATransform, capsule.pointA);
+                var rayDisplacement   = math.transform(bInATransform, capsule.pointB) - rayStart;
+                var rayRelativeStarts = simd.dot(rayStart, edgePlaneNormals) - edgePlaneDistances;
+                var relativeDiffs     = simd.dot(rayDisplacement, edgePlaneNormals);
+                var rayRelativeEnds   = rayRelativeStarts + relativeDiffs;
+                var rayFractions      = math.select(-rayRelativeStarts / relativeDiffs, float4.zero, relativeDiffs == float4.zero);
+                var startsInside      = rayRelativeStarts <= 0f;
+                var endsInside        = rayRelativeEnds <= 0f;
+                var projectsOnFace    = startsInside | endsInside;
+                var enterFractions    = math.select(float4.zero, rayFractions, !startsInside & rayFractions > float4.zero);
+                var exitFractions     = math.select(1f, rayFractions, !endsInside & rayFractions < 1f);
+                var fractionA         = math.cmax(enterFractions);
+                var fractionB         = math.cmin(exitFractions);
+                needsClosestPoint     = true;
+                if (math.all(projectsOnFace) && fractionA < fractionB)
+                {
+                    // Add the two contacts from the possibly clipped segment
+                    var distanceScalarAlongContactNormal = math.rcp(math.dot(triangleLocalContactNormal, plane.normal));
+                    var clippedSegmentA                  = rayStart + fractionA * rayDisplacement;
+                    var clippedSegmentB                  = rayStart + fractionB * rayDisplacement;
+                    var aDistance                        = mathex.SignedDistance(plane, clippedSegmentA) * distanceScalarAlongContactNormal;
+                    var bDistance                        = mathex.SignedDistance(plane, clippedSegmentB) * distanceScalarAlongContactNormal;
+                    result.Add(math.transform(triangleTransform, clippedSegmentA), aDistance - capsule.radius);
+                    result.Add(math.transform(triangleTransform, clippedSegmentB), bDistance - capsule.radius);
+                    needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
+                }
+            }
+
+            if (needsClosestPoint)
+                result.Add(distanceResult.hitpointB, distanceResult.distance);
+            return result;
+        }
+
         internal static bool TriangleCapsuleDistance(in TriangleCollider triangle, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
         {
             // The strategy for this is different from Unity Physics, but is inspired by the capsule-capsule algorithm

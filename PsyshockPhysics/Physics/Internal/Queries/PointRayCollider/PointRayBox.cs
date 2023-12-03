@@ -277,6 +277,60 @@ namespace Latios.Psyshock
             var featureCodeVertex        = math.bitmask(new bool4(isNegative, false));
             return (ushort)math.select(featureCodeFace, math.select(featureCodeEdge, featureCodeVertex, normalsNotZeroCount == 3), normalsNotZeroCount > 1);
         }
+
+        internal static void BestFacePlanesAndVertices(in BoxCollider box,
+                                                       float3 localDirectionToAlign,
+                                                       out simdFloat3 edgePlaneOutwardNormals,
+                                                       out float4 edgePlaneDistances,
+                                                       out Plane plane,
+                                                       out simdFloat3 vertices)
+        {
+            var axisMagnitudes = math.abs(localDirectionToAlign);
+            var bestAxis       = math.cmax(axisMagnitudes) == axisMagnitudes;
+            // Prioritize y first, then z, then x if multiple distances perfectly match.
+            // Todo: Should this be configurabe?
+            bestAxis.xz               &= !bestAxis.y;
+            bestAxis.x                &= !bestAxis.z;
+            bool   bestAxisIsNegative  = math.any(bestAxis & (localDirectionToAlign < 0f));
+            var    faceIndex           = math.tzcnt(math.bitmask(new bool4(bestAxis, false))) + math.select(0, 3, bestAxisIsNegative);
+            float4 ones                = 1f;
+            float4 firstComponent      = new float4(-1f, 1f, 1f, -1f);
+            float4 secondCompPos       = new float4(1f, 1f, -1f, -1f);  // CW so that edge X plane_normal => outward
+            switch (faceIndex)
+            {
+                case 0:  // positive X
+                    plane    = new Plane(new float3(1f, 0f, 0f), box.halfSize.x);
+                    vertices = new simdFloat3(ones, firstComponent, secondCompPos);
+                    break;
+                case 1:  // positive Y
+                    plane    = new Plane(new float3(0f, 1f, 0f), box.halfSize.y);
+                    vertices = new simdFloat3(firstComponent, ones, secondCompPos);
+                    break;
+                case 2:  // positive Z
+                    plane    = new Plane(new float3(0f, 0f, 1f), box.halfSize.z);
+                    vertices = new simdFloat3(firstComponent, secondCompPos, ones);
+                    break;
+                case 3:  // negative X
+                    plane    = new Plane(new float3(-1f, 0f, 0f), -box.halfSize.x);
+                    vertices = new simdFloat3(-ones, firstComponent, -secondCompPos);
+                    break;
+                case 4:  // negative Y
+                    plane    = new Plane(new float3(0f, -1f, 0f), -box.halfSize.y);
+                    vertices = new simdFloat3(firstComponent, -ones, -secondCompPos);
+                    break;
+                case 5:  // negative Z
+                    plane    = new Plane(new float3(0f, 0f, -1f), -box.halfSize.z);
+                    vertices = new simdFloat3(firstComponent, -secondCompPos, -ones);
+                    break;
+                default:  // Should not happen
+                    plane    = default;
+                    vertices = default;
+                    break;
+            }
+            vertices                *= box.halfSize;
+            edgePlaneOutwardNormals  = simd.cross(vertices.bcda - vertices, localDirectionToAlign);  // These normals are perpendicular to the contact normal, not the plane.
+            edgePlaneDistances       = simd.dot(edgePlaneOutwardNormals, vertices.bcda);
+        }
     }
 }
 

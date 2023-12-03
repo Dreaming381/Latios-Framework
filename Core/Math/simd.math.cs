@@ -162,6 +162,11 @@ namespace Latios
             return math.max(math.max(s.x, s.y), s.z);
         }
 
+        public static float3 csumabcd(simdFloat3 s)
+        {
+            return new float3(math.csum(s.x), math.csum(s.y), math.csum(s.z));
+        }
+
         public static simdFloat3 abs(simdFloat3 s)
         {
             return new simdFloat3(math.abs(s.x), math.abs(s.y), math.abs(s.z));
