@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.8.5]
+# Latios Framework for Unity ECS – [0.8.6]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -122,6 +122,8 @@ of rich text tags is also supported.
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
+-   Mimic – Community-driven solutions for replicating common GameObject tools
+    and workflows inside Unity ECS
 
 ## Why Use the Latios Framework?
 

@@ -954,14 +954,25 @@ namespace Latios.Kinemation.Systems
             m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
             var entitiesGraphicsChunkUpdater = new EntitiesGraphicsChunkUpdater
             {
-                ComponentTypes                 = m_burstCompatibleTypeArray,
-                chunkMaterialPropertyDirtyMask = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                UnreferencedBatchIndices       = unreferencedBatchIndices,
-                ChunkProperties                = m_ChunkProperties,
-                LastSystemVersion              = lastSystemVersion,
+                postProcessMatrixHandle         = GetComponentTypeHandle<PostProcessMatrix>(true),
+                previousPostProcessMatrixHandle = GetComponentTypeHandle<PreviousPostProcessMatrix>(true),
 
-                WorldToLocalType     = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
-                PrevWorldToLocalType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+                materialTypeHandleArray        = m_burstCompatibleTypeArray,
+                chunkMaterialPropertyDirtyMask = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                unreferencedBatchIndices       = unreferencedBatchIndices,
+                chunkProperties                = m_ChunkProperties,
+                lastSystemVersion              = lastSystemVersion,
+
+                worldToLocalType     = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
+                prevWorldToLocalType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+                worldTransformType    = TypeManager.GetTypeIndex<WorldTransform>(),
+                previousTransformType = TypeManager.GetTypeIndex<PreviousTransform>(),
+# elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                worldTransformType    = TypeManager.GetTypeIndex<LocalToWorld>(),
+                previousTransformType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
+#endif
 
 #if PROFILE_BURST_JOB_INTERNALS
                 ProfileAddUpload = new ProfilerMarker("AddUpload"),
@@ -1629,20 +1640,26 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         internal struct EntitiesGraphicsChunkUpdater
         {
-            public ComponentTypeCache.BurstCompatibleTypeArray         ComponentTypes;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>         postProcessMatrixHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousPostProcessMatrix> previousPostProcessMatrixHandle;
+
+            public ComponentTypeCache.BurstCompatibleTypeArray         materialTypeHandleArray;
             public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask> chunkMaterialPropertyDirtyMask;
 
             [NativeDisableParallelForRestriction]
-            public NativeArray<long> UnreferencedBatchIndices;
+            public NativeArray<long> unreferencedBatchIndices;
 
             [NativeDisableParallelForRestriction]
             [ReadOnly]
-            public NativeArray<ChunkProperty> ChunkProperties;
+            public NativeArray<ChunkProperty> chunkProperties;
 
-            public uint LastSystemVersion;
+            public uint lastSystemVersion;
 
-            public int WorldToLocalType;
-            public int PrevWorldToLocalType;
+            public int worldToLocalType;
+            public int prevWorldToLocalType;
+
+            public int worldTransformType;
+            public int previousTransformType;
 
             unsafe void MarkBatchAsReferenced(int batchIndex)
             {
@@ -1650,10 +1667,10 @@ namespace Latios.Kinemation.Systems
 
                 AtomicHelpers.IndexToQwIndexAndMask(batchIndex, out int qw, out long mask);
 
-                Debug.Assert(qw < UnreferencedBatchIndices.Length, "Batch index out of bounds");
+                Debug.Assert(qw < unreferencedBatchIndices.Length, "Batch index out of bounds");
 
                 AtomicHelpers.AtomicAnd(
-                    (long*)UnreferencedBatchIndices.GetUnsafePtr(),
+                    (long*)unreferencedBatchIndices.GetUnsafePtr(),
                     qw,
                     ~mask);
             }
@@ -1674,34 +1691,34 @@ namespace Latios.Kinemation.Systems
                 if (!isNewChunk)
                     MarkBatchAsReferenced(chunkInfo.BatchIndex);
 
-                bool structuralChanges = chunk.DidOrderChange(LastSystemVersion);
+                bool structuralChanges = chunk.DidOrderChange(lastSystemVersion);
 
                 ref var mask = ref chunk.GetChunkComponentRefRW(ref chunkMaterialPropertyDirtyMask);
 
-                fixed (DynamicComponentTypeHandle* fixedT0 = &ComponentTypes.t0)
+                fixed (DynamicComponentTypeHandle* fixedT0 = &materialTypeHandleArray.t0)
                 {
                     for (int i = chunkInfo.ChunkTypesBegin; i < chunkInfo.ChunkTypesEnd; ++i)
                     {
-                        var chunkProperty = ChunkProperties[i];
+                        var chunkProperty = chunkProperties[i];
                         var type          = chunkProperty.ComponentTypeIndex;
                     }
 
                     for (int i = chunkInfo.ChunkTypesBegin; i < chunkInfo.ChunkTypesEnd; ++i)
                     {
-                        var chunkProperty = ChunkProperties[i];
-                        var type          = ComponentTypes.Type(fixedT0, chunkProperty.ComponentTypeIndex);
-                        var typeIndex     = ComponentTypes.TypeIndexToArrayIndex[ComponentTypeCache.GetArrayIndex(chunkProperty.ComponentTypeIndex)];
+                        var chunkProperty = chunkProperties[i];
+                        var type          = materialTypeHandleArray.Type(fixedT0, chunkProperty.ComponentTypeIndex);
+                        var typeIndex     = materialTypeHandleArray.TypeIndexToArrayIndex[ComponentTypeCache.GetArrayIndex(chunkProperty.ComponentTypeIndex)];
+                        var chunkType     = chunkProperty.ComponentTypeIndex;
+                        if (chunkType == worldToLocalType || chunkType == prevWorldToLocalType)
+                            continue;
 
-                        var chunkType          = chunkProperty.ComponentTypeIndex;
-                        var isWorldToLocal     = chunkType == WorldToLocalType;
-                        var isPrevWorldToLocal = chunkType == PrevWorldToLocalType;
+                        bool componentChanged = chunk.DidChange(ref type, lastSystemVersion);
+                        if (chunkType == worldTransformType)
+                            componentChanged |= chunk.DidChange(ref postProcessMatrixHandle, lastSystemVersion);
+                        if (chunkType == previousTransformType)
+                            componentChanged |= chunk.DidChange(ref previousPostProcessMatrixHandle, lastSystemVersion);
 
-                        var skipComponent = (isWorldToLocal || isPrevWorldToLocal);
-
-                        bool componentChanged  = chunk.DidChange(ref type, LastSystemVersion);
-                        bool copyComponentData = (isNewChunk || structuralChanges || componentChanged) && !skipComponent;
-
-                        if (copyComponentData)
+                        if (isNewChunk || structuralChanges || componentChanged)
                         {
                             if (typeIndex >= 64)
                                 mask.upper.SetBits(typeIndex - 64, true);
@@ -1799,9 +1816,9 @@ namespace Latios.Kinemation.Systems
 
                     // When LOD ranges change, we must reset the movement grace to avoid using stale data
                     bool lodRangeChange =
-                        chunkHeader.ArchetypeChunk.DidOrderChange(EntitiesGraphicsChunkUpdater.LastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(ref LodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(ref RootLodRange, EntitiesGraphicsChunkUpdater.LastSystemVersion);
+                        chunkHeader.ArchetypeChunk.DidOrderChange(EntitiesGraphicsChunkUpdater.lastSystemVersion) |
+                        chunkHeader.ArchetypeChunk.DidChange(ref LodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion) |
+                        chunkHeader.ArchetypeChunk.DidChange(ref RootLodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion);
 
                     if (lodRangeChange)
                     {

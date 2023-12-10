@@ -24,15 +24,16 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
-        /// Returns true if the coroutine needs to restart from the beginning.
+        /// Returns false if the coroutine needs to restart from the beginning.
         /// Terminate is set to true if the system is being destroyed and resources
-        /// should be cleaned up. If both are false, operation may continue as normal.
+        /// should be cleaned up. If terminate is false and the method returns true,
+        /// operation may continue as normal.
         /// </summary>
         /// <param name="expectedPhase">The expected next phase of operation</param>
         /// <param name="terminate"><see langword="true"/>if the system is being destroyed,
         /// false otherwise</param>
-        /// <returns>True if the phase did not match expectations, false otherwise.
-        /// This returns false if terminate is true.</returns>
+        /// <returns>True if the phase matched expectations, false otherwise.
+        /// This returns true if terminate is true.</returns>
         protected bool GetPhaseActions(CullingComputeDispatchState expectedPhase, out bool terminate)
         {
             terminate = m_inShutdown;

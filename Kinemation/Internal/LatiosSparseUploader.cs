@@ -382,7 +382,7 @@ namespace Latios.Kinemation.SparseUpload
         /// <param name="postMatrixSrc">A pointer to a memory area that contains float3x4 matrices to multiply with the qvvs.</param>
         public void AddQvvsUpload(void* src, int numQvvs, int offset, void* postMatrixSrc = null)
         {
-            QvvsUploadHelper(src, numQvvs, offset, -1);
+            QvvsUploadHelper(src, numQvvs, offset, -1, postMatrixSrc);
         }
 
         /// <summary>
@@ -402,7 +402,7 @@ namespace Latios.Kinemation.SparseUpload
         /// <param name="postMatrixSrc">A pointer to a memory area that contains float3x4 matrices to multiply with the qvvs.</param>
         public void AddQvvsUploadAndInverse(void* src, int numQvvs, int offset, int offsetInverse, void* postMatrixSrc = null)
         {
-            QvvsUploadHelper(src, numQvvs, offset, offsetInverse);
+            QvvsUploadHelper(src, numQvvs, offset, offsetInverse, postMatrixSrc);
         }
 
         /// <summary>

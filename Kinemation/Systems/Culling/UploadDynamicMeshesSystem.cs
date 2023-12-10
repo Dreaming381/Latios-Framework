@@ -201,7 +201,8 @@ namespace Latios.Kinemation
                 bool needsPrevious = (classification & DeformClassification.AnyPreviousDeform) != DeformClassification.None;
                 bool needsTwoAgo   = (classification & DeformClassification.TwoAgoDeform) != DeformClassification.None;
 
-                for (int i = 0; i < chunk.Count; i++)
+                var enumerator = new ChunkEntityEnumerator(true, new v128(lower, upper), chunk.Count);
+                while (enumerator.NextEntityIndex(out int i))
                 {
                     var state            = states[i].state;
                     var mask             = state & DynamicMeshState.Flags.RotationMask;
