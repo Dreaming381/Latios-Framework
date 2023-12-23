@@ -41,6 +41,7 @@ namespace Latios.Kinemation
             if (unityUpdateBounds != null)
                 unityUpdateBounds.Enabled = false;
 
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateGraphicsBufferBrokerSystem>(),                 world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderUpdateSuperSystem>(),                world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderSyncPointSuperSystem>(),             world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationFrameSyncPointSuperSystem>(),              world);
@@ -53,15 +54,6 @@ namespace Latios.Kinemation
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<CopyTransformFromBoneSystem>(),                      world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<RotateAnimatedBuffersSystem>(),                      world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateMatrixPreviousSystem>(),                       world);
-        }
-
-        /// <summary>
-        /// Installs the Kinemation Mecanim state machine runtime systems. This should only be installed in the runtime world.
-        /// </summary>
-        /// <param name="world"></param>
-        public static void InstallMecanimFeatures(World world)
-        {
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<MecanimSuperSystem>(), world);
         }
     }
 }

@@ -29,6 +29,8 @@ namespace InternalSourceGen
         public int                                    meshEntryIndex;
     }
 
+    internal struct BoundMeshNeedsReinit : IComponentData { }
+
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     internal struct ChunkSkinningCullingTag : IComponentData { }
 
@@ -328,11 +330,6 @@ namespace InternalSourceGen
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
     }
 
-    internal partial struct GraphicsBufferManager : IManagedStructComponent
-    {
-        public GraphicsBufferTrackingPool pool;
-    }
-
     internal unsafe partial struct BrgCullingContext : ICollectionComponent
     {
         //public BatchCullingContext cullingContext;
@@ -441,11 +438,6 @@ namespace InternalSourceGen
 
         // The data is owned by a world or system rewindable allocator.
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
-    }
-
-    internal struct GlyphCountThisFrame : IComponentData
-    {
-        public uint glyphCount;
     }
     #endregion
 }

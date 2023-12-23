@@ -15,6 +15,8 @@ namespace Latios.Kinemation
         public CullingComputeDispatchState state;
     }
 
+namespace Systems
+{
     public abstract partial class CullingComputeDispatchSubSystemBase : SubSystem
     {
         protected abstract IEnumerable<bool> UpdatePhase();
@@ -72,5 +74,6 @@ namespace Latios.Kinemation
             OnDestroyDispatchSystem();
         }
     }
+}
 }
 

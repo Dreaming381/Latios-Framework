@@ -1,4 +1,3 @@
-using Latios.Kinemation.TextBackend.Systems;
 using Latios.Transforms.Systems;
 using Unity.Entities;
 using Unity.Rendering;
@@ -9,31 +8,9 @@ using Unity.Transforms;
 namespace Latios.Kinemation.Systems
 {
     /// <summary>
-    /// This super system contains systems that manage the animator state machine and
-    /// resulting layered bone transformations.
-    /// </summary>
-    [UpdateInGroup(typeof(SimulationSystemGroup))]
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-    [UpdateBefore(typeof(TransformSuperSystem))]
-#else
-    [UpdateBefore(typeof(TransformSystemGroup))]
-#endif
-    [DisableAutoCreation]
-    public partial class MecanimSuperSystem : SuperSystem
-    {
-        protected override void CreateSystems()
-        {
-            EnableSystemSorting = false;
-
-            GetOrCreateAndAddUnmanagedSystem<MecanimStateMachineUpdateSystem>();
-            GetOrCreateAndAddUnmanagedSystem<ApplyMecanimLayersToExposedBonesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<ApplyMecanimLayersToOptimizedSkeletonsSystem>();
-        }
-    }
-
-    /// <summary>
-    /// Subclass this class and add it to the world prior to installing Kinemation
-    /// to customize the culling loop.
+    /// This super system executes for each culling pass callback from Unity and typically
+    /// runs multiple times per frame. If you need a new hook point into this culling loop
+    /// for your own custom systems, please make a request via available social channels.
     /// </summary>
     [DisableAutoCreation]
     public partial class KinemationCullingSuperSystem : SuperSystem
@@ -73,10 +50,11 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddManagedSystem<TextBackendDispatchSystem>();
+            GetOrCreateAndAddManagedSystem<CullingRoundRobinEarlyExtensionsSuperSystem>();
             GetOrCreateAndAddManagedSystem<UploadDynamicMeshesSystem>();
             GetOrCreateAndAddManagedSystem<BlendShapesDispatchSystem>();
             GetOrCreateAndAddManagedSystem<SkinningDispatchSystem>();
+            GetOrCreateAndAddManagedSystem<CullingRoundRobinLateExtensionsSuperSystem>();
             GetOrCreateAndAddManagedSystem<UploadMaterialPropertiesSystem>();
 
             worldBlackboardEntity.AddComponent<CullingComputeDispatchActiveState>();
@@ -93,16 +71,44 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    /// <summary>
+    /// This round-robin super system is intended for systems that don't require info from deforming meshes.
+    /// This is the ideal location for round-robin systems that schedule single-threaded jobs updating material properties.
+    /// </summary>
+    [DisableAutoCreation]
+    public partial class CullingRoundRobinEarlyExtensionsSuperSystem : SuperSystem
+    {
+        protected override void CreateSystems()
+        {
+            EnableSystemSorting = true;
+        }
+    }
+
+    /// <summary>
+    /// This round-robin super system updates right before material properties and is intended for systems that require
+    /// valid graphics buffer contents from deforming meshes.
+    /// </summary>
+    [DisableAutoCreation]
+    public partial class CullingRoundRobinLateExtensionsSuperSystem : SuperSystem
+    {
+        protected override void CreateSystems()
+        {
+            EnableSystemSorting = true;
+        }
+    }
+
+    /// <summary>
+    /// This is the main super system that processes render bounds.
+    /// </summary>
     [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
     [UpdateBefore(typeof(RenderBoundsUpdateSystem))]
     [DisableAutoCreation]
-    public partial class KinemationRenderUpdateSuperSystem : RootSuperSystem
+    public partial class KinemationRenderUpdateSuperSystem : SuperSystem
     {
         protected override void CreateSystems()
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<TextBackendUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
@@ -112,6 +118,10 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    /// <summary>
+    /// This super system updates after the second presentation sync point (the one that always happens).
+    /// Jobs scheduled from here and afterwards may run during engine and editor updates.
+    /// </summary>
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     [UpdateAfter(typeof(LatiosEntitiesGraphicsSystem))]
     [DisableAutoCreation]
@@ -133,6 +143,11 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    /// <summary>
+    /// This super system runs during the sync point stage of PresentationSystemGroup.
+    /// Often, none of the systems in this stage do anything, so there may not actually
+    /// be a real sync point here.
+    /// </summary>
     [UpdateInGroup(typeof(StructuralChangePresentationSystemGroup))]
     [DisableAutoCreation]
     public partial class KinemationRenderSyncPointSuperSystem : SuperSystem
@@ -147,6 +162,10 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    /// <summary>
+    /// This super system runs during the Latios Framework sync point stage in InitializationSystemGroup.
+    /// This helps prevent sync points from happening in PresentationSystemGroup.
+    /// </summary>
     [UpdateInGroup(typeof(Latios.Systems.LatiosWorldSyncGroup))]
     [DisableAutoCreation]
     public partial class KinemationFrameSyncPointSuperSystem : SuperSystem
@@ -155,6 +174,7 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
+            GetOrCreateAndAddUnmanagedSystem<LiveBakingCheckForReinitsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosUpdateEntitiesGraphicsChunkStructureSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosAddWorldAndChunkRenderBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<KinemationBindingReactiveSystem>();

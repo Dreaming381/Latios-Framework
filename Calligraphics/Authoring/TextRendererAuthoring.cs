@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Latios.Authoring;
-using Latios.Kinemation.TextBackend.Authoring;
+using Latios.Calligraphics.Rendering.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Graphics;

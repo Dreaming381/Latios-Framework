@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using Debug = UnityEngine.Debug;
 using Unity.Entities;
 using Unity.Entities.Exposed;
@@ -40,12 +39,14 @@ namespace Latios.Systems
         public LatiosInitializationSystemGroupManager(LatiosWorld world, InitializationSystemGroup initializationGroup)
         {
             m_latiosWorld             = world;
+            var autoDestroyExpired    = world.CreateSystem<AutoDestroyExpirablesSystem>();
             var syncPlayback          = world.CreateSystemManaged<SyncPointPlaybackSystemDispatch>();
             var mergeGlobals          = world.CreateSystemManaged<MergeBlackboardsSystem>();
             var collectionReactive    = world.CreateSystem<CollectionComponentsReactiveSystem>();
             var managedStructReactive = world.CreateSystem<ManagedStructComponentsReactiveSystem>();
             var syncGroup             = world.GetOrCreateSystemManaged<LatiosWorldSyncGroup>();
             var preSyncGroup          = world.GetOrCreateSystemManaged<PreSyncPointGroup>();
+            initializationGroup.AddSystemToUpdateList(autoDestroyExpired);
             initializationGroup.AddSystemToUpdateList(syncPlayback);
             initializationGroup.AddSystemToUpdateList(syncGroup);
             initializationGroup.AddSystemToUpdateList(preSyncGroup);

@@ -1,0 +1,26 @@
+{
+    "name": "Latios.Mimic",
+    "rootNamespace": "Latios.Mimic",
+    "references": [
+        "GUID:46fe9b4ef94d76744bc0b97bc2f73d94",
+        "GUID:59e15be979a1f934cac2dcd97dd0ea2b",
+        "GUID:11912cc675165314485c904ed61b2e92",
+        "GUID:2665a8d13d1b3f18800f46e256720795",
+        "GUID:e0cd26848372d4e5c891c569017e11f1",
+        "GUID:d8b63aba1907145bea998dd612889d6b",
+        "GUID:734d92eba21c94caba915361bd5ac177",
+        "GUID:8819f35a0fc84499b990e90a4ca1911f",
+        "GUID:a655924d5e83d054fb97f0b7d01a12ea",
+        "GUID:59a14596f9fb90a41af02f3a54868295",
+        "GUID:a5baed0c9693541a5bd947d336ec7659"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

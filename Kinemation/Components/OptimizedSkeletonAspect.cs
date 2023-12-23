@@ -9,6 +9,10 @@ using Unity.Mathematics;
 
 namespace Latios.Kinemation
 {
+    /// <summary>
+    /// An aspect that provides full editing of an optimized skeleton's transforms.
+    /// This also provides access to the inertial blending interface built into optimized skeletons.
+    /// </summary>
     public readonly partial struct OptimizedSkeletonAspect : IAspect
     {
         readonly WorldTransformReadOnlyAspect                   m_worldTransform;
@@ -202,6 +206,39 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
+    /// A handle to the root bone's QVVS in the entity's local space, which is unused in hierarchy calculations and often
+    /// contains the root motion delta.
+    /// </summary>
+    public readonly partial struct OptimizedRootDeltaROAspect : IAspect
+    {
+        readonly RefRO<OptimizedSkeletonState>                    m_skeletonState;
+        [ReadOnly] readonly DynamicBuffer<OptimizedBoneTransform> m_boneTransforms;
+
+        public TransformQvvs rootDelta
+        {
+            get
+            {
+                var state = m_skeletonState.ValueRO.state;
+                EnsureLocalRootIsAccessible(state);
+                var  mask      = (byte)(state & OptimizedSkeletonState.Flags.RotationMask);
+                bool isDirty   = (state & OptimizedSkeletonState.Flags.IsDirty) == OptimizedSkeletonState.Flags.IsDirty;
+                int  boneCount = m_boneTransforms.Length / 6;
+                var  index     = math.select(OptimizedSkeletonState.PreviousFromMask[mask], OptimizedSkeletonState.CurrentFromMask[mask], isDirty) * boneCount * 2 + boneCount;
+                return m_boneTransforms[index].boneTransform;
+            }
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void EnsureLocalRootIsAccessible(OptimizedSkeletonState.Flags state)
+        {
+            if ((state & OptimizedSkeletonState.Flags.NeedsSync) == OptimizedSkeletonState.Flags.NeedsSync ||
+                (state & OptimizedSkeletonState.Flags.NeedsHistorySync) == OptimizedSkeletonState.Flags.NeedsHistorySync)
+                throw new InvalidOperationException(
+                    "OptimizedBoneDeltaRO is trying to access an optimized skeleton which is not synced. You must sync the skeleton first via OptimizedSkeletonAspect.EndSamplingAndSync() and OptimizedSkeletonAspect.SyncHistory().");
+        }
+    }
+
+    /// <summary>
     /// An Optimized Bone handle that can be acquired from an OptimizedSkeletonAspect.
     /// It provides many useful utilities for interacting with the individual bones.
     /// </summary>
@@ -253,6 +290,23 @@ namespace Latios.Kinemation
         /// An array of skeleton bone indices of all the immediate children of this bone
         /// </summary>
         public ref BlobArray<short> childrenIndices => ref m_allChildrenIndices[m_index];
+
+        /// <summary>
+        /// The root-space transform of the bone from the previous frame
+        /// </summary>
+        public TransformQvvs previousRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        /// <summary>
+        /// The local-space transform of the bone from the previous frame
+        /// </summary>
+        public TransformQvvs previousLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
+        /// <summary>
+        /// The root-space transform of the bone from two frames ago
+        /// </summary>
+        public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        /// <summary>
+        /// The local-space transform of the bone from two frames ago
+        /// </summary>
+        public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
 
         // Todo: More ReadOnly Properties
 
@@ -306,7 +360,8 @@ namespace Latios.Kinemation
                     local.boneTransform.position = qvvs.InverseTransformPoint(in parentRootTransform, value);
                 else
                     local.boneTransform.position = value;
-                PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -327,7 +382,8 @@ namespace Latios.Kinemation
                     local.boneTransform.rotation = qvvs.InverseTransformRotation(in parentRootTransform, value);
                 else
                     local.boneTransform.rotation = value;
-                PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -348,7 +404,8 @@ namespace Latios.Kinemation
                     local.boneTransform.scale = qvvs.InverseTransformScale(in parentRootTransform, value);
                 else
                     local.boneTransform.scale = value;
-                PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -369,7 +426,8 @@ namespace Latios.Kinemation
                     root.boneTransform.position = qvvs.TransformPoint(in parentRootTransform, value);
                 else
                     root.boneTransform.position = value;
-                PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -390,7 +448,8 @@ namespace Latios.Kinemation
                     root.boneTransform.rotation = qvvs.TransformRotation(in parentRootTransform, value);
                 else
                     root.boneTransform.rotation = value;
-                PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -411,7 +470,8 @@ namespace Latios.Kinemation
                     root.boneTransform.scale = qvvs.TransformScale(in parentRootTransform, value);
                 else
                     root.boneTransform.scale = value;
-                PropagateScaleChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -429,7 +489,8 @@ namespace Latios.Kinemation
                 local.boneTransform.stretch = value;
                 ref var root                = ref m_boneTransforms.ElementAt(currentRootIndex);
                 root.boneTransform.stretch  = value;
-                PropagateStretchChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagateStretchChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -460,7 +521,8 @@ namespace Latios.Kinemation
                     local.boneTransform = qvvs.inversemulqvvs(in parentRootTransform, value);
                 else
                     local.boneTransform = value;
-                PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -481,31 +543,13 @@ namespace Latios.Kinemation
                     root.boneTransform = qvvs.mul(in parentRootTransform, value);
                 else
                     root.boneTransform = value;
-                PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                if (m_index > 0)
+                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
         #endregion
 
         // Todo: Modification Methods and ReadOnly Transformation Methods
-
-        #region ReadOnly Properties
-        /// <summary>
-        /// The root-space transform of the bone from the previous frame
-        /// </summary>
-        public TransformQvvs previousRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
-        /// <summary>
-        /// The local-space transform of the bone from the previous frame
-        /// </summary>
-        public TransformQvvs previousLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
-        /// <summary>
-        /// The root-space transform of the bone from two frames ago
-        /// </summary>
-        public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
-        /// <summary>
-        /// The local-space transform of the bone from two frames ago
-        /// </summary>
-        public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
-        #endregion
     }
 
     /// <summary>

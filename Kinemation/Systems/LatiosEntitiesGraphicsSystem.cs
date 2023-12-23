@@ -121,10 +121,11 @@ namespace Latios.Kinemation.Systems
         private uint m_LastSystemVersionAtLastUpdate;
         private uint m_globalSystemVersionAtLastUpdate;
 
-        private EntityQuery m_EntitiesGraphicsRenderedQuery;
-        private EntityQuery m_LodSelectGroup;
-        private EntityQuery m_ChangedTransformQuery;
-        private EntityQuery m_MetaEntitiesForHybridRenderableChunksQuery;
+        private EntityQuery     m_EntitiesGraphicsRenderedQuery;
+        private EntityQueryMask m_entitiesGraphicsRenderedQueryMask;
+        private EntityQuery     m_LodSelectGroup;
+        private EntityQuery     m_ChangedTransformQuery;
+        private EntityQuery     m_MetaEntitiesForHybridRenderableChunksQuery;
 
         const int   kInitialMaxBatchCount         = 1 * 1024;
         const float kMaxBatchGrowFactor           = 2f;
@@ -248,6 +249,7 @@ namespace Latios.Kinemation.Systems
                     ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>(),
                 },
             });
+            m_entitiesGraphicsRenderedQueryMask = m_EntitiesGraphicsRenderedQuery.GetEntityQueryMask();
 
             m_LodSelectGroup = GetEntityQuery(new EntityQueryDesc
             {
@@ -908,7 +910,7 @@ namespace Latios.Kinemation.Systems
             Profiler.EndSample();
 
             var numNewChunksArray = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
-            totalChunks           = m_EntitiesGraphicsRenderedQuery.CalculateChunkCount();
+            totalChunks           = m_EntitiesGraphicsRenderedQuery.CalculateChunkCountWithoutFiltering();
             var newChunks         = CollectionHelper.CreateNativeArray<ArchetypeChunk>(totalChunks, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
             var classifyNewChunksJob = new ClassifyNewChunksJobLatiosVersion
@@ -916,7 +918,8 @@ namespace Latios.Kinemation.Systems
                 EntitiesGraphicsChunkInfo = entitiesGraphicsRenderedChunkTypeRO,
                 ChunkHeader               = chunkHeadersRO,
                 NumNewChunks              = numNewChunksArray,
-                NewChunks                 = newChunks
+                NewChunks                 = newChunks,
+                chunkValidityMask         = m_entitiesGraphicsRenderedQueryMask
             }
             .ScheduleParallel(m_MetaEntitiesForHybridRenderableChunksQuery, inputDependencies);
 
@@ -1731,6 +1734,7 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>               ChunkHeader;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
+            [ReadOnly] public EntityQueryMask                                chunkValidityMask;
 
             [NativeDisableParallelForRestriction]
             public NativeArray<ArchetypeChunk> NewChunks;
@@ -1752,8 +1756,36 @@ namespace Latios.Kinemation.Systems
 
                     if (ShouldCountAsNewChunk(chunkInfo, chunkHeader.ArchetypeChunk))
                     {
+                        bool skip = false;
+                        ValidateChunkArchetype(chunkHeader.ArchetypeChunk, ref skip);
+                        if (skip)
+                            continue;
                         ClassifyNewChunk(chunkHeader.ArchetypeChunk);
                     }
+                }
+            }
+
+            [System.Diagnostics.Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+            void ValidateChunkArchetype(ArchetypeChunk chunk, ref bool skip)
+            {
+                if (!chunkValidityMask.MatchesIgnoreFilter(chunk))
+                {
+                    FixedString4096Bytes badArchetype  = default;
+                    var                  badComponents = chunk.Archetype.GetComponentTypes();
+                    foreach (var bad in badComponents)
+                    {
+                        var name = bad.ToFixedString();
+                        if (badArchetype.Length + name.Length > 4000)
+                        {
+                            for (int i = 0; i < 3; i++)
+                                badArchetype.Append('.');
+                            break;
+                        }
+                        badArchetype.Append(name);
+                        badArchetype.Append('\n');
+                    }
+                    UnityEngine.Debug.LogError(
+                        $"An invalid archetype was detected in a renderable entity with the EntitiesGraphicsChunkInfo chunk component. The most common cause for this is attempting to use Unity Physics with QVVS Transforms. Invalid archetype: {badArchetype}");
                 }
             }
 

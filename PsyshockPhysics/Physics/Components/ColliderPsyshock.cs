@@ -58,19 +58,19 @@ namespace Latios.Psyshock
         [FieldOffset(0)]
         ColliderType m_type;
 
-        [FieldOffset(16)]
+        [FieldOffset(4)]
         internal SphereCollider m_sphere;
 
-        [FieldOffset(16)]
+        [FieldOffset(4)]
         internal CapsuleCollider m_capsule;
 
-        [FieldOffset(16)]
+        [FieldOffset(4)]
         internal BoxCollider m_box;
 
-        [FieldOffset(16)]
+        [FieldOffset(4)]
         internal TriangleCollider m_triangle;
 
-        [FieldOffset(8)]
+        [FieldOffset(16)]
         internal ConvexCollider m_convex;
 
         // Unity crashes when there are aliased BlobAssetReferences.

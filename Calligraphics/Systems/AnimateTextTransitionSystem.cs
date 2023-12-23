@@ -1,22 +1,19 @@
+using Latios.Calligraphics.Rendering;
 using Latios.Calligraphics.RichText;
 using Latios.Calligraphics.RichText.Parsing;
-using Latios.Kinemation.Systems;
-using Latios.Kinemation.TextBackend;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.Rendering;
 
 using static Unity.Entities.SystemAPI;
 
 namespace Latios.Calligraphics.Systems
 {
-    [UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
+    [UpdateInGroup(typeof(CalligraphicsUpdateSuperSystem))]
     [UpdateAfter(typeof(GenerateGlyphsSystem))]
-    [UpdateBefore(typeof(KinemationRenderUpdateSuperSystem))]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     public partial struct AnimateTextTransitionSystem : ISystem

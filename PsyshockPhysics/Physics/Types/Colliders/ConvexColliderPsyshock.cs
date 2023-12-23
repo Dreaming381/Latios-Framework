@@ -11,17 +11,17 @@ namespace Latios.Psyshock
     /// It is often derived from a Mesh.
     /// </summary>
     [Serializable]
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct ConvexCollider
     {
         /// <summary>
         /// The blob asset containing the raw convex hull data
         /// </summary>
-        [FieldOffset(0)] public BlobAssetReference<ConvexColliderBlob> convexColliderBlob;
+        [FieldOffset(24)] public BlobAssetReference<ConvexColliderBlob> convexColliderBlob;
         /// <summary>
         /// The premultiplied scale and stretch in local space
         /// </summary>
-        [FieldOffset(8)] public float3 scale;
+        [FieldOffset(0)] public float3 scale;
 
         /// <summary>
         /// Creates a new ConvexCollider
@@ -49,13 +49,14 @@ namespace Latios.Psyshock
     /// </summary>
     public struct ConvexColliderBlob
     {
+        // Note: Max vertices is 252, max faces is 252, and max vertices per face is 32
         public BlobArray<float>  verticesX;
         public BlobArray<float>  verticesY;
         public BlobArray<float>  verticesZ;
         public BlobArray<float3> vertexNormals;
 
-        public BlobArray<int2>   vertexIndicesInEdges;
-        public BlobArray<float3> edgeNormals;
+        public BlobArray<IndexPair> vertexIndicesInEdges;
+        public BlobArray<float3>    edgeNormals;
 
         // outward normals and distance to origin
         public BlobArray<float> facePlaneX;
@@ -66,16 +67,41 @@ namespace Latios.Psyshock
         // xyz normal w, signed distance
         public BlobArray<float4> faceEdgeOutwardPlanes;
 
-        public BlobArray<int>  edgeIndicesInFaces;
-        public BlobArray<int2> edgeIndicesInFacesStartsAndCounts;
+        public BlobArray<EdgeIndexInFace> edgeIndicesInFaces;
+        public BlobArray<StartAndCount>   edgeIndicesInFacesStartsAndCounts;
 
-        public BlobArray<int2> faceIndicesByEdge;
-        public BlobArray<int>  faceIndicesByVertex;
-        public BlobArray<int2> faceIndicesByVertexStartsAndCounts;
+        public BlobArray<IndexPair>     faceIndicesByEdge;
+        public BlobArray<byte>          faceIndicesByVertex;
+        public BlobArray<StartAndCount> faceIndicesByVertexStartsAndCounts;
+
+        public BlobArray<byte> yz2DVertexIndices;
+        public BlobArray<byte> xz2DVertexIndices;
+        public BlobArray<byte> xy2DVertexIndices;
 
         public Aabb localAabb;
 
         public FixedString128Bytes meshName;
+
+        public struct IndexPair
+        {
+            public byte x;
+            public byte y;
+        }
+
+        public struct EdgeIndexInFace
+        {
+            // 32 edges per face * 252 faces only requires 13 bits
+            public ushort raw;
+            public int index => raw & 0x7fff;
+            public bool flipped => (raw & 0x8000) != 0;
+        }
+
+        public struct StartAndCount
+        {
+            // 32 vertices / edges per face * 252 faces only requires 13 bits, and the count only requires 6
+            public ushort start;
+            public byte   count;
+        }
     }
 }
 

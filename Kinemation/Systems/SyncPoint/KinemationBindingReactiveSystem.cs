@@ -36,6 +36,7 @@ namespace Latios.Kinemation.Systems
         EntityQuery m_deadCopyDeformQuery;
         EntityQuery m_disableComputeDeformQuery;
         EntityQuery m_enableComputeDeformQuery;
+        EntityQuery m_meshesWithReinitQuery;
 
         EntityQuery m_newSkeletonsQuery;
         EntityQuery m_deadSkeletonsQuery;
@@ -75,7 +76,7 @@ namespace Latios.Kinemation.Systems
             m_deadPreviousPostProcessMatrixQuery = state.Fluent().With<PreviousPostProcessMatrix>(true).Without<PostProcessMatrix>().Build();
 
             m_newDeformMeshesQuery  = state.Fluent().With<MeshDeformDataBlobReference>(true).Without<BoundMesh>().Build();
-            m_bindableMeshesQuery   = state.Fluent().With<NeedsBindingFlag>().With<MeshDeformDataBlobReference>(true).With<BoundMesh>().Build();
+            m_bindableMeshesQuery   = state.Fluent().WithAnyEnabled<NeedsBindingFlag, BoundMeshNeedsReinit>().With<MeshDeformDataBlobReference>(true).With<BoundMesh>().Build();
             m_deadDeformMeshesQuery = state.Fluent().With<BoundMesh>().Without<MeshDeformDataBlobReference>().Build();
 
             m_newSkinnedMeshesQuery = state.Fluent().With<BindSkeletonRoot>(true).With<MeshDeformDataBlobReference>(true)
@@ -88,6 +89,8 @@ namespace Latios.Kinemation.Systems
 
             m_disableComputeDeformQuery = state.Fluent().With<DisableComputeShaderProcessingTag>(true).With<ChunkSkinningCullingTag>(false, true).Build();
             m_enableComputeDeformQuery  = state.Fluent().With<SkeletonDependent>(true).Without<DisableComputeShaderProcessingTag>().Without<ChunkSkinningCullingTag>(true).Build();
+
+            m_meshesWithReinitQuery = state.Fluent().With<BoundMeshNeedsReinit>().Build();
 
             m_newSkeletonsQuery             = state.Fluent().With<SkeletonRootTag>(true).Without<DependentSkinnedMesh>().Build();
             m_deadSkeletonsQuery            = state.Fluent().With<DependentSkinnedMesh>().Without<SkeletonRootTag>().Build();
@@ -142,7 +145,8 @@ namespace Latios.Kinemation.Systems
             bool haveNewPreviousPostProcessMatrix  = !m_newPreviousPostProcessMatrixQuery.IsEmptyIgnoreFilter;
             bool haveDeadPreviousPostProcessMatrix = !m_deadPreviousPostProcessMatrixQuery.IsEmptyIgnoreFilter;
 
-            // Skinned meshes are a special case of deform meshes in which extra structural changes are required.
+            // Skinned boundMeshes are a special case of deform boundMeshes in which extra structural changes are required.
+            bool haveMeshesWithReinit = !m_meshesWithReinitQuery.IsEmptyIgnoreFilter;
             bool haveNewDeformMeshes  = !m_newDeformMeshesQuery.IsEmptyIgnoreFilter;
             bool haveBindableMeshes   = !m_bindableMeshesQuery.IsEmptyIgnoreFilter;
             bool haveDeadDeformMeshes = !m_deadDeformMeshesQuery.IsEmptyIgnoreFilter;
@@ -162,7 +166,7 @@ namespace Latios.Kinemation.Systems
             bool haveCullableExposedBones     = !m_cullableExposedBonesQuery.IsEmptyIgnoreFilter;
 
             // The '2' variants are covered by the base dead skeletons
-            bool requiresStructuralChange = haveNewDeformMeshes | haveDeadDeformMeshes | haveNewSkeletons | haveDeadSkeletons |
+            bool requiresStructuralChange = haveMeshesWithReinit | haveNewDeformMeshes | haveDeadDeformMeshes | haveNewSkeletons | haveDeadSkeletons |
                                             haveNewExposedSkeletons | haveDeadExposedSkeletons | haveNewOptimizedSkeletons | haveDeadOptimizedSkeletons |
                                             haveNewMeshes | haveDeadMeshes | haveNewPreviousPostProcessMatrix | haveDeadPreviousPostProcessMatrix |
                                             haveNewCopyMeshes | haveDeadCopyMeshes;
@@ -262,6 +266,7 @@ namespace Latios.Kinemation.Systems
                         skinnedMeshRemoveOpsBlockList = skinnedMeshRemoveOpsBlockList,
                         needsBindingHandle            = GetComponentTypeHandle<NeedsBindingFlag>(false),
                         newMeshesJob                  = newMeshJob,
+                        needsReinitHandle             = GetComponentTypeHandle<BoundMeshNeedsReinit>(true)
                     }.ScheduleParallel(m_bindableMeshesQuery, state.Dependency);
                 }
             }
@@ -353,10 +358,11 @@ namespace Latios.Kinemation.Systems
                     state.EntityManager.SetName(m_failedSkeletonMeshBindingEntity, "Failed Bindings Root");
                 }
 
-                state.EntityManager.RemoveComponent(m_deadSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
-                                                                                                   ComponentType.ReadWrite<SkeletonDependent>(),
-                                                                                                   ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>(),
-                                                                                                   ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
+                state.EntityManager.RemoveComponent<BoundMeshNeedsReinit>(m_meshesWithReinitQuery);
+                state.EntityManager.RemoveComponent(                      m_deadSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
+                                                                                                                         ComponentType.ReadWrite<SkeletonDependent>(),
+                                                                                                                         ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>(),
+                                                                                                                         ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
                 // If CopyLocalToParentFromBone somehow gets added by accident, we might as well remove it.
                 // Also, we remove the LocalTransform and ParentToWorldTransform now to possibly prevent a structural change later.
@@ -650,7 +656,7 @@ namespace Latios.Kinemation.Systems
                 var entities = chunk.GetNativeArray(entityHandle);
                 var meshes   = chunk.GetNativeArray(ref boundMeshHandle);
 
-                // This accounts for both skinned meshes and blend shape meshes.
+                // This accounts for both skinned boundMeshes and blend shape boundMeshes.
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     // If the mesh is in a valid state, this is not null.
@@ -660,7 +666,7 @@ namespace Latios.Kinemation.Systems
                     }
                 }
 
-                // Everything from here is specific to skinned meshes
+                // Everything from here is specific to skinned boundMeshes
                 if (chunk.Has(ref depsHandle))
                 {
                     var deps = chunk.GetNativeArray(ref depsHandle);
@@ -748,7 +754,7 @@ namespace Latios.Kinemation.Systems
                     }, m_nativeThreadIndex);
                 }
 
-                // Everything from this point on is specific to skinned meshes bound to skeletons.
+                // Everything from this point on is specific to skinned boundMeshes bound to skeletons.
                 var hasRootRefs = chunk.Has(ref rootRefHandle);
                 if (hasRootRefs)
                 {
@@ -857,7 +863,7 @@ namespace Latios.Kinemation.Systems
 
                         // This checks override bones are sized correctly relative to the bindposes,
                         // and if necessary, allocates a copy for later.
-                        // Most meshes do not have override bones.
+                        // Most boundMeshes do not have override bones.
                         UnsafeList<short> bonesList = default;
                         if (hasOverrideBones)
                         {
@@ -903,6 +909,8 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<SkeletonDependent> depsHandle;
             public ComponentTypeHandle<NeedsBindingFlag>  needsBindingHandle;
 
+            [ReadOnly] public ComponentTypeHandle<BoundMeshNeedsReinit> needsReinitHandle;
+
             public UnsafeParallelBlockList meshRemoveOpsBlockList;
             public UnsafeParallelBlockList skinnedMeshRemoveOpsBlockList;
 
@@ -912,24 +920,36 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                bool needsReinint     = chunk.Has(ref needsReinitHandle);
+                bool hasNeedsBindings = chunk.Has(ref needsBindingHandle);
+
                 // The general strategy here is to unbind anything requesting a rebind
                 // and then to treat it like a new mesh using that job's struct.
-                if (!chunk.DidChange(ref needsBindingHandle, lastSystemVersion))
+                if (!chunk.DidChange(ref needsBindingHandle, lastSystemVersion) && !needsReinint)
                     return;
+
+                var reinitLower = new BitField64();
+                var reinitUpper = new BitField64();
 
                 {
                     // New scope so that the compiler doesn't keep these variables on the stack when running the NewMesh job.
                     var  entities      = chunk.GetNativeArray(newMeshesJob.entityHandle);
-                    var  meshes        = chunk.GetNativeArray(ref boundMeshHandle);
+                    var  boundMeshes   = chunk.GetNativeArray(ref boundMeshHandle);
+                    var  targetMeshes  = chunk.GetNativeArray(ref newMeshesJob.meshBlobRefHandle);
                     bool isSkinnedMesh = chunk.Has(ref depsHandle);
                     var  deps          = chunk.GetNativeArray(ref depsHandle);
 
-                    var needs = chunk.GetEnabledMask(ref needsBindingHandle);
+                    EnabledMask needs = default;
+
+                    if (!hasNeedsBindings)
+                        needs = chunk.GetEnabledMask(ref needsBindingHandle);
 
                     for (int i = 0; i < chunk.Count; i++)
                     {
                         // If the mesh is in a valid state, this is not null.
-                        if (meshes[i].meshBlob != BlobAssetReference<MeshDeformDataBlob>.Null && needs[i])
+                        bool rebind = boundMeshes[i].meshBlob != BlobAssetReference<MeshDeformDataBlob>.Null && hasNeedsBindings && needs[i];
+                        bool reinit = needsReinint && boundMeshes[i].meshBlob != targetMeshes[i].blob;
+                        if (rebind || reinit)
                         {
                             if (isSkinnedMesh)
                             {
@@ -947,7 +967,7 @@ namespace Latios.Kinemation.Systems
                                 skinnedMeshRemoveOpsBlockList.Write(new SkinnedMeshRemoveOperation
                                 {
                                     meshEntity        = entities[i],
-                                    oldBoundMeshState = meshes[i],
+                                    oldBoundMeshState = boundMeshes[i],
                                     oldDependentState = deps[i]
                                 }, m_nativeThreadIndex);
 
@@ -957,16 +977,27 @@ namespace Latios.Kinemation.Systems
                             meshRemoveOpsBlockList.Write(new MeshRemoveOperation
                             {
                                 meshEntity        = entities[i],
-                                oldBoundMeshState = meshes[i]
+                                oldBoundMeshState = boundMeshes[i]
                             }, m_nativeThreadIndex);
 
                             // Todo: We can't set the whole enabled bit array in batch?
-                            needs[i] = false;
+                            if (hasNeedsBindings)
+                                needs[i] = false;
+                            if (reinit)
+                            {
+                                if (i < 64)
+                                    reinitLower.SetBits(i, true);
+                                else
+                                    reinitUpper.SetBits(i - 64, true);
+                            }
                         }
                     }
                 }
 
-                newMeshesJob.Execute(chunk, unfilteredChunkIndex, useEnabledMask, chunkEnabledMask);
+                if (hasNeedsBindings)
+                    newMeshesJob.Execute(chunk, unfilteredChunkIndex, useEnabledMask, chunkEnabledMask);
+                else if (needsReinint)
+                    newMeshesJob.Execute(chunk, unfilteredChunkIndex, true, new v128(reinitLower.Value, reinitUpper.Value));
             }
         }
         #endregion

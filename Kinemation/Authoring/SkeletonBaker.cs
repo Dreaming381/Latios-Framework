@@ -41,6 +41,11 @@ namespace Latios.Kinemation.Authoring
                 if (GetComponentInParent<Animator>(skinnedMesh) != authoring)
                     continue;
 
+                var sharedMesh = skinnedMesh.sharedMesh;
+                DependsOn(sharedMesh);
+                if (sharedMesh.bindposeCount == 0)
+                    continue;
+
                 skinnedMeshesToBind.Add(GetEntity(skinnedMesh, TransformUsageFlags.Dynamic));
             }
 

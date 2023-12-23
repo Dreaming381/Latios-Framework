@@ -65,7 +65,7 @@ namespace Latios.Transforms.Abstract
             get
             {
                 ref readonly float4x4 ltw = ref localToWorld.ValueRO.Value;
-                return new TransformQvvs(ltw.Translation(), ltw.Rotation());
+                return new TransformQvvs(ltw.Translation(), ltw.Rotation(), ltw.Scale().x, 1f);
             }
         }
 

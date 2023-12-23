@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -124,6 +125,362 @@ namespace Latios.Psyshock
             };
 
             return true;
+        }
+
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in ConvexCollider convex,
+                                                                          in RigidTransform convexTransform,
+                                                                          in BoxCollider box,
+                                                                          in RigidTransform boxTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            var contactNormal = math.normalizesafe((distanceResult.hitpointB - distanceResult.hitpointA) * math.select(1f, -1f, distanceResult.distance < 0f), float3.zero);
+            if (contactNormal.Equals(float3.zero))
+            {
+                contactNormal = math.normalize(distanceResult.normalA - distanceResult.normalB);
+            }
+            var aLocalContactNormal = math.InverseRotateFast(convexTransform.rot, contactNormal);
+            contactNormal           = -contactNormal;
+
+            ref var blob       = ref convex.convexColliderBlob.Value;
+            float3  invScale   = math.rcp(convex.scale);
+            var     bitmask    = math.bitmask(new bool4(math.isfinite(invScale), false));
+            var     dimensions = math.countbits(bitmask);
+
+            if (dimensions == 3)
+            {
+                var bInATransform       = math.mul(math.inverse(convexTransform), boxTransform);
+                var bLocalContactNormal = math.InverseRotateFast(bInATransform.rot, -aLocalContactNormal);
+                PointRayConvex.BestFacePlane(ref convex.convexColliderBlob.Value,
+                                             aLocalContactNormal * invScale,
+                                             distanceResult.featureCodeA,
+                                             out var aPlane,
+                                             out int faceIndex,
+                                             out int edgeCount);
+                PointRayBox.BestFacePlanesAndVertices(in box, bLocalContactNormal, out var bEdgePlaneNormals, out _, out var bPlane, out var bVertices);
+                bVertices                              = simd.transform(bInATransform, bVertices);
+                bEdgePlaneNormals                      = simd.mul(bInATransform.rot, bEdgePlaneNormals);
+                var  bEdgePlaneDistances               = simd.dot(bEdgePlaneNormals, bVertices.bcda);
+                bool needsClosestPoint                 = true;
+                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+
+                bool projectBOnA        = math.abs(math.dot(aPlane.normal, aLocalContactNormal)) < 0.05f;
+                int4 positiveSideCounts = 0;
+                int4 negativeSideCounts = 0;
+
+                UnityContactManifoldExtra3D result          = default;
+                var                         edgeIndicesBase = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].start;
+
+                // Project and clip edges of A onto the face of B.
+                for (int edgeIndex = 0; edgeIndex < edgeCount; edgeIndex++)
+                {
+                    var    edgeIndexInFace = blob.edgeIndicesInFaces[edgeIndicesBase + edgeIndex];
+                    var    edge            = blob.vertexIndicesInEdges[edgeIndexInFace.index];
+                    var    edgeStart       = edgeIndexInFace.flipped ? edge.y : edge.x;
+                    var    edgeTail        = edgeIndexInFace.flipped ? edge.x : edge.y;
+                    float3 rayStart        = new float3(blob.verticesX[edgeStart], blob.verticesY[edgeStart], blob.verticesZ[edgeStart]) * convex.scale;
+                    float3 rayDisplacement = new float3(blob.verticesX[edgeTail], blob.verticesY[edgeTail], blob.verticesZ[edgeTail]) * convex.scale - rayStart;
+
+                    var rayRelativeStarts = simd.dot(rayStart, bEdgePlaneNormals) - bEdgePlaneDistances;
+                    var relativeDiffs     = simd.dot(rayDisplacement, bEdgePlaneNormals);
+                    var rayRelativeEnds   = rayRelativeStarts + relativeDiffs;
+                    var rayFractions      = math.select(-rayRelativeStarts / relativeDiffs, float4.zero, relativeDiffs == float4.zero);
+                    var startsInside      = rayRelativeStarts <= 0f;
+                    var endsInside        = rayRelativeEnds <= 0f;
+                    var projectsOnFace    = startsInside | endsInside;
+                    var enterFractions    = math.select(float4.zero, rayFractions, !startsInside & rayFractions > float4.zero);
+                    var exitFractions     = math.select(1f, rayFractions, !endsInside & rayFractions < 1f);
+                    var fractionA         = math.cmax(enterFractions);
+                    var fractionB         = math.cmin(exitFractions);
+
+                    if (math.all(projectsOnFace) && fractionA < fractionB)
+                    {
+                        // Add the two contacts from the possibly clipped segment
+                        var clippedSegmentA = rayStart + fractionA * rayDisplacement;
+                        var aDistance       = mathex.SignedDistance(bPlane, clippedSegmentA) * distanceScalarAlongContactNormalB;
+                        result.Add(math.transform(convexTransform, clippedSegmentA + aLocalContactNormal * aDistance), aDistance);
+                        needsClosestPoint &= aDistance > distanceResult.distance + 1e-4f;
+                        if (fractionB < 1f)  // Avoid duplication when vertex is not clipped
+                        {
+                            var clippedSegmentB = rayStart + fractionB * rayDisplacement;
+                            var bDistance       = mathex.SignedDistance(bPlane, clippedSegmentB) * distanceScalarAlongContactNormalB;
+                            result.Add(math.transform(convexTransform, clippedSegmentB + aLocalContactNormal * bDistance), bDistance);
+                            needsClosestPoint &= bDistance > distanceResult.distance + 1e-4f;
+                        }
+                    }
+
+                    // Inside for each edge of A
+                    if (projectBOnA)
+                    {
+                        var aEdgePlaneNormal   = math.cross(rayDisplacement, aLocalContactNormal);
+                        var edgePlaneDistance  = math.dot(aEdgePlaneNormal, rayStart);
+                        var projection         = simd.dot(bVertices, aEdgePlaneNormal) + edgePlaneDistance;
+                        positiveSideCounts    += math.select(int4.zero, 1, projection > 0f);
+                        negativeSideCounts    += math.select(int4.zero, 1, projection < 0f);
+                    }
+                }
+                if (projectBOnA)
+                {
+                    var distanceScalarAlongContactNormalA = math.rcp(math.dot(aLocalContactNormal, aPlane.normal));
+                    var bProjectsOnA                      = math.min(positiveSideCounts, negativeSideCounts) == 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var vertex = bVertices[i];
+                        if (bProjectsOnA[i])
+                        {
+                            var distance = mathex.SignedDistance(aPlane, vertex) * distanceScalarAlongContactNormalA;
+                            result.Add(math.transform(convexTransform, vertex), distance);
+                            needsClosestPoint &= distance > distanceResult.distance + 1e-4f;
+                        }
+                    }
+                }
+
+                var requiredContacts = math.select(32, 31, needsClosestPoint);
+                if (result.baseStorage.contactCount <= requiredContacts)
+                {
+                    if (needsClosestPoint)
+                        result.baseStorage.Add(distanceResult.hitpointB, distanceResult.distance);
+                    return result.baseStorage;
+                }
+
+                // Simplification required
+                Span<byte>   indices           = stackalloc byte[requiredContacts];
+                Span<float3> projectedContacts = stackalloc float3[result.baseStorage.contactCount];
+                for (int i = 0; i < result.baseStorage.contactCount; i++)
+                {
+                    projectedContacts[i] = result[i].location;
+                }
+                var                            finalVertexCount = ExpandingPolygonBuilder2D.Build(ref indices, projectedContacts, bPlane.normal);
+                UnitySim.ContactsBetweenResult finalResult      = default;
+                finalResult.contactNormal                       = result.baseStorage.contactNormal;
+                for (int i = 0; i < finalVertexCount; i++)
+                {
+                    finalResult.Add(result[indices[i]]);
+                }
+                if (needsClosestPoint)
+                    finalResult.Add(distanceResult.hitpointB, distanceResult.distance);
+                return finalResult;
+            }
+            else if (dimensions == 0)
+            {
+                UnitySim.ContactsBetweenResult result = default;
+                result.contactNormal                  = contactNormal;
+                result.Add(distanceResult.hitpointB, distanceResult.distance);
+                return result;
+            }
+            else if (dimensions == 1)
+            {
+                var convexCapsule                                                  = new CapsuleCollider(blob.localAabb.min * convex.scale, blob.localAabb.max * convex.scale, 0f);
+                var flippedDistanceResult                                          = distanceResult;
+                (flippedDistanceResult.hitpointA, flippedDistanceResult.hitpointB) = (flippedDistanceResult.hitpointB, flippedDistanceResult.hitpointA);
+                (flippedDistanceResult.normalA, flippedDistanceResult.normalB)     = (flippedDistanceResult.normalB, flippedDistanceResult.normalA);
+                (flippedDistanceResult.subColliderIndexA,
+                 flippedDistanceResult.subColliderIndexB)                                = (flippedDistanceResult.subColliderIndexB, flippedDistanceResult.subColliderIndexA);
+                (flippedDistanceResult.featureCodeA, flippedDistanceResult.featureCodeB) = (flippedDistanceResult.featureCodeB, flippedDistanceResult.featureCodeA);
+                var result                                                               = CapsuleBox.UnityContactsBetween(in box,
+                                                                                                                           in boxTransform,
+                                                                                                                           in convexCapsule,
+                                                                                                                           in convexTransform,
+                                                                                                                           in flippedDistanceResult);
+                result.FlipInPlace();
+                return result;
+            }
+            else if (dimensions == 2)
+            {
+                ref var indices2D = ref blob.yz2DVertexIndices;  // bitmask = 6
+                var     aPlane    = new Plane(new float3(1f, 0f, 0f), 0f);
+                if (bitmask == 5)
+                {
+                    indices2D = ref blob.xz2DVertexIndices;
+                    aPlane    = new Plane(new float3(0f, 1f, 0f), 0f);
+                }
+                else if (bitmask == 3)
+                {
+                    indices2D = ref blob.xy2DVertexIndices;
+                    aPlane    = new Plane(new float3(0f, 0f, 1f), 0f);
+                }
+                if (math.dot(aPlane.normal, aLocalContactNormal) < 0f)
+                    aPlane = mathex.Flip(aPlane);
+
+                var bInATransform       = math.mul(math.inverse(convexTransform), boxTransform);
+                var bLocalContactNormal = math.InverseRotateFast(bInATransform.rot, -aLocalContactNormal);
+                PointRayBox.BestFacePlanesAndVertices(in box, bLocalContactNormal, out var bEdgePlaneNormals, out _, out var bPlane, out var bVertices);
+                bVertices                              = simd.transform(bInATransform, bVertices);
+                bEdgePlaneNormals                      = simd.mul(bInATransform.rot, bEdgePlaneNormals);
+                var  bEdgePlaneDistances               = simd.dot(bEdgePlaneNormals, bVertices.bcda);
+                bool needsClosestPoint                 = true;
+                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+
+                bool projectBOnA        = math.abs(math.dot(aPlane.normal, aLocalContactNormal)) < 0.05f;
+                int4 positiveSideCounts = 0;
+                int4 negativeSideCounts = 0;
+
+                UnityContactManifoldExtra2D result = default;
+
+                // Project and clip edges of A onto the face of B.
+                for (int edgeIndex = 0; edgeIndex < indices2D.Length; edgeIndex++)
+                {
+                    var edgeTail  = edgeIndex + 1;
+                    edgeTail     -= math.select(0, indices2D.Length, edgeTail >= indices2D.Length);
+                    float3 rayStart;
+                    float3 rayDisplacement;
+                    if (bitmask == 6)
+                    {
+                        rayStart        = new float3(0f, blob.verticesY[edgeIndex], blob.verticesZ[edgeIndex]) * convex.scale;
+                        rayDisplacement = new float3(0f, blob.verticesY[edgeTail], blob.verticesZ[edgeTail]) * convex.scale - rayStart;
+                    }
+                    else if (bitmask == 5)
+                    {
+                        rayStart        = new float3(blob.verticesX[edgeIndex], 0f, blob.verticesZ[edgeIndex]) * convex.scale;
+                        rayDisplacement = new float3(blob.verticesX[edgeTail], 0f, blob.verticesZ[edgeTail]) * convex.scale - rayStart;
+                    }
+                    else  // bitmask == 3
+                    {
+                        rayStart        = new float3(blob.verticesX[edgeIndex], blob.verticesY[edgeIndex], 0f) * convex.scale;
+                        rayDisplacement = new float3(blob.verticesX[edgeTail], blob.verticesY[edgeTail], 0f) * convex.scale - rayStart;
+                    }
+                    var rayRelativeStarts = simd.dot(rayStart, bEdgePlaneNormals) - bEdgePlaneDistances;
+                    var relativeDiffs     = simd.dot(rayDisplacement, bEdgePlaneNormals);
+                    var rayRelativeEnds   = rayRelativeStarts + relativeDiffs;
+                    var rayFractions      = math.select(-rayRelativeStarts / relativeDiffs, float4.zero, relativeDiffs == float4.zero);
+                    var startsInside      = rayRelativeStarts <= 0f;
+                    var endsInside        = rayRelativeEnds <= 0f;
+                    var projectsOnFace    = startsInside | endsInside;
+                    var enterFractions    = math.select(float4.zero, rayFractions, !startsInside & rayFractions > float4.zero);
+                    var exitFractions     = math.select(1f, rayFractions, !endsInside & rayFractions < 1f);
+                    var fractionA         = math.cmax(enterFractions);
+                    var fractionB         = math.cmin(exitFractions);
+
+                    if (math.all(projectsOnFace) && fractionA < fractionB)
+                    {
+                        // Add the two contacts from the possibly clipped segment
+                        var clippedSegmentA = rayStart + fractionA * rayDisplacement;
+                        var aDistance       = mathex.SignedDistance(bPlane, clippedSegmentA) * distanceScalarAlongContactNormalB;
+                        result.Add(math.transform(convexTransform, clippedSegmentA + aLocalContactNormal * aDistance), aDistance);
+                        needsClosestPoint &= aDistance > distanceResult.distance + 1e-4f;
+                        if (fractionB < 1f)  // Avoid duplication when vertex is not clipped
+                        {
+                            var clippedSegmentB = rayStart + fractionB * rayDisplacement;
+                            var bDistance       = mathex.SignedDistance(bPlane, clippedSegmentB) * distanceScalarAlongContactNormalB;
+                            result.Add(math.transform(convexTransform, clippedSegmentB + aLocalContactNormal * bDistance), bDistance);
+                            needsClosestPoint &= bDistance > distanceResult.distance + 1e-4f;
+                        }
+                    }
+
+                    // Inside for each edge of A
+                    if (projectBOnA)
+                    {
+                        var aEdgePlaneNormal   = math.cross(rayDisplacement, aLocalContactNormal);
+                        var edgePlaneDistance  = math.dot(aEdgePlaneNormal, rayStart);
+                        var projection         = simd.dot(bVertices, aEdgePlaneNormal) + edgePlaneDistance;
+                        positiveSideCounts    += math.select(int4.zero, 1, projection > 0f);
+                        negativeSideCounts    += math.select(int4.zero, 1, projection < 0f);
+                    }
+                }
+                if (projectBOnA)
+                {
+                    var distanceScalarAlongContactNormalA = math.rcp(math.dot(aLocalContactNormal, aPlane.normal));
+                    var bProjectsOnA                      = math.min(positiveSideCounts, negativeSideCounts) == 0;
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var vertex = bVertices[i];
+                        if (bProjectsOnA[i])
+                        {
+                            var distance = mathex.SignedDistance(aPlane, vertex) * distanceScalarAlongContactNormalA;
+                            result.Add(math.transform(convexTransform, vertex), distance);
+                            needsClosestPoint &= distance > distanceResult.distance + 1e-4f;
+                        }
+                    }
+                }
+
+                var requiredContacts = math.select(32, 31, needsClosestPoint);
+                if (result.baseStorage.contactCount <= requiredContacts)
+                {
+                    if (needsClosestPoint)
+                        result.baseStorage.Add(distanceResult.hitpointB, distanceResult.distance);
+                    return result.baseStorage;
+                }
+
+                // Simplification required
+                Span<byte>   indices           = stackalloc byte[requiredContacts];
+                Span<float3> projectedContacts = stackalloc float3[result.baseStorage.contactCount];
+                for (int i = 0; i < result.baseStorage.contactCount; i++)
+                {
+                    projectedContacts[i] = result[i].location;
+                }
+                var                            finalVertexCount = ExpandingPolygonBuilder2D.Build(ref indices, projectedContacts, bPlane.normal);
+                UnitySim.ContactsBetweenResult finalResult      = default;
+                finalResult.contactNormal                       = result.baseStorage.contactNormal;
+                for (int i = 0; i < finalVertexCount; i++)
+                {
+                    finalResult.Add(result[indices[i]]);
+                }
+                if (needsClosestPoint)
+                    finalResult.Add(distanceResult.hitpointB, distanceResult.distance);
+                return finalResult;
+            }
+            else
+            {
+                // Can't happen
+                return default;
+            }
+        }
+
+        unsafe struct UnityContactManifoldExtra2D
+        {
+            public UnitySim.ContactsBetweenResult baseStorage;
+            public fixed float                    extraContactsData[384];
+
+            public ref UnitySim.ContactsBetweenResult.ContactOnB this[int index]
+            {
+                get
+                {
+                    if (index < 32)
+                    {
+                        fixed (void* ptr = baseStorage.contactsData)
+                        return ref ((UnitySim.ContactsBetweenResult.ContactOnB*)ptr)[index];
+                    }
+                    else
+                    {
+                        fixed (void* ptr = extraContactsData)
+                        return ref ((UnitySim.ContactsBetweenResult.ContactOnB*)ptr)[index - 32];
+                    }
+                }
+            }
+
+            public void Add(float3 locationOnB, float distanceToA)
+            {
+                this[baseStorage.contactCount] = new UnitySim.ContactsBetweenResult.ContactOnB { location = locationOnB, distanceToA = distanceToA };
+                baseStorage.contactCount++;
+            }
+        }
+
+        unsafe struct UnityContactManifoldExtra3D
+        {
+            public UnitySim.ContactsBetweenResult baseStorage;
+            public fixed float                    extraContactsData[16];
+
+            public ref UnitySim.ContactsBetweenResult.ContactOnB this[int index]
+            {
+                get
+                {
+                    if (index < 32)
+                    {
+                        fixed (void* ptr = baseStorage.contactsData)
+                        return ref ((UnitySim.ContactsBetweenResult.ContactOnB*)ptr)[index];
+                    }
+                    else
+                    {
+                        fixed (void* ptr = extraContactsData)
+                        return ref ((UnitySim.ContactsBetweenResult.ContactOnB*)ptr)[index - 32];
+                    }
+                }
+            }
+
+            public void Add(float3 locationOnB, float distanceToA)
+            {
+                this[baseStorage.contactCount] = new UnitySim.ContactsBetweenResult.ContactOnB { location = locationOnB, distanceToA = distanceToA };
+                baseStorage.contactCount++;
+            }
         }
     }
 }

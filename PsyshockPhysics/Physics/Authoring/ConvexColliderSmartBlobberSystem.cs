@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
@@ -265,13 +266,19 @@ namespace Latios.Psyshock.Authoring.Systems
                     edgeIndicesInFacesStartsAndCounts.Add(new int2(edgeIndicesInFaceStart, tempVerticesInFace.Length));
                 }
 
-                var viie = builder.ConstructFromNativeArray(ref blobRoot.vertexIndicesInEdges,
-                                                            (int2*)vertexIndicesInEdges.GetUnsafeReadOnlyPtr(),
-                                                            vertexIndicesInEdges.Length);
-                var eiif    = builder.ConstructFromNativeArray(ref blobRoot.edgeIndicesInFaces, (int*)edgeIndicesInFaces.GetUnsafeReadOnlyPtr(), edgeIndicesInFaces.Length);
-                var eiifsac = builder.ConstructFromNativeArray(ref blobRoot.edgeIndicesInFacesStartsAndCounts,
-                                                               (int2*)edgeIndicesInFacesStartsAndCounts.GetUnsafeReadOnlyPtr(),
-                                                               edgeIndicesInFacesStartsAndCounts.Length);
+                var viie = builder.Allocate(ref blobRoot.vertexIndicesInEdges, vertexIndicesInEdges.Length);
+                for (int i = 0; i < vertexIndicesInEdges.Length; i++)
+                    viie[i] = new ConvexColliderBlob.IndexPair { x = (byte)vertexIndicesInEdges[i].x, y = (byte)vertexIndicesInEdges[i].y };
+                var eiif                                                                                = builder.Allocate(ref blobRoot.edgeIndicesInFaces,
+                                                                                                                           edgeIndicesInFaces.Length);
+                for (int i = 0; i < edgeIndicesInFaces.Length; i++)
+                    eiif[i] = new ConvexColliderBlob.EdgeIndexInFace { raw = (ushort)(((ushort)edgeIndicesInFaces[i]) | math.select(0, 0x8000, edgeFlippedInFaces[i])) };
+                var eiifsac                                                = builder.Allocate(ref blobRoot.edgeIndicesInFacesStartsAndCounts,
+                                                                                              edgeIndicesInFacesStartsAndCounts.Length);
+                for (int i = 0; i < edgeIndicesInFacesStartsAndCounts.Length; i++)
+                    eiifsac[i] = new ConvexColliderBlob.StartAndCount {
+                        start  = (ushort)edgeIndicesInFacesStartsAndCounts[i].x, count = (byte)edgeIndicesInFacesStartsAndCounts[i].y
+                    };
 
                 var fibvsac = builder.Allocate(ref blobRoot.faceIndicesByVertexStartsAndCounts, vertices.Length);  // This clears memory
                 var fibe    = builder.Allocate(ref blobRoot.faceIndicesByEdge, vertexIndicesInEdges.Length);
@@ -322,7 +329,7 @@ namespace Latios.Psyshock.Authoring.Systems
                         var    outwardNormal                 = math.cross(plane.normal, b - a);
                         outwardNormal                        = math.select(-outwardNormal, outwardNormal, ccw);
                         faceEdgeOutwardPlanes[faceEdgeIndex] = new Plane(outwardNormal, -math.dot(outwardNormal, a));
-                        fibvsac[abIndices.x].y++;
+                        fibvsac[abIndices.x].count++;
                     }
                 }
 
@@ -339,7 +346,7 @@ namespace Latios.Psyshock.Authoring.Systems
                     float3 a = vertices[abIndices.x];
                     float3 b = vertices[abIndices.y];
 
-                    fibe[edgeIndex] = new int2(-1, -1);
+                    fibe[edgeIndex] = new ConvexColliderBlob.IndexPair { x = 255, y = 255 };
                 }
 
                 var verticesX = builder.Allocate(ref blobRoot.verticesX, vertices.Length);
@@ -360,8 +367,8 @@ namespace Latios.Psyshock.Authoring.Systems
                     aabb = Physics.CombineAabb(vertex, aabb);
 
                     vertexNormals[vertexIndex]  = math.normalize(vertexNormals[vertexIndex]);
-                    fibvsac[vertexIndex].x      = runningCount;
-                    runningCount               += fibvsac[vertexIndex].y;
+                    fibvsac[vertexIndex].start  = (ushort)runningCount;
+                    runningCount               += fibvsac[vertexIndex].count;
                 }
 
                 blobRoot.localAabb = aabb;
@@ -375,19 +382,59 @@ namespace Latios.Psyshock.Authoring.Systems
                     for (int faceEdgeIndex = edgeIndicesStartAndCount.x; faceEdgeIndex < edgeIndicesStartAndCount.x + edgeIndicesStartAndCount.y; faceEdgeIndex++)
                     {
                         int edgeIndex = edgeIndicesInFaces[faceEdgeIndex];
-                        if (fibe[edgeIndex].x < 0)
-                            fibe[edgeIndex].x = faceIndex;
+                        if (fibe[edgeIndex].x == 255)
+                            fibe[edgeIndex].x = (byte)faceIndex;
                         else
-                            fibe[edgeIndex].y = faceIndex;
+                            fibe[edgeIndex].y = (byte)faceIndex;
                         int2 abIndices        = vertexIndicesInEdges[edgeIndex];
                         if (edgeFlippedInFaces[faceEdgeIndex])
-                            abIndices                                           = abIndices.yx;
-                        fibv[fibvsac[abIndices.x].x + fibvCounts[abIndices.x]]  = faceIndex;
-                        fibvCounts[abIndices.x]                                += 1;
+                            abIndices                                               = abIndices.yx;
+                        fibv[fibvsac[abIndices.x].start + fibvCounts[abIndices.x]]  = (byte)faceIndex;
+                        fibvCounts[abIndices.x]                                    += 1;
                     }
                 }
 
+                Build2DHull(ref builder,
+                            ref blobRoot.yz2DVertexIndices,
+                            null,
+                            (float*)verticesY.GetUnsafePtr(),
+                            (float*)verticesZ.GetUnsafePtr(),
+                            (byte)verticesX.Length,
+                            new float3(1f, 0f, 0f));
+                Build2DHull(ref builder,
+                            ref blobRoot.xz2DVertexIndices,
+                            (float*)verticesX.GetUnsafePtr(),
+                            null,
+                            (float*)verticesZ.GetUnsafePtr(),
+                            (byte)verticesX.Length,
+                            new float3(0f, 1f, 0f));
+                Build2DHull(ref builder,
+                            ref blobRoot.xy2DVertexIndices,
+                            (float*)verticesX.GetUnsafePtr(),
+                            (float*)verticesY.GetUnsafePtr(),
+                            null,
+                            (byte)verticesX.Length,
+                            new float3(0f, 0f, 1f));
+
                 result = builder.CreateBlobAssetReference<ConvexColliderBlob>(Allocator.Persistent);
+            }
+
+            unsafe void Build2DHull(ref BlobBuilder builder, ref BlobArray<byte> hullTarget, float* xPtr, float* yPtr, float* zPtr, byte srcVerticesCount, float3 normal)
+            {
+                Span<float3> srcVertices = stackalloc float3[srcVerticesCount];
+                for (int i = 0; i < srcVerticesCount; i++)
+                {
+                    float x        = xPtr != null ? xPtr[i] : 0f;
+                    float y        = yPtr != null ? yPtr[i] : 0f;
+                    float z        = zPtr != null ? zPtr[i] : 0f;
+                    srcVertices[i] = new float3(x, y, z);
+                }
+
+                Span<byte> indices  = stackalloc byte[srcVerticesCount];
+                var        hullSize = ExpandingPolygonBuilder2D.Build(ref indices, srcVertices, normal);
+                var        result   = builder.Allocate(ref hullTarget, hullSize);
+                for (int i = 0; i < hullSize; i++)
+                    result[i] = indices[i];
             }
         }
 

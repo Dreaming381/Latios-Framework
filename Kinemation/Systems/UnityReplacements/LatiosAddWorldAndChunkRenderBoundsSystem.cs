@@ -18,6 +18,7 @@ namespace Latios.Kinemation
     {
         EntityQuery m_MissingWorldRenderBounds;
         EntityQuery m_MissingWorldChunkRenderBounds;
+        EntityQuery m_missingChunkBoneWorldBounds;  // Live baking doesn't support chunk components?
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -28,6 +29,8 @@ namespace Latios.Kinemation
             m_MissingWorldChunkRenderBounds =
                 state.Fluent().With<RenderBounds>(true).WithWorldTransformReadOnly().Without<ChunkWorldRenderBounds>(true).IncludePrefabs().IncludeDisabledEntities().
                 Build();
+
+            m_missingChunkBoneWorldBounds = state.Fluent().With<BoneWorldBounds>().Without<ChunkBoneWorldBounds>(true).IncludePrefabs().IncludeDisabledEntities().Build();
         }
 
         [BurstCompile]
@@ -40,6 +43,7 @@ namespace Latios.Kinemation
         {
             state.EntityManager.AddComponent(m_MissingWorldRenderBounds,      ComponentType.ReadWrite<WorldRenderBounds>());
             state.EntityManager.AddComponent(m_MissingWorldChunkRenderBounds, ComponentType.ChunkComponent<ChunkWorldRenderBounds>());
+            state.EntityManager.AddComponent(m_missingChunkBoneWorldBounds,   ComponentType.ChunkComponent<ChunkBoneWorldBounds>());
         }
     }
 }

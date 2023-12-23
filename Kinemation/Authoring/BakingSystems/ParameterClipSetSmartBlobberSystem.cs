@@ -3,8 +3,10 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEditor.PackageManager;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
@@ -110,6 +112,61 @@ namespace Latios.Kinemation.Authoring
             return baker.RequestCreateBlobAsset<ParameterClipSetBlob, ParameterClipSetBakeData>(new ParameterClipSetBakeData { config = config});
         }
     }
+
+    public static class ParameterClipBlobBuilderExtensions
+    {
+        /// <summary>
+        /// Creates a ParameterClip for a set of parameters, invoking AclUnity compression.
+        /// Use this when embedding ParameterClip instances inside of custom blob assets.
+        /// </summary>
+        /// <param name="destinationClip">This target clip within a blob asset being built</param>
+        /// <param name="config">The configuration containing all the input data that should go into the ParameterClip</param>
+        /// <param name="scratchCache">An optional scratch NativeList that can be passed in on repeated calls to speed up blob generation and reduce temporary memory usage</param>
+        /// <returns>True if the clip was successfully built, false if there was an error with the inputs</returns>
+        public static unsafe bool CreateParameterClip(this ref BlobBuilder builder,
+                                                      ref ParameterClip destinationClip,
+                                                      in ParameterClipConfig config,
+                                                      NativeList<float>      scratchCache = default)
+        {
+            if (config.sampleRate <= 0f)
+            {
+                Debug.LogError("Kinemation failed to bake the parameter clip. The clip had a sample rate less or equal to 0f. This is not allowed.");
+                return false;
+            }
+
+            var sampleCount      = config.parametersInClip[0].samples.Length;
+            var totalSampleCount = sampleCount * config.parametersInClip.Length;
+            if (!scratchCache.IsCreated)
+                scratchCache = new NativeList<float>(totalSampleCount, Allocator.Temp);
+            scratchCache.Clear();
+            foreach (var parameter in config.parametersInClip)
+            {
+                if (parameter.samples.Length != sampleCount)
+                {
+                    Debug.LogError("Kinemation failed to bake parameter clip. A clip does not contain the same number of samples for all parameters.");
+                    return false;
+                }
+                scratchCache.Add(parameter.maxError);
+            }
+            foreach (var parameter in config.parametersInClip)
+                scratchCache.AddRange(parameter.samples);
+            var scratchArray = scratchCache.AsArray();
+            var errors       = scratchArray.GetSubArray(0, config.parametersInClip.Length);
+            var samples      = scratchArray.GetSubArray(config.parametersInClip.Length, totalSampleCount);
+
+            destinationClip      = default;
+            destinationClip.name = config.name;
+            ClipEventsBlobHelpers.Convert(ref destinationClip.events, ref builder, config.events);
+
+            var compressedClip = AclUnity.Compression.CompressScalarsClip(samples, errors, config.sampleRate, config.compressionLevel);
+            var compressedData = builder.Allocate(ref destinationClip.compressedClipDataAligned16, compressedClip.sizeInBytes, 16);
+            compressedClip.CopyTo((byte*)compressedData.GetUnsafePtr());
+            compressedClip.Dispose();
+
+            return true;
+        }
+    }
+
     /// <summary>
     /// Input for the SkeletonClipSetBlob Smart Blobber
     /// </summary>

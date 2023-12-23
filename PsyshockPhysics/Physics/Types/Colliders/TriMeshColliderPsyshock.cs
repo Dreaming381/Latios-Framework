@@ -1,5 +1,4 @@
 using System;
-using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
@@ -13,17 +12,17 @@ namespace Latios.Psyshock
     /// It is often derived from a Mesh.
     /// </summary>
     [Serializable]
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct TriMeshCollider
     {
         /// <summary>
         /// The blob asset containing the raw triMesh hull data
         /// </summary>
-        [FieldOffset(0)] public BlobAssetReference<TriMeshColliderBlob> triMeshColliderBlob;
+        [FieldOffset(24)] public BlobAssetReference<TriMeshColliderBlob> triMeshColliderBlob;
         /// <summary>
         /// The premultiplied scale and stretch in local space
         /// </summary>
-        [FieldOffset(8)] public float3 scale;
+        [FieldOffset(0)] public float3 scale;
 
         /// <summary>
         /// Creates a new TriMeshCollider

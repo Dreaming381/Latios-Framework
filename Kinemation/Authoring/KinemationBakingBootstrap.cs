@@ -36,16 +36,6 @@ namespace Latios.Kinemation.Authoring
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosAddWorldAndChunkRenderBoundsSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosRenderBoundsUpdateSystem>());
         }
-
-        /// <summary>
-        /// Adds Mecanim bakers and baking systems into baking world
-        /// </summary>
-        public static void InstallMecanimBakersAndSystems(ref CustomBakingBootstrapContext context)
-        {
-#if UNITY_EDITOR
-            context.filteredBakerTypes.Add(typeof(MecanimSmartBaker));
-#endif
-        }
     }
 }
 

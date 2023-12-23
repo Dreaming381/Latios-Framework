@@ -35,11 +35,22 @@ namespace Latios.Psyshock
                 Add(new ContactOnB { location = locationOnB, distanceToA = distanceToA });
             }
 
-            public void Remove(int index)
+            public void RemoveAtSwapBack(int index)
             {
                 CheckInRange(index);
                 this[index] = this[contactCount - 1];
                 contactCount--;
+            }
+
+            public void FlipInPlace()
+            {
+                for (int i = 0; i < contactCount; i++)
+                {
+                    var contact       = this[i];
+                    contact.location += contact.distanceToA * contactNormal;
+                    this[i]           = contact;
+                }
+                contactNormal = -contactNormal;
             }
 
             public struct ContactOnB

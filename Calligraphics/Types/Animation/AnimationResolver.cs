@@ -1,4 +1,4 @@
-using Latios.Kinemation.TextBackend;
+using Latios.Calligraphics.Rendering;
 using Unity.Entities;
 
 namespace Latios.Calligraphics
@@ -43,7 +43,7 @@ namespace Latios.Calligraphics
         }
 
         internal static void SetValue(ref DynamicBuffer<RenderGlyph> renderGlyphs, TextAnimationTransition transition, GlyphMapper glyphMapper,
-            int startIndex, int endIndex, float normalizedTime)
+                                      int startIndex, int endIndex, float normalizedTime)
         {
             switch (transition.glyphProperty)
             {
@@ -98,3 +98,4 @@ namespace Latios.Calligraphics
         }
     }
 }
+

@@ -168,7 +168,7 @@ namespace Latios.Myri
     /// If present on an entity with an AudioSourceOneshot, the entity will be destroyed when the playhead passes the last sample.
     /// This is conservatively computed based on values from the audio thread, so the entity may not be destroyed until multiple frames later.
     /// </summary>
-    public struct AudioSourceDestroyOneShotWhenFinished : IComponentData { }
+    public struct AudioSourceDestroyOneShotWhenFinished : IComponentData, IAutoDestroyExpirable { }
 
     /// <summary>
     /// An audio clip representation accessible in Burst jobs.

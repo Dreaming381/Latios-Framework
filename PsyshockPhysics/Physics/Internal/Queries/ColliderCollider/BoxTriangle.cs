@@ -279,7 +279,7 @@ namespace Latios.Psyshock
                 }
 
                 // Project vertices of B onto the face of A
-                if (math.abs(math.dot(aPlane.normal, aLocalContactNormal)) < 0.05f)
+                if (math.abs(math.dot(aPlane.normal, aLocalContactNormal)) > 0.05f)
                 {
                     var distanceScalarAlongContactNormalA = math.rcp(math.dot(aLocalContactNormal, aPlane.normal));
                     for (int i = 0; i < 4; i++)

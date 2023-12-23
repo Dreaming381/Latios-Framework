@@ -11,6 +11,6 @@ int _start;
 void CopyBytes(uint3 id : SV_DispatchThreadID)
 {
     int index = _start + id.x;
-    uint4 data = _src.Load4(index);
-    _dst.Store4(index, data);
+    uint data = _src.Load(index);
+    _dst.Store(index, data);
 }

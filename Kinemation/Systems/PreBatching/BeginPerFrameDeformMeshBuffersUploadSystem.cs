@@ -4,38 +4,27 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine;
+
+// Todo: Split broker management to separate system that updates at the beginning of PresentationSystemGroup (OrderFirst = true).
 
 namespace Latios.Kinemation.Systems
 {
     [DisableAutoCreation]
     public partial class BeginPerFrameDeformMeshBuffersUploadSystem : SubSystem
     {
-        GraphicsBufferTrackingPool m_pool;
-
         protected override void OnCreate()
         {
-            m_pool = new GraphicsBufferTrackingPool();
-            worldBlackboardEntity.AddManagedStructComponent(new GraphicsBufferManager
-            {
-                pool = m_pool,
-            });
-
             worldBlackboardEntity.AddManagedStructComponent(new MeshGpuUploadBuffers());
             worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new MeshGpuUploadBuffersMapped());
-        }
-
-        protected override void OnDestroy()
-        {
-            m_pool.Dispose();
         }
 
         protected override void OnUpdate()
         {
             var meshGpuManager        = worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(false);
             var boneOffsetsGpuManager = worldBlackboardEntity.GetCollectionComponent<BoneOffsetsGpuManager>(false);
-            var bufferManager         = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferManager>();
+            var broker                = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferBrokerReference>();
 
-            bufferManager.pool.Update();
             CompleteDependency();
 
             JobHandle jhv = default;
@@ -47,22 +36,22 @@ namespace Latios.Kinemation.Systems
             MeshGpuUploadBuffersMapped newBuffersMapped = default;
 
             var requiredSizes            = meshGpuManager.requiredBufferSizes.Value;
-            newBuffers.verticesBuffer    = bufferManager.pool.GetMeshVerticesBuffer(requiredSizes.requiredVertexBufferSize);
-            newBuffers.weightsBuffer     = bufferManager.pool.GetMeshWeightsBuffer(requiredSizes.requiredWeightBufferSize);
-            newBuffers.bindPosesBuffer   = bufferManager.pool.GetMeshBindPosesBuffer(requiredSizes.requiredBindPoseBufferSize);
-            newBuffers.blendShapesBuffer = bufferManager.pool.GetMeshBlendShapesBuffer(requiredSizes.requiredBlendShapesBufferSize);
+            newBuffers.verticesBuffer    = broker.graphicsBufferBroker.GetMeshVerticesBuffer(requiredSizes.requiredVertexBufferSize);
+            newBuffers.weightsBuffer     = broker.graphicsBufferBroker.GetMeshWeightsBuffer(requiredSizes.requiredWeightBufferSize);
+            newBuffers.bindPosesBuffer   = broker.graphicsBufferBroker.GetMeshBindPosesBuffer(requiredSizes.requiredBindPoseBufferSize);
+            newBuffers.blendShapesBuffer = broker.graphicsBufferBroker.GetMeshBlendShapesBuffer(requiredSizes.requiredBlendShapesBufferSize);
 
             if (!meshGpuManager.uploadCommands.IsEmpty)
             {
                 var uploadCount                                        = (uint)meshGpuManager.uploadCommands.Length;
-                newBuffers.verticesUploadBuffer                        = bufferManager.pool.GetMeshVerticesUploadBuffer(requiredSizes.requiredVertexUploadSize);
-                newBuffers.weightsUploadBuffer                         = bufferManager.pool.GetMeshWeightsUploadBuffer(requiredSizes.requiredWeightUploadSize);
-                newBuffers.bindPosesUploadBuffer                       = bufferManager.pool.GetMeshBindPosesUploadBuffer(requiredSizes.requiredBindPoseUploadSize);
-                newBuffers.blendShapesUploadBuffer                     = bufferManager.pool.GetMeshBlendShapesUploadBuffer(requiredSizes.requiredBlendShapesUploadSize);
-                newBuffers.verticesUploadMetaBuffer                    = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.weightsUploadMetaBuffer                     = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.bindPosesUploadMetaBuffer                   = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
-                newBuffers.blendShapesUploadMetaBuffer                 = bufferManager.pool.GetUploadMetaBuffer(uploadCount);
+                newBuffers.verticesUploadBuffer                        = broker.graphicsBufferBroker.GetMeshVerticesUploadBuffer(requiredSizes.requiredVertexUploadSize);
+                newBuffers.weightsUploadBuffer                         = broker.graphicsBufferBroker.GetMeshWeightsUploadBuffer(requiredSizes.requiredWeightUploadSize);
+                newBuffers.bindPosesUploadBuffer                       = broker.graphicsBufferBroker.GetMeshBindPosesUploadBuffer(requiredSizes.requiredBindPoseUploadSize);
+                newBuffers.blendShapesUploadBuffer                     = broker.graphicsBufferBroker.GetMeshBlendShapesUploadBuffer(requiredSizes.requiredBlendShapesUploadSize);
+                newBuffers.verticesUploadMetaBuffer                    = broker.graphicsBufferBroker.GetMetaUint3UploadBuffer(uploadCount);
+                newBuffers.weightsUploadMetaBuffer                     = broker.graphicsBufferBroker.GetMetaUint3UploadBuffer(uploadCount);
+                newBuffers.bindPosesUploadMetaBuffer                   = broker.graphicsBufferBroker.GetMetaUint3UploadBuffer(uploadCount);
+                newBuffers.blendShapesUploadMetaBuffer                 = broker.graphicsBufferBroker.GetMetaUint3UploadBuffer(uploadCount);
                 newBuffersMapped.verticesUploadBufferWriteCount        = requiredSizes.requiredVertexUploadSize;
                 newBuffersMapped.weightsUploadBufferWriteCount         = requiredSizes.requiredWeightUploadSize;
                 newBuffersMapped.bindPosesUploadBufferWriteCount       = requiredSizes.requiredBindPoseUploadSize;
@@ -71,18 +60,17 @@ namespace Latios.Kinemation.Systems
                 newBuffersMapped.weightsUploadMetaBufferWriteCount     = uploadCount;
                 newBuffersMapped.bindPosesUploadMetaBufferWriteCount   = uploadCount;
                 newBuffersMapped.blendShapesUploadMetaBufferWriteCount = uploadCount;
-                var mappedVertices                                     = newBuffers.verticesUploadBuffer.LockBufferForWrite<UndeformedVertex>(0,
-                                                                                                                                              (int)requiredSizes.requiredVertexUploadSize);
-                var mappedWeights = newBuffers.weightsUploadBuffer.LockBufferForWrite<BoneWeightLinkedList>(0,
-                                                                                                            (int)requiredSizes.requiredWeightUploadSize);  // Unity uses T for sizing so we don't need to *2 here.
-                var mappedBindPoses = newBuffers.bindPosesUploadBuffer.LockBufferForWrite<float3x4>(0,
-                                                                                                    (int)requiredSizes.requiredBindPoseUploadSize);
-                var mappedBlendShapes = newBuffers.blendShapesUploadBuffer.LockBufferForWrite<BlendShapeVertexDisplacement>(0,
-                                                                                                                            (int)requiredSizes.requiredBlendShapesUploadSize);
-                var mappedVerticesMeta               = newBuffers.verticesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
-                var mappedWeightsMeta                = newBuffers.weightsUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
-                var mappedBindPosesMeta              = newBuffers.bindPosesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
-                var mappedBlendShapesMeta            = newBuffers.blendShapesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
+
+                var mappedVertices    = newBuffers.verticesUploadBuffer.LockBufferForWrite<UndeformedVertex>(0, (int)requiredSizes.requiredVertexUploadSize);
+                var mappedWeights     = newBuffers.weightsUploadBuffer.LockBufferForWrite<BoneWeightLinkedList>(0, (int)requiredSizes.requiredWeightUploadSize);  // Unity uses T for sizing so we don't need to *2 here.
+                var mappedBindPoses   = newBuffers.bindPosesUploadBuffer.LockBufferForWrite<float3x4>(0, (int)requiredSizes.requiredBindPoseUploadSize);
+                var mappedBlendShapes =
+                    newBuffers.blendShapesUploadBuffer.LockBufferForWrite<BlendShapeVertexDisplacement>(0, (int)requiredSizes.requiredBlendShapesUploadSize);
+                var mappedVerticesMeta    = newBuffers.verticesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
+                var mappedWeightsMeta     = newBuffers.weightsUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
+                var mappedBindPosesMeta   = newBuffers.bindPosesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
+                var mappedBlendShapesMeta = newBuffers.blendShapesUploadMetaBuffer.LockBufferForWrite<uint3>(0, (int)uploadCount);
+
                 newBuffersMapped.needsMeshCommitment = true;
 
                 ref var allocator       = ref World.UpdateAllocator;
@@ -144,13 +132,13 @@ namespace Latios.Kinemation.Systems
 
             uint boneOffsetsSize         = (uint)boneOffsetsGpuManager.offsets.Length;
             uint boneOffsetsGpuSize      = boneOffsetsSize / 2;
-            newBuffers.boneOffsetsBuffer = bufferManager.pool.GetBoneOffsetsBuffer(boneOffsetsGpuSize);
+            newBuffers.boneOffsetsBuffer = broker.graphicsBufferBroker.GetBoneOffsetsBuffer(boneOffsetsGpuSize);
 
             if (boneOffsetsGpuManager.isDirty.Value)
             {
                 uint metaCount                                         = (uint)math.ceil(boneOffsetsGpuSize / 64f);
-                newBuffers.boneOffsetsUploadBuffer                     = bufferManager.pool.GetBoneOffsetsUploadBuffer(boneOffsetsGpuSize);
-                newBuffers.boneOffsetsUploadMetaBuffer                 = bufferManager.pool.GetUploadMetaBuffer(boneOffsetsGpuSize);
+                newBuffers.boneOffsetsUploadBuffer                     = broker.graphicsBufferBroker.GetBoneOffsetsUploadBuffer(boneOffsetsGpuSize);
+                newBuffers.boneOffsetsUploadMetaBuffer                 = broker.graphicsBufferBroker.GetMetaUint3UploadBuffer(boneOffsetsGpuSize);
                 newBuffersMapped.boneOffsetsUploadBufferWriteCount     = boneOffsetsGpuSize;
                 newBuffersMapped.boneOffsetsUploadMetaBufferWriteCount = metaCount;
                 var mappedBoneOffsets                                  = newBuffers.boneOffsetsUploadBuffer.LockBufferForWrite<uint>(0, (int)boneOffsetsGpuSize);

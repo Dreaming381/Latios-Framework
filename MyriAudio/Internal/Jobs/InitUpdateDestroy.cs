@@ -14,33 +14,32 @@ namespace Latios.Myri
         [BurstCompile]
         public struct DestroyOneshotsWhenFinishedJob : IJobChunk
         {
-            public DestroyCommandBuffer.ParallelWriter                dcb;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceOneShot> oneshotHandle;
-            [ReadOnly] public EntityTypeHandle                        entityHandle;
-            [ReadOnly] public NativeReference<int>                    audioFrame;
-            [ReadOnly] public NativeReference<int>                    lastPlayedAudioFrame;
-            [ReadOnly] public ComponentLookup<AudioSettings>          settingsLookup;
-            public Entity                                             worldBlackboardEntity;
-            public int                                                sampleRate;
-            public int                                                samplesPerFrame;
+            public ComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished> expireHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceOneShot>         oneshotHandle;
+            [ReadOnly] public NativeReference<int>                            audioFrame;
+            [ReadOnly] public NativeReference<int>                            lastPlayedAudioFrame;
+            [ReadOnly] public ComponentLookup<AudioSettings>                  settingsLookup;
+            public Entity                                                     worldBlackboardEntity;
+            public int                                                        sampleRate;
+            public int                                                        samplesPerFrame;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                var entities = chunk.GetNativeArray(entityHandle);
+                var mask     = chunk.GetEnabledMask(ref expireHandle);
                 for (int i = 0; i < oneshots.Length; i++)
                 {
                     var os = oneshots[i];
                     if (!os.m_clip.IsCreated)
                     {
-                        dcb.Add(entities[i], unfilteredChunkIndex);
+                        mask[i] = false;
                         continue;
                     }
                     int    playedFrames = lastPlayedAudioFrame.Value - os.m_spawnedAudioFrame;
                     double resampleRate = os.clip.Value.sampleRate / (double)sampleRate;
                     if (os.isInitialized && os.clip.Value.samplesLeftOrMono.Length < resampleRate * playedFrames * samplesPerFrame)
                     {
-                        dcb.Add(entities[i], unfilteredChunkIndex);
+                        mask[i] = false;
                     }
                 }
             }

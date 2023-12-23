@@ -69,16 +69,22 @@ namespace Latios.Kinemation.Systems
                 bool hasDynamicMesh  = chunk.Has(ref dynamicMeshMaxVertexDisplacementHandle);
                 bool hasBlendShapes  = chunk.Has(ref blendShapeWeightsHandle) && chunk.Has(ref blendShapeStateHandle);
                 bool hasShaderBounds = chunk.Has(ref shaderBoundsHandle);
+                bool hasSkeleton     = chunk.Has(ref skeletonDependentHandle);
+                bool hasLocalBounds  = chunk.Has(ref localBoundsHandle);
                 bool didOrderChange  = chunk.DidOrderChange(lastSystemVersion);
 
                 // We only care about didOrderChange if the chunk is missing a component, because that component could have been removed.
                 // This isn't much of an optimization, but is still relatively cheap to compute.
+                bool renderBoundsChanged     = !hasSkeleton && hasLocalBounds && chunk.DidChange(ref localBoundsHandle, lastSystemVersion);
                 bool meshNeedsUpdate         = hasDynamicMesh && chunk.DidChange(ref dynamicMeshMaxVertexDisplacementHandle, lastSystemVersion);
                 meshNeedsUpdate             |= (!hasDynamicMesh && didOrderChange);
+                meshNeedsUpdate             |= renderBoundsChanged;
                 bool blendShapesNeedsUpdate  = hasBlendShapes && chunk.DidChange(ref blendShapeWeightsHandle, lastSystemVersion);
                 blendShapesNeedsUpdate      |= (!hasBlendShapes && didOrderChange);
+                blendShapesNeedsUpdate      |= renderBoundsChanged;
                 bool shaderNeedsUpdate       = hasShaderBounds && chunk.DidChange(ref shaderBoundsHandle, lastSystemVersion);
                 shaderNeedsUpdate           |= (!hasShaderBounds && didOrderChange);
+                shaderNeedsUpdate           |= renderBoundsChanged;
 
                 if (!(meshNeedsUpdate || blendShapesNeedsUpdate || shaderNeedsUpdate))
                     return;
@@ -118,6 +124,7 @@ namespace Latios.Kinemation.Systems
                         weights              = weights.GetSubArray(weightsBase, shapeOffsets.Length);
                         for (int j = 0; j < shapeOffsets.Length; j++)
                         {
+                            //UnityEngine.Debug.Log($"j: {j} offset: {shapeOffsets[j]}, weight: {weights[j]}");
                             localRadialBounds[i] += weights[j] * shapeOffsets[j];
                         }
                     }
@@ -144,6 +151,7 @@ namespace Latios.Kinemation.Systems
                         var aabb = blobs[i].meshBlob.Value.undeformedAabb;
                         Physics.GetCenterExtents(aabb, out var center, out var extents);
                         bounds[i] = new RenderBounds { Value = new AABB { Center = center, Extents = extents + localRadialBounds[i] } };
+                        //UnityEngine.Debug.Log($"aabb: {aabb.min}, {aabb.max}, center: {center}, extents: {extents}, radial: {localRadialBounds[i]}");
                     }
                 }
             }

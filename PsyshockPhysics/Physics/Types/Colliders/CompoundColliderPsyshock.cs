@@ -11,7 +11,7 @@ namespace Latios.Psyshock
     /// A uniformly scaled collection of colliders and their relative transforms.
     /// </summary>
     [Serializable]
-    [StructLayout(LayoutKind.Explicit)]
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct CompoundCollider
     {
         /// <summary>
@@ -38,19 +38,19 @@ namespace Latios.Psyshock
         /// <summary>
         /// The blob asset containing the subcolliders of this compound collider
         /// </summary>
-        [FieldOffset(0)] public BlobAssetReference<CompoundColliderBlob> compoundColliderBlob;
+        [FieldOffset(24)] public BlobAssetReference<CompoundColliderBlob> compoundColliderBlob;
         /// <summary>
         /// The scale of the collider that should be propagated to all subcolliders. It is applied in addition to any scaling from a transform.
         /// </summary>
-        [FieldOffset(8)] public float scale;
+        [FieldOffset(0)] public float scale;
         /// <summary>
         /// The stretch of the collider that should be propagated to all subcolliders. It is applied in addition to any stretching from a transform.
         /// </summary>
-        [FieldOffset(12)] public float3 stretch;  // Todo: Alignment?
+        [FieldOffset(4)] public float3 stretch;
         /// <summary>
         /// The stretch mode which specifies how subcolliders should respond to stretch values
         /// </summary>
-        [FieldOffset(24)] public StretchMode stretchMode;
+        [FieldOffset(16)] public StretchMode stretchMode;
 
         /// <summary>
         /// Constructs a new CompoundCollider

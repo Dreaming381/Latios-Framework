@@ -8,7 +8,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
@@ -88,7 +88,7 @@ namespace Latios.Kinemation
                 }.Schedule(collectJh);
 
                 // Fetching this now because culling jobs are still running (hopefully).
-                var graphicsPool = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferManager>().pool;
+                var graphicsBroker = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferBrokerReference>().graphicsBufferBroker;
 
                 yield return true;
 
@@ -112,7 +112,7 @@ namespace Latios.Kinemation
                 }
 
                 var metaBufferSize = (uint)payloads.Length * 2 + requiredWeightsBufferSize.Value;
-                var metaBuffer     = graphicsPool.GetUploadMetaBuffer(metaBufferSize);
+                var metaBuffer     = graphicsBroker.GetMetaUint4UploadBuffer(metaBufferSize);
 
                 Dependency = new WriteMetaBufferJob
                 {
@@ -131,9 +131,9 @@ namespace Latios.Kinemation
                 if (terminate)
                     break;
 
-                var persistentBuffer = graphicsPool.GetDeformBuffer(worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
-                m_dispatchShader.SetBuffer(0, _srcVertices,      graphicsPool.GetMeshVerticesBufferRO());
-                m_dispatchShader.SetBuffer(0, _blendShapeDeltas, graphicsPool.GetMeshBlendShapesBufferRO());
+                var persistentBuffer = graphicsBroker.GetDeformBuffer(worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
+                m_dispatchShader.SetBuffer(0, _srcVertices,      graphicsBroker.GetMeshVerticesBuffer());
+                m_dispatchShader.SetBuffer(0, _blendShapeDeltas, graphicsBroker.GetMeshBlendShapesBufferRO());
                 m_dispatchShader.SetBuffer(0, _dstVertices,      persistentBuffer);
                 m_dispatchShader.SetBuffer(0, _metaBuffer,       metaBuffer);
 
@@ -141,6 +141,7 @@ namespace Latios.Kinemation
                 {
                     uint dispatchCount = math.min(dispatchesRemaining, 65535);
                     m_dispatchShader.SetInt(_startOffset, (int)offset);
+                    //UnityEngine.Debug.Log("Dispatching");
                     m_dispatchShader.Dispatch(0, (int)dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
@@ -184,6 +185,7 @@ namespace Latios.Kinemation
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                //UnityEngine.Debug.Log("Checking chunk for upload");
                 var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
                 var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
@@ -257,6 +259,7 @@ namespace Latios.Kinemation
                             gpuTarget = legacyComputeShaderIndices[i].firstVertexIndex;
                         else
                             gpuTarget = legacyDotsShaderIndices[i].parameters.x;
+                        //UnityEngine.Debug.Log("Wrote upload payload");
                         streamWriter.Write(new UploadPayload
                         {
                             weightsPtr            = currentPtr,
@@ -354,6 +357,7 @@ namespace Latios.Kinemation
 
             public unsafe void Execute(int index)
             {
+                //UnityEngine.Debug.Log("Writing meta");
                 var payload           = payloads[index];
                 metaBuffer[2 * index] = new uint4(payload.nonzeroWeightsCount,
                                                   payload.weightsBufferStart + (uint)payloads.Length * 2,
@@ -376,6 +380,18 @@ namespace Latios.Kinemation
                         if (weightsPtr[i] == 0f)
                             continue;
 
+                        //float maxDisplacement = 0f;
+                        //for (int j = 0; j < blobShapes.shapes[i].count; j++)
+                        //{
+                        //    var vert        = blobShapes.gpuData[(int)(blobShapes.shapes[i].start + j)];
+                        //    maxDisplacement = math.max(math.length(vert.positionDisplacement), maxDisplacement);
+                        //    if (vert.targetVertexIndex >= entry.blob.Value.undeformedVertices.Length)
+                        //        UnityEngine.Debug.Log(
+                        //            $"dispatch vertex delta at {j} references vertex {vert.targetVertexIndex} for mesh vertex count {entry.blob.Value.undeformedVertices.Length}");
+                        //    UnityEngine.Debug.Log(
+                        //        $"dispatch vertex: {j}, {vert.targetVertexIndex}, {vert.positionDisplacement}, {vert.normalDisplacement}, {vert.tangentDisplacement}");
+                        //}
+                        //UnityEngine.Debug.Log($"verticesCount: {blobShapes.shapes[i].count}, dispatch maxDisplacement: {maxDisplacement}");
                         weightsBuffer[nextNonzeroWeightIndex] = new uint4(blobShapes.shapes[i].permutationID,
                                                                           blobShapes.shapes[i].count,
                                                                           blobShapes.shapes[i].start + entry.blendShapesStart,

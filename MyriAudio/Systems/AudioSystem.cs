@@ -50,7 +50,6 @@ namespace Latios.Myri.Systems
         private EntityQuery m_oneshotsQuery;
         private EntityQuery m_loopedQuery;
 
-        EntityTypeHandle                            m_entityHandle;
         ComponentTypeHandle<AudioListener>          m_listenerHandle;
         ComponentTypeHandle<AudioSourceOneShot>     m_oneshotHandle;
         ComponentTypeHandle<AudioSourceLooped>      m_loopedHandle;
@@ -80,7 +79,6 @@ namespace Latios.Myri.Systems
             m_oneshotsQuery                      = state.Fluent().With<AudioSourceOneShot>().Build();
             m_loopedQuery                        = state.Fluent().With<AudioSourceLooped>().Build();
 
-            m_entityHandle         = state.GetEntityTypeHandle();
             m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);
             m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
             m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
@@ -164,7 +162,6 @@ namespace Latios.Myri.Systems
             var deadListenerEntities  = m_deadListenersQuery.ToEntityArray(Allocator.TempJob);
 
             //Type handles
-            m_entityHandle.Update(ref state);
             m_listenerHandle.Update(ref state);
             m_oneshotHandle.Update(ref state);
             m_loopedHandle.Update(ref state);
@@ -186,7 +183,6 @@ namespace Latios.Myri.Systems
             };
 
             //Containers
-            var destroyCommandBuffer     = latiosWorld.syncPoint.CreateDestroyCommandBuffer().AsParallelWriter();
             var entityCommandBuffer      = latiosWorld.syncPoint.CreateEntityCommandBuffer();
             var dspCommandBlock          = m_graph.CreateCommandBlock();
             var listenersWithTransforms  = new NativeList<ListenerWithTransform>(aliveListenerEntities.Length, Allocator.TempJob);
@@ -265,8 +261,7 @@ namespace Latios.Myri.Systems
 
             var destroyOneshotsJH = new InitUpdateDestroy.DestroyOneshotsWhenFinishedJob
             {
-                dcb                   = destroyCommandBuffer,
-                entityHandle          = m_entityHandle,
+                expireHandle          = GetComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished>(false),
                 oneshotHandle         = m_oneshotHandle,
                 audioFrame            = m_audioFrame,
                 lastPlayedAudioFrame  = m_lastPlayedAudioFrame,

@@ -260,7 +260,8 @@ namespace Latios.Psyshock
 
             ref var blob       = ref convex.convexColliderBlob.Value;
             float3  invScale   = math.rcp(convex.scale);
-            var     dimensions = math.countbits(math.bitmask(new bool4(math.isfinite(invScale), false)));
+            var     bitmask    = math.bitmask(new bool4(math.isfinite(invScale), false));
+            var     dimensions = math.countbits(bitmask);
             if (dimensions == 3)
             {
                 var convexLocalContactNormal = math.InverseRotateFast(convexTransform.rot, -distanceResult.normalB);
@@ -279,7 +280,7 @@ namespace Latios.Psyshock
                     var rayStart        = math.transform(bInATransform, capsule.pointA);
                     var rayDisplacement = math.transform(bInATransform, capsule.pointB) - rayStart;
 
-                    var    edgeIndicesBase = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].x;
+                    var    edgeIndicesBase = blob.edgeIndicesInFacesStartsAndCounts[faceIndex].start;
                     float4 enterFractions  = float4.zero;
                     float4 exitFractions   = 1f;
                     bool4  projectsOnFace  = true;
@@ -288,10 +289,10 @@ namespace Latios.Psyshock
                         int4 indices       = i + new int4(0, 1, 2, 3);
                         indices            = math.select(indices, indices - edgeCount, indices >= edgeCount);
                         indices           += edgeIndicesBase;
-                        var segmentA       = blob.vertexIndicesInEdges[indices.x];
-                        var segmentB       = blob.vertexIndicesInEdges[indices.y];
-                        var segmentC       = blob.vertexIndicesInEdges[indices.z];
-                        var segmentD       = blob.vertexIndicesInEdges[indices.w];
+                        var segmentA       = blob.vertexIndicesInEdges[blob.edgeIndicesInFaces[indices.x].index];
+                        var segmentB       = blob.vertexIndicesInEdges[blob.edgeIndicesInFaces[indices.y].index];
+                        var segmentC       = blob.vertexIndicesInEdges[blob.edgeIndicesInFaces[indices.z].index];
+                        var segmentD       = blob.vertexIndicesInEdges[blob.edgeIndicesInFaces[indices.w].index];
                         var edgeVerticesA  = new simdFloat3(new float4(blob.verticesX[segmentA.x], blob.verticesX[segmentB.x], blob.verticesX[segmentC.x],
                                                                        blob.verticesX[segmentD.x]),
                                                             new float4(blob.verticesY[segmentA.x], blob.verticesY[segmentB.x], blob.verticesY[segmentC.x],
@@ -359,58 +360,119 @@ namespace Latios.Psyshock
             }
             else if (dimensions == 2)
             {
-                var bInATransform            = math.mul(math.inverse(convexTransform), capsuleTransform);
-                var capA                     = math.transform(bInATransform, capsule.pointA);
-                var capB                     = math.transform(bInATransform, capsule.pointB);
-                var convexLocalContactNormal = math.rotate(bInATransform.rot, -result.contactNormal);
+                var convexLocalContactNormal = math.InverseRotateFast(convexTransform.rot, -distanceResult.normalB);
 
-                var mask            = math.select(0f, 1f, math.isfinite(invScale));
-                var invMask         = 1f - mask;
-                var rayDisplacement = 2f * math.length(math.max(math.abs(capA), math.abs(capB)));
-                var inflateConvex   = convex;
-                inflateConvex.scale = math.select(1f, convex.scale, math.isfinite(invScale));
-
-                var hitA = PointRayConvex.RaycastConvex(new Ray(capA, capA - convexLocalContactNormal * rayDisplacement), in inflateConvex, out _, out _);
-                var hitB = PointRayConvex.RaycastConvex(new Ray(capA, capA - convexLocalContactNormal * rayDisplacement), in inflateConvex, out _, out _);
-
-                var clippedA = capA;
-                var clippedB = capB;
-                if (!hitA)
+                ref var indices2D = ref blob.yz2DVertexIndices;  // bitmask = 6
+                var     plane     = new Plane(new float3(1f, 0f, 0f), 0f);
+                if (bitmask == 5)
                 {
-                    var castCapsule = new CapsuleCollider(-invMask, invMask, 0f);
-                    var castStart   = new RigidTransform(quaternion.identity, capA * mask);
-                    if (ColliderCast(in castCapsule, in castStart, capB * mask, in convex, RigidTransform.identity, out var hit))
+                    indices2D = ref blob.xz2DVertexIndices;
+                    plane     = new Plane(new float3(0f, 1f, 0f), 0f);
+                }
+                else if (bitmask == 3)
+                {
+                    indices2D = ref blob.xy2DVertexIndices;
+                    plane     = new Plane(new float3(0f, 0f, 1f), 0f);
+                }
+                if (math.dot(plane.normal, convexLocalContactNormal) < 0f)
+                    plane = mathex.Flip(plane);
+
+                bool needsClosestPoint = math.abs(math.dot(convexLocalContactNormal, plane.normal)) < 0.05f;
+
+                if (!needsClosestPoint)
+                {
+                    var bInATransform   = math.mul(math.inverse(convexTransform), capsuleTransform);
+                    var rayStart        = math.transform(bInATransform, capsule.pointA);
+                    var rayDisplacement = math.transform(bInATransform, capsule.pointB) - rayStart;
+
+                    float4 enterFractions = float4.zero;
+                    float4 exitFractions  = 1f;
+                    bool4  projectsOnFace = true;
+                    for (int i = 0; i < indices2D.Length; i += 4)
                     {
-                        clippedA = hit.hitpoint * mask + capA * invMask;
-                        hitA     = true;
+                        int4 indices             = i + new int4(0, 1, 2, 3);
+                        indices                  = math.select(indices, indices - indices2D.Length, indices >= indices2D.Length);
+                        var        extraIndex    = math.select(i + 4, i + 4 - indices2D.Length, i + 4 >= indices2D.Length);
+                        simdFloat3 edgeVerticesA = default;
+                        simdFloat3 edgeVerticesB = default;
+                        if (bitmask == 6)
+                        {
+                            edgeVerticesA = new simdFloat3(float4.zero,
+                                                           new float4(blob.verticesY[indices.x], blob.verticesY[indices.y], blob.verticesY[indices.z],
+                                                                      blob.verticesY[indices.w]) * convex.scale.y,
+                                                           new float4(blob.verticesZ[indices.x], blob.verticesZ[indices.y], blob.verticesZ[indices.z],
+                                                                      blob.verticesZ[indices.w]) * convex.scale.z);
+                            edgeVerticesB = new simdFloat3(float4.zero,
+                                                           new float4(blob.verticesY[indices.y], blob.verticesY[indices.z], blob.verticesY[indices.w],
+                                                                      blob.verticesY[extraIndex]) * convex.scale.y,
+                                                           new float4(blob.verticesZ[indices.y], blob.verticesZ[indices.z], blob.verticesZ[indices.w],
+                                                                      blob.verticesZ[extraIndex]) * convex.scale.z);
+                        }
+                        else if (bitmask == 5)
+                        {
+                            edgeVerticesA = new simdFloat3(new float4(blob.verticesX[indices.x], blob.verticesX[indices.y], blob.verticesX[indices.z],
+                                                                      blob.verticesX[indices.w]) * convex.scale.x,
+                                                           float4.zero,
+                                                           new float4(blob.verticesZ[indices.x], blob.verticesZ[indices.y], blob.verticesZ[indices.z],
+                                                                      blob.verticesZ[indices.w]) * convex.scale.z);
+                            edgeVerticesB = new simdFloat3(new float4(blob.verticesX[indices.y], blob.verticesX[indices.z], blob.verticesX[indices.w],
+                                                                      blob.verticesX[extraIndex]) * convex.scale.x,
+                                                           float4.zero,
+                                                           new float4(blob.verticesZ[indices.y], blob.verticesZ[indices.z], blob.verticesZ[indices.w],
+                                                                      blob.verticesZ[extraIndex]) * convex.scale.z);
+                        }
+                        else  // bitmask == 3
+                        {
+                            edgeVerticesA = new simdFloat3(new float4(blob.verticesX[indices.x], blob.verticesX[indices.y], blob.verticesX[indices.z],
+                                                                      blob.verticesX[indices.w]) * convex.scale.x,
+                                                           new float4(blob.verticesY[indices.x], blob.verticesY[indices.y], blob.verticesY[indices.z],
+                                                                      blob.verticesY[indices.w]) * convex.scale.y,
+                                                           float4.zero);
+                            edgeVerticesB = new simdFloat3(new float4(blob.verticesX[indices.y], blob.verticesX[indices.z], blob.verticesX[indices.w],
+                                                                      blob.verticesX[extraIndex]) * convex.scale.x,
+                                                           new float4(blob.verticesY[indices.y], blob.verticesY[indices.z], blob.verticesY[indices.w],
+                                                                      blob.verticesY[extraIndex]) * convex.scale.y,
+                                                           float4.zero);
+                        }
+
+                        // The average of all 8 vertices is the average of all the edge midpoints, which should be a point inside the face
+                        // to help get the correct outward edge planes.
+                        var midpoint           = simd.csumabcd(edgeVerticesA + edgeVerticesB) / 8f;
+                        var edgeDisplacements  = edgeVerticesB - edgeVerticesA;
+                        var edgePlaneNormals   = simd.cross(edgeDisplacements, convexLocalContactNormal);
+                        edgePlaneNormals       = simd.select(-edgePlaneNormals, edgePlaneNormals, simd.dot(edgePlaneNormals, midpoint - edgeVerticesA) > 0f);
+                        var edgePlaneDistances = simd.dot(edgePlaneNormals, edgeVerticesB);
+
+                        var rayRelativeStarts  = simd.dot(rayStart, edgePlaneNormals) - edgePlaneDistances;
+                        var relativeDiffs      = simd.dot(rayDisplacement, edgePlaneNormals);
+                        var rayRelativeEnds    = rayRelativeStarts + relativeDiffs;
+                        var rayFractions       = math.select(-rayRelativeStarts / relativeDiffs, float4.zero, relativeDiffs == float4.zero);
+                        var startsInside       = rayRelativeStarts <= 0f;
+                        var endsInside         = rayRelativeEnds <= 0f;
+                        projectsOnFace        &= startsInside | endsInside;
+                        enterFractions         = math.select(float4.zero, rayFractions, !startsInside & rayFractions > enterFractions);
+                        exitFractions          = math.select(1f, rayFractions, !endsInside & rayFractions < exitFractions);
+                    }
+
+                    var fractionA     = math.cmax(enterFractions);
+                    var fractionB     = math.cmin(exitFractions);
+                    needsClosestPoint = true;
+                    if (math.all(projectsOnFace) && fractionA < fractionB)
+                    {
+                        // Add the two contacts from the possibly clipped segment
+                        var distanceScalarAlongContactNormal = math.rcp(math.dot(convexLocalContactNormal, plane.normal));
+                        var clippedSegmentA                  = rayStart + fractionA * rayDisplacement;
+                        var clippedSegmentB                  = rayStart + fractionB * rayDisplacement;
+                        var aDistance                        = mathex.SignedDistance(plane, clippedSegmentA) * distanceScalarAlongContactNormal;
+                        var bDistance                        = mathex.SignedDistance(plane, clippedSegmentB) * distanceScalarAlongContactNormal;
+                        result.Add(math.transform(convexTransform, clippedSegmentA), aDistance - capsule.radius);
+                        result.Add(math.transform(convexTransform, clippedSegmentB), bDistance - capsule.radius);
+                        needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
                     }
                 }
-                if (!hitB)
-                {
-                    var castCapsule = new CapsuleCollider(-invMask, invMask, 0f);
-                    var castStart   = new RigidTransform(quaternion.identity, capB * mask);
-                    if (ColliderCast(in castCapsule, in castStart, capA * mask, in convex, RigidTransform.identity, out var hit))
-                    {
-                        clippedB = hit.hitpoint * mask + capB * invMask;
-                        hitB     = true;
-                    }
-                }
 
-                bool needsClosestPoint = true;
-                if ((hitA || hitB) && math.dot(clippedB - clippedA, capB - capA) >= 0f)
-                {
-                    var plane                            = new Plane(invMask * math.select(-1f, 1f, convexLocalContactNormal >= 0f), 0f);
-                    var distanceScalarAlongContactNormal = math.rcp(math.dot(convexLocalContactNormal, plane.normal));
-                    var aDistance                        = mathex.SignedDistance(plane, clippedA) * distanceScalarAlongContactNormal;
-                    var bDistance                        = mathex.SignedDistance(plane, clippedB) * distanceScalarAlongContactNormal;
-                    result.Add(math.transform(convexTransform, clippedA), aDistance - capsule.radius);
-                    result.Add(math.transform(convexTransform, clippedB), bDistance - capsule.radius);
-                    needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
-                }
                 if (needsClosestPoint)
-                {
                     result.Add(distanceResult.hitpointB, distanceResult.distance);
-                }
                 return result;
             }
             else

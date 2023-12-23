@@ -12,7 +12,6 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
         Latios.Transforms.Authoring.TransformsBakingBootstrap.InstallLatiosTransformsBakers(ref context);
         Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemationBakersAndSystems(ref context);
-        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallMecanimBakersAndSystems(ref context);
     }
 }
 
@@ -21,7 +20,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
 {
     public World InitializeOrModify(World defaultEditorWorld)
     {
-        var world                        = new LatiosWorld(defaultEditorWorld.Name);
+        var world                        = new LatiosWorld(defaultEditorWorld.Name, defaultEditorWorld.Flags);
         world.zeroToleranceForExceptions = true;
 
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default, true);
@@ -53,7 +52,6 @@ public class LatiosBootstrap : ICustomBootstrap
         Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        Latios.Kinemation.KinemationBootstrap.InstallMecanimFeatures(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
 

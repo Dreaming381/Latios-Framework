@@ -58,9 +58,11 @@ namespace Latios
         /// Automatically creates parent ComponentSystemGroups if necessary.
         /// Use this instead of InjectSystemsFromNamespace because Unity sometimes forgets to put namespaces on things.
         /// </summary>
-        /// <param name="systems"></param>
-        /// <param name="world"></param>
-        /// <param name="defaultGroup"></param>
+        /// <param name="systems">List of systems containing the namespaced systems to inject using world.GetOrCreateSystem</param>
+        /// <param name="world">The world to inject the systems into</param>
+        /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
+        /// <param name="silenceWarnings">If false, this method will print warnings about Unity systems that fail to specify a namespace.
+        /// Use this to report bugs to Unity, as the presence of these systems prevent startup optimizations.</param>
         public static void InjectUnitySystems(NativeList<SystemTypeIndex> systems, World world, ComponentSystemGroup defaultGroup = null, bool silenceWarnings = true)
         {
             var sysList = new NativeList<SystemTypeIndex>(Allocator.Temp);
@@ -77,6 +79,34 @@ namespace Latios
                         continue;
                 }
                 else if (!type.Namespace.Contains("Unity"))
+                    continue;
+
+                sysList.Add(system);
+            }
+
+            InjectSystems(sysList, world, defaultGroup);
+        }
+
+        /// <summary>
+        /// Injects all systems not made by Unity (or systems that use "Unity" in their namespace or assembly)
+        /// and not part of a module installer from the systems list. Automatically creates parent ComponentSystemGroups if necessary.
+        /// It is recommended to use this after installing modules with module installers.
+        /// </summary>
+        /// <param name="systems">List of systems containing the namespaced systems to inject using world.GetOrCreateSystem</param>
+        /// <param name="world">The world to inject the systems into</param>
+        /// <param name="defaultGroup">If no UpdateInGroupAttributes exist on the type and this value is not null, the system is injected in this group</param>
+        public static void InjectUserSystems(NativeList<SystemTypeIndex> systems, World world, ComponentSystemGroup defaultGroup)
+        {
+            var sysList = new NativeList<SystemTypeIndex>(Allocator.Temp);
+            foreach (var system in systems)
+            {
+                var type = system.GetManagedType();
+                if (type.Namespace == null)
+                {
+                    if (type.Assembly.FullName.Contains("Unity"))
+                        continue;
+                }
+                else if (type.Namespace.Contains("Unity"))
                     continue;
 
                 sysList.Add(system);

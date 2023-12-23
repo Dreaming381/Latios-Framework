@@ -188,7 +188,7 @@ namespace Latios.Kinemation.Systems
                     worldBlackboardEntity       = worldBlackboardEntity
                 }.Schedule(collectJh);
 
-                var graphicsPool = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferManager>().pool;
+                var graphicsBroker = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferBrokerReference>().graphicsBufferBroker;
 
                 yield return true;
 
@@ -215,8 +215,8 @@ namespace Latios.Kinemation.Systems
                 m_worldTransformHandle.Update(ref CheckedStateRef);
                 m_worldTransformLookup.Update(ref CheckedStateRef);
 
-                var skinningMetaBuffer   = graphicsPool.GetDispatchMetaBuffer(layouts.requiredMetaSize);
-                var boneTransformsBuffer = graphicsPool.GetBonesBuffer(layouts.requiredUploadTransforms);
+                var skinningMetaBuffer   = graphicsBroker.GetMetaUint4UploadBuffer(layouts.requiredMetaSize);
+                var boneTransformsBuffer = graphicsBroker.GetBonesBuffer(layouts.requiredUploadTransforms);
                 var skinningMetaArray    = skinningMetaBuffer.LockBufferForWrite<uint4>(0, (int)layouts.requiredMetaSize);
                 var boneTransformsArray  = boneTransformsBuffer.LockBufferForWrite<TransformQvvs>(0, (int)layouts.requiredUploadTransforms);
 
@@ -262,17 +262,17 @@ namespace Latios.Kinemation.Systems
                     break;
 
                 var requiredDeformSizes    = worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>();
-                var shaderTransformsBuffer = graphicsPool.GetSkinningTransformsBuffer(requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning);
-                var shaderDeformBuffer     = graphicsPool.GetDeformBuffer(requiredDeformSizes.maxRequiredDeformVertices);
+                var shaderTransformsBuffer = graphicsBroker.GetSkinningTransformsBuffer(requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning);
+                var shaderDeformBuffer     = graphicsBroker.GetDeformBuffer(requiredDeformSizes.maxRequiredDeformVertices);
 
                 //UnityEngine.Debug.Log($"Vertex Skinning Buffer size: {requiredDeformSizes.maxRequiredBoneTransformsForVertexSkinning}");
 
                 m_batchSkinningShader.SetBuffer(0, _dstTransforms,          shaderTransformsBuffer);
                 m_batchSkinningShader.SetBuffer(0, _dstVertices,            shaderDeformBuffer);
-                m_batchSkinningShader.SetBuffer(0, _srcVertices,            graphicsPool.GetMeshVerticesBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _boneWeights,            graphicsPool.GetMeshWeightsBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _bindPoses,              graphicsPool.GetMeshBindPosesBufferRO());
-                m_batchSkinningShader.SetBuffer(0, _boneOffsets,            graphicsPool.GetBoneOffsetsBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _srcVertices,            graphicsBroker.GetMeshVerticesBuffer());
+                m_batchSkinningShader.SetBuffer(0, _boneWeights,            graphicsBroker.GetMeshWeightsBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _bindPoses,              graphicsBroker.GetMeshBindPosesBufferRO());
+                m_batchSkinningShader.SetBuffer(0, _boneOffsets,            graphicsBroker.GetBoneOffsetsBufferRO());
                 m_batchSkinningShader.SetBuffer(0, _metaBuffer,             skinningMetaBuffer);
                 m_batchSkinningShader.SetBuffer(0, _skeletonQvvsTransforms, boneTransformsBuffer);
 
@@ -286,8 +286,8 @@ namespace Latios.Kinemation.Systems
                 }
 
                 m_expansionShader.SetBuffer(0, _dstTransforms,          shaderTransformsBuffer);
-                m_expansionShader.SetBuffer(0, _bindPoses,              graphicsPool.GetMeshBindPosesBufferRO());
-                m_expansionShader.SetBuffer(0, _boneOffsets,            graphicsPool.GetBoneOffsetsBufferRO());
+                m_expansionShader.SetBuffer(0, _bindPoses,              graphicsBroker.GetMeshBindPosesBufferRO());
+                m_expansionShader.SetBuffer(0, _boneOffsets,            graphicsBroker.GetBoneOffsetsBufferRO());
                 m_expansionShader.SetBuffer(0, _metaBuffer,             skinningMetaBuffer);
                 m_expansionShader.SetBuffer(0, _skeletonQvvsTransforms, boneTransformsBuffer);
 
@@ -301,9 +301,9 @@ namespace Latios.Kinemation.Systems
                 }
 
                 m_meshSkinningShader.SetBuffer(0, _dstVertices,    shaderDeformBuffer);
-                m_meshSkinningShader.SetBuffer(0, _srcVertices,    graphicsPool.GetMeshVerticesBufferRO());
-                m_meshSkinningShader.SetBuffer(0, _boneWeights,    graphicsPool.GetMeshWeightsBufferRO());
-                m_meshSkinningShader.SetBuffer(0, _bindPoses,      graphicsPool.GetMeshBindPosesBufferRO());
+                m_meshSkinningShader.SetBuffer(0, _srcVertices,    graphicsBroker.GetMeshVerticesBuffer());
+                m_meshSkinningShader.SetBuffer(0, _boneWeights,    graphicsBroker.GetMeshWeightsBufferRO());
+                m_meshSkinningShader.SetBuffer(0, _bindPoses,      graphicsBroker.GetMeshBindPosesBufferRO());
                 m_meshSkinningShader.SetBuffer(0, _metaBuffer,     skinningMetaBuffer);
                 m_meshSkinningShader.SetBuffer(0, _boneTransforms, shaderTransformsBuffer);
 
@@ -319,7 +319,7 @@ namespace Latios.Kinemation.Systems
                 UnityEngine.Shader.SetGlobalBuffer(_DeformedMeshData,              shaderDeformBuffer);
                 UnityEngine.Shader.SetGlobalBuffer(_PreviousFrameDeformedMeshData, shaderDeformBuffer);
                 UnityEngine.Shader.SetGlobalBuffer(_SkinMatrices,                  shaderTransformsBuffer);
-                UnityEngine.Shader.SetGlobalBuffer(_latiosBindPoses,               graphicsPool.GetMeshBindPosesBufferRO());
+                UnityEngine.Shader.SetGlobalBuffer(_latiosBindPoses,               graphicsBroker.GetMeshBindPosesBufferRO());
                 UnityEngine.Shader.SetGlobalBuffer(_latiosBoneTransforms,          shaderTransformsBuffer);
                 UnityEngine.Shader.SetGlobalBuffer(_latiosDeformBuffer,            shaderDeformBuffer);
             }

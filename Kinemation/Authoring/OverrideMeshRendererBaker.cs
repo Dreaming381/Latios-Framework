@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using static UnityEngine.EventSystems.EventTrigger;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Hybrid.Baking;
@@ -33,6 +34,33 @@ namespace Latios.Kinemation.Authoring
                 foreach (var entity in additionalEntities)
                 {
                     baker.AddComponent(entity, new MeshRendererBakingData { MeshRenderer = renderer });
+                }
+            }
+        }
+
+        /// <summary>
+        /// Bake a Mesh Renderer using the provided mesh and materials
+        /// </summary>
+        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
+        /// <param name="mesh">The mesh to use</param>
+        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
+        public static void BakeMeshAndMaterial(this IBaker baker,
+                                               Entity renderableEntity,
+                                               RenderMeshDescription renderMeshDescription,
+                                               Mesh mesh,
+                                               List<Material>        materials,
+                                               int firstUniqueSubmeshIndex = int.MaxValue)
+        {
+            MeshRendererBakingUtility.Convert(baker, renderableEntity, renderMeshDescription, mesh, materials, out var additionalEntities, firstUniqueSubmeshIndex);
+
+            // Todo: Skinned skips lightmaps which require a valid Renderer.
+            baker.AddComponent<SkinnedMeshRendererBakingData>(renderableEntity);
+
+            if (additionalEntities != null)
+            {
+                foreach (var entity in additionalEntities)
+                {
+                    baker.AddComponent<SkinnedMeshRendererBakingData>(entity);
                 }
             }
         }

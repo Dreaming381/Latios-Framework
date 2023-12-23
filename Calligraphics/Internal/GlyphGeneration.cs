@@ -1,5 +1,5 @@
+using Latios.Calligraphics.Rendering;
 using Latios.Calligraphics.RichText;
-using Latios.Kinemation.TextBackend;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
