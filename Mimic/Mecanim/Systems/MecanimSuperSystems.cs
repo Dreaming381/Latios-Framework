@@ -6,7 +6,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-namespace Latios.Mimic.Mecanim.Systems
+namespace Latios.Mimic.Addons.Mecanim.Systems
 {
     /// <summary>
     /// This super system contains systems that manage the animator state machine and

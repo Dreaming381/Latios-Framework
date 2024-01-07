@@ -161,6 +161,15 @@ namespace Latios.Psyshock
             return true;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in TriMeshCollider triMesh,
+                                                                          in RigidTransform triMeshTransform,
+                                                                          in SphereCollider sphere,
+                                                                          in RigidTransform sphereTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
         unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, IDistanceBetweenAllProcessor
         {
             public TriMeshCollider triMesh;

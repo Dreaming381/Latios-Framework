@@ -1,8 +1,8 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
-using UnityEngine;
 
+#if false
 namespace Latios.LifeFX
 {
     [InternalBufferCapacity(0)]
@@ -91,4 +91,5 @@ namespace Latios.LifeFX
         public float inverseExpectedLifetime;
     }
 }
+#endif
 

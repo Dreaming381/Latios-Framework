@@ -434,6 +434,9 @@ namespace Latios.Kinemation.Systems
                                                              materialMeshInfo.MaterialID :
                                                              brgRenderMeshArray.GetMaterialID(materialMeshInfo);
 
+                                if (materialID == BatchMaterialID.Null)
+                                    continue;
+
                                 var settings = new DrawCommandSettings
                                 {
                                     FilterIndex  = filterIndex,
@@ -831,6 +834,9 @@ namespace Latios.Kinemation.Systems
                                 BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
                                                              materialMeshInfo.MaterialID :
                                                              brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                                if (materialID == BatchMaterialID.Null)
+                                    continue;
 
                                 var settings = new DrawCommandSettings
                                 {

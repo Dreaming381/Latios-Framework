@@ -352,8 +352,6 @@ namespace Latios
 
         unsafe void ReallocUp(int newCapacity)
         {
-            // Todo:
-
             // Resize and move old elements to second half of new allocation
             var oldOverflowCount = m_buffer.Length - m_capacity / 2;
             if (!m_buffer.ElementAt(m_buffer.Length - 1).isOccupied)

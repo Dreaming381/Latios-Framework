@@ -77,6 +77,24 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
+        /// Computes the number of wraps through the clip between the previous time and the current time.
+        /// Every time the clip wraps from the end to the beginning, 1 wrap is added. Every time the clip
+        /// wraps backwards from the beginning to the end, 1 wrap is subtracted, meaning the final result
+        /// can be negative. The final result is a whole number, but for performance reasons is returned
+        /// as a floating point value.
+        /// </summary>
+        /// <param name="currentTime">The current unbounded time</param>
+        /// <param name="previousTime">The previous unbounded time</param>
+        /// <returns>A signed integral number of wraps that occurred</returns>
+        public float CountLoopCycleTransitions(float currentTime, float previousTime)
+        {
+            float2 packedTimes = new float2(currentTime, previousTime);
+            math.modf(packedTimes / duration, out var cycles);
+            cycles -= math.select(0f, 1f, packedTimes < 0f);
+            return cycles.x - cycles.y;
+        }
+
+        /// <summary>
         /// Samples the animation clip for the given bone index at the given time
         /// </summary>
         /// <param name="boneIndex">The bone index to sample. This value is automatically clamped to a valid value.</param>
@@ -192,10 +210,10 @@ namespace Latios.Kinemation
         public short                    parameterCount;
         public BlobArray<ParameterClip> clips;
         /// <summary>
-        /// Equivalent to the FixedString64Bytes.GetHashCode() for each parameter name
+        /// Equivalent to the FixedString128Bytes.GetHashCode() for each parameter name
         /// </summary>
         public BlobArray<int>                parameterNameHashes;
-        public BlobArray<FixedString64Bytes> parameterNames;
+        public BlobArray<FixedString128Bytes> parameterNames;
     }
 
     /// <summary>
@@ -241,6 +259,24 @@ namespace Latios.Kinemation
             float wrappedTime  = math.fmod(time, duration);
             wrappedTime       += math.select(0f, duration, wrappedTime < 0f);
             return wrappedTime;
+        }
+
+        /// <summary>
+        /// Computes the number of wraps through the clip between the previous time and the current time.
+        /// Every time the clip wraps from the end to the beginning, 1 wrap is added. Every time the clip
+        /// wraps backwards from the beginning to the end, 1 wrap is subtracted, meaning the final result
+        /// can be negative. The final result is a whole number, but for performance reasons is returned
+        /// as a floating point value.
+        /// </summary>
+        /// <param name="currentTime">The current unbounded time</param>
+        /// <param name="previousTime">The previous unbounded time</param>
+        /// <returns>A signed integral number of wraps that occurred</returns>
+        public float CountLoopCycleTransitions(float currentTime, float previousTime)
+        {
+            float2 packedTimes = new float2(currentTime, previousTime);
+            math.modf(packedTimes / duration, out var cycles);
+            cycles -= math.select(0f, 1f, packedTimes < 0f);
+            return cycles.x - cycles.y;
         }
 
         /// <summary>

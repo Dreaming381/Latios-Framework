@@ -1,3 +1,4 @@
+#if false
 using Latios.LifeFX;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
@@ -83,38 +84,38 @@ namespace Latios.Mimic.Shuriken.Systems
         private struct ShurikenParticleAttributesJob : IJobChunk
         {
             [FormerlySerializedAs("ecb")] public EntityCommandBuffer.ParallelWriter ecbParallelWriter;
-            public EntityTypeHandle                                                 entityHandle;
-            public ComponentTypeHandle<ShurikenParticleSystemData>                  particleSystemHandle;
+            public EntityTypeHandle entityHandle;
+            public ComponentTypeHandle<ShurikenParticleSystemData> particleSystemHandle;
 
             //Modules
-            public ComponentTypeHandle<ShurikenMainModuleOverride>                 mainModuleHandle;
+            public ComponentTypeHandle<ShurikenMainModuleOverride> mainModuleHandle;
             public ComponentTypeHandle<ShurikenVelocityOverLifetimeModuleOverride> velocityOverLifetimeModuleHandle;
 
             public ComponentTypeHandle<ShurikenLimitVelocityOverLifetimeModuleOverride> limitVelocityOverLifetimeModuleHandle;
 
-            public ComponentTypeHandle<ShurikenInheritVelocityModuleOverride>        inheritVelocityModuleHandle;
+            public ComponentTypeHandle<ShurikenInheritVelocityModuleOverride> inheritVelocityModuleHandle;
             public ComponentTypeHandle<ShurikenLifetimeByEmitterSpeedModuleOverride> lifetimeByEmitterSpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenForceOverLifetimeModuleOverride>      forceOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenColorOverLifetimeModuleOverride>      colorOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenColorBySpeedModuleOverride>           colorBySpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenSizeOverLifetimeModuleOverride>       sizeOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenSizeBySpeedModuleOverride>            sizeBySpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenRotationOverLifetimeModuleOverride>   rotationOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenForceOverLifetimeModuleOverride> forceOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenColorOverLifetimeModuleOverride> colorOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenColorBySpeedModuleOverride> colorBySpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenSizeOverLifetimeModuleOverride> sizeOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenSizeBySpeedModuleOverride> sizeBySpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenRotationOverLifetimeModuleOverride> rotationOverLifetimeModuleHandle;
 
             public ComponentTypeHandle<ShurikenRotationBySpeedModuleOverride> rotationBySpeedModuleHandle;
 
             public ComponentTypeHandle<ShurikenExternalForcesModuleOverride> externalForcesModuleHandle;
-            public ComponentTypeHandle<ShurikenNoiseModuleOverride>          noiseModuleHandle;
+            public ComponentTypeHandle<ShurikenNoiseModuleOverride> noiseModuleHandle;
 
             //Particle Attributes
-            public BufferTypeHandle<ParticleSeed>          particleSeedHandle;
-            public BufferTypeHandle<ParticleRotation>      particleRotationHandle;
-            public BufferTypeHandle<ParticleRotation3d>    particleRotation3dHandle;
+            public BufferTypeHandle<ParticleSeed> particleSeedHandle;
+            public BufferTypeHandle<ParticleRotation> particleRotationHandle;
+            public BufferTypeHandle<ParticleRotation3d> particleRotation3dHandle;
             public BufferTypeHandle<ParticleRotationSpeed> particleRotationSpeedHandle;
-            public BufferTypeHandle<ParticleScale>         particleScaleHandle;
-            public BufferTypeHandle<ParticleScale3d>       particleScale3dHandle;
-            public BufferTypeHandle<ParticleColor>         particleColorHandle;
-            public BufferTypeHandle<ParticleVelocity>      particleVelocityHandle;
+            public BufferTypeHandle<ParticleScale> particleScaleHandle;
+            public BufferTypeHandle<ParticleScale3d> particleScale3dHandle;
+            public BufferTypeHandle<ParticleColor> particleColorHandle;
+            public BufferTypeHandle<ParticleVelocity> particleVelocityHandle;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask,
@@ -322,4 +323,5 @@ namespace Latios.Mimic.Shuriken.Systems
         }
     }
 }
+#endif
 

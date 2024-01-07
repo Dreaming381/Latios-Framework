@@ -320,9 +320,12 @@ namespace AclUnity
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         static void CheckCompressionLevelIsValid(short compressionLevel)
         {
+            if (compressionLevel == 100) // Automatic mode
+                return;
             var clampedLevel = math.clamp(compressionLevel, 0, 4);
             if (compressionLevel != clampedLevel)
-                throw new ArgumentOutOfRangeException("compressionLevel must be between 0 (lowest/fastest_to_compress) and 4 (highest/slowest_to_compress)");
+                throw new ArgumentOutOfRangeException(
+                    "compressionLevel must be between 0 (lowest/fastest_to_compress) and 4 (highest/slowest_to_compress) or 100 for automatic mode");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]

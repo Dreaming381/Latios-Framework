@@ -65,6 +65,27 @@ namespace Latios.Psyshock
 
         internal ushort featureCodeA;
         internal ushort featureCodeB;
+
+        /// <summary>
+        /// Swaps the contents of A and B in the result
+        /// </summary>
+        public void FlipInPlace()
+        {
+            (hitpointB, hitpointA)                 = (hitpointA, hitpointB);
+            (normalB, normalA)                     = (normalA, normalB);
+            (subColliderIndexB, subColliderIndexA) = (subColliderIndexA, subColliderIndexB);
+            (featureCodeB,  featureCodeA)          = (featureCodeA, featureCodeB);
+        }
+
+        /// <summary>
+        /// Gets a new result with the contents of A and B swapped
+        /// </summary>
+        public ColliderDistanceResult ToFlipped()
+        {
+            var result = this;
+            result.FlipInPlace();
+            return result;
+        }
     }
 
     /// <summary>

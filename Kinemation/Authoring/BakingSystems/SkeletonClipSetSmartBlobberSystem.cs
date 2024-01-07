@@ -43,7 +43,7 @@ namespace Latios.Kinemation.Authoring
     {
         /// <summary>
         /// Higher levels lead to longer compression time but more compressed clips.
-        /// Values range from 0 to 4. Typical default is 2.
+        /// Values range from 0 to 4 or 100 for automatic mode.
         /// </summary>
         public short compressionLevel;
         /// <summary>
@@ -106,7 +106,7 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public static readonly SkeletonClipCompressionSettings kDefaultSettings = new SkeletonClipCompressionSettings
         {
-            compressionLevel             = 2,
+            compressionLevel             = 100,
             maxDistanceError             = 0.0001f,
             sampledErrorDistanceFromBone = 0.03f,
             maxUniformScaleError         = 0.00001f,

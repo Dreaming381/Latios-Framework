@@ -10,11 +10,11 @@ namespace Latios.Mimic.Authoring
         /// <summary>
         /// Adds Mecanim bakers and baking systems into baking world
         /// </summary>
-        public static void InstallMecanimBakersAndSystems(ref CustomBakingBootstrapContext context)
+        public static void InstallMecanimAddon(ref CustomBakingBootstrapContext context)
         {
 #if UNITY_EDITOR
-            context.filteredBakerTypes.Add(typeof(Mecanim.Authoring.MecanimSmartBaker));
-            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Mecanim.Authoring.Systems.MecanimAnimatorControllerSmartBlobberSystem>());
+            context.filteredBakerTypes.Add(typeof(Addons.Mecanim.Authoring.MecanimSmartBaker));
+            context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<Addons.Mecanim.Authoring.Systems.MecanimAnimatorControllerSmartBlobberSystem>());
 #endif
         }
     }

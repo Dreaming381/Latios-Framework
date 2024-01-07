@@ -8,7 +8,7 @@ using AnimatorControllerParameterType = UnityEngine.AnimatorControllerParameterT
 
 using static Unity.Entities.SystemAPI;
 
-namespace Latios.Mimic.Mecanim.Systems
+namespace Latios.Mimic.Addons.Mecanim.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
@@ -21,10 +21,10 @@ namespace Latios.Mimic.Mecanim.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent()
-                      .With<MecanimController>(             false)
+                      .With<MecanimController>(false)
                       .With<MecanimLayerStateMachineStatus>(false)
-                      .With<MecanimParameter>(              false)
-                      .With<TimedMecanimClipInfo>(          false).Build();
+                      .With<MecanimParameter>(false)
+                      .With<TimedMecanimClipInfo>(false).Build();
         }
 
         [BurstCompile]
@@ -37,10 +37,10 @@ namespace Latios.Mimic.Mecanim.Systems
         {
             state.Dependency = new Job
             {
-                deltaTime                   = Time.DeltaTime,
-                controllerHandle            = GetComponentTypeHandle<MecanimController>(false),
-                parameterHandle             = GetBufferTypeHandle<MecanimParameter>(false),
-                layerHandle                 = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(false),
+                deltaTime = Time.DeltaTime,
+                controllerHandle = GetComponentTypeHandle<MecanimController>(false),
+                parameterHandle = GetBufferTypeHandle<MecanimParameter>(false),
+                layerHandle = GetBufferTypeHandle<MecanimLayerStateMachineStatus>(false),
                 previousFrameClipInfoHandle = GetBufferTypeHandle<TimedMecanimClipInfo>(false)
             }.ScheduleParallel(m_query, state.Dependency);
         }
@@ -50,36 +50,36 @@ namespace Latios.Mimic.Mecanim.Systems
         {
             public float deltaTime;
             [ReadOnly]
-            public ComponentTypeHandle<MecanimController>           controllerHandle;
+            public ComponentTypeHandle<MecanimController> controllerHandle;
             public BufferTypeHandle<MecanimLayerStateMachineStatus> layerHandle;
-            public BufferTypeHandle<MecanimParameter>               parameterHandle;
-            public BufferTypeHandle<TimedMecanimClipInfo>           previousFrameClipInfoHandle;
+            public BufferTypeHandle<MecanimParameter> parameterHandle;
+            public BufferTypeHandle<TimedMecanimClipInfo> previousFrameClipInfoHandle;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var controllers                  = chunk.GetNativeArray(ref controllerHandle);
-                var layersBuffers                = chunk.GetBufferAccessor(ref layerHandle);
-                var parametersBuffers            = chunk.GetBufferAccessor(ref parameterHandle);
+                var controllers = chunk.GetNativeArray(ref controllerHandle);
+                var layersBuffers = chunk.GetBufferAccessor(ref layerHandle);
+                var parametersBuffers = chunk.GetBufferAccessor(ref parameterHandle);
                 var previousFrameClipInfoBuffers = chunk.GetBufferAccessor(ref previousFrameClipInfoHandle);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 while (enumerator.NextEntityIndex(out var indexInChunk))
                 {
-                    var     controller            = controllers[indexInChunk];
-                    ref var controllerBlob        = ref controller.controller.Value;
-                    var     parameters            = parametersBuffers[indexInChunk].AsNativeArray();
-                    ref var parameterBlobs        = ref controllerBlob.parameters;
-                    var     layers                = layersBuffers[indexInChunk].AsNativeArray();
-                    var     previousFrameClipInfo = previousFrameClipInfoBuffers[indexInChunk].AsNativeArray();
+                    var controller = controllers[indexInChunk];
+                    ref var controllerBlob = ref controller.controller.Value;
+                    var parameters = parametersBuffers[indexInChunk].AsNativeArray();
+                    ref var parameterBlobs = ref controllerBlob.parameters;
+                    var layers = layersBuffers[indexInChunk].AsNativeArray();
+                    var previousFrameClipInfo = previousFrameClipInfoBuffers[indexInChunk].AsNativeArray();
 
-                    var   deltaTime            = this.deltaTime * controller.speed;
+                    var deltaTime = this.deltaTime * controller.speed;
                     float inertialBlendMaxTime = float.MaxValue;
-                    bool  needsInertialBlend   = false;
+                    bool needsInertialBlend = false;
 
                     for (int layerIndex = 0; layerIndex < layers.Length; layerIndex++)
                     {
-                        var     layer     = layers[layerIndex];
+                        var layer = layers[layerIndex];
                         ref var layerBlob = ref controllerBlob.layers[layerIndex];
 
                         layer.timeInState += deltaTime;
@@ -92,13 +92,13 @@ namespace Latios.Mimic.Mecanim.Systems
                                 var clipInfo = previousFrameClipInfo[i];
                                 if (clipInfo.layerIndex == layerIndex && clipInfo.stateIndex == layer.previousStateIndex)
                                 {
-                                    clipInfo.timeFragment    = layer.timeInState - layer.transitionEndTimeInState;
+                                    clipInfo.timeFragment = layer.timeInState - layer.transitionEndTimeInState;
                                     previousFrameClipInfo[i] = clipInfo;
                                 }
                             }
 
-                            layer.previousStateIndex          = -1;
-                            layer.currentTransitionIndex      = -1;
+                            layer.previousStateIndex = -1;
+                            layer.currentTransitionIndex = -1;
                             layer.currentTransitionIsAnyState = false;
                         }
                         else
@@ -108,7 +108,7 @@ namespace Latios.Mimic.Mecanim.Systems
                                 var clipInfo = previousFrameClipInfo[i];
                                 if (clipInfo.layerIndex == layerIndex)
                                 {
-                                    clipInfo.timeFragment    = deltaTime;
+                                    clipInfo.timeFragment = deltaTime;
                                     previousFrameClipInfo[i] = clipInfo;
                                 }
                             }
@@ -126,8 +126,8 @@ namespace Latios.Mimic.Mecanim.Systems
                                 ref var transition = ref currentState.transitions[i];
 
                                 // Early out if we have an exit time and we haven't reached it yet
-                                ref var state                 = ref layerBlob.states[layer.currentStateIndex];
-                                float   normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
+                                ref var state = ref layerBlob.states[layer.currentStateIndex];
+                                float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
                                 if (transition.hasExitTime && transition.exitTime > normalizedTimeInState)
                                     continue;
 
@@ -172,8 +172,8 @@ namespace Latios.Mimic.Mecanim.Systems
                             // Check if we can interrupt the current transition
                             if (layer.currentTransitionIsAnyState)
                             {
-                                ref var currentTransition  = ref layerBlob.anyStateTransitions[layer.currentTransitionIndex];
-                                needsInertialBlend        |= TryInterruptTransition(ref layer,
+                                ref var currentTransition = ref layerBlob.anyStateTransitions[layer.currentTransitionIndex];
+                                needsInertialBlend |= TryInterruptTransition(ref layer,
                                                                                     ref layerBlob,
                                                                                     ref currentTransition,
                                                                                     ref parameters,
@@ -182,8 +182,8 @@ namespace Latios.Mimic.Mecanim.Systems
                             }
                             else if (layer.currentTransitionIndex >= 0)
                             {
-                                ref var currentTransition  = ref layerBlob.states[layer.previousStateIndex].transitions[layer.currentTransitionIndex];
-                                needsInertialBlend        |= TryInterruptTransition(ref layer,
+                                ref var currentTransition = ref layerBlob.states[layer.previousStateIndex].transitions[layer.currentTransitionIndex];
+                                needsInertialBlend |= TryInterruptTransition(ref layer,
                                                                                     ref layerBlob,
                                                                                     ref currentTransition,
                                                                                     ref parameters,
@@ -228,62 +228,62 @@ namespace Latios.Mimic.Mecanim.Systems
             private bool TryInterruptTransition(ref MecanimLayerStateMachineStatus layer,
                                                 ref MecanimControllerLayerBlob layerBlob,
                                                 ref MecanimStateTransitionBlob currentTransition,
-                                                ref NativeArray<MecanimParameter>   parameters,
+                                                ref NativeArray<MecanimParameter> parameters,
                                                 ref BlobArray<MecanimParameterBlob> parameterBlobs,
                                                 ref float maxTransitionDuration)
             {
                 switch (currentTransition.interruptionSource)
                 {
                     case MecanimStateTransitionBlob.InterruptionSource.Source:
-                    {
-                        ref var anyTransitions = ref layerBlob.anyStateTransitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref sourceStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration,
-                                                  layer.currentTransitionIndex))
-                            return true;
+                        {
+                            ref var anyTransitions = ref layerBlob.anyStateTransitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref sourceStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration,
+                                                      layer.currentTransitionIndex))
+                                return true;
 
-                        break;
-                    }
+                            break;
+                        }
                     case MecanimStateTransitionBlob.InterruptionSource.Destination:
-                    {
-                        ref var anyTransitions = ref layerBlob.anyStateTransitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        break;
-                    }
+                        {
+                            ref var anyTransitions = ref layerBlob.anyStateTransitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            break;
+                        }
                     case MecanimStateTransitionBlob.InterruptionSource.SourceThenDestination:
-                    {
-                        ref var anyTransitions = ref layerBlob.anyStateTransitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob,  ref sourceStateTransitions, ref parameters, ref parameterBlobs,
-                                                  ref maxTransitionDuration, layer.currentTransitionIndex))
-                            return true;
-                        ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        break;
-                    }
+                        {
+                            ref var anyTransitions = ref layerBlob.anyStateTransitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref sourceStateTransitions, ref parameters, ref parameterBlobs,
+                                                      ref maxTransitionDuration, layer.currentTransitionIndex))
+                                return true;
+                            ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            break;
+                        }
                     case MecanimStateTransitionBlob.InterruptionSource.DestinationThenSource:
-                    {
-                        ref var anyTransitions = ref layerBlob.anyStateTransitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
-                            return true;
-                        ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
-                        if (TryInterruptFromState(ref layer, ref layerBlob, ref sourceStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration,
-                                                  layer.currentTransitionIndex))
-                            return true;
-                        break;
-                    }
+                        {
+                            ref var anyTransitions = ref layerBlob.anyStateTransitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref anyTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            ref var destinationStateTransitions = ref layerBlob.states[currentTransition.destinationStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref destinationStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration, -1))
+                                return true;
+                            ref var sourceStateTransitions = ref layerBlob.states[currentTransition.originStateIndex].transitions;
+                            if (TryInterruptFromState(ref layer, ref layerBlob, ref sourceStateTransitions, ref parameters, ref parameterBlobs, ref maxTransitionDuration,
+                                                      layer.currentTransitionIndex))
+                                return true;
+                            break;
+                        }
                 }
 
                 return false;
@@ -292,8 +292,8 @@ namespace Latios.Mimic.Mecanim.Systems
             private bool TryInterruptFromState(ref MecanimLayerStateMachineStatus layer,
                                                ref MecanimControllerLayerBlob layerBlob,
                                                ref BlobArray<MecanimStateTransitionBlob> interruptingTransitions,
-                                               ref NativeArray<MecanimParameter>         parameters,
-                                               ref BlobArray<MecanimParameterBlob>       parameterBlobs,
+                                               ref NativeArray<MecanimParameter> parameters,
+                                               ref BlobArray<MecanimParameterBlob> parameterBlobs,
                                                ref float transitionMaxDuration,
                                                short orderedTransitionStopIndex)
             {
@@ -320,14 +320,15 @@ namespace Latios.Mimic.Mecanim.Systems
                                            bool isAnyStateTransition,
                                            bool needsInertialBlend = false)
             {
-                layer.previousStateIndex          = layer.currentStateIndex;
-                layer.previousStateExitTime       = layer.timeInState;
-                layer.currentTransitionIndex      = stateTransitionIndex;
+                layer.previousStateIndex = layer.currentStateIndex;
+                layer.previousStateExitTime = layer.timeInState;
+                layer.currentTransitionIndex = stateTransitionIndex;
                 layer.currentTransitionIsAnyState = isAnyStateTransition;
-                layer.currentStateIndex           = transitionBlob.destinationStateIndex != -1 ? transitionBlob.destinationStateIndex : layerBlob.defaultStateIndex;  // "Exit" state
-                layer.timeInState                 =
-                    transitionBlob.hasExitTime ? math.max(layer.timeInState - transitionBlob.exitTime, 0) + transitionBlob.offset : transitionBlob.offset;
-                ref var lastState              = ref layerBlob.states[layer.previousStateIndex];
+                layer.currentStateIndex = transitionBlob.destinationStateIndex != -1 ? transitionBlob.destinationStateIndex : layerBlob.defaultStateIndex;  // "Exit" state
+
+                ref var destinationState = ref layerBlob.states[layer.currentStateIndex];
+                ref var lastState = ref layerBlob.states[layer.previousStateIndex];
+                layer.timeInState = transitionBlob.offset * destinationState.averageDuration;
                 layer.transitionEndTimeInState = transitionBlob.hasFixedDuration ?
                                                  transitionBlob.duration :
                                                  lastState.averageDuration * transitionBlob.duration;
@@ -337,15 +338,15 @@ namespace Latios.Mimic.Mecanim.Systems
             private bool ConditionsMet(in MecanimLayerStateMachineStatus layer,
                                        ref MecanimControllerLayerBlob layerBlob,
                                        ref MecanimStateTransitionBlob transitionBlob,
-                                       in NativeArray<MecanimParameter>    parameters,
+                                       in NativeArray<MecanimParameter> parameters,
                                        ref BlobArray<MecanimParameterBlob> parameterBlobs,
                                        float deltaTime)
             {
                 bool conditionsMet = true;
                 for (int j = 0; j < transitionBlob.conditions.Length && conditionsMet; j++)
                 {
-                    ref var condition     = ref transitionBlob.conditions[j];
-                    var     parameter     = parameters[condition.parameterIndex];
+                    ref var condition = ref transitionBlob.conditions[j];
+                    var parameter = parameters[condition.parameterIndex];
                     ref var parameterData = ref parameterBlobs[condition.parameterIndex];
 
                     if (parameterData.parameterType == AnimatorControllerParameterType.Trigger)
@@ -416,7 +417,7 @@ namespace Latios.Mimic.Mecanim.Systems
                     ref var state = ref layerBlob.states[layer.currentStateIndex];
 
                     float normalizedTimeInState = (layer.timeInState % state.averageDuration) / state.averageDuration;
-                    var   normalizedDeltaTime   = deltaTime / state.averageDuration;
+                    var normalizedDeltaTime = deltaTime / state.averageDuration;
 
                     conditionsMet &= transitionBlob.exitTime > normalizedTimeInState - normalizedDeltaTime && transitionBlob.exitTime <= normalizedTimeInState;
                 }
@@ -425,13 +426,13 @@ namespace Latios.Mimic.Mecanim.Systems
             }
 
             private void ConsumeTriggers(ref MecanimStateTransitionBlob transitionBlob,
-                                         ref NativeArray<MecanimParameter>   parameters,
+                                         ref NativeArray<MecanimParameter> parameters,
                                          ref BlobArray<MecanimParameterBlob> paramterBlobs)
             {
                 for (int i = 0; i < transitionBlob.conditions.Length; i++)
                 {
-                    ref var condition      = ref transitionBlob.conditions[i];
-                    var     parameterIndex = condition.parameterIndex;
+                    ref var condition = ref transitionBlob.conditions[i];
+                    var parameterIndex = condition.parameterIndex;
                     if (paramterBlobs[parameterIndex].parameterType == AnimatorControllerParameterType.Trigger)
                         parameters[parameterIndex] = new MecanimParameter { triggerParam = false };
                 }
@@ -439,4 +440,3 @@ namespace Latios.Mimic.Mecanim.Systems
         }
     }
 }
-

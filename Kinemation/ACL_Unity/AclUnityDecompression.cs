@@ -6,6 +6,8 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
+// Todo: Design public APIs for masked sampling and parameter blending.
+
 namespace AclUnity
 {
     public static unsafe class Decompression
@@ -248,7 +250,10 @@ namespace AclUnity
             const string dllName = AclUnityCommon.dllName;
 
             [DllImport(dllName)]
-            public static extern void samplePose(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float time,
+            public static extern void samplePose(void*  compressedTransformTracks,
+                                                 void*  compressedScaleTracks,
+                                                 float* aosOutputBuffer,
+                                                 float time,
                                                  byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
@@ -260,8 +265,38 @@ namespace AclUnity
                                                              byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseBlendedAdd(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float blendFactor, float time,
+            public static extern void samplePoseBlendedAdd(void*  compressedTransformTracks,
+                                                           void*  compressedScaleTracks,
+                                                           float* aosOutputBuffer,
+                                                           float blendFactor,
+                                                           float time,
                                                            byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMasked(void*  compressedTransformTracks,
+                                                       void*  compressedScaleTracks,
+                                                       float* aosOutputBuffer,
+                                                       ulong* mask,
+                                                       float time,
+                                                       byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMaskedBlendedFirst(void*  compressedTransformTracks,
+                                                                   void*  compressedScaleTracks,
+                                                                   float* aosOutputBuffer,
+                                                                   ulong* mask,
+                                                                   float blendFactor,
+                                                                   float time,
+                                                                   byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMaskedBlendedAdd(void*  compressedTransformTracks,
+                                                                 void*  compressedScaleTracks,
+                                                                 float* aosOutputBuffer,
+                                                                 ulong* mask,
+                                                                 float blendFactor,
+                                                                 float time,
+                                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
             public static extern void sampleBone(void*  compressedTransformTracks,
@@ -272,10 +307,53 @@ namespace AclUnity
                                                  byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void sampleFloats(void* compressedFloatTracks, float* floatOutputBuffer, float time, byte keyframeInterpolationMode);
+            public static extern void sampleFloats(void*  compressedFloatTracks,
+                                                   float* floatOutputBuffer,
+                                                   float time,
+                                                   byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern float sampleFloat(void* compressedFloatTracks, int trackIndex, float time, byte keyframeInterpolationMode);
+            public static extern void sampleFloatsBlendedFirst(void*  compressedFloatTracks,
+                                                               float* floatOutputBuffer,
+                                                               float blendFactor,
+                                                               float time,
+                                                               byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsBlendedAdd(void*  compressedFloatTracks,
+                                                             float* floatOutputBuffer,
+                                                             float blendFactor,
+                                                             float time,
+                                                             byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMasked(void*  compressedFloatTracks,
+                                                         float* floatOutputBuffer,
+                                                         ulong* mask,
+                                                         float time,
+                                                         byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMaskedBlendedFirst(void*  compressedFloatTracks,
+                                                                     float* floatOutputBuffer,
+                                                                     ulong* mask,
+                                                                     float blendFactor,
+                                                                     float time,
+                                                                     byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMaskedBlendedAdd(void*  compressedFloatTracks,
+                                                                   float* floatOutputBuffer,
+                                                                   ulong* mask,
+                                                                   float blendFactor,
+                                                                   float time,
+                                                                   byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern float sampleFloat(void* compressedFloatTracks,
+                                                   int trackIndex,
+                                                   float time,
+                                                   byte keyframeInterpolationMode);
         }
 
         static class AVX
@@ -283,7 +361,10 @@ namespace AclUnity
             const string dllName = AclUnityCommon.dllNameAVX;
 
             [DllImport(dllName)]
-            public static extern void samplePose(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float time,
+            public static extern void samplePose(void*  compressedTransformTracks,
+                                                 void*  compressedScaleTracks,
+                                                 float* aosOutputBuffer,
+                                                 float time,
                                                  byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
@@ -295,8 +376,38 @@ namespace AclUnity
                                                              byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void samplePoseBlendedAdd(void* compressedTransformTracks, void* compressedScaleTracks, float* aosOutputBuffer, float blendFactor, float time,
+            public static extern void samplePoseBlendedAdd(void*  compressedTransformTracks,
+                                                           void*  compressedScaleTracks,
+                                                           float* aosOutputBuffer,
+                                                           float blendFactor,
+                                                           float time,
                                                            byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMasked(void*  compressedTransformTracks,
+                                                       void*  compressedScaleTracks,
+                                                       float* aosOutputBuffer,
+                                                       ulong* mask,
+                                                       float time,
+                                                       byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMaskedBlendedFirst(void*  compressedTransformTracks,
+                                                                   void*  compressedScaleTracks,
+                                                                   float* aosOutputBuffer,
+                                                                   ulong* mask,
+                                                                   float blendFactor,
+                                                                   float time,
+                                                                   byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void samplePoseMaskedBlendedAdd(void*  compressedTransformTracks,
+                                                                 void*  compressedScaleTracks,
+                                                                 float* aosOutputBuffer,
+                                                                 ulong* mask,
+                                                                 float blendFactor,
+                                                                 float time,
+                                                                 byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
             public static extern void sampleBone(void*  compressedTransformTracks,
@@ -307,10 +418,53 @@ namespace AclUnity
                                                  byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern void sampleFloats(void* compressedFloatTracks, float* floatOutputBuffer, float time, byte keyframeInterpolationMode);
+            public static extern void sampleFloats(void*  compressedFloatTracks,
+                                                   float* floatOutputBuffer,
+                                                   float time,
+                                                   byte keyframeInterpolationMode);
 
             [DllImport(dllName)]
-            public static extern float sampleFloat(void* compressedFloatTracks, int trackIndex, float time, byte keyframeInterpolationMode);
+            public static extern void sampleFloatsBlendedFirst(void*  compressedFloatTracks,
+                                                               float* floatOutputBuffer,
+                                                               float blendFactor,
+                                                               float time,
+                                                               byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsBlendedAdd(void*  compressedFloatTracks,
+                                                             float* floatOutputBuffer,
+                                                             float blendFactor,
+                                                             float time,
+                                                             byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMasked(void*  compressedFloatTracks,
+                                                         float* floatOutputBuffer,
+                                                         ulong* mask,
+                                                         float time,
+                                                         byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMaskedBlendedFirst(void*  compressedFloatTracks,
+                                                                     float* floatOutputBuffer,
+                                                                     ulong* mask,
+                                                                     float blendFactor,
+                                                                     float time,
+                                                                     byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern void sampleFloatsMaskedBlendedAdd(void*  compressedFloatTracks,
+                                                                   float* floatOutputBuffer,
+                                                                   ulong* mask,
+                                                                   float blendFactor,
+                                                                   float time,
+                                                                   byte keyframeInterpolationMode);
+
+            [DllImport(dllName)]
+            public static extern float sampleFloat(void* compressedFloatTracks,
+                                                   int trackIndex,
+                                                   float time,
+                                                   byte keyframeInterpolationMode);
         }
     }
 }

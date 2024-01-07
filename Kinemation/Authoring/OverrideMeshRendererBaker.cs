@@ -1,8 +1,9 @@
+using System;
 using System.Collections.Generic;
-using static UnityEngine.EventSystems.EventTrigger;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Hybrid.Baking;
+using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine;
 
@@ -18,124 +19,205 @@ namespace Latios.Kinemation.Authoring
     public static class OverrideMeshRendererBakerExtensions
     {
         /// <summary>
-        /// Bake a Mesh Renderer using the provided mesh and materials
+        /// Bakes the Mesh Renderer settings with the provided mesh and material onto a single entity.
         /// </summary>
-        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
-        /// <param name="mesh">The mesh to use</param>
-        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
-        public static void BakeMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials, int firstUniqueSubmeshIndex = int.MaxValue)
+        /// <param name="rendererSettings">The rendering settings for the given entity that should have rendering components baked for it</param>
+        /// <param name="mesh">The mesh the entity should use</param>
+        /// <param name="material">The material (or potentially a copy in the case of lightmaps) the entity should use</param>
+        /// <param name="submesh">The submesh this entity should render at</param>
+        public static void BakeMeshAndMaterial(this IBaker baker, MeshRendererBakeSettings rendererSettings, Mesh mesh, Material material, int submesh = 0)
         {
-            MeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, out var additionalEntities, firstUniqueSubmeshIndex);
-
-            baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
-
-            if (additionalEntities != null)
+            Span<MeshRendererBakeSettings> renderers = stackalloc MeshRendererBakeSettings[1];
+            renderers[0]                             = rendererSettings;
+            Span<MeshMaterialSubmeshSettings> mms    = stackalloc MeshMaterialSubmeshSettings[1];
+            mms[0]                                   = new MeshMaterialSubmeshSettings
             {
-                foreach (var entity in additionalEntities)
-                {
-                    baker.AddComponent(entity, new MeshRendererBakingData { MeshRenderer = renderer });
-                }
-            }
+                mesh     = mesh,
+                material = material,
+                submesh  = submesh
+            };
+            Span<int> counts = stackalloc int[1];
+            counts[0]        = 1;
+            baker.BakeMeshAndMaterial(renderers, mms, counts);
         }
 
         /// <summary>
-        /// Bake a Mesh Renderer using the provided mesh and materials
+        /// Bakes the Mesh Renderer settings and associated meshes and materials into the collection of entities.
+        /// The first settings instance is assumed to be the primary entity while the remaining entities are children entities.
         /// </summary>
-        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
-        /// <param name="mesh">The mesh to use</param>
-        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
+        /// <param name="rendererSettings">The rendering settings for each given entity that should have rendering components baked for it</param>
+        /// <param name="meshMaterialSubmeshes">The flattened array of MeshMaterialSubmeshSettings ordered by their corresponding MeshRendererBakeSettings</param>
+        /// <param name="meshMaterialSubmeshCountsByRenderer">The count of MeshMaterialSubmeshSettings associated with each MeshRendererBakeSettings</param>
         public static void BakeMeshAndMaterial(this IBaker baker,
-                                               Entity renderableEntity,
-                                               RenderMeshDescription renderMeshDescription,
-                                               Mesh mesh,
-                                               List<Material>        materials,
-                                               int firstUniqueSubmeshIndex = int.MaxValue)
+                                               ReadOnlySpan<MeshRendererBakeSettings>    rendererSettings,
+                                               ReadOnlySpan<MeshMaterialSubmeshSettings> meshMaterialSubmeshes,
+                                               ReadOnlySpan<int>                         meshMaterialSubmeshCountsByRenderer)
         {
-            MeshRendererBakingUtility.Convert(baker, renderableEntity, renderMeshDescription, mesh, materials, out var additionalEntities, firstUniqueSubmeshIndex);
+            LatiosMeshRendererBakingUtility.Convert(baker, rendererSettings, meshMaterialSubmeshes, meshMaterialSubmeshCountsByRenderer);
+        }
+    }
 
-            // Todo: Skinned skips lightmaps which require a valid Renderer.
-            baker.AddComponent<SkinnedMeshRendererBakingData>(renderableEntity);
+    /// <summary>
+    /// The settings used to bake rendering components onto a target entity, independent of the meshes and materials used
+    /// </summary>
+    public struct MeshRendererBakeSettings
+    {
+        /// <summary>
+        /// The entity the rendering components should be added to
+        /// </summary>
+        public Entity targetEntity;
+        /// <summary>
+        /// The RenderMeshDescription that describes rendering flags, masks, and filters for the entity
+        /// </summary>
+        public RenderMeshDescription renderMeshDescription;
+        /// <summary>
+        /// The local bounds of this entity (not used for skeletal meshes)
+        /// </summary>
+        public UnityEngine.Bounds localBounds;
+        /// <summary>
+        /// Set to true if the entity is expected to have deformations
+        /// </summary>
+        public bool isDeforming;
+        /// <summary>
+        /// Set to true if materials that do not match the isDeforming status are expected and intended
+        /// </summary>
+        public bool suppressDeformationWarnings;
+        /// <summary>
+        /// Set to true if lightmaps should be accounted for with this entity, assuming the lightmapIndex is valid
+        /// </summary>
+        public bool useLightmapsIfPossible;
+        /// <summary>
+        /// The lightmap index retrieved from the Renderer (some values are reserved as invalid)
+        /// </summary>
+        public int lightmapIndex;
+        /// <summary>
+        /// The lightmap texture scale and offset for the Renderer
+        /// </summary>
+        public float4 lightmapScaleOffset;
+        /// <summary>
+        /// The entity that contains the LOD group components
+        /// </summary>
+        public Entity lodGroupEntity;
+        /// <summary>
+        /// A bitmask where each bit represents a LOD level in the LOD group this entity belongs to
+        /// </summary>
+        public int lodGroupMask;
+        /// <summary>
+        /// True if the entity should be treated as if it were marked static
+        /// </summary>
+        public bool isStatic;
+    }
 
-            if (additionalEntities != null)
+    /// <summary>
+    /// A combination of mesh, material, and submesh that can be rendered
+    /// </summary>
+    public struct MeshMaterialSubmeshSettings
+    {
+        public UnityObjectRef<Mesh>     mesh;
+        public UnityObjectRef<Material> material;
+        public int                      submesh;
+    }
+
+    public static class RenderingBakingTools
+    {
+        /// <summary>
+        /// Extracts the mesh and materials combination into the destination span of MeshMaterialSubmeshSettings
+        /// </summary>
+        /// <param name="dst">Length must be greater or equal to the count of shared materials</param>
+        /// <param name="mesh">The mesh used for all settings</param>
+        /// <param name="sharedMaterials">The list of shared materials, where a MeshMaterialSubmeshSettings will be created for each
+        /// material using a submesh of the corresponding index</param>
+        public static void ExtractMeshMaterialSubmeshes(Span<MeshMaterialSubmeshSettings> dst, Mesh mesh, List<Material> sharedMaterials)
+        {
+            if (sharedMaterials == null)
+                return;
+
+            if (dst.Length < sharedMaterials.Count)
+                throw new ArgumentException("dst is not large enough to contain sharedMaterials", "dst");
+
+            for (int i = 0; i < sharedMaterials.Count; i++)
             {
-                foreach (var entity in additionalEntities)
+                dst[i] = new MeshMaterialSubmeshSettings
                 {
-                    baker.AddComponent<SkinnedMeshRendererBakingData>(entity);
-                }
+                    mesh     = mesh,
+                    material = sharedMaterials[i],
+                    submesh  = i
+                };
             }
         }
 
         /// <summary>
-        /// Bake a Skinned Mesh Renderer using the provided mesh and materials.
-        /// This does not bake the MeshDeformDataBlob.
+        /// Returns true if the material requires depth sorting due to alpha transparency
         /// </summary>
-        /// <param name="renderer">The Renderer to base shadow mapping, visibility, and global illumination settings from</param>
-        /// <param name="mesh">The mesh to use</param>
-        /// <param name="materials">The materials to use, one for each submesh in the mesh</param>
-        public static void BakeDeformMeshAndMaterial(this IBaker baker, Renderer renderer, Mesh mesh, List<Material> materials, int firstUniqueSubmeshIndex = int.MaxValue)
+        public static bool RequiresDepthSorting(Material material) => RenderMeshUtility.DepthSortedFlags(material) == RenderMeshUtility.EntitiesGraphicsComponentFlags.DepthSorted;
+
+        /// <summary>
+        /// Rearranges the MeshMaterialSubmeshSettings such that the elements that do not require depth sorting are at the beginning
+        /// of the span and those that do are at the end of the span
+        /// </summary>
+        /// <param name="meshMaterialSubmeshSettings">The span whose settings elements should be rearranged</param>
+        /// <returns>The number of elements that do not require depth sorting</returns>
+        public static int GroupByDepthSorting(Span<MeshMaterialSubmeshSettings> meshMaterialSubmeshSettings)
         {
-            var sharedMesh = mesh;
-            if (sharedMesh == null)
+            int tail      = meshMaterialSubmeshSettings.Length - 1;
+            var lastIndex = tail;
+            for (int head = 0; head < tail; head++)
             {
-                Debug.LogError($"Kinemation failed to bake Dynamic Mesh because no mesh was assigned.");
-                return;
-            }
-
-            if (materials.Count == 0)
-            {
-                Debug.LogError($"Kinemation failed to bake Dynamic Mesh because no materials were assigned.");
-                return;
-            }
-
-            int  countValidMaterials     = 0;
-            int  knownValidMaterialIndex = -1;
-            bool needsWarning            = false;
-            for (int i = 0; i < materials.Count; i++)
-            {
-                if (materials[i] == null)
+                var headMaterial = meshMaterialSubmeshSettings[head].material.Value;
+                if (RequiresDepthSorting(headMaterial))
                 {
-                    needsWarning = true;
-                }
-                else
-                {
-                    if (knownValidMaterialIndex < 0)
-                        knownValidMaterialIndex = i;
-                    countValidMaterials++;
+                    for (; tail > head; tail--)
+                    {
+                        var tailMaterial = meshMaterialSubmeshSettings[tail].material.Value;
+                        if (!RequiresDepthSorting(tailMaterial))
+                        {
+                            (meshMaterialSubmeshSettings[tail], meshMaterialSubmeshSettings[head]) = (meshMaterialSubmeshSettings[head], meshMaterialSubmeshSettings[tail]);
+                            break;
+                        }
+                    }
+
+                    if (tail == head)
+                        return tail;
                 }
             }
+            if (tail != lastIndex || RequiresDepthSorting(meshMaterialSubmeshSettings[lastIndex].material.Value))
+                return tail;
+            return lastIndex + 1;
+        }
 
-            if (countValidMaterials == 0)
+        /// <summary>
+        /// Acquires the LOD Group entity and mask that the passed in renderer belongs to
+        /// </summary>
+        /// <param name="baker">The baker used to search for the LOD Group in the hierarchy</param>
+        /// <param name="renderer">The renderer to find within the LOD Group</param>
+        /// <param name="lodGroupEntity">The entity which represents the LOD Group</param>
+        /// <param name="lodMask">The bitmask that represents the levels in the LOD Group the renderer belongs to</param>
+        public static void GetLOD(IBaker baker, Renderer renderer, out Entity lodGroupEntity, out int lodMask)
+        {
+            var group      = baker.GetComponentInParent<LODGroup>();
+            lodGroupEntity = baker.GetEntity(group, TransformUsageFlags.Renderable);
+            if (group != null)
             {
-                Debug.LogError($"Kinemation failed to bake Dynamic Mesh because no materials were assigned.");
-                return;
-            }
-            if (needsWarning)
-            {
-                Debug.LogWarning($"Some materials for Dynamic Mesh were not assigned. Rendering results may be incorrect.");
-            }
+                lodMask          = 0;
+                var lodGroupLODs = group.GetLODs();
 
-            var additionalEntities = new NativeList<Entity>(Allocator.Temp);
-            LatiosDeformMeshRendererBakingUtility.Convert(baker, renderer, mesh, materials, additionalEntities, knownValidMaterialIndex, firstUniqueSubmeshIndex);
+                int lodGroupMask = 0;
 
-            var primaryEntity = baker.GetEntity(TransformUsageFlags.Renderable);
-            if (renderer is SkinnedMeshRenderer smr)
-            {
-                baker.AddComponent(primaryEntity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = smr });
-
-                foreach (var entity in additionalEntities)
+                // Find the renderer inside the LODGroup
+                for (int i = 0; i < lodGroupLODs.Length; ++i)
                 {
-                    baker.AddComponent(entity, new SkinnedMeshRendererBakingData { SkinnedMeshRenderer = smr });
+                    foreach (var candidate in lodGroupLODs[i].renderers)
+                    {
+                        if (renderer == candidate)
+                        {
+                            lodGroupMask |= (1 << i);
+                        }
+                    }
                 }
+                lodMask = lodGroupMask > 0 ? lodGroupMask : -1;
             }
             else
-            {
-                baker.AddComponent(baker.GetEntity(TransformUsageFlags.Renderable), new MeshRendererBakingData { MeshRenderer = renderer });
-
-                foreach (var entity in additionalEntities)
-                {
-                    baker.AddComponent(entity, new MeshRendererBakingData { MeshRenderer = renderer });
-                }
-            }
+                lodMask = -1;
         }
     }
 
@@ -162,17 +244,53 @@ namespace Latios.Kinemation.Authoring
             if (textMesh != null)
                 return;
 
-            // Takes a dependency on the mesh
             var meshFilter = GetComponent<MeshFilter>();
             var mesh       = (meshFilter != null) ? GetComponent<MeshFilter>().sharedMesh : null;
 
-            // Takes a dependency on the materials
             m_materialsCache.Clear();
             authoring.GetSharedMaterials(m_materialsCache);
 
-            DependsOnLightBaking();
+            Span<MeshMaterialSubmeshSettings> mms = stackalloc MeshMaterialSubmeshSettings[m_materialsCache.Count];
+            RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, mesh, m_materialsCache);
+            var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
-            this.BakeMeshAndMaterial(authoring, mesh, m_materialsCache);
+            RenderingBakingTools.GetLOD(this, authoring, out var lodGroupEntity, out var lodMask);
+
+            var rendererSettings = new MeshRendererBakeSettings
+            {
+                targetEntity                = GetEntity(TransformUsageFlags.Renderable),
+                renderMeshDescription       = new RenderMeshDescription(authoring),
+                isDeforming                 = false,
+                suppressDeformationWarnings = false,
+                useLightmapsIfPossible      = true,
+                lightmapIndex               = authoring.lightmapIndex,
+                lightmapScaleOffset         = authoring.lightmapScaleOffset,
+                lodGroupEntity              = lodGroupEntity,
+                lodGroupMask                = lodMask,
+                isStatic                    = IsStatic(),
+                localBounds                 = mesh != null ? mesh.bounds : default,
+            };
+
+            if (opaqueMaterialCount == mms.Length || opaqueMaterialCount == 0)
+            {
+                Span<MeshRendererBakeSettings> renderers = stackalloc MeshRendererBakeSettings[1];
+                renderers[0]                             = rendererSettings;
+                Span<int> count                          = stackalloc int[1];
+                count[0]                                 = mms.Length;
+                this.BakeMeshAndMaterial(renderers, mms, count);
+            }
+            else
+            {
+                var                             additionalEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{GetName()}-TransparentRenderEntity");
+                Span <MeshRendererBakeSettings> renderers        = stackalloc MeshRendererBakeSettings[2];
+                renderers[0]                                     = rendererSettings;
+                renderers[1]                                     = rendererSettings;
+                renderers[1].targetEntity                        = additionalEntity;
+                Span<int> counts                                 = stackalloc int[2];
+                counts[0]                                        = opaqueMaterialCount;
+                counts[1]                                        = mms.Length - opaqueMaterialCount;
+                this.BakeMeshAndMaterial(renderers, mms, counts);
+            }
         }
     }
 }

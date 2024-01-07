@@ -1,3 +1,4 @@
+#if false
 using System;
 using AclUnity;
 using Latios.Authoring;
@@ -104,14 +105,14 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
         private unsafe BlobAssetReference<ShurikenModulesBlob> BakeParticleSystemModules(ParticleSystem particleSystem)
         {
             const int moduleCount = 20;  //Number of modules to process
-            var       builder     = new BlobBuilder(Allocator.Temp);
-            ref var   root        = ref builder.ConstructRoot<ShurikenModulesBlob>();
+            var builder     = new BlobBuilder(Allocator.Temp);
+            ref var root        = ref builder.ConstructRoot<ShurikenModulesBlob>();
 
             var clipNameList     = new NativeList<FixedString64Bytes>(Allocator.Temp);
             var clipNameHashList = new NativeList<int>(Allocator.Temp);
 
             //Create main module
-            var mainModuleClips                           = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var mainModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.mainModule.duration                      = particleSystem.main.duration;
             root.mainModule.loop                          = particleSystem.main.loop;
             root.mainModule.prewarm                       = particleSystem.main.prewarm;
@@ -161,7 +162,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.mainModule.ringBufferMode      = particleSystem.main.ringBufferMode;
 
             //Create emission module
-            var emissionModuleClips                        = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var emissionModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.emissionModule.enabled                    = particleSystem.emission.enabled;
             root.emissionModule.rateOverTime               = CreateMinMaxCurve(ref emissionModuleClips, particleSystem.emission.rateOverTime);
             root.emissionModule.rateOverTimeMultiplier     = particleSystem.emission.rateOverTimeMultiplier;
@@ -170,8 +171,8 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             builder.Allocate(ref root.emissionBursts, particleSystem.emission.burstCount);
             for (int i = 0; i < particleSystem.emission.burstCount; i++)
             {
-                var burst                    = particleSystem.emission.GetBurst(i);
-                var emissionBurst            = new EmissionBurst();
+                var burst         = particleSystem.emission.GetBurst(i);
+                var emissionBurst = new EmissionBurst();
                 emissionBurst.time           = burst.time;
                 emissionBurst.count          = CreateMinMaxCurve(ref emissionModuleClips, burst.count);
                 emissionBurst.cycleCount     = burst.cycleCount;
@@ -181,7 +182,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             }
 
             //Create shape module
-            var shapeModuleClips                      = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var shapeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.shapeModule.enabled                  = particleSystem.shape.enabled;
             root.shapeModule.shapeType                = particleSystem.shape.shapeType;
             root.shapeModule.randomDirectionAmount    = particleSystem.shape.randomDirectionAmount;
@@ -209,7 +210,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             //TODO:  Textures
 
             //Create velocity over lifetime module
-            var velocityOverLifetimeModuleClips                      = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var velocityOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.velocityOverLifetimeModule.enabled                  = particleSystem.velocityOverLifetime.enabled;
             root.velocityOverLifetimeModule.x                        = CreateMinMaxCurve(ref velocityOverLifetimeModuleClips, particleSystem.velocityOverLifetime.x);
             root.velocityOverLifetimeModule.xMultiplier              = particleSystem.velocityOverLifetime.xMultiplier;
@@ -236,7 +237,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.velocityOverLifetimeModule.space                    = particleSystem.velocityOverLifetime.space;
 
             //Create limit velocity over lifetime module
-            var limitVelocityOverLifetimeModuleClips     = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var limitVelocityOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.limitVelocityOverLifetimeModule.enabled = particleSystem.limitVelocityOverLifetime.enabled;
             root.limitVelocityOverLifetimeModule.limitX  = CreateMinMaxCurve(ref limitVelocityOverLifetimeModuleClips,
                                                                              particleSystem.limitVelocityOverLifetime.limitX);
@@ -260,21 +261,21 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.limitVelocityOverLifetimeModule.multiplyDragByParticleSize     = particleSystem.limitVelocityOverLifetime.multiplyDragByParticleSize;
 
             //Create inherit velocity module
-            var inheritVelocityModuleClips             = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var inheritVelocityModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.inheritVelocityModule.enabled         = particleSystem.inheritVelocity.enabled;
             root.inheritVelocityModule.mode            = particleSystem.inheritVelocity.mode;
             root.inheritVelocityModule.curve           = CreateMinMaxCurve(ref inheritVelocityModuleClips, particleSystem.inheritVelocity.curve);
             root.inheritVelocityModule.curveMultiplier = particleSystem.inheritVelocity.curveMultiplier;
 
             //Create lifetime by emitter speed module
-            var lifetimeByEmitterSpeedModuleClips             = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var lifetimeByEmitterSpeedModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.lifetimeByEmitterSpeedModule.enabled         = particleSystem.lifetimeByEmitterSpeed.enabled;
             root.lifetimeByEmitterSpeedModule.curve           = CreateMinMaxCurve(ref lifetimeByEmitterSpeedModuleClips, particleSystem.lifetimeByEmitterSpeed.curve);
             root.lifetimeByEmitterSpeedModule.curveMultiplier = particleSystem.lifetimeByEmitterSpeed.curveMultiplier;
             root.lifetimeByEmitterSpeedModule.range           = particleSystem.lifetimeByEmitterSpeed.range;
 
             //Create force over lifetime module
-            var forceOverLifetimeModuleClips         = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var forceOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.forceOverLifetimeModule.enabled     = particleSystem.forceOverLifetime.enabled;
             root.forceOverLifetimeModule.x           = CreateMinMaxCurve(ref forceOverLifetimeModuleClips, particleSystem.forceOverLifetime.x);
             root.forceOverLifetimeModule.xMultiplier = particleSystem.forceOverLifetime.xMultiplier;
@@ -286,7 +287,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.forceOverLifetimeModule.randomized  = particleSystem.forceOverLifetime.randomized;
 
             //Create color over lifetime module
-            var colorOverLifetimeModuleClips     = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var colorOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.colorOverLifetimeModule.enabled = particleSystem.colorOverLifetime.enabled;
             CreateMinMaxGradient(ref colorOverLifetimeModuleClips,
                                  particleSystem.colorOverLifetime.color,
@@ -296,7 +297,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
                                  out root.colorOverLifetimeModule.colorAlpha);
 
             //Create color by speed module
-            var colorBySpeedModuleClips     = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var colorBySpeedModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.colorBySpeedModule.enabled = particleSystem.colorBySpeed.enabled;
             CreateMinMaxGradient(ref colorBySpeedModuleClips,
                                  particleSystem.colorBySpeed.color,
@@ -307,7 +308,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.colorBySpeedModule.range = particleSystem.colorBySpeed.range;
 
             //Create size over lifetime module
-            var sizeOverLifetimeModuleClips          = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var sizeOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.sizeOverLifetimeModule.enabled      = particleSystem.sizeOverLifetime.enabled;
             root.sizeOverLifetimeModule.x            = CreateMinMaxCurve(ref sizeOverLifetimeModuleClips, particleSystem.sizeOverLifetime.x);
             root.sizeOverLifetimeModule.xMultiplier  = particleSystem.sizeOverLifetime.xMultiplier;
@@ -318,7 +319,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.sizeOverLifetimeModule.separateAxes = particleSystem.sizeOverLifetime.separateAxes;
 
             //Create size by speed module
-            var sizeBySpeedModuleClips          = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var sizeBySpeedModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.sizeBySpeedModule.enabled      = particleSystem.sizeBySpeed.enabled;
             root.sizeBySpeedModule.x            = CreateMinMaxCurve(ref sizeBySpeedModuleClips, particleSystem.sizeBySpeed.x);
             root.sizeBySpeedModule.xMultiplier  = particleSystem.sizeBySpeed.xMultiplier;
@@ -330,7 +331,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.sizeBySpeedModule.range        = particleSystem.sizeBySpeed.range;
 
             //Create rotation over lifetime module
-            var rotationOverLifetimeModuleClips          = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var rotationOverLifetimeModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.rotationOverLifetimeModule.enabled      = particleSystem.rotationOverLifetime.enabled;
             root.rotationOverLifetimeModule.x            = CreateMinMaxCurve(ref rotationOverLifetimeModuleClips, particleSystem.rotationOverLifetime.x, math.radians);
             root.rotationOverLifetimeModule.xMultiplier  = particleSystem.rotationOverLifetime.xMultiplier;
@@ -341,7 +342,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.rotationOverLifetimeModule.separateAxes = particleSystem.rotationOverLifetime.separateAxes;
 
             //Create rotation by speed module
-            var rotationBySpeedModuleClips          = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var rotationBySpeedModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.rotationBySpeedModule.enabled      = particleSystem.rotationBySpeed.enabled;
             root.rotationBySpeedModule.x            = CreateMinMaxCurve(ref rotationBySpeedModuleClips, particleSystem.rotationBySpeed.x, math.radians);
             root.rotationBySpeedModule.xMultiplier  = particleSystem.rotationBySpeed.xMultiplier;
@@ -353,7 +354,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.rotationBySpeedModule.range        = particleSystem.rotationBySpeed.range;
 
             //Create external forces module
-            var externalForcesModuleClips             = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var externalForcesModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.externalForcesModule.enabled         = particleSystem.externalForces.enabled;
             root.externalForcesModule.multiplier      = particleSystem.externalForces.multiplier;
             root.externalForcesModule.multiplierCurve = CreateMinMaxCurve(ref externalForcesModuleClips, particleSystem.externalForces.multiplierCurve);
@@ -361,7 +362,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.externalForcesModule.influenceMask   = (uint)particleSystem.externalForces.influenceMask.value;
 
             //Create noise module
-            var noiseModuleClips                   = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var noiseModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.noiseModule.enabled               = particleSystem.noise.enabled;
             root.noiseModule.separateAxes          = particleSystem.noise.separateAxes;
             root.noiseModule.strengthX             = CreateMinMaxCurve(ref noiseModuleClips, particleSystem.noise.strengthX);
@@ -390,7 +391,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.noiseModule.sizeAmount            = CreateMinMaxCurve(ref noiseModuleClips, particleSystem.noise.sizeAmount);
 
             //Create collision module
-            var collisionModuleClips                                   = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var collisionModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.collisionModule.enabled                               = particleSystem.collision.enabled;
             root.collisionModule.type                                  = particleSystem.collision.type;
             root.collisionModule.mode                                  = particleSystem.collision.mode;
@@ -429,7 +430,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.subEmittersModule.subEmittersCount = particleSystem.subEmitters.subEmittersCount;
 
             //Create texture sheet animation module
-            var textureSheetAnimationModuleClips                     = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var textureSheetAnimationModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.textureSheetAnimationModule.enabled                 = particleSystem.textureSheetAnimation.enabled;
             root.textureSheetAnimationModule.mode                    = particleSystem.textureSheetAnimation.mode;
             root.textureSheetAnimationModule.numTilesX               = particleSystem.textureSheetAnimation.numTilesX;
@@ -448,7 +449,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
 
             //Create lights module
             //TODO: Lights
-            var lightsModuleClips                   = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var lightsModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.lightsModule.enabled               = particleSystem.lights.enabled;
             root.lightsModule.ratio                 = particleSystem.lights.ratio;
             root.lightsModule.useRandomDistribution = particleSystem.lights.useRandomDistribution;
@@ -463,7 +464,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             root.lightsModule.maxLights             = particleSystem.lights.maxLights;
 
             //Create trails module
-            var trailsModuleClips                  = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
+            var trailsModuleClips = new NativeList<Compression.AclCompressedClipResult>(Allocator.Temp);
             root.trailsModule.enabled              = particleSystem.trails.enabled;
             root.trailsModule.mode                 = particleSystem.trails.mode;
             root.trailsModule.ratio                = particleSystem.trails.ratio;
@@ -504,7 +505,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             var moduleClips = builder.Allocate(ref root.sampledClips.clips, moduleCount);
 
             //Write clip data
-            short   parameterCount = 0;
+            short parameterCount = 0;
             ref var mainModuleClip = ref moduleClips[0];
             WriteParameterClips(ref builder,
                                 ref mainModuleClip,
@@ -647,8 +648,8 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
                                 ref parameterCount);
 
             root.sampledClips.parameterCount = parameterCount;
-            var parameterNames               = builder.Allocate(ref root.sampledClips.parameterNames, parameterCount);
-            var parameterNameHashes          = builder.Allocate(ref root.sampledClips.parameterNameHashes, parameterCount);
+            var parameterNames      = builder.Allocate(ref root.sampledClips.parameterNames, parameterCount);
+            var parameterNameHashes = builder.Allocate(ref root.sampledClips.parameterNameHashes, parameterCount);
             for (int i = 0; i < parameterCount; i++)
             {
                 parameterNames[i]      = clipNameList[i];
@@ -724,7 +725,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
                                                     in ParticleSystem.MinMaxCurve minMaxCurve, Func<float, float> valueModifier = null)
         {
             MinMaxCurvePacked minMaxCurvePacked = new MinMaxCurvePacked();
-            minMaxCurvePacked.mode              = minMaxCurve.mode;
+            minMaxCurvePacked.mode = minMaxCurve.mode;
             switch (minMaxCurvePacked.mode)
             {
                 case ParticleSystemCurveMode.Constant:
@@ -758,11 +759,11 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
 
         private Compression.AclCompressedClipResult GetClipFromCurve(AnimationCurve curve, Func<float, float> valueModifier = null)
         {
-            const int   sampleRate       = 60;
+            const int sampleRate       = 60;
             const short compressionLevel = 0;
-            var         curveTime        = curve.keys[^ 1].time;
-            var         sampleInterval   = curveTime / sampleRate;
-            float       totalTime        = 0f;
+            var curveTime        = curve.keys[^ 1].time;
+            var sampleInterval   = curveTime / sampleRate;
+            float totalTime        = 0f;
 
             NativeList<float> samples = new NativeList<float>(Allocator.Temp);
             while (totalTime <= curveTime)
@@ -773,17 +774,17 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             }
 
             NativeArray<float> errors = new NativeArray<float>(1, Allocator.Temp);
-            errors[0]                 = 10f;  //??
+            errors[0] = 10f;  //??
 
             return AclUnity.Compression.CompressScalarsClip(samples.AsArray(), errors, sampleRate, compressionLevel);
         }
 
         private void GetClipsFromGradient(ref NativeList<Compression.AclCompressedClipResult> parameterClips, Gradient gradient)
         {
-            const int   sampleRate       = 60;
+            const int sampleRate       = 60;
             const short compressionLevel = 0;
-            var         curveTime        = 1f;
-            var         sampleInterval   = curveTime / sampleRate;
+            var curveTime        = 1f;
+            var sampleInterval   = curveTime / sampleRate;
 
             NativeArray<float> redSamples   = new NativeArray<float>(sampleRate, Allocator.Temp);
             NativeArray<float> greenSamples = new NativeArray<float>(sampleRate, Allocator.Temp);
@@ -802,7 +803,7 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
             }
 
             NativeArray<float> errors = new NativeArray<float>(4, Allocator.Temp);
-            errors[0]                 = 10f;  //??
+            errors[0] = 10f;  //??
 
             parameterClips.Add(AclUnity.Compression.CompressScalarsClip(redSamples, errors, sampleRate, compressionLevel));
             parameterClips.Add(AclUnity.Compression.CompressScalarsClip(greenSamples, errors, sampleRate, compressionLevel));
@@ -811,4 +812,5 @@ namespace Latios.Mimic.Shuriken.Authoring.Systems
         }
     }
 }
+#endif
 

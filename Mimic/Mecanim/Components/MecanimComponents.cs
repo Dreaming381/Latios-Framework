@@ -6,7 +6,7 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Latios.Mimic.Mecanim
+namespace Latios.Mimic.Addons.Mecanim
 {
     #region Components
     /// <summary>
@@ -52,6 +52,19 @@ namespace Latios.Mimic.Mecanim
         public bool triggerStartInertialBlend;
     }
 
+    /// <summary>
+    /// Contains entity references to meshes that can be transformed by blend shapes.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct BlendShapeClipSet : IBufferElementData
+    {
+        public Entity meshEntity;
+        /// <summary>
+        /// The blend shape parameter values for each clip
+        /// </summary>
+        public BlobAssetReference<ParameterClipSetBlob> clips;
+    }
+    
     /// <summary>
     /// Contains the stateful data of an animator controller layer.
     /// Prefer to use MecanimAspect instead of this buffer directly.

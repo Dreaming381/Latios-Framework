@@ -1,3 +1,4 @@
+#if false
 #if UNITY_EDITOR
 using Latios.Authoring;
 using Latios.LifeFX;
@@ -33,7 +34,7 @@ namespace Latios.Mimic.Shuriken.Authoring
             baker.AddBuffer<ParticleSeed>(                entity);
             baker.AddBuffer<ParticleCenter>(              entity);
             baker.AddBuffer<ParticleRotationSpeed>(       entity);
-            baker.AddBuffer<ParticleAgeFraction>(          entity);
+            baker.AddBuffer<ParticleAgeFraction>(         entity);
             baker.AddBuffer<ParticleInverseStartLifetime>(entity);
 
             // Buffers based on module configuration
@@ -109,5 +110,6 @@ namespace Latios.Mimic.Shuriken.Authoring
     {
     }
 }
+#endif
 #endif
 

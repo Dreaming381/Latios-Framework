@@ -11,8 +11,8 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
     public void InitializeBakingForAllWorlds(ref CustomBakingBootstrapContext context)
     {
         Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
-        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemationBakersAndSystems(ref context);
-        //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimBakersAndSystems(ref context);
+        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
+        //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);
     }
 }
 
@@ -47,7 +47,7 @@ public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
 
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        //Latios.Mimic.MimicBootstrap.InstallMecanim(world);
+        //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
 
@@ -73,7 +73,7 @@ public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
 
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        //Latios.Mimic.MimicBootstrap.InstallMecanim(world);
+        //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
 

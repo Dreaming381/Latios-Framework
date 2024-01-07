@@ -1,3 +1,4 @@
+#if false
 using System.Runtime.InteropServices;
 using Latios.Kinemation;
 using Unity.Entities;
@@ -8,15 +9,15 @@ namespace Latios.Mimic.Shuriken
 {
     public struct ShurikenParticleSystemData : IComponentData
     {
-        public bool  isPlaying;
-        public bool  isEmitting;
-        public bool  isStopped;
-        public bool  isPaused;
-        public int   particleCount;
+        public bool isPlaying;
+        public bool isEmitting;
+        public bool isStopped;
+        public bool isPaused;
+        public int particleCount;
         public float time;
         public float delayTime;
         public float totalTime;
-        public uint  randomSeed;
+        public uint randomSeed;
         public float distanceTraveled;
 
         public float previousFrameTime;
@@ -34,30 +35,30 @@ namespace Latios.Mimic.Shuriken
 
     public struct ShurikenModulesBlob
     {
-        public ParameterClipSetBlob                    sampledClips;
-        public ShurikenMainModule                      mainModule;
-        public ShurikenEmissionModule                  emissionModule;
-        public BlobArray<EmissionBurst>                emissionBursts;
-        public ShurikenShapeModule                     shapeModule;
-        public ShurikenVelocityOverLifetimeModule      velocityOverLifetimeModule;
+        public ParameterClipSetBlob sampledClips;
+        public ShurikenMainModule mainModule;
+        public ShurikenEmissionModule emissionModule;
+        public BlobArray<EmissionBurst> emissionBursts;
+        public ShurikenShapeModule shapeModule;
+        public ShurikenVelocityOverLifetimeModule velocityOverLifetimeModule;
         public ShurikenLimitVelocityOverLifetimeModule limitVelocityOverLifetimeModule;
-        public ShurikenInheritVelocityModule           inheritVelocityModule;
-        public ShurikenLifetimeByEmitterSpeedModule    lifetimeByEmitterSpeedModule;
-        public ShurikenForceOverLifetimeModule         forceOverLifetimeModule;
-        public ShurikenColorOverLifetimeModule         colorOverLifetimeModule;
-        public ShurikenColorBySpeedModule              colorBySpeedModule;
-        public ShurikenSizeOverLifetimeModule          sizeOverLifetimeModule;
-        public ShurikenSizeBySpeedModule               sizeBySpeedModule;
-        public ShurikenRotationOverLifetimeModule      rotationOverLifetimeModule;
-        public ShurikenRotationBySpeedModule           rotationBySpeedModule;
-        public ShurikenExternalForcesModule            externalForcesModule;
-        public ShurikenNoiseModule                     noiseModule;
-        public ShurikenCollisionModule                 collisionModule;
-        public ShurikenTriggerModule                   triggerModule;
-        public ShurikenSubEmittersModule               subEmittersModule;
-        public ShurikenTextureSheetAnimationModule     textureSheetAnimationModule;
-        public ShurikenLightsModule                    lightsModule;
-        public ShurikenTrailModule                     trailsModule;
+        public ShurikenInheritVelocityModule inheritVelocityModule;
+        public ShurikenLifetimeByEmitterSpeedModule lifetimeByEmitterSpeedModule;
+        public ShurikenForceOverLifetimeModule forceOverLifetimeModule;
+        public ShurikenColorOverLifetimeModule colorOverLifetimeModule;
+        public ShurikenColorBySpeedModule colorBySpeedModule;
+        public ShurikenSizeOverLifetimeModule sizeOverLifetimeModule;
+        public ShurikenSizeBySpeedModule sizeBySpeedModule;
+        public ShurikenRotationOverLifetimeModule rotationOverLifetimeModule;
+        public ShurikenRotationBySpeedModule rotationBySpeedModule;
+        public ShurikenExternalForcesModule externalForcesModule;
+        public ShurikenNoiseModule noiseModule;
+        public ShurikenCollisionModule collisionModule;
+        public ShurikenTriggerModule triggerModule;
+        public ShurikenSubEmittersModule subEmittersModule;
+        public ShurikenTextureSheetAnimationModule textureSheetAnimationModule;
+        public ShurikenLightsModule lightsModule;
+        public ShurikenTrailModule trailsModule;
     }
 
     [StructLayout(LayoutKind.Explicit)]
@@ -163,4 +164,5 @@ namespace Latios.Mimic.Shuriken
         }
     }
 }
+#endif
 

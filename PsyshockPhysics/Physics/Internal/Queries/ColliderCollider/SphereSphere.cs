@@ -69,10 +69,7 @@ namespace Latios.Psyshock
                                                                           in RigidTransform bTransform,
                                                                           in ColliderDistanceResult distanceResult)
         {
-            UnitySim.ContactsBetweenResult result = default;
-            result.contactNormal                  = distanceResult.normalB;
-            result.Add(distanceResult.hitpointB, distanceResult.distance);
-            return result;
+            return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
         }
 
         internal static bool SphereSphereDistance(in SphereCollider sphereA,

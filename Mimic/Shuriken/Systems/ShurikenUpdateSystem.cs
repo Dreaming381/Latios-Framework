@@ -1,3 +1,4 @@
+#if false
 using Latios.Kinemation;
 using Latios.LifeFX;
 using Latios.Mimic.Shuriken.Internal;
@@ -25,9 +26,9 @@ namespace Latios.Mimic.Shuriken.Systems
     public partial struct ShurikenUpdateSystem : ISystem
     {
         private WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
-        private EntityQuery                             m_query;
-        private float                                   m_previousDeltaTime;
-        private float                                   m_previousUnscaledDeltaTime;
+        private EntityQuery m_query;
+        private float m_previousDeltaTime;
+        private float m_previousUnscaledDeltaTime;
 
         public void OnCreate(ref SystemState state)
         {
@@ -100,31 +101,31 @@ namespace Latios.Mimic.Shuriken.Systems
         {
             public SystemRng systemRng;
             //TODO:  Get this from the world
-            public float2                                          physics2dGravity;
-            public float3                                          physics3dGravity;
-            public WorldTransformReadOnlyAspect.TypeHandle         transformHandle;
+            public float2 physics2dGravity;
+            public float3 physics3dGravity;
+            public WorldTransformReadOnlyAspect.TypeHandle transformHandle;
             public ComponentTypeHandle<ShurikenParticleSystemData> particleSystemHandle;
-            public float                                           deltaTime;
-            public float                                           unscaledDeltaTime;
-            public float                                           previousDeltaTime;
-            public float                                           previousUnscaledDeltaTime;
+            public float deltaTime;
+            public float unscaledDeltaTime;
+            public float previousDeltaTime;
+            public float previousUnscaledDeltaTime;
 
             //Modules
-            public ComponentTypeHandle<ShurikenMainModuleOverride>                      mainModuleHandle;
-            public ComponentTypeHandle<ShurikenEmissionModuleOverride>                  emissionModuleHandle;
-            public BufferTypeHandle<EmissionBurst>                                      emissionBurstHandle;
-            public ComponentTypeHandle<ShurikenShapeModuleOverride>                     shapeModuleHandle;
-            public ComponentTypeHandle<ShurikenVelocityOverLifetimeModuleOverride>      velocityOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenMainModuleOverride> mainModuleHandle;
+            public ComponentTypeHandle<ShurikenEmissionModuleOverride> emissionModuleHandle;
+            public BufferTypeHandle<EmissionBurst> emissionBurstHandle;
+            public ComponentTypeHandle<ShurikenShapeModuleOverride> shapeModuleHandle;
+            public ComponentTypeHandle<ShurikenVelocityOverLifetimeModuleOverride> velocityOverLifetimeModuleHandle;
             public ComponentTypeHandle<ShurikenLimitVelocityOverLifetimeModuleOverride> limitVelocityOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenInheritVelocityModuleOverride>           inheritVelocityModuleHandle;
-            public ComponentTypeHandle<ShurikenLifetimeByEmitterSpeedModuleOverride>    lifetimeByEmitterSpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenForceOverLifetimeModuleOverride>         forceOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenColorOverLifetimeModuleOverride>         colorOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenColorBySpeedModuleOverride>              colorBySpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenSizeOverLifetimeModuleOverride>          sizeOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenSizeBySpeedModuleOverride>               sizeBySpeedModuleHandle;
-            public ComponentTypeHandle<ShurikenRotationOverLifetimeModuleOverride>      rotationOverLifetimeModuleHandle;
-            public ComponentTypeHandle<ShurikenRotationBySpeedModuleOverride>           rotationBySpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenInheritVelocityModuleOverride> inheritVelocityModuleHandle;
+            public ComponentTypeHandle<ShurikenLifetimeByEmitterSpeedModuleOverride> lifetimeByEmitterSpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenForceOverLifetimeModuleOverride> forceOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenColorOverLifetimeModuleOverride> colorOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenColorBySpeedModuleOverride> colorBySpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenSizeOverLifetimeModuleOverride> sizeOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenSizeBySpeedModuleOverride> sizeBySpeedModuleHandle;
+            public ComponentTypeHandle<ShurikenRotationOverLifetimeModuleOverride> rotationOverLifetimeModuleHandle;
+            public ComponentTypeHandle<ShurikenRotationBySpeedModuleOverride> rotationBySpeedModuleHandle;
             //public ComponentTypeHandle<ShurikenExternalForcesModuleOverride> externalForcesModuleHandle;
             public ComponentTypeHandle<ShurikenNoiseModuleOverride> noiseModuleHandle;
             // public ComponentTypeHandle<ShurikenCollisionModuleOverride> collisionModuleHandle;
@@ -135,16 +136,16 @@ namespace Latios.Mimic.Shuriken.Systems
             // public ComponentTypeHandle<ShurikenTrailModuleOverride> trailsModuleHandle;
 
             //Particle Attributes
-            public BufferTypeHandle<ParticleSeed>                 particleSeedHandle;
-            public BufferTypeHandle<ParticleCenter>               particleCenterHandle;
-            public BufferTypeHandle<ParticleRotation>             particleRotationHandle;
-            public BufferTypeHandle<ParticleRotation3d>           particleRotation3dHandle;
-            public BufferTypeHandle<ParticleRotationSpeed>        particleRotationSpeedHandle;
-            public BufferTypeHandle<ParticleScale>                particleScaleHandle;
-            public BufferTypeHandle<ParticleScale3d>              particleScale3dHandle;
-            public BufferTypeHandle<ParticleColor>                particleColorHandle;
-            public BufferTypeHandle<ParticleVelocity>             particleVelocityHandle;
-            public BufferTypeHandle<ParticleAgeFraction>           particleAgePercentHandle;
+            public BufferTypeHandle<ParticleSeed> particleSeedHandle;
+            public BufferTypeHandle<ParticleCenter> particleCenterHandle;
+            public BufferTypeHandle<ParticleRotation> particleRotationHandle;
+            public BufferTypeHandle<ParticleRotation3d> particleRotation3dHandle;
+            public BufferTypeHandle<ParticleRotationSpeed> particleRotationSpeedHandle;
+            public BufferTypeHandle<ParticleScale> particleScaleHandle;
+            public BufferTypeHandle<ParticleScale3d> particleScale3dHandle;
+            public BufferTypeHandle<ParticleColor> particleColorHandle;
+            public BufferTypeHandle<ParticleVelocity> particleVelocityHandle;
+            public BufferTypeHandle<ParticleAgeFraction> particleAgePercentHandle;
             public BufferTypeHandle<ParticleInverseStartLifetime> particleInverseStartLifetimeHandle;
 
             /*
@@ -201,7 +202,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                     //TODO:  Implement separate axis setting for scale and rotation
                     //Optional buffers determined by "separate axes" setting
-                    bool                            hasRotation3d     = false;
+                    bool hasRotation3d     = false;
                     DynamicBuffer<ParticleRotation> particleRotations = default;
                     if (particleRotationsAccessor.Length > 0)
                     {
@@ -215,7 +216,7 @@ namespace Latios.Mimic.Shuriken.Systems
                         hasRotation3d       = true;
                     }
 
-                    bool                         hasScale3d     = false;
+                    bool hasScale3d     = false;
                     DynamicBuffer<ParticleScale> particleScales = default;
                     if (particleScalesAccessor.Length > 0)
                     {
@@ -229,7 +230,7 @@ namespace Latios.Mimic.Shuriken.Systems
                         hasScale3d       = true;
                     }
 
-                    var                          hasColor       = false;
+                    var hasColor       = false;
                     DynamicBuffer<ParticleColor> particleColors = default;
                     if (particleColorsAccessor.Length > 0)
                     {
@@ -237,7 +238,7 @@ namespace Latios.Mimic.Shuriken.Systems
                         hasColor       = true;
                     }
 
-                    var                             hasVelocity        = false;
+                    var hasVelocity        = false;
                     DynamicBuffer<ParticleVelocity> particleVelocities = default;
                     if (particleVelocitiesAccessor.Length > 0)
                     {
@@ -247,7 +248,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                     //Get the main module
                     ShurikenMainModule mainModule;
-                    ref ParameterClip  mainModuleClip = ref GetModuleAndClip(in chunk,
+                    ref ParameterClip mainModuleClip = ref GetModuleAndClip(in chunk,
                                                                             entityIndexInChunk,
                                                                             in mainModules,
                                                                             in particleSystem.Modules.Value.mainModule,
@@ -270,7 +271,7 @@ namespace Latios.Mimic.Shuriken.Systems
                             }
                         }
 
-                        bool  isDelayed;
+                        bool isDelayed;
                         float simulationDeltaTime;
                         float previousSimulationDeltaTime;
 
@@ -289,10 +290,10 @@ namespace Latios.Mimic.Shuriken.Systems
                             #region Emission Module
 
                             //Get distance traveled
-                            var                        distanceTraveledDelta = math.length(transform.position - particleSystem.previousPosition);
-                            int                        newParticleCount;
-                            ShurikenEmissionModule     emissionModule;
-                            ParameterClip              emissionModuleClip;
+                            var distanceTraveledDelta = math.length(transform.position - particleSystem.previousPosition);
+                            int newParticleCount;
+                            ShurikenEmissionModule emissionModule;
+                            ParameterClip emissionModuleClip;
                             NativeArray<EmissionBurst> emissionBursts;
                             if (chunk.HasChunkComponent<ShurikenEmissionModuleOverride>())
                             {
@@ -302,8 +303,8 @@ namespace Latios.Mimic.Shuriken.Systems
                             }
                             else
                             {
-                                emissionModule                  = particleSystem.Modules.Value.emissionModule;
-                                emissionModuleClip              = particleSystem.Modules.Value.sampledClips.clips[ShurikenEmissionModule.clipIndex];
+                                emissionModule     = particleSystem.Modules.Value.emissionModule;
+                                emissionModuleClip = particleSystem.Modules.Value.sampledClips.clips[ShurikenEmissionModule.clipIndex];
                                 ref var emissionBurstsBlobArray = ref particleSystem.Modules.Value.emissionBursts;
 
                                 unsafe
@@ -352,7 +353,7 @@ namespace Latios.Mimic.Shuriken.Systems
                             #region Shape Module
 
                             ShurikenShapeModule shapeModule;
-                            ref ParameterClip   shapeModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip shapeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                      entityIndexInChunk,
                                                                                      in shapeModules,
                                                                                      in particleSystem.Modules.Value.shapeModule,
@@ -381,7 +382,7 @@ namespace Latios.Mimic.Shuriken.Systems
                                 #region Velocity Over Lifetime Module
 
                                 ShurikenVelocityOverLifetimeModule velocityOverLifetimeModule;
-                                ref ParameterClip                  velocityOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip velocityOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                         entityIndexInChunk,
                                                                                                         in velocityOverLifetimeModules,
                                                                                                         in particleSystem.Modules.Value.velocityOverLifetimeModule,
@@ -398,7 +399,7 @@ namespace Latios.Mimic.Shuriken.Systems
                                 #region Limit Velocity Over Lifetime Module
 
                                 ShurikenLimitVelocityOverLifetimeModule limitVelocityOverLifetimeModule;
-                                ref ParameterClip                       limitVelocityOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip limitVelocityOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                              entityIndexInChunk,
                                                                                                              in limitVelocityOverLifetimeModules,
                                                                                                              in particleSystem.Modules.Value.limitVelocityOverLifetimeModule,
@@ -419,7 +420,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                                 #region Inherit Velocity Module
                                 ShurikenInheritVelocityModule inheritVelocityModule;
-                                ref ParameterClip             inheritVelocityModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip inheritVelocityModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                    entityIndexInChunk,
                                                                                                    in inheritVelocityModules,
                                                                                                    in particleSystem.Modules.Value.inheritVelocityModule,
@@ -434,7 +435,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region Lifetime By Emitter Speed Module
                             ShurikenLifetimeByEmitterSpeedModule lifetimeByEmitterSpeedModule;
-                            ref ParameterClip                    lifetimeByEmitterSpeedModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip lifetimeByEmitterSpeedModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                       entityIndexInChunk,
                                                                                                       in lifetimeByEmitterSpeedModules,
                                                                                                       in particleSystem.Modules.Value.lifetimeByEmitterSpeedModule,
@@ -456,7 +457,7 @@ namespace Latios.Mimic.Shuriken.Systems
                                 #region Force Over Lifetime Module
 
                                 ShurikenForceOverLifetimeModule forceOverLifetimeModule;
-                                ref ParameterClip               forceOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip forceOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                      entityIndexInChunk,
                                                                                                      in forceOverLifetimeModules,
                                                                                                      in particleSystem.Modules.Value.forceOverLifetimeModule,
@@ -476,7 +477,7 @@ namespace Latios.Mimic.Shuriken.Systems
                                 #region Color Over Lifetime Module
 
                                 ShurikenColorOverLifetimeModule colorOverLifetimeModule;
-                                ref ParameterClip               colorOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip colorOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                      entityIndexInChunk,
                                                                                                      in colorOverLifetimeModules,
                                                                                                      in particleSystem.Modules.Value.colorOverLifetimeModule,
@@ -493,7 +494,7 @@ namespace Latios.Mimic.Shuriken.Systems
                                 #region ColorBySpeed Module
 
                                 ShurikenColorBySpeedModule colorBySpeedModule;
-                                ref ParameterClip          colorBySpeedModuleClip = ref GetModuleAndClip(in chunk,
+                                ref ParameterClip colorBySpeedModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                 entityIndexInChunk,
                                                                                                 in colorBySpeedModules,
                                                                                                 in particleSystem.Modules.Value.colorBySpeedModule,
@@ -510,7 +511,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region Size Over Lifetime Module
                             ShurikenSizeOverLifetimeModule sizeOverLifetimeModule;
-                            ref ParameterClip              sizeOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip sizeOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                 entityIndexInChunk,
                                                                                                 in sizeOverLifetimeModules,
                                                                                                 in particleSystem.Modules.Value.sizeOverLifetimeModule,
@@ -524,7 +525,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region SizeBySpeed Module
                             ShurikenSizeBySpeedModule sizeBySpeedModule;
-                            ref ParameterClip         sizeBySpeedModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip sizeBySpeedModuleClip = ref GetModuleAndClip(in chunk,
                                                                                            entityIndexInChunk,
                                                                                            in sizeBySpeedModules,
                                                                                            in particleSystem.Modules.Value.sizeBySpeedModule,
@@ -538,7 +539,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region Rotation Over Lifetime Module
                             ShurikenRotationOverLifetimeModule rotationOverLifetimeModule;
-                            ref ParameterClip                  rotationOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip rotationOverLifetimeModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                     entityIndexInChunk,
                                                                                                     in rotationOverLifetimeModules,
                                                                                                     in particleSystem.Modules.Value.rotationOverLifetimeModule,
@@ -552,7 +553,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region RotationBySpeed Module
                             ShurikenRotationBySpeedModule rotationBySpeedModule;
-                            ref ParameterClip             rotationBySpeedModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip rotationBySpeedModuleClip = ref GetModuleAndClip(in chunk,
                                                                                                entityIndexInChunk,
                                                                                                in rotationBySpeedModules,
                                                                                                in particleSystem.Modules.Value.rotationBySpeedModule,
@@ -566,7 +567,7 @@ namespace Latios.Mimic.Shuriken.Systems
 
                             #region Noise Module
                             ShurikenNoiseModule noiseModule;
-                            ref ParameterClip   noiseModuleClip = ref GetModuleAndClip(in chunk,
+                            ref ParameterClip noiseModuleClip = ref GetModuleAndClip(in chunk,
                                                                                      entityIndexInChunk,
                                                                                      in noiseModules,
                                                                                      in particleSystem.Modules.Value.noiseModule,
@@ -594,17 +595,17 @@ namespace Latios.Mimic.Shuriken.Systems
                             {
                                 for (int i = 0; i < particleCenters.Length; i++)
                                 {
-                                    var particleCenter    = particleCenters[i];
+                                    var particleCenter = particleCenters[i];
                                     particleCenter.center += particleVelocities[i].velocity * simulationDeltaTime;
-                                    particleCenters[i]    = particleCenter;
+                                    particleCenters[i]     = particleCenter;
                                 }
                             }
                             //Update system state
-                            particleSystem.distanceTraveled  += distanceTraveledDelta;
-                            particleSystem.previousPosition   = transform.position;
-                            particleSystem.previousFrameTime  = particleSystem.time;
-                            particleSystem.time              += simulationDeltaTime;
-                            particleSystem.totalTime         += simulationDeltaTime;
+                            particleSystem.distanceTraveled += distanceTraveledDelta;
+                            particleSystem.previousPosition  = transform.position;
+                            particleSystem.previousFrameTime = particleSystem.time;
+                            particleSystem.time             += simulationDeltaTime;
+                            particleSystem.totalTime        += simulationDeltaTime;
                         }
                     }
 
@@ -652,7 +653,7 @@ namespace Latios.Mimic.Shuriken.Systems
                 ref DynamicBuffer<ParticleColor>                particleColors,
                 bool hasVelocity,
                 ref DynamicBuffer<ParticleVelocity>             particleVelocities,
-                ref DynamicBuffer<ParticleAgeFraction>           particleAgePercents,
+                ref DynamicBuffer<ParticleAgeFraction>          particleAgePercents,
                 ref DynamicBuffer<ParticleInverseStartLifetime> particleInverseStartLifetimes)
             {
                 particleSeeds.RemoveAtSwapBack(particleIndex);
@@ -710,4 +711,5 @@ namespace Latios.Mimic.Shuriken.Systems
         }
     }
 }
+#endif
 

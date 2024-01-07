@@ -20,7 +20,7 @@ namespace Latios
 
             entityManager.AddComponent(dst, componentType);
 
-            if (componentType.IsZeroSized)
+            if (componentType.IsZeroSized && !componentType.IsEnableable)
                 return;
 
             var typeInfo           = TypeManager.GetTypeInfo(componentType.TypeIndex);
@@ -33,11 +33,20 @@ namespace Latios
             var handleRO           = entityManager.GetDynamicComponentTypeHandle(typeRO);
             var srcChunk           = entityManager.GetStorageInfo(src);
             var dstChunk           = entityManager.GetStorageInfo(dst);
-            var dstPtr             = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRW, size).GetUnsafePtr();
-            dstPtr                += dstChunk.IndexInChunk * size;
-            var srcPtr             = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRO, size).GetUnsafeReadOnlyPtr();
-            srcPtr                += srcChunk.IndexInChunk * size;
-            UnsafeUtility.MemCpy(dstPtr, srcPtr, size);
+            if (!componentType.IsEnableable)
+            {
+                var dstPtr = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRW, size).GetUnsafePtr();
+                dstPtr += dstChunk.IndexInChunk * size;
+                var srcPtr = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRO, size).GetUnsafeReadOnlyPtr();
+                srcPtr += srcChunk.IndexInChunk * size;
+                UnsafeUtility.MemCpy(dstPtr, srcPtr, size);
+            }
+
+            if (componentType.IsEnableable)
+            {
+                var enabled = srcChunk.Chunk.IsComponentEnabled(ref handleRO, srcChunk.IndexInChunk);
+                dstChunk.Chunk.SetComponentEnabled(ref handleRW, dstChunk.IndexInChunk, enabled);
+            }
         }
 
         [GenerateTestsForBurstCompatibility]
@@ -64,6 +73,12 @@ namespace Latios
             var srcPtr            = srcBufferAccess.GetUnsafeReadOnlyPtrAndLength(srcChunk.IndexInChunk, out int length);
             dstBufferAccess.ResizeUninitialized(dstChunk.IndexInChunk, length);
             UnsafeUtility.MemCpy(dstBufferAccess.GetUnsafePtr(dstChunk.IndexInChunk), srcPtr, dstBufferAccess.ElementSize * (long)length);
+
+            if (componentType.IsEnableable)
+            {
+                var enabled = srcChunk.Chunk.IsComponentEnabled(ref handleRO, srcChunk.IndexInChunk);
+                dstChunk.Chunk.SetComponentEnabled(ref handleRW, dstChunk.IndexInChunk, enabled);
+            }
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]

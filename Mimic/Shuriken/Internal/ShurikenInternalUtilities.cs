@@ -1,3 +1,4 @@
+#if false
 using System.Runtime.CompilerServices;
 using Latios.Kinemation;
 using Latios.LifeFX;
@@ -93,10 +94,10 @@ namespace Latios.Mimic.Shuriken.Internal
                 var startColorBlueSequence  = rng.GetSequence(ShurikenMainModule.moduleSeed + ShurikenMainModule.startColorBlueSeed);
                 var startColorAlphaSequence = rng.GetSequence(ShurikenMainModule.moduleSeed + ShurikenMainModule.startColorAlphaSeed);
 
-                var startColorRed                    = (half)mainModule.startColorRed.Evaluate(ref clip, startColorRedSequence, particleSystemData.time);
-                var startColorGreen                  = (half)mainModule.startColorGreen.Evaluate(ref clip, startColorGreenSequence, particleSystemData.time);
-                var startColorBlue                   = (half)mainModule.startColorBlue.Evaluate(ref clip, startColorBlueSequence, particleSystemData.time);
-                var startColorAlpha                  = (half)mainModule.startColorAlpha.Evaluate(ref clip, startColorAlphaSequence, particleSystemData.time);
+                var startColorRed   = (half)mainModule.startColorRed.Evaluate(ref clip, startColorRedSequence, particleSystemData.time);
+                var startColorGreen = (half)mainModule.startColorGreen.Evaluate(ref clip, startColorGreenSequence, particleSystemData.time);
+                var startColorBlue  = (half)mainModule.startColorBlue.Evaluate(ref clip, startColorBlueSequence, particleSystemData.time);
+                var startColorAlpha = (half)mainModule.startColorAlpha.Evaluate(ref clip, startColorAlphaSequence, particleSystemData.time);
                 colors.Add(new ParticleColor { color = new half4(startColorRed, startColorGreen, startColorBlue, startColorAlpha)});
             }
 
@@ -105,7 +106,7 @@ namespace Latios.Mimic.Shuriken.Internal
                 velocities.Add(new ParticleVelocity { velocity = math.mul(startRotation, math.forward()) * startSpeed });
             }
 
-            agePercents.Add(new ParticleAgeFraction { fraction                                  = 0 });
+            agePercents.Add(new ParticleAgeFraction { fraction = 0 });
             inverseStartLifetimes.Add(new ParticleInverseStartLifetime {inverseExpectedLifetime = 1f / startLifetime});
         }
 
@@ -190,9 +191,9 @@ namespace Latios.Mimic.Shuriken.Internal
                     var particleSeed = particleSeeds[i].stableSeed;
                     var particleRng  = new Rng(particleSeed);
 
-                    var agePercent          = particleAgePercents[i];
-                    agePercent.fraction    += (ushort)(simulationDeltaTime / particleInverseStartLifetimes[i].inverseExpectedLifetime);
-                    particleAgePercents[i]  = agePercent;
+                    var agePercent = particleAgePercents[i];
+                    agePercent.fraction   += (ushort)(simulationDeltaTime / particleInverseStartLifetimes[i].inverseExpectedLifetime);
+                    particleAgePercents[i] = agePercent;
 
                     var startSpeedSequence          = particleRng.GetSequence(ShurikenMainModule.moduleSeed + ShurikenMainModule.startSpeedSeed);
                     var startSizeXSequence          = particleRng.GetSequence(ShurikenMainModule.moduleSeed + ShurikenMainModule.startSizeXSeed);
@@ -229,40 +230,40 @@ namespace Latios.Mimic.Shuriken.Internal
 
                     if (hasRotation3d)
                     {
-                        var particleRotation3d      = particleRotations3d[i];
+                        var particleRotation3d = particleRotations3d[i];
                         particleRotation3d.rotation = rotation;
                         particleRotations3d[i]      = particleRotation3d;
                     }
                     else
                     {
-                        var particleRotation         = particleRotations[i];
+                        var particleRotation = particleRotations[i];
                         particleRotation.rotationCCW = rotationEulerX;
                         particleRotations[i]         = particleRotation;
                     }
 
                     if (hasScale3d)
                     {
-                        var particleScale3d   = particleScales3d[i];
+                        var particleScale3d = particleScales3d[i];
                         particleScale3d.scale = new float3(sizeX, sizeY, sizeZ);
                         particleScales3d[i]   = particleScale3d;
                     }
                     else
                     {
-                        var particleScale   = particleScales[i];
+                        var particleScale = particleScales[i];
                         particleScale.scale = sizeX;
                         particleScales[i]   = particleScale;
                     }
 
                     if (hasColor)
                     {
-                        var particleColor   = particleColors[i];
+                        var particleColor = particleColors[i];
                         particleColor.color = new half4(colorRed, colorGreen, colorBlue, colorAlpha);
                         particleColors[i]   = particleColor;
                     }
 
                     if (hasVelocity)
                     {
-                        var particleVelocity      = particleVelocities[i];
+                        var particleVelocity = particleVelocities[i];
                         particleVelocity.velocity = math.mul(rotation, math.forward()) * startSpeed + gravity * particleLifeTime;
                         particleVelocities[i]     = particleVelocity;
                     }
@@ -337,8 +338,8 @@ namespace Latios.Mimic.Shuriken.Internal
                         if (burstsSequence.NextFloat(0, 1) < burst.probability)
                         {
                             // Calculate the number of particles to emit
-                            int burstParticleCount  = (int)burst.count.Evaluate(ref clip, burstElementSequence, particleSystemData.time);
-                            newParticleCount       += burstParticleCount;
+                            int burstParticleCount = (int)burst.count.Evaluate(ref clip, burstElementSequence, particleSystemData.time);
+                            newParticleCount += burstParticleCount;
                         }
                     }
                 }
@@ -376,7 +377,7 @@ namespace Latios.Mimic.Shuriken.Internal
         {
             if (module.enabled)
             {
-                float3     shapePosition = float3.zero;
+                float3 shapePosition = float3.zero;
                 quaternion shapeRotation = quaternion.identity;
 
                 //TODO:  Change the rotations
@@ -393,8 +394,8 @@ namespace Latios.Mimic.Shuriken.Internal
                     {
                         case ParticleSystemShapeType.Box:
                         {
-                            var min          = -module.scale / 2f;
-                            var max          = module.scale / 2f;
+                            var min = -module.scale / 2f;
+                            var max = module.scale / 2f;
                             shapePosition    = shapeModuleSequence.NextFloat3(min, max) + shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
                             shapeRotation    = quaternion.Euler(module.rotationEulerRadians);
                             shapePosition    = math.mul(quaternion.Euler(module.rotationEulerRadians), shapePosition);
@@ -409,7 +410,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             float arcPosition =
@@ -422,8 +423,8 @@ namespace Latios.Mimic.Shuriken.Internal
                             // Calculate position within the circle considering Radius Thickness
                             float distanceFromCenter = module.radius * math.sqrt(shapeModuleSequence.NextFloat(0, module.radiusThickness));
                             float angle              = arcPosition;
-                            shapePosition            = new float3(distanceFromCenter * math.cos(angle), distanceFromCenter * math.sin(angle), 0);
-                            shapeRotation            = quaternion.Euler(module.rotationEulerRadians);
+                            shapePosition = new float3(distanceFromCenter * math.cos(angle), distanceFromCenter * math.sin(angle), 0);
+                            shapeRotation = quaternion.Euler(module.rotationEulerRadians);
 
                             // Apply Randomize Position
                             shapePosition += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
@@ -441,7 +442,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             float arcPosition =
@@ -459,7 +460,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             if (module.radiusThickness < 1f)
                             {
                                 // Emission closer to the edge based on radius thickness
-                                float minDistance  = module.radius * module.radiusThickness;
+                                float minDistance = module.radius * module.radiusThickness;
                                 distanceFromCenter = math.lerp(minDistance, module.radius, distanceFromCenter);
                             }
 
@@ -479,7 +480,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             float arcPosition =
@@ -494,14 +495,14 @@ namespace Latios.Mimic.Shuriken.Internal
                             float r = module.donutRadius * module.radiusThickness;
 
                             // Calculate position on the donut using arcPosition
-                            float angle1  = arcPosition;
-                            float angle2  = shapeModuleSequence.NextFloat(0, 2 * math.PI);
+                            float angle1 = arcPosition;
+                            float angle2 = shapeModuleSequence.NextFloat(0, 2 * math.PI);
                             shapePosition = new float3((R + r * math.cos(angle2)) * math.cos(angle1), (R + r * math.cos(angle2)) * math.sin(angle1), r * math.sin(angle2));
 
                             // Apply Randomize Position
                             shapePosition += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
 
-                            shapeRotation               = quaternion.Euler(module.rotationEulerRadians);
+                            shapeRotation = quaternion.Euler(module.rotationEulerRadians);
                             float3 donutPositionRotated = math.mul(shapeRotation, shapePosition);
 
                             particlePosition = donutPositionRotated + module.position;
@@ -515,7 +516,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             // Calculate the arc position
@@ -576,7 +577,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             // Calculate the arc position
@@ -611,10 +612,10 @@ namespace Latios.Mimic.Shuriken.Internal
                         {
                             shapePosition = GetPositionOnBox(ref shapeModuleSequence, module.scale, false, default);
 
-                            shapePosition    += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);  // Randomize Position
-                            shapeRotation     = quaternion.EulerXYZ(module.rotationEulerRadians);
-                            shapePosition     = math.mul(shapeRotation, shapePosition);
-                            particlePosition  = shapePosition + module.position;
+                            shapePosition   += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);  // Randomize Position
+                            shapeRotation    = quaternion.EulerXYZ(module.rotationEulerRadians);
+                            shapePosition    = math.mul(shapeRotation, shapePosition);
+                            particlePosition = shapePosition + module.position;
 
                             break;
                         }
@@ -641,7 +642,7 @@ namespace Latios.Mimic.Shuriken.Internal
                             {
                                 var particleAgePercent           = particleAgePercents[i - 1];
                                 var particleInverseStartLifetime = particleInverseStartLifetimes[i - 1];
-                                timeFactor                       = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
+                                timeFactor = particleAgePercent.fraction * particleInverseStartLifetime.inverseExpectedLifetime;
                             }
 
                             // Calculate the arc position based on the Cone settings
@@ -661,17 +662,17 @@ namespace Latios.Mimic.Shuriken.Internal
                             // Apply Radius Thickness
                             if (module.radiusThickness < 1f)
                             {
-                                float minDistance  = radiusAtHeight * module.radiusThickness;
+                                float minDistance = radiusAtHeight * module.radiusThickness;
                                 distanceFromCenter = math.lerp(minDistance, radiusAtHeight, distanceFromCenter);
                             }
 
                             shapePosition = new float3(distanceFromCenter * math.cos(angle), distanceFromCenter * math.sin(angle), height - module.length / 2);
 
                             // Apply Randomize Position
-                            shapePosition    += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
-                            shapeRotation     = quaternion.Euler(module.rotationEulerRadians);
-                            shapePosition     = math.mul(shapeRotation, shapePosition);
-                            particlePosition  = shapePosition + module.position;
+                            shapePosition   += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
+                            shapeRotation    = quaternion.Euler(module.rotationEulerRadians);
+                            shapePosition    = math.mul(shapeRotation, shapePosition);
+                            particlePosition = shapePosition + module.position;
 
                             break;
                         }
@@ -686,12 +687,12 @@ namespace Latios.Mimic.Shuriken.Internal
                         case ParticleSystemShapeType.SingleSidedEdge:
                         {
                             float linePosition = shapeModuleSequence.NextFloat(-module.length / 2, module.length / 2);
-                            shapePosition      = new float3(linePosition, 0, 0);  // Assuming edge along x-axis
+                            shapePosition = new float3(linePosition, 0, 0);  // Assuming edge along x-axis
                             // Apply Randomize Position
-                            shapePosition    += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
-                            shapeRotation     = quaternion.Euler(module.rotationEulerRadians);
-                            shapePosition     = math.mul(shapeRotation, shapePosition);
-                            particlePosition  = shapePosition + module.position;
+                            shapePosition   += shapeModuleSequence.NextFloat3(-module.randomPositionAmount, module.randomPositionAmount);
+                            shapeRotation    = quaternion.Euler(module.rotationEulerRadians);
+                            shapePosition    = math.mul(shapeRotation, shapePosition);
+                            particlePosition = shapePosition + module.position;
 
                             break;
                         }
@@ -703,16 +704,16 @@ namespace Latios.Mimic.Shuriken.Internal
 
                     // Set rotation
                     quaternion particleRotation = quaternion.identity;
-                    particleRotation            = ApplySphericalAndRandomRotations(ref shapeModuleSequence, module, shapeRotation, shapePosition);
+                    particleRotation = ApplySphericalAndRandomRotations(ref shapeModuleSequence, module, shapeRotation, shapePosition);
                     if (hasRotation3d)
                     {
-                        var particleRotation3d      = particleRotations3d[i];
+                        var particleRotation3d = particleRotations3d[i];
                         particleRotation3d.rotation = particleRotation;
                         particleRotations3d[i]      = particleRotation3d;
                     }
                     else
                     {
-                        var particleRotation2d         = particleRotations[i];
+                        var particleRotation2d = particleRotations[i];
                         particleRotation2d.rotationCCW = GetEulerX(particleRotation);
                         particleRotations[i]           = particleRotation2d;
                     }
@@ -720,7 +721,7 @@ namespace Latios.Mimic.Shuriken.Internal
                     if (hasVelocity)
                     {
                         // Reapply new rotation to velocity
-                        var particleVelocity      = particleVelocities[i];
+                        var particleVelocity = particleVelocities[i];
                         particleVelocity.velocity = math.mul(particleRotation, math.forward() * math.length(particleVelocity.velocity));
                         particleVelocities[i]     = particleVelocity;
                     }
@@ -735,12 +736,12 @@ namespace Latios.Mimic.Shuriken.Internal
         internal static float3 GetPositionOnBox(ref Rng.RngSequence shapeModuleSequence, float3 scale, bool isShell, float3 shellThickness = default)
         {
             float3 position = float3.zero;
-            int    component;
+            int component;
 
             if (isShell)
             {
                 // Randomly select one of the six faces of the box for BoxShell
-                int face  = shapeModuleSequence.NextInt(1, 7);
+                int face = shapeModuleSequence.NextInt(1, 7);
                 component = (face - 1) % 3;  // Determines which component (x, y, or z) is constant
 
                 position[component] = (face <= 3 ? 1 : -1) * scale[component] / 2;
@@ -755,7 +756,7 @@ namespace Latios.Mimic.Shuriken.Internal
             else
             {
                 // BoxEdge logic
-                int edge  = shapeModuleSequence.NextInt(1, 13);
+                int edge = shapeModuleSequence.NextInt(1, 13);
                 component = (edge - 1) / 4;  // Determines the axis along which the edge lies
 
                 // Position along the selected edge
@@ -780,11 +781,11 @@ namespace Latios.Mimic.Shuriken.Internal
 
                 // Apply Spherize Direction
                 var spherizedRotation = quaternion.LookRotation(math.normalize(shapePositionBeforeRotation), math.up());
-                baseRotation          = math.slerp(baseRotation, spherizedRotation, clampedSpherizeWeight / totalWeight);
+                baseRotation = math.slerp(baseRotation, spherizedRotation, clampedSpherizeWeight / totalWeight);
 
                 // Apply Randomize Direction
                 var randomizedRotation = quaternion.LookRotation(math.normalize(sequence.NextFloat3(new float3(-1f, -1f, -1f), new float3(1f, 1f, 1f))), math.up());
-                baseRotation           = math.slerp(baseRotation, randomizedRotation, clampedRandomizeWeight / totalWeight);
+                baseRotation = math.slerp(baseRotation, randomizedRotation, clampedRandomizeWeight / totalWeight);
 
                 return baseRotation;
             }
@@ -806,12 +807,12 @@ namespace Latios.Mimic.Shuriken.Internal
                     break;
                 case ParticleSystemShapeMultiModeValue.PingPong:
                     float modulus = (timeFactor * arcSpeed) % (arc * 2);
-                    arcPosition   = arc - math.abs(modulus - arc);
+                    arcPosition = arc - math.abs(modulus - arc);
                     break;
                 case ParticleSystemShapeMultiModeValue.BurstSpread:
                     float segments       = math.ceil(1f / arcSpread);
                     float currentSegment = math.floor(timeFactor * segments) % segments;
-                    arcPosition          = (currentSegment / segments) * arc;
+                    arcPosition = (currentSegment / segments) * arc;
                     break;
             }
 
@@ -846,22 +847,22 @@ namespace Latios.Mimic.Shuriken.Internal
             {
                 var rng = new Rng(particleSeeds[i].stableSeed);
 
-                var    velocity         = particleVelocities[i];
-                var    additiveVelocity = float3.zero;
+                var velocity         = particleVelocities[i];
+                var additiveVelocity = float3.zero;
                 float3 particlePosition = particleCenters[i].center;
 
                 // Apply linear velocities
-                var velocitySequence  = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.velocitySeed);
-                additiveVelocity.x   += module.x.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.xMultiplier;
-                additiveVelocity.y   += module.y.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.yMultiplier;
-                additiveVelocity.z   += module.z.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.zMultiplier;
+                var velocitySequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.velocitySeed);
+                additiveVelocity.x += module.x.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.xMultiplier;
+                additiveVelocity.y += module.y.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.yMultiplier;
+                additiveVelocity.z += module.z.Evaluate(ref clip, velocitySequence, particleSystemData.time) * module.zMultiplier;
 
                 // Orbital velocities
-                var    orbitalSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.orbitalSeed);
+                var orbitalSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.orbitalSeed);
                 float3 orbitalVelocity = float3.zero;
-                orbitalVelocity.x      = module.orbitalX.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalXMultiplier;
-                orbitalVelocity.y      = module.orbitalY.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalYMultiplier;
-                orbitalVelocity.z      = module.orbitalZ.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalZMultiplier;
+                orbitalVelocity.x = module.orbitalX.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalXMultiplier;
+                orbitalVelocity.y = module.orbitalY.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalYMultiplier;
+                orbitalVelocity.z = module.orbitalZ.Evaluate(ref clip, orbitalSequence, particleSystemData.time) * module.orbitalZMultiplier;
 
                 // Apply rotations
                 quaternion rotationX = quaternion.AxisAngle(new float3(1, 0, 0), orbitalVelocity.x);
@@ -872,11 +873,11 @@ namespace Latios.Mimic.Shuriken.Internal
                 quaternion combinedRotation = math.mul(math.mul(rotationX, rotationY), rotationZ);
 
                 // Orbital offsets
-                var    orbitalOffsetSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.orbitalOffsetSeed);
+                var orbitalOffsetSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.orbitalOffsetSeed);
                 float3 orbitalOffset         = float3.zero;
-                orbitalOffset.x              = module.orbitalOffsetX.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetXMultiplier;
-                orbitalOffset.y              = module.orbitalOffsetY.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetYMultiplier;
-                orbitalOffset.z              = module.orbitalOffsetZ.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetZMultiplier;
+                orbitalOffset.x = module.orbitalOffsetX.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetXMultiplier;
+                orbitalOffset.y = module.orbitalOffsetY.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetYMultiplier;
+                orbitalOffset.z = module.orbitalOffsetZ.Evaluate(ref clip, orbitalOffsetSequence, particleSystemData.time) * module.orbitalOffsetZMultiplier;
 
                 float3 orbitPosition = math.mul(combinedRotation, particlePosition + orbitalOffset);
                 float3 deltaPosition = orbitPosition - particleCenters[i].center;
@@ -887,7 +888,7 @@ namespace Latios.Mimic.Shuriken.Internal
                 // Radial velocity
                 if (module.radialMultiplier != 0)
                 {
-                    var   radialSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.radialSeed);
+                    var radialSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.radialSeed);
                     float radialValue    = module.radial.Evaluate(ref clip, radialSequence, particleSystemData.time);
 
                     float3 radialDirection = math.normalize(particlePosition);
@@ -897,9 +898,9 @@ namespace Latios.Mimic.Shuriken.Internal
                 }
 
                 // Speed Modifier
-                var speedSequence  = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.speedModifierSeed);
-                var speedModifier  = module.speedModifier.Evaluate(ref clip, speedSequence, particleSystemData.time) * module.speedModifierMultiplier;
-                additiveVelocity  *= speedModifier;
+                var speedSequence = rng.GetSequence(ShurikenVelocityOverLifetimeModule.moduleSeed + ShurikenVelocityOverLifetimeModule.speedModifierSeed);
+                var speedModifier = module.speedModifier.Evaluate(ref clip, speedSequence, particleSystemData.time) * module.speedModifierMultiplier;
+                additiveVelocity *= speedModifier;
 
                 if (module.space == ParticleSystemSimulationSpace.World)
                 {
@@ -908,8 +909,8 @@ namespace Latios.Mimic.Shuriken.Internal
                 }
 
                 // Apply the updated velocity back to the DynamicBuffer
-                velocity.velocity     += additiveVelocity;
-                particleVelocities[i]  = velocity;
+                velocity.velocity    += additiveVelocity;
+                particleVelocities[i] = velocity;
             }
         }
 
@@ -930,9 +931,9 @@ namespace Latios.Mimic.Shuriken.Internal
             {
                 var rng = new Rng(particleSeeds[i].stableSeed);
 
-                var    velocity   = particleVelocities[i].velocity;
-                var    scale      = particleScales[i].scale;
-                float  limitValue = 0;
+                var velocity   = particleVelocities[i].velocity;
+                var scale      = particleScales[i].scale;
+                float limitValue = 0;
                 float3 dragValue;
 
                 // Limit velocity
@@ -980,8 +981,8 @@ namespace Latios.Mimic.Shuriken.Internal
                 }
 
                 // Apply dampen (scaled with age percent)
-                float dampenFactor  = 1 - module.dampen * particleAgePercents[i].fraction;
-                velocity           *= dampenFactor;
+                float dampenFactor = 1 - module.dampen * particleAgePercents[i].fraction;
+                velocity *= dampenFactor;
 
                 // Apply drag
                 if (module.dragMultiplier != 0)
@@ -1093,7 +1094,7 @@ namespace Latios.Mimic.Shuriken.Internal
             {
                 var rng = new Rng(particleSeeds[i].stableSeed);
 
-                var   velocity   = particleVelocities[i].velocity;
+                var velocity   = particleVelocities[i].velocity;
                 float agePercent = particleAges[i].fraction;
 
                 // Evaluate the force for each axis
@@ -1138,7 +1139,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleColors.Length; i++)
             {
-                var   rng        = new Rng(particleSeeds[i].stableSeed);
+                var rng        = new Rng(particleSeeds[i].stableSeed);
                 float agePercent = particleAges[i].fraction;
 
                 // Evaluate the color for each channel
@@ -1181,7 +1182,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleColors.Length; i++)
             {
-                var   velocity      = particleVelocities[i].velocity;
+                var velocity      = particleVelocities[i].velocity;
                 float particleSpeed = math.length(velocity);
                 if (particleSpeed < module.range.x || particleSpeed > module.range.y)
                 {
@@ -1232,8 +1233,8 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleSeeds.Length; i++)
             {
-                var    rng             = new Rng(particleSeeds[i].stableSeed);
-                float  agePercent      = particleAges[i].fraction;
+                var rng             = new Rng(particleSeeds[i].stableSeed);
+                float agePercent      = particleAges[i].fraction;
                 float3 scaleMultiplier = new float3();
 
                 if (module.separateAxes)
@@ -1275,7 +1276,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleSeeds.Length; i++)
             {
-                var   rng           = new Rng(particleSeeds[i].stableSeed);
+                var rng           = new Rng(particleSeeds[i].stableSeed);
                 float particleSpeed = math.length(particleVelocities[i].velocity);
 
                 if (particleSpeed < module.range.x && particleSpeed > module.range.y)
@@ -1283,7 +1284,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
                 // Normalize the speed within the specified range
                 float normalizedSpeed = (particleSpeed - module.range.x) / (module.range.y - module.range.x);
-                normalizedSpeed       = math.clamp(normalizedSpeed, 0, 1);  // Ensure it's within 0-1 range
+                normalizedSpeed = math.clamp(normalizedSpeed, 0, 1);  // Ensure it's within 0-1 range
 
                 float scaleMultiplier;
                 if (module.separateAxes)
@@ -1320,7 +1321,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleSeeds.Length; i++)
             {
-                var   rng        = new Rng(particleSeeds[i].stableSeed);
+                var rng        = new Rng(particleSeeds[i].stableSeed);
                 float agePercent = particleAges[i].fraction / (float)ushort.MaxValue;
 
                 quaternion additionalRotation = quaternion.identity;
@@ -1371,7 +1372,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
             for (int i = 0; i < particleSeeds.Length; i++)
             {
-                var   rng           = new Rng(particleSeeds[i].stableSeed);
+                var rng           = new Rng(particleSeeds[i].stableSeed);
                 float particleSpeed = math.length(particleVelocities[i].velocity);
 
                 // Check if the particle's speed is within the specified range
@@ -1400,7 +1401,7 @@ namespace Latios.Mimic.Shuriken.Internal
                         normalizedSpeed) * module.zMultiplier;
 
                     quaternion additionalRotation = quaternion.EulerXYZ(rotationX, rotationY, rotationZ);
-                    particleRotations3d[i]        = new ParticleRotation3d { rotation = math.mul(particleRotations3d[i].rotation, additionalRotation) };
+                    particleRotations3d[i] = new ParticleRotation3d { rotation = math.mul(particleRotations3d[i].rotation, additionalRotation) };
                 }
                 else
                 {
@@ -1509,14 +1510,14 @@ namespace Latios.Mimic.Shuriken.Internal
                         quaternion combinedRotation = math.mul(math.mul(rotationX, rotationY), rotationZ);
 
                         // Apply the combined rotation to the particle's current rotation
-                        var particleRotation      = particleRotations3d[i];
+                        var particleRotation = particleRotations3d[i];
                         particleRotation.rotation = math.mul(particleRotation.rotation, combinedRotation);
                         particleRotations3d[i]    = particleRotation;
                     }
                     else
                     {
                         // Apply angular change to the particle's current rotation
-                        var particleRotation          = particleRotations[i];
+                        var particleRotation = particleRotations[i];
                         particleRotation.rotationCCW += math.radians(noiseValue.x) * rotationAmount;
                         particleRotations[i]          = particleRotation;
                     }
@@ -1528,13 +1529,13 @@ namespace Latios.Mimic.Shuriken.Internal
                 {
                     if (hasScale3d)
                     {
-                        var particleScale    = particleScales3d[i];
+                        var particleScale = particleScales3d[i];
                         particleScale.scale += noiseValue * sizeAmount;
                         particleScales3d[i]  = particleScale;
                     }
                     else
                     {
-                        var particleScale    = particleScales[i];
+                        var particleScale = particleScales[i];
                         particleScale.scale += noiseValue.x * sizeAmount;
                         particleScales[i]    = particleScale;
                     }
@@ -1545,9 +1546,9 @@ namespace Latios.Mimic.Shuriken.Internal
         internal static float3 GenerateNoiseValue(ref ParameterClip clip, ShurikenNoiseModule module, Rng particleRng, float timeFactor, float scrollSpeed)
         {
             float3 totalNoise   = float3.zero;
-            float  amplitude    = 1;
-            float  frequency    = module.frequency;
-            float  maxAmplitude = 0;  // Used for normalizing the result
+            float amplitude    = 1;
+            float frequency    = module.frequency;
+            float maxAmplitude = 0;  // Used for normalizing the result
 
             var xSequence = particleRng.GetSequence(ShurikenNoiseModule.moduleSeed + ShurikenNoiseModule.noiseXSeed);
             var ySequence = particleRng.GetSequence(ShurikenNoiseModule.moduleSeed + ShurikenNoiseModule.noiseYSeed);
@@ -1626,7 +1627,7 @@ namespace Latios.Mimic.Shuriken.Internal
 
         internal static float GetEulerX(quaternion quaternion)
         {
-            var    q        = quaternion.value;
+            var q        = quaternion.value;
             double sinrCosp = +2.0 * (q.w * q.x + q.y * q.z);
             double cosrCosp = +1.0 - 2.0 * (q.x * q.x + q.y * q.y);
             return (float)math.atan2(sinrCosp, cosrCosp);
@@ -1639,4 +1640,5 @@ namespace Latios.Mimic.Shuriken.Internal
         }
     }
 }
+#endif
 

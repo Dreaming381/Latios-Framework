@@ -11,6 +11,14 @@ namespace Unity.Entities.Exposed
         {
             return baker._State.AuthoringSource.GetInstanceID();
         }
+
+        public static UnityEngine.Object GetAuthoringObjectForDebugDiagnostics(this IBaker baker)
+        {
+            if (baker._State.AuthoringSource == null)
+                return baker._State.AuthoringObject;
+            else
+                return baker._State.AuthoringSource;
+        }
     }
 
     public static class BlobAssetStoreExposedExtensions

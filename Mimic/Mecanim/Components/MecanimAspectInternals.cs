@@ -2,7 +2,7 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace Latios.Mimic.Mecanim
+namespace Latios.Mimic.Addons.Mecanim
 {
     /// <summary>
     /// Aspect that exposes Unity animator functionality

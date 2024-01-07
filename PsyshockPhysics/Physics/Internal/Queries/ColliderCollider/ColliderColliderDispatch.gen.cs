@@ -20,61 +20,37 @@ namespace Latios.Psyshock
                 case (ColliderType.Sphere, ColliderType.Capsule):
                 {
                     var r = SphereCapsule.DistanceBetween(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Sphere, ColliderType.Box):
                 {
                     var r = SphereBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Sphere, ColliderType.Triangle):
                 {
                     var r = SphereTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Sphere, ColliderType.Convex):
                 {
                     var r = SphereConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Sphere, ColliderType.TriMesh):
                 {
                     var r = SphereTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Sphere, ColliderType.Compound):
                 {
                     var r = SphereCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Capsule, ColliderType.Sphere):
@@ -84,51 +60,31 @@ namespace Latios.Psyshock
                 case (ColliderType.Capsule, ColliderType.Box):
                 {
                     var r = CapsuleBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Capsule, ColliderType.Triangle):
                 {
                     var r = CapsuleTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Capsule, ColliderType.Convex):
                 {
                     var r = CapsuleConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Capsule, ColliderType.TriMesh):
                 {
                     var r = CapsuleTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Capsule, ColliderType.Compound):
                 {
                     var r = CapsuleCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Box, ColliderType.Sphere):
@@ -140,41 +96,25 @@ namespace Latios.Psyshock
                 case (ColliderType.Box, ColliderType.Triangle):
                 {
                     var r = BoxTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Box, ColliderType.Convex):
                 {
                     var r = BoxConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Box, ColliderType.TriMesh):
                 {
                     var r = BoxTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Box, ColliderType.Compound):
                 {
                     var r = BoxCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Triangle, ColliderType.Sphere):
@@ -188,31 +128,19 @@ namespace Latios.Psyshock
                 case (ColliderType.Triangle, ColliderType.Convex):
                 {
                     var r = TriangleConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Triangle, ColliderType.TriMesh):
                 {
                     var r = TriangleTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Triangle, ColliderType.Compound):
                 {
                     var r = TriangleCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Convex, ColliderType.Sphere):
@@ -228,21 +156,13 @@ namespace Latios.Psyshock
                 case (ColliderType.Convex, ColliderType.TriMesh):
                 {
                     var r = ConvexTriMesh.DistanceBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_convex, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Convex, ColliderType.Compound):
                 {
                     var r = ConvexCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_convex, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.TriMesh, ColliderType.Sphere):
@@ -260,11 +180,7 @@ namespace Latios.Psyshock
                 case (ColliderType.TriMesh, ColliderType.Compound):
                 {
                     var r = TriMeshCompound.DistanceBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triMesh, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     return r;
                 }
                 case (ColliderType.Compound, ColliderType.Sphere):
@@ -293,12 +209,7 @@ namespace Latios.Psyshock
 
             public void Execute(in ColliderDistanceResult result)
             {
-                var result2                                            = result;
-                (result2.hitpointA, result2.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                (result2.normalA, result2.normalB)                     = (result.normalB, result.normalA);
-                (result2.subColliderIndexA, result2.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                (result2.featureCodeA, result2.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
-                processor->Execute(in result2);
+                processor->Execute(result.ToFlipped());
             }
         }
 
@@ -323,44 +234,28 @@ namespace Latios.Psyshock
                 case (ColliderType.Sphere, ColliderType.Capsule):
                 {
                     SphereCapsule.DistanceBetween(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Sphere, ColliderType.Box):
                 {
                     SphereBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Sphere, ColliderType.Triangle):
                 {
                     SphereTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Sphere, ColliderType.Convex):
                 {
                     SphereConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
@@ -385,33 +280,21 @@ namespace Latios.Psyshock
                 case (ColliderType.Capsule, ColliderType.Box):
                 {
                     CapsuleBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Capsule, ColliderType.Triangle):
                 {
                     CapsuleTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Capsule, ColliderType.Convex):
                 {
                     CapsuleConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
@@ -442,22 +325,14 @@ namespace Latios.Psyshock
                 case (ColliderType.Box, ColliderType.Triangle):
                 {
                     BoxTriangle.DistanceBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
                 case (ColliderType.Box, ColliderType.Convex):
                 {
                     BoxConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
@@ -494,11 +369,7 @@ namespace Latios.Psyshock
                 case (ColliderType.Triangle, ColliderType.Convex):
                 {
                     TriangleConvex.DistanceBetween(in colliderB.m_convex, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-                    (result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+                    result.FlipInPlace();
                     processor.Execute(in result);
                     break;
                 }
@@ -699,6 +570,201 @@ namespace Latios.Psyshock
                 default:
                     result = default;
                     return false;
+            }
+        }
+
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in Collider colliderA,
+                                                                          in RigidTransform aTransform,
+                                                                          in Collider colliderB,
+                                                                          in RigidTransform bTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            switch ((colliderA.type, colliderB.type))
+            {
+                case (ColliderType.Sphere, ColliderType.Sphere):
+                    return SphereSphere.UnityContactsBetween(in colliderA.m_sphere, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Sphere, ColliderType.Capsule):
+                {
+                    var result = SphereCapsule.UnityContactsBetween(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Sphere, ColliderType.Box):
+                {
+                    var result = SphereBox.UnityContactsBetween(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Sphere, ColliderType.Triangle):
+                {
+                    var result = SphereTriangle.UnityContactsBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Sphere, ColliderType.Convex):
+                {
+                    var result = SphereConvex.UnityContactsBetween(in colliderB.m_convex, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Sphere, ColliderType.TriMesh):
+                {
+                    var result = SphereTriMesh.UnityContactsBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Sphere, ColliderType.Compound):
+                {
+                    var result = SphereCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_sphere, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Capsule, ColliderType.Sphere):
+                    return SphereCapsule.UnityContactsBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Capsule, ColliderType.Capsule):
+                    return CapsuleCapsule.UnityContactsBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Capsule, ColliderType.Box):
+                {
+                    var result = CapsuleBox.UnityContactsBetween(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Capsule, ColliderType.Triangle):
+                {
+                    var result = CapsuleTriangle.UnityContactsBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_capsule, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Capsule, ColliderType.Convex):
+                {
+                    var result = CapsuleConvex.UnityContactsBetween(in colliderB.m_convex, in bTransform, in colliderA.m_capsule, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Capsule, ColliderType.TriMesh):
+                {
+                    var result = CapsuleTriMesh.UnityContactsBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_capsule, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Capsule, ColliderType.Compound):
+                {
+                    var result = CapsuleCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_capsule, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Box, ColliderType.Sphere):
+                    return SphereBox.UnityContactsBetween(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Box, ColliderType.Capsule):
+                    return CapsuleBox.UnityContactsBetween(in colliderA.m_box, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Box, ColliderType.Box):
+                    return BoxBox.UnityContactsBetween(in colliderA.m_box, in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.Box, ColliderType.Triangle):
+                {
+                    var result = BoxTriangle.UnityContactsBetween(in colliderB.m_triangle, in bTransform, in colliderA.m_box, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Box, ColliderType.Convex):
+                {
+                    var result = BoxConvex.UnityContactsBetween(in colliderB.m_convex, in bTransform, in colliderA.m_box, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Box, ColliderType.TriMesh):
+                {
+                    var result = BoxTriMesh.UnityContactsBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_box, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Box, ColliderType.Compound):
+                {
+                    var result = BoxCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_box, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Triangle, ColliderType.Sphere):
+                    return SphereTriangle.UnityContactsBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Triangle, ColliderType.Capsule):
+                    return CapsuleTriangle.UnityContactsBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Triangle, ColliderType.Box):
+                    return BoxTriangle.UnityContactsBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.Triangle, ColliderType.Triangle):
+                    return TriangleTriangle.UnityContactsBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_triangle, in bTransform, in distanceResult);
+                case (ColliderType.Triangle, ColliderType.Convex):
+                {
+                    var result = TriangleConvex.UnityContactsBetween(in colliderB.m_convex, in bTransform, in colliderA.m_triangle, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Triangle, ColliderType.TriMesh):
+                {
+                    var result = TriangleTriMesh.UnityContactsBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_triangle, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Triangle, ColliderType.Compound):
+                {
+                    var result = TriangleCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triangle, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Convex, ColliderType.Sphere):
+                    return SphereConvex.UnityContactsBetween(in colliderA.m_convex, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Convex, ColliderType.Capsule):
+                    return CapsuleConvex.UnityContactsBetween(in colliderA.m_convex, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Convex, ColliderType.Box):
+                    return BoxConvex.UnityContactsBetween(in colliderA.m_convex, in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.Convex, ColliderType.Triangle):
+                    return TriangleConvex.UnityContactsBetween(in colliderA.m_convex, in aTransform, in colliderB.m_triangle, in bTransform, in distanceResult);
+                case (ColliderType.Convex, ColliderType.Convex):
+                    return ConvexConvex.UnityContactsBetween(in colliderA.m_convex, in aTransform, in colliderB.m_convex, in bTransform, in distanceResult);
+                case (ColliderType.Convex, ColliderType.TriMesh):
+                {
+                    var result = ConvexTriMesh.UnityContactsBetween(in colliderB.m_triMesh, in bTransform, in colliderA.m_convex, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Convex, ColliderType.Compound):
+                {
+                    var result = ConvexCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_convex, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.TriMesh, ColliderType.Sphere):
+                    return SphereTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.Capsule):
+                    return CapsuleTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.Box):
+                    return BoxTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.Triangle):
+                    return TriangleTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_triangle, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.Convex):
+                    return ConvexTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_convex, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.TriMesh):
+                    return TriMeshTriMesh.UnityContactsBetween(in colliderA.m_triMesh, in aTransform, in colliderB.m_triMesh, in bTransform, in distanceResult);
+                case (ColliderType.TriMesh, ColliderType.Compound):
+                {
+                    var result = TriMeshCompound.UnityContactsBetween(in colliderB.m_compound, in bTransform, in colliderA.m_triMesh, in aTransform, in distanceResult);
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Compound, ColliderType.Sphere):
+                    return SphereCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Capsule):
+                    return CapsuleCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Box):
+                    return BoxCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Triangle):
+                    return TriangleCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_triangle, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Convex):
+                    return ConvexCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_convex, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.TriMesh):
+                    return TriMeshCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_triMesh, in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Compound):
+                    return CompoundCompound.UnityContactsBetween(in colliderA.m_compound, in aTransform, in colliderB.m_compound, in bTransform, in distanceResult);
+                default:
+                    return default;
             }
         }
     }

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Latios.Kinemation.Authoring;
 using Unity.Burst;
 using Unity.Collections;
@@ -16,15 +15,28 @@ namespace Latios.Calligraphics.Rendering.Authoring
         public const string kTextBackendMeshPath     = "Packages/com.latios.latiosframework/Kinemation/Resources/LatiosTextBackendMesh.mesh";
         public const string kTextBackendMeshResource = "LatiosTextBackendMesh";
 
-        static List<Material> s_materialCache = new List<Material>(1);
-
         public static void BakeTextBackendMeshAndMaterial(this IBaker baker, Renderer renderer, Material material)
         {
             var mesh = Resources.Load<Mesh>(kTextBackendMeshResource);
 
-            s_materialCache.Clear();
-            s_materialCache.Add(material);
-            baker.BakeMeshAndMaterial(renderer, mesh, s_materialCache);
+            RenderingBakingTools.GetLOD(baker, renderer, out var lodGroupEntity, out var lodMask);
+
+            var rendererSettings = new MeshRendererBakeSettings
+            {
+                targetEntity                = baker.GetEntity(TransformUsageFlags.Renderable),
+                renderMeshDescription       = new RenderMeshDescription(renderer),
+                isDeforming                 = true,
+                suppressDeformationWarnings = false,
+                useLightmapsIfPossible      = true,
+                lightmapIndex               = renderer.lightmapIndex,
+                lightmapScaleOffset         = renderer.lightmapScaleOffset,
+                lodGroupEntity              = lodGroupEntity,
+                lodGroupMask                = lodMask,
+                isStatic                    = baker.IsStatic(),
+                localBounds                 = default,
+            };
+
+            baker.BakeMeshAndMaterial(rendererSettings, mesh, material);
 
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
 
@@ -33,19 +45,15 @@ namespace Latios.Calligraphics.Rendering.Authoring
             baker.AddComponent<TextShaderIndex>(entity);
         }
 
-        public static void BakeTextBackendMeshAndMaterial(this IBaker baker, Entity renderableEntity, RenderMeshDescription renderDescription, Material material)
+        public static void BakeTextBackendMeshAndMaterial(this IBaker baker, MeshRendererBakeSettings rendererSettings, Material material)
         {
             var mesh = Resources.Load<Mesh>(kTextBackendMeshResource);
 
-            s_materialCache.Clear();
-            s_materialCache.Add(material);
-            baker.BakeMeshAndMaterial(renderableEntity, renderDescription, mesh, s_materialCache);
+            baker.BakeMeshAndMaterial(rendererSettings, mesh, material);
 
-            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
-
-            baker.AddComponent( entity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
-            baker.AddBuffer<RenderGlyph>(entity);
-            baker.AddComponent<TextShaderIndex>(entity);
+            baker.AddComponent(rendererSettings.targetEntity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
+            baker.AddBuffer<RenderGlyph>(rendererSettings.targetEntity);
+            baker.AddComponent<TextShaderIndex>(rendererSettings.targetEntity);
         }
 
         #region Mesh Building

@@ -11,7 +11,7 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
     {
         Latios.Transforms.Authoring.TransformsBakingBootstrap.InstallLatiosTransformsBakers(ref context);
         Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
-        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemationBakersAndSystems(ref context);
+        Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
     }
 }
 

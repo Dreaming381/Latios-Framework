@@ -63,11 +63,7 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 #>
 				{
 					var r = <#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result);
-					
-					(result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-					(result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+					result.FlipInPlace();
 					return r;
 				}
 <#
@@ -95,12 +91,7 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 			
 			public void Execute(in ColliderDistanceResult result)
 			{
-				var result2 = result;
-				(result2.hitpointA, result2.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                (result2.normalA, result2.normalB)                     = (result.normalB, result.normalA);
-                (result2.subColliderIndexA, result2.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-				(result2.featureCodeA, result2.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
-				processor->Execute(in result2);
+				processor->Execute(result.ToFlipped());
 			}
 		}
 		
@@ -133,11 +124,7 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 #>
 				{
 					<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result);
-					
-					(result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
-					(result.featureCodeA, result.featureCodeB)           = (result.featureCodeB, result.featureCodeA);
+					result.FlipInPlace();
 					processor.Execute(in result);
 					break;
 				}
@@ -216,6 +203,52 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 				default:
 					result = default;
 					return false;
+			}
+		}
+
+		public static UnitySim.ContactsBetweenResult UnityContactsBetween(in Collider colliderA,
+                                                                          in RigidTransform aTransform,
+                                                                          in Collider colliderB,
+                                                                          in RigidTransform bTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+		{
+			switch ((colliderA.type, colliderB.type))
+			{
+<#
+i = 0;
+foreach (var colliderTypeNameA in colliderTypeNames)
+{
+	var colliderNameA = colliderLowerNames[colliderTypeNameA];
+	int j = 0;
+	foreach (var colliderTypeNameB in colliderTypeNames)
+	{
+		var colliderNameB = colliderLowerNames[colliderTypeNameB];
+#>
+				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+<#
+		if (i < j)
+		{
+#>
+				{
+					var result = <#= colliderTypeNameA #><#= colliderTypeNameB #>.UnityContactsBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, in distanceResult);
+					result.FlipInPlace();
+					return result;
+				}
+<#
+		}
+		else
+		{
+#>
+					return <#= colliderTypeNameB #><#= colliderTypeNameA #>.UnityContactsBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, in distanceResult);
+<#
+		}
+		j++;			
+	}
+	i++;
+}
+#>
+				default:
+					return default;
 			}
 		}
 	}

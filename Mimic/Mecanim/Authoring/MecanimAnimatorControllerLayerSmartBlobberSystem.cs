@@ -14,7 +14,7 @@ using UnityEngine;
 // Todo: This blob builder is very heavy on allocations with the use of Linq.
 // It may be worth optimizing at some point.
 
-namespace Latios.Mimic.Mecanim.Authoring
+namespace Latios.Mimic.Addons.Mecanim.Authoring
 {
     public static class MecanimBlobberAPIExtensions
     {
@@ -60,7 +60,7 @@ namespace Latios.Mimic.Mecanim.Authoring
     }
 }
 
-namespace Latios.Mimic.Mecanim.Authoring.Systems
+namespace Latios.Mimic.Addons.Mecanim.Authoring.Systems
 {
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
@@ -188,7 +188,7 @@ namespace Latios.Mimic.Mecanim.Authoring.Systems
                                         AnimatorControllerParameter[] parameters,
                                         AnimationClip[]               clips)
         {
-            blobAnimatorState.name = new FixedString64Bytes("ChildMotion");
+            blobAnimatorState.name = new FixedString64Bytes(motion.name);
 
             blobAnimatorState.averageDuration     = motion.averageDuration;
             blobAnimatorState.averageSpeed        = motion.averageSpeed;

@@ -27,7 +27,7 @@ namespace Latios.Kinemation.Authoring
         /// The list of parameter names which should be baked into the clip set. The length of this array
         /// should either match the number of parameters in each and every clip or be left defaulted (unallocated).
         /// </summary>
-        public NativeArray<FixedString64Bytes> parameterNames;
+        public NativeArray<FixedString128Bytes> parameterNames;
     }
 
     /// <summary>
@@ -69,11 +69,11 @@ namespace Latios.Kinemation.Authoring
         public float sampleRate;
         /// <summary>
         /// Higher levels lead to longer compression time but more compressed clips.
-        /// Values range from 0 to 4. Typical default is 2.
+        /// Values range from 0 to 4 or 100 for automatic mode.
         /// </summary>
         public short compressionLevel;
 
-        public static readonly short defaultCompressionLevel = 2;
+        public static readonly short defaultCompressionLevel = 100;
         public static readonly float defaultMaxError         = 0.00001f;
 
         /// <summary>
@@ -231,7 +231,7 @@ namespace Latios.Kinemation.Authoring
             events.EnsureCapacity(totalEventCount);
             if (config.parameterNames.IsCreated)
             {
-                var parameterNames = baker.AddBuffer<ParameterName>(blobBakingEntity).Reinterpret<FixedString64Bytes>();
+                var parameterNames = baker.AddBuffer<ParameterName>(blobBakingEntity).Reinterpret<FixedString128Bytes>();
                 parameterNames.AddRange(config.parameterNames);
             }
 
@@ -281,7 +281,7 @@ namespace Latios.Kinemation.Authoring
     [TemporaryBakingType]
     internal struct ParameterName : IBufferElementData
     {
-        public FixedString64Bytes name;
+        public FixedString128Bytes name;
     }
 }
 
@@ -355,7 +355,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     compressedClip.Dispose();
                 }
 
-                root.parameterCount = dstClips[0].parameterCount;
+                root.parameterCount = (short)parameterCount;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<ParameterClipSetBlob>(Allocator.Persistent));
             }

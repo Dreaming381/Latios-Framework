@@ -1620,7 +1620,7 @@ namespace Latios.Kinemation.Systems
         struct ProcessSkinnedMeshStateOpsJob : IJobParallelForDefer
         {
             [NativeDisableParallelForRestriction] public ComponentLookup<SkeletonDependent> stateLookup;
-            [NativeDisableParallelForRestriction] public ParentReadWriteAspect.Lookup       parentLookup;  // Todo: Does this even work?
+            [NativeDisableParallelForRestriction] public ParentReadWriteAspect.Lookup       parentLookup;
             [ReadOnly] public NativeArray<SkinnedMeshWriteStateOperation>                   ops;
             public Entity                                                                   failedBindingEntity;
 

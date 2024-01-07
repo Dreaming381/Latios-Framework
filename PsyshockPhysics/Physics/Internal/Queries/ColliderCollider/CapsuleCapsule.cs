@@ -75,10 +75,7 @@ namespace Latios.Psyshock
         {
             // As of Unity Physics 1.0.14, only a single contact is generated for this case,
             // and there is a todo for making it multi-contact.
-            UnitySim.ContactsBetweenResult result = default;
-            result.contactNormal                  = distanceResult.normalB;
-            result.Add(distanceResult.hitpointB, distanceResult.distance);
-            return result;
+            return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
         }
 
         internal static bool CapsuleCapsuleDistance(in CapsuleCollider capsuleA, in CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)

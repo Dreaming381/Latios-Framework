@@ -102,7 +102,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
 
             var builders                 = new NativeArray<MeshDeformDataBuilder>(hashmap.Count(), Allocator.TempJob, NativeArrayOptions.ClearMemory);
-            var blendShapeRequestBuffers = new NativeArray<NativeArray<BlendShapeVertexDisplacement> >(builders.Length, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+            var blendShapeRequestBuffers = new NativeArray<NativeArray<uint> >(builders.Length, Allocator.TempJob, NativeArrayOptions.ClearMemory);
             var blendShapeRequests       =
                 new NativeArray<UnityEngine.Rendering.AsyncGPUReadbackRequest>(builders.Length, Allocator.TempJob, NativeArrayOptions.ClearMemory);
             int index = 0;
@@ -152,9 +152,9 @@ namespace Latios.Kinemation.Authoring.Systems
                         verticesCount = math.max(verticesCount, range.endIndex + 1);
                     }
                     builder.blendShapeBufferSize = verticesCount;
-                    var cpuBuffer                = new NativeArray<BlendShapeVertexDisplacement>(gpuBuffer.count * 10,
-                                                                                                 Allocator.Persistent,
-                                                                                                 NativeArrayOptions.UninitializedMemory);
+                    var cpuBuffer                = new NativeArray<uint>(math.max(gpuBuffer.count, (int)verticesCount * 10),
+                                                                         Allocator.Persistent,
+                                                                         NativeArrayOptions.ClearMemory);
                     blendShapeRequests[index]       = UnityEngine.Rendering.AsyncGPUReadback.RequestIntoNativeArray(ref cpuBuffer, gpuBuffer);
                     blendShapeRequestBuffers[index] = cpuBuffer;
                     m_graphicsBufferCache.Add(gpuBuffer);

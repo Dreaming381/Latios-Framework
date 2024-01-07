@@ -166,6 +166,16 @@ namespace Latios.Psyshock
             return true;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in TriMeshCollider triMesh,
+                                                                          in RigidTransform triMeshTransform,
+                                                                          in TriangleCollider triangle,
+                                                                          in RigidTransform triangleTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            var a = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[distanceResult.subColliderIndexA], 1f, triMesh.scale);
+            return TriangleTriangle.UnityContactsBetween(in a, in triMeshTransform, in triangle, in triangleTransform, in distanceResult);
+        }
+
         struct TriangleDistanceProcessor : TriMeshColliderBlob.IFindTrianglesProcessor
         {
             public BlobAssetReference<TriMeshColliderBlob> blob;

@@ -1,67 +1,232 @@
+using System;
 using System.Collections.Generic;
 using Latios.Transforms;
 using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Mathematics;
 using Unity.Rendering;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
 {
-    class MeshRendererBakingUtility
+    class LatiosMeshRendererBakingUtility
     {
         [BakingType]
-        struct CopyParentRequestTag : IRequestCopyParentTransform { }
+        internal struct CopyParentRequestTag : IRequestCopyParentTransform { }
 
-        struct LODState
-        {
-            public LODGroup LodGroup;
-            public Entity   LodGroupEntity;
-            public int      LodGroupMask;
-        }
-
-        static void CreateLODState(IBaker baker, Renderer authoringSource, out LODState lodState)
-        {
-            // LODGroup
-            lodState                = new LODState();
-            lodState.LodGroup       = baker.GetComponentInParent<LODGroup>();
-            lodState.LodGroupEntity = baker.GetEntity(lodState.LodGroup, TransformUsageFlags.Renderable);
-            lodState.LodGroupMask   = FindInLODs(lodState.LodGroup, authoringSource);
-        }
-
-        private static int FindInLODs(LODGroup lodGroup, Renderer authoring)
-        {
-            if (lodGroup != null)
-            {
-                var lodGroupLODs = lodGroup.GetLODs();
-
-                int lodGroupMask = 0;
-
-                // Find the renderer inside the LODGroup
-                for (int i = 0; i < lodGroupLODs.Length; ++i)
-                {
-                    foreach (var renderer in lodGroupLODs[i].renderers)
-                    {
-                        if (renderer == authoring)
-                        {
-                            lodGroupMask |= (1 << i);
-                        }
-                    }
-                }
-                return lodGroupMask > 0 ? lodGroupMask : -1;
-            }
-            return -1;
-        }
-
-#pragma warning disable CS0162
         [BakingType] struct RequestPreviousTag : IRequestPreviousTransform { }
 
-        private static void AddRendererComponents(Entity entity, IBaker baker, in RenderMeshDescription renderMeshDescription, RenderMesh renderMesh)
+        static List<int> s_validIndexCache = new List<int>();
+
+        internal static void Convert(IBaker baker,
+                                     ReadOnlySpan<MeshRendererBakeSettings>    rendererSettings,
+                                     ReadOnlySpan<MeshMaterialSubmeshSettings> meshMaterialSubmeshes,
+                                     ReadOnlySpan<int>                         meshMaterialSubmeshCountsByRenderer)
+        {
+            if (rendererSettings.IsEmpty && meshMaterialSubmeshes.IsEmpty && meshMaterialSubmeshCountsByRenderer.IsEmpty)
+                return;
+
+            var authoringForLogging = baker.GetAuthoringObjectForDebugDiagnostics();
+            if (rendererSettings.IsEmpty)
+            {
+                Debug.LogWarning($"Renderer is not baked because the provided span of MeshRendererBakeSettings is empty on object {authoringForLogging.name}.",
+                                 authoringForLogging);
+                return;
+            }
+            if (meshMaterialSubmeshes.IsEmpty)
+            {
+                Debug.LogWarning($"Renderer is not baked because the provided span of MeshMaterialSubmeshSettings is empty on object {authoringForLogging.name}.",
+                                 authoringForLogging);
+                return;
+            }
+            if (rendererSettings.Length != meshMaterialSubmeshCountsByRenderer.Length)
+            {
+                Debug.LogWarning(
+                    $"Renderer is not baked because the provided span of MeshRendererBakeSettings is of different length than the meshMaterialSubmeshCountsByRenderer {rendererSettings.Length} vs {meshMaterialSubmeshCountsByRenderer.Length} for object {authoringForLogging.name}.",
+                    authoringForLogging);
+                return;
+            }
+
+            DeformClassification requiredPropertiesForReference = DeformClassification.None;
+            int                  primaryRendererIndex           = -1;
+            for (int rangeStart = 0, rendererIndex = 0; rendererIndex < rendererSettings.Length; rendererIndex++)
+            {
+                var renderer = rendererSettings[rendererIndex];
+
+                if (renderer.targetEntity == Entity.Null)
+                {
+                    Debug.LogError($"MeshRendererBakeSettings at index {rendererIndex} for object {authoringForLogging.name} did not provide a valid target entity.",
+                                   authoringForLogging);
+                    rangeStart += meshMaterialSubmeshCountsByRenderer[rendererIndex];
+                    continue;
+                }
+
+                var countInRenderer = meshMaterialSubmeshCountsByRenderer[rendererIndex];
+                s_validIndexCache.Clear();
+                DeformClassification                             classification = DeformClassification.None;
+                RenderMeshUtility.EntitiesGraphicsComponentFlags flags          = RenderMeshUtility.EntitiesGraphicsComponentFlags.UseRenderMeshArray;
+
+                for (int i = 0; i < countInRenderer; i++)
+                {
+                    var mmsIndex = rangeStart + i;
+                    var mms      = meshMaterialSubmeshes[mmsIndex];
+                    var mesh     = mms.mesh.Value;
+                    if (mesh == null)
+                    {
+                        Debug.LogWarning($"MeshMaterialSubmeshSettings at index {mmsIndex} has a null mesh for object {authoringForLogging.name}", authoringForLogging);
+                        continue;
+                    }
+                    var material = mms.material.Value;
+                    if (material == null)
+                    {
+                        Debug.LogWarning($"MeshMaterialSubmeshSettings at index {mmsIndex} has a null material for object {authoringForLogging.name}", authoringForLogging);
+                        continue;
+                    }
+
+                    baker.DependsOn(mesh);
+                    baker.DependsOn(material);
+
+                    var mmsClassification = GetDeformClassificationFromMaterial(material);
+                    if (renderer.isDeforming && mmsClassification == DeformClassification.None && !renderer.suppressDeformationWarnings)
+                    {
+                        Debug.LogWarning(
+                            $"Material {material.name} used by deforming MeshRendererBakeSettings index {rendererIndex} for object {authoringForLogging.name} uses shader {material.shader.name} which does not support deformations. Please see the Kinemation Getting Started Guide Part 2 to learn how to set up a proper shader graph shader for deformations.",
+                            authoringForLogging);
+                    }
+                    else if (!renderer.isDeforming && mmsClassification != DeformClassification.None && !renderer.suppressDeformationWarnings)
+                    {
+                        Debug.LogWarning(
+                            $"Material {material.name} used by non-deforming MeshRendererBakeSettings index {rendererIndex} for object {authoringForLogging.name} uses shader {material.shader.name} which uses deformations. This may result in incorrect rendering.",
+                            authoringForLogging);
+                    }
+                    classification |= mmsClassification;
+
+                    flags |= RenderMeshUtility.DepthSortedFlags(material);
+
+                    s_validIndexCache.Add(mmsIndex);
+                }
+
+                if (s_validIndexCache.Count > 0)
+                {
+                    // Always disable per-object motion vectors for static objects
+                    if (renderer.isStatic)
+                    {
+                        if (renderer.renderMeshDescription.FilterSettings.MotionMode == MotionVectorGenerationMode.Object)
+                            renderer.renderMeshDescription.FilterSettings.MotionMode = MotionVectorGenerationMode.Camera;
+                    }
+
+                    AddRendererComponents(renderer.targetEntity, baker, in renderer, flags);
+
+                    if (renderer.isDeforming && primaryRendererIndex >= 0)
+                    {
+                        AddMaterialPropertiesFromDeformClassification(baker, renderer.targetEntity, classification);
+                        baker.AddComponent(renderer.targetEntity, new CopyDeformFromEntity { sourceDeformedEntity = rendererSettings[primaryRendererIndex].targetEntity });
+                    }
+
+                    if (renderer.isDeforming)
+                        requiredPropertiesForReference |= classification;
+
+                    if (renderer.lodGroupEntity != Entity.Null && renderer.lodGroupMask != -1)
+                    {
+                        var lodComponent = new MeshLODComponent { Group = renderer.lodGroupEntity, LODMask = renderer.lodGroupMask };
+                        baker.AddComponent(renderer.targetEntity, lodComponent);
+                    }
+
+                    if (renderer.useLightmapsIfPossible)
+                        baker.DependsOnLightBaking();
+                    if (renderer.useLightmapsIfPossible && GetStaticLightingModeFromLightmapIndex(renderer.lightmapIndex) == RenderMeshUtility.StaticLightingMode.LightMapped)
+                    {
+                        var lightmapSet = new ComponentTypeSet(ComponentType.ReadWrite<BakingLightmapIndex>(),
+                                                               ComponentType.ReadWrite<BuiltinMaterialPropertyUnity_LightmapIndex>(),
+                                                               ComponentType.ReadWrite<BuiltinMaterialPropertyUnity_LightmapST>(),
+                                                               ComponentType.ReadWrite<LightMaps>());
+                        baker.AddComponent(renderer.targetEntity, lightmapSet);
+
+                        baker.SetComponent(renderer.targetEntity, new BakingLightmapIndex { lightmapIndex             = renderer.lightmapIndex });
+                        baker.SetComponent(renderer.targetEntity, new BuiltinMaterialPropertyUnity_LightmapST { Value = renderer.lightmapScaleOffset });
+                    }
+
+                    if (primaryRendererIndex >= 0)
+                    {
+                        baker.AddComponent<AdditionalMeshRendererEntity>(renderer.targetEntity);
+                        if (!renderer.isStatic)
+                            baker.AddComponent<CopyParentRequestTag>(renderer.targetEntity);
+                    }
+                    else
+                        primaryRendererIndex = rendererIndex;
+
+                    var mmsBuffer      = baker.AddBuffer<BakingMaterialMeshSubmesh>(renderer.targetEntity);
+                    mmsBuffer.Capacity = s_validIndexCache.Count;
+
+                    foreach (var i in s_validIndexCache)
+                    {
+                        var src = meshMaterialSubmeshes[i];
+                        mmsBuffer.Add(new BakingMaterialMeshSubmesh
+                        {
+                            mesh     = src.mesh,
+                            material = src.material,
+                            submesh  = src.submesh
+                        });
+                    }
+                }
+                rangeStart += meshMaterialSubmeshCountsByRenderer[rendererIndex];
+            }
+
+            if (primaryRendererIndex >= 0)
+                AddMaterialPropertiesFromDeformClassification(baker, rendererSettings[primaryRendererIndex].targetEntity, requiredPropertiesForReference);
+        }
+
+        static int s_currentVertexMatrixProperty  = Shader.PropertyToID("_latiosCurrentVertexSkinningMatrixBase");
+        static int s_previousVertexMatrixProperty = Shader.PropertyToID("_latiosPreviousVertexSkinningMatrixBase");
+        static int s_twoAgoVertexMatrixProperty   = Shader.PropertyToID("_latiosTwoAgoVertexSkinningMatrixBase");
+        static int s_currentVertexDqsProperty     = Shader.PropertyToID("_latiosCurrentVertexSkinningDqsBase");
+        static int s_previousVertexDqsProperty    = Shader.PropertyToID("_latiosPreviousVertexSkinningDqsBase");
+        static int s_twoAgoVertexDqsProperty      = Shader.PropertyToID("_latiosTwoAgoVertexSkinningDqsBase");
+        static int s_currentDeformProperty        = Shader.PropertyToID("_latiosCurrentDeformBase");
+        static int s_previousDeformProperty       = Shader.PropertyToID("_latiosPreviousDeformBase");
+        static int s_twoAgoDeformProperty         = Shader.PropertyToID("_latiosTwoAgoDeformBase");
+
+        static int s_legacyLbsProperty           = Shader.PropertyToID("_SkinMatrixIndex");
+        static int s_legacyDotsDeformProperty    = Shader.PropertyToID("_DotsDeformationParams");
+        static int s_legacyComputeDeformProperty = Shader.PropertyToID("_ComputeMeshIndex");
+
+        private static DeformClassification GetDeformClassificationFromMaterial(Material material)
+        {
+            DeformClassification classification = DeformClassification.None;
+            if (material.HasProperty(s_legacyLbsProperty))
+                classification |= DeformClassification.LegacyLbs;
+            if (material.HasProperty(s_legacyComputeDeformProperty))
+                classification |= DeformClassification.LegacyCompute;
+            if (material.HasProperty(s_legacyDotsDeformProperty))
+                classification |= DeformClassification.LegacyDotsDefom;
+            if (material.HasProperty(s_currentVertexMatrixProperty))
+                classification |= DeformClassification.CurrentVertexMatrix;
+            if (material.HasProperty(s_previousVertexMatrixProperty))
+                classification |= DeformClassification.PreviousVertexMatrix;
+            if (material.HasProperty(s_twoAgoVertexMatrixProperty))
+                classification |= DeformClassification.TwoAgoVertexMatrix;
+            if (material.HasProperty(s_currentVertexDqsProperty))
+                classification |= DeformClassification.CurrentVertexDqs;
+            if (material.HasProperty(s_previousVertexDqsProperty))
+                classification |= DeformClassification.PreviousVertexDqs;
+            if (material.HasProperty(s_twoAgoVertexDqsProperty))
+                classification |= DeformClassification.TwoAgoVertexDqs;
+            if (material.HasProperty(s_currentDeformProperty))
+                classification |= DeformClassification.CurrentDeform;
+            if (material.HasProperty(s_previousDeformProperty))
+                classification |= DeformClassification.PreviousDeform;
+            if (material.HasProperty(s_twoAgoDeformProperty))
+                classification |= DeformClassification.TwoAgoDeform;
+            return classification;
+        }
+
+        private static void AddRendererComponents(Entity entity, IBaker baker, in MeshRendererBakeSettings settings, RenderMeshUtility.EntitiesGraphicsComponentFlags baseFlags)
         {
             // Add all components up front using as few calls as possible.
-            var componentSet = RenderMeshUtility.ComputeComponentTypes(RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking,
-                                                                       renderMeshDescription, baker.IsStatic(), renderMesh.materials);
+            baseFlags        |= RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking;
+            var componentSet  = RenderMeshUtility.ComputeComponentTypes(baseFlags, settings.renderMeshDescription, baker.IsStatic(), null);
             baker.AddComponent(entity, componentSet);
             for (int i = 0; i < componentSet.Length; i++)
             {
@@ -72,220 +237,52 @@ namespace Latios.Kinemation.Authoring
 #endif
             }
 
-            baker.SetSharedComponentManaged(entity, renderMesh);
-            baker.SetSharedComponentManaged(entity, renderMeshDescription.FilterSettings);
+            baker.SetSharedComponentManaged(entity, settings.renderMeshDescription.FilterSettings);
 
-            var localBounds                                     = renderMesh.mesh.bounds.ToAABB();
-            baker.SetComponent(entity, new RenderBounds { Value = localBounds });
+            baker.SetComponent(entity, new RenderBounds { Value = settings.localBounds.ToAABB() });
         }
 
-#if !ENABLE_MESH_RENDERER_SUBMESH_DATA_SHARING
-#error Latios Framework requires ENABLE_MESH_RENDERER_SUBMESH_DATA_SHARING to be defined in your scripting define symbols.
-#endif
-
-        internal static void Convert(IBaker baker,
-                                     Renderer authoring,
-                                     Mesh mesh,
-                                     List<Material>   sharedMaterials,
-                                     out List<Entity> additionalEntities,
-                                     int firstUniqueSubmeshIndex = int.MaxValue)
+        static void AddMaterialPropertiesFromDeformClassification(IBaker baker, Entity entity, DeformClassification classification)
         {
-            additionalEntities = default;
+            FixedList128Bytes<ComponentType> materialPropertyTypesToAdd = default;
+            if ((classification & DeformClassification.LegacyLbs) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyLinearBlendSkinningShaderIndex>());
+            if ((classification & DeformClassification.LegacyCompute) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyComputeDeformShaderIndex>());
+            if ((classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyDotsDeformParamsShaderIndex>());
+            if ((classification & DeformClassification.CurrentVertexMatrix) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<CurrentMatrixVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.PreviousVertexMatrix) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<PreviousMatrixVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.TwoAgoVertexMatrix) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<TwoAgoMatrixVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.CurrentVertexDqs) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<CurrentDqsVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.PreviousVertexDqs) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<PreviousDqsVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.TwoAgoVertexDqs) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<TwoAgoDqsVertexSkinningShaderIndex>());
+            if ((classification & DeformClassification.CurrentDeform) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<CurrentDeformShaderIndex>());
+            if ((classification & DeformClassification.PreviousDeform) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<PreviousDeformShaderIndex>());
+            if ((classification & DeformClassification.TwoAgoDeform) != DeformClassification.None)
+                materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<TwoAgoDeformShaderIndex>());
 
-            if (mesh == null || sharedMaterials.Count == 0)
-            {
-                Debug.LogWarning(
-                    $"Renderer is not converted because either the assigned mesh is null or no materials are assigned on GameObject {authoring.name}.",
-                    authoring);
-                return;
-            }
-
-            firstUniqueSubmeshIndex = math.clamp(firstUniqueSubmeshIndex, 1, sharedMaterials.Count);
-
-            if (sharedMaterials.Count > firstUniqueSubmeshIndex)
-                additionalEntities = new List<Entity>();
-
-            // Takes a dependency on the material
-            foreach (var material in sharedMaterials)
-                baker.DependsOn(material);
-
-            // Takes a dependency on the mesh
-            baker.DependsOn(mesh);
-
-            foreach (var material in sharedMaterials)
-            {
-                if (LatiosDeformMeshRendererBakingUtility.CheckHasDeformMaterialProperty(material))
-                {
-                    Debug.LogWarning(
-                        $"Material {material.name} used on mesh {mesh.name} baked with reference Renderer {authoring.gameObject.name} is a deform material but is not being baked as such. This will result in incorrect rendering.");
-                }
-            }
-
-            // RenderMeshDescription accesses the GameObject layer.
-            // Declaring the dependency on the GameObject with GetLayer, so the baker rebakes if the layer changes
-            baker.GetLayer(authoring);
-            var desc             = new RenderMeshDescription(authoring);
-            var batchedMaterials = new List<Material>(firstUniqueSubmeshIndex);
-            for (int i = 0; i < firstUniqueSubmeshIndex; i++)
-                batchedMaterials.Add(sharedMaterials[i]);
-            var renderMesh = new RenderMesh(authoring, mesh, batchedMaterials);
-
-            // Always disable per-object motion vectors for static objects
-            if (baker.IsStatic())
-            {
-                if (desc.FilterSettings.MotionMode == MotionVectorGenerationMode.Object)
-                    desc.FilterSettings.MotionMode = MotionVectorGenerationMode.Camera;
-            }
-
-            CreateLODState(baker, authoring, out var lodState);
-
-            var entity = baker.GetEntity(authoring, TransformUsageFlags.Renderable);
-
-            AddRendererComponents(entity, baker, desc, renderMesh);
-
-            if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
-            {
-                var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
-                baker.AddComponent(entity, lodComponent);
-            }
-
-            if (additionalEntities != null)
-            {
-                for (int m = firstUniqueSubmeshIndex; m < sharedMaterials.Count; m++)
-                {
-                    Entity meshEntity;
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
-
-                    // Update Transform components:
-                    baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
-                    if (!baker.IsStatic())
-                        baker.AddComponent<CopyParentRequestTag>(meshEntity);
-
-                    additionalEntities.Add(meshEntity);
-
-                    var material = sharedMaterials[m];
-
-                    renderMesh.subMesh  = m;
-                    renderMesh.material = material;
-
-                    AddRendererComponents(
-                        meshEntity,
-                        baker,
-                        desc,
-                        renderMesh);
-
-                    if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
-                    {
-                        var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
-                        baker.AddComponent(meshEntity, lodComponent);
-                    }
-                }
-            }
+            baker.AddComponent(entity, new ComponentTypeSet(in materialPropertyTypesToAdd));
         }
 
-        internal static void Convert(IBaker baker,
-                                     Entity renderableEntity,
-                                     RenderMeshDescription renderMeshDescription,
-                                     Mesh mesh,
-                                     List<Material>        sharedMaterials,
-                                     out List<Entity>      additionalEntities,
-                                     int firstUniqueSubmeshIndex = int.MaxValue)
+        static RenderMeshUtility.StaticLightingMode GetStaticLightingModeFromLightmapIndex(int lightmapIndex)
         {
-            additionalEntities = default;
+            var staticLightingMode = RenderMeshUtility.StaticLightingMode.None;
+            if (lightmapIndex >= 65534 || lightmapIndex < 0)
+                staticLightingMode = RenderMeshUtility.StaticLightingMode.LightProbes;
+            else if (lightmapIndex >= 0)
+                staticLightingMode = RenderMeshUtility.StaticLightingMode.LightMapped;
 
-            if (mesh == null || sharedMaterials.Count == 0)
-            {
-                Debug.LogWarning(
-                    $"RenderMeshDescription is not converted because either the assigned mesh is null or no materials are assigned on GameObject {baker.GetName()}.");
-                return;
-            }
-
-            firstUniqueSubmeshIndex = math.clamp(firstUniqueSubmeshIndex, 1, sharedMaterials.Count);
-
-            if (sharedMaterials.Count > firstUniqueSubmeshIndex)
-                additionalEntities = new List<Entity>();
-
-            // Takes a dependency on the material
-            foreach (var material in sharedMaterials)
-                baker.DependsOn(material);
-
-            // Takes a dependency on the mesh
-            baker.DependsOn(mesh);
-
-            foreach (var material in sharedMaterials)
-            {
-                if (LatiosDeformMeshRendererBakingUtility.CheckHasDeformMaterialProperty(material))
-                {
-                    Debug.LogWarning(
-                        $"Material {material.name} used on mesh {mesh.name} baked with a custom RenderMeshDescription is a deform material but is not being baked as such. This will result in incorrect rendering.");
-                }
-            }
-
-            var batchedMaterials = new List<Material>(firstUniqueSubmeshIndex);
-            for (int i = 0; i < firstUniqueSubmeshIndex; i++)
-                batchedMaterials.Add(sharedMaterials[i]);
-            var renderMesh = new RenderMesh
-            {
-                materials = batchedMaterials,
-                mesh      = mesh,
-                subMesh   = 0
-            };
-
-            // Always disable per-object motion vectors for static objects
-            if (baker.IsStatic())
-            {
-                if (renderMeshDescription.FilterSettings.MotionMode == MotionVectorGenerationMode.Object)
-                    renderMeshDescription.FilterSettings.MotionMode = MotionVectorGenerationMode.Camera;
-            }
-
-            // Todo: RenderMeshDescriptions lack ability to be put into LODs.
-            // Add custom LOD API for this use case?
-            //CreateLODState(baker, authoring, out var lodState);
-
-            baker.AddTransformUsageFlags(renderableEntity, TransformUsageFlags.Renderable);
-
-            AddRendererComponents(renderableEntity, baker, renderMeshDescription, renderMesh);
-
-            //if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
-            //{
-            //    var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
-            //    baker.AddComponent(entity, lodComponent);
-            //}
-
-            if (additionalEntities != null)
-            {
-                for (int m = firstUniqueSubmeshIndex; m < sharedMaterials.Count; m++)
-                {
-                    Entity meshEntity;
-                    meshEntity = baker.CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{baker.GetName()}-MeshRendererEntity");
-
-                    // Update Transform components:
-                    baker.AddComponent<AdditionalMeshRendererEntity>(meshEntity);
-                    if (!baker.IsStatic())
-                        baker.AddComponent<CopyParentRequestTag>(meshEntity);
-
-                    additionalEntities.Add(meshEntity);
-
-                    var material = sharedMaterials[m];
-
-                    renderMesh.subMesh  = m;
-                    renderMesh.material = material;
-
-                    AddRendererComponents(
-                        meshEntity,
-                        baker,
-                        renderMeshDescription,
-                        renderMesh);
-
-                    //if (lodState.LodGroupEntity != Entity.Null && lodState.LodGroupMask != -1)
-                    //{
-                    //    var lodComponent = new MeshLODComponent { Group = lodState.LodGroupEntity, LODMask = lodState.LodGroupMask };
-                    //    baker.AddComponent(meshEntity, lodComponent);
-                    //}
-                }
-            }
+            return staticLightingMode;
         }
-#pragma warning restore CS0162
     }
 }
 

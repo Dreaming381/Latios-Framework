@@ -1,3 +1,4 @@
+#if false
 namespace Latios.Mimic.Shuriken
 {
     // /// <summary>
@@ -158,4 +159,5 @@ namespace Latios.Mimic.Shuriken
         UV3 = 8,
     }
 }
+#endif
 

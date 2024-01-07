@@ -122,6 +122,23 @@ namespace Latios.Psyshock
             return hit;
         }
 
+        public static UnitySim.ContactsBetweenResult UnityContactsBetween(in CompoundCollider compound,
+                                                                          in RigidTransform compoundTransform,
+                                                                          in CapsuleCollider capsule,
+                                                                          in RigidTransform capsuleTransform,
+                                                                          in ColliderDistanceResult distanceResult)
+        {
+            compound.GetScaledStretchedSubCollider(distanceResult.subColliderIndexA, out var collider, out var colliderTransform);
+            colliderTransform = math.mul(compoundTransform, colliderTransform);
+            return collider.type switch
+                   {
+                       ColliderType.Sphere => ContactManifoldHelpers.GetSingleContactManifold(in distanceResult),
+                       ColliderType.Capsule => CapsuleCapsule.UnityContactsBetween(in collider.m_capsule, in colliderTransform, in capsule, in capsuleTransform, distanceResult),
+                       ColliderType.Box => CapsuleBox.UnityContactsBetween(in collider.m_box, in colliderTransform, in capsule, in capsuleTransform, distanceResult),
+                       _ => ContactManifoldHelpers.GetSingleContactManifold(in distanceResult)
+                   };
+        }
+
         // We use a reduced set dispatch here so that Burst doesn't have to try to make these methods re-entrant.
         private static bool DistanceBetween(in Collider collider,
                                             in RigidTransform colliderTransform,

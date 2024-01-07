@@ -358,7 +358,7 @@ namespace Latios.Psyshock
                 var convexCapsule = new CapsuleCollider(blob.localAabb.min * convex.scale, blob.localAabb.max * convex.scale, 0f);
                 return CapsuleCapsule.UnityContactsBetween(in convexCapsule, in convexTransform, in capsule, in capsuleTransform, in distanceResult);
             }
-            else if (dimensions == 2)
+            else  //if (dimensions == 2)
             {
                 var convexLocalContactNormal = math.InverseRotateFast(convexTransform.rot, -distanceResult.normalB);
 
@@ -473,11 +473,6 @@ namespace Latios.Psyshock
 
                 if (needsClosestPoint)
                     result.Add(distanceResult.hitpointB, distanceResult.distance);
-                return result;
-            }
-            else
-            {
-                // Can't happen.
                 return result;
             }
         }

@@ -1,17 +1,15 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.9.0-alpha.4]
+# Latios Framework for Unity ECS – [0.9.0-beta.1]
 
 **This is a prerelease version of the Latios Framework version 0.9 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, have not been updated to reflect the new features and changes in
-0.9. Git hashes may not be preserved on transition to beta or  official
-release.**
+still under development. Changelogs and Documentation are currently being
+updated to reflect the new features and changes in 0.9.**
 
 **You are still welcome to submit bug reports and PRs for this and future
 prerelease versions!**
 
-**This version of the alpha uses Unity 2022.3.13 with Entities 1.1.0-pre.3.**
+**This version of the beta uses Unity 2022.3.13 with Entities 1.1.0-pre.3.**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -39,14 +37,11 @@ adaptations of top-class solutions in the industry (see [Third Party
 Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
-The Latios Framework is best-known in the community for Kinemation, a module
-which provides extremely high-performance CPU animation and GPU skinned mesh
-rendering features.
+This version targets Entities 1.1.0-pre.3 and a minimum editor version of
+2022.3.13f1. If you are still using Entities 1.0.16, please reach out if you
+face regressions when updating Unity packages.
 
-This version targets Entities 1.0.16. If you are still using Entities 0.51.1,
-please use the framework version 0.5.8 instead.
-
-*[0.7.x] users, please read the* [*Upgrade
+*[0.8.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
@@ -54,8 +49,12 @@ survey**](https://forms.gle/kW1nGSqYkCEQFyjb8)**!**
 
 ## Modules
 
-The Latios Framework contains multiple modules, each of which contain public API
-for your own use.
+The Latios Framework contains multiple **modules**, each of which contain public
+API for your own use. Additionally, each module may contain **addons**. Addons
+are community contributed features, and consequently may have different design
+philosophies or support guarantees as other features. With that said, some addon
+authors are very active and offer support and reliability that surpasses native
+features.
 
 ### Core
 
@@ -106,13 +105,13 @@ amounts of sources at once. Playing audio is as simple as instantiating prefabs.
 Animation and Rendering provides authored animation, simulated animation, and
 everything in between. It includes an overhauled Entities Graphics for
 significantly improved performance of both skinned and non-skinned entities
-including true frustum culling and LOD support. It also provides extra features
-such as enabled bit toggled rendering and mesh modifications in Burst jobs.
+including true frustum culling and LOD support. It also provides a comprehensive
+API for injecting custom effects into ECS rendering.
 
 On the animation side, Kinemation supports bone entity and optimized bone buffer
 configurations. It includes utilities for inertial blending. And for animation
 clips it leverages ACL, a powerful high quality animation compression solution
-used in AAA titles such as Rise of the Tomb Raider and Valorant.
+used in AAA titles such as Rise of the Tomb Raider, Fortnite, and Valorant.
 
 ### Calligraphics
 
@@ -123,10 +122,22 @@ material property support. The text can be animated with the built-in tweening
 engine, or you can make your own animations with the glyph mapping API. A subset
 of rich text tags is also supported.
 
+### Mimic
+
+Mimic provides behavioral replicas of popular solutions within the Unity
+ecosystem, rewritten to leverage the features of the other modules and the
+performance benefits of Unity’s ECS. With Mimic, teams can continue to use
+familiar and proven authoring tools and workflows while simultaneously being
+fully invested into Unity ECS and the Latios Framework.
+
+-   Addons
+    -   Mecanim by Sovogal – Replication of Unity’s Animator Controller state
+        machine with support for blend trees, interrupts, root motion, and
+        events.
+
 ### Future Modules
 
--   Mach-Axle AI – An infinite axis utility evaluator designed for high
-    throughput
+-   Mach-Axle AI – A utility AI evaluator designed for high throughput
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
@@ -151,7 +162,7 @@ control. If not, there’s likely an issue worth bringing to attention.
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
 in Unity ECS such as audio and animation. Current Phase III development focuses
-on modernizing the technology for Entities 1.0 and facilitating gameplay design.
+on modernizing the technology for Entities 1.X and facilitating gameplay design.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.
@@ -259,7 +270,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.8.X) will always preserve backwards compatibility back to the
+Patch releases (0.9.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
@@ -279,9 +290,9 @@ If you would like to be added to this list, see
 [Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
 for how to get started.
 
--   Sovogal – Significant contributions to Kinemation’s Mecanim controller and
-    the Calligraphics module (including the name)
--   canmom – Android support, Kinemation baking, and build fixes
+-   Sovogal – Primary author of Mimic’s Mecanim addon and made significant
+    contributions to the Calligraphics module (including the name)
+-   canmom – Android support, Kinemation baking fixes, and build fixes
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support

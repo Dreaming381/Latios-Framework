@@ -10,9 +10,9 @@ namespace Latios.Mimic
         /// Installs the Mecanim state machine runtime systems. This should only be installed in the runtime world.
         /// </summary>
         /// <param name="world"></param>
-        public static void InstallMecanim(World world)
+        public static void InstallMecanimAddon(World world)
         {
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Mecanim.Systems.MecanimSuperSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Addons.Mecanim.Systems.MecanimSuperSystem>(), world);
         }
     }
 }

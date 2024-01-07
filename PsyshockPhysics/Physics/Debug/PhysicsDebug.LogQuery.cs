@@ -1,10 +1,4 @@
-#define LATIOS_ALPHA
-
-#if LATIOS_ALPHA
 using Latios.Transforms;
-#else
-using System.Runtime.InteropServices;
-#endif
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -127,54 +121,6 @@ namespace Latios.Psyshock
         {
             writer.WriteBytes(&value, sizeof(float));
         }
-
-#if !LATIOS_ALPHA
-        [StructLayout(LayoutKind.Explicit, Size = 48)]
-        public struct TransformQvvs
-        {
-            [FieldOffset(0)] public quaternion rotation;  // All qvvs operations assume this value is normalized
-            [FieldOffset(16)] public float3 position;
-            [FieldOffset(28)] public int worldIndex;  // User-define-able, can be used for floating origin or something
-            [FieldOffset(32)] public float3 stretch;
-            [FieldOffset(44)] public float scale;
-
-            public static readonly TransformQvvs identity = new TransformQvvs
-            {
-                position   = float3.zero,
-                rotation   = quaternion.identity,
-                scale      = 1f,
-                stretch    = 1f,
-                worldIndex = 0
-            };
-
-            public TransformQvvs(float3 position, quaternion rotation)
-            {
-                this.position = position;
-                this.rotation = rotation;
-                scale         = 1f;
-                stretch       = 1f;
-                worldIndex    = 0;
-            }
-
-            public TransformQvvs(float3 position, quaternion rotation, float scale, float3 stretch, int worldIndex = 0)
-            {
-                this.position   = position;
-                this.rotation   = rotation;
-                this.scale      = scale;
-                this.stretch    = stretch;
-                this.worldIndex = worldIndex;
-            }
-
-            public TransformQvvs(RigidTransform rigidTransform)
-            {
-                position   = rigidTransform.pos;
-                rotation   = rigidTransform.rot;
-                scale      = 1f;
-                stretch    = 1f;
-                worldIndex = 0;
-            }
-        }
-#endif
     }
 }
 

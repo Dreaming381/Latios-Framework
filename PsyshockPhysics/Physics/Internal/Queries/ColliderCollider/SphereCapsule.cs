@@ -108,10 +108,7 @@ namespace Latios.Psyshock
                                                                           in RigidTransform sphereTransform,
                                                                           in ColliderDistanceResult distanceResult)
         {
-            UnitySim.ContactsBetweenResult result = default;
-            result.contactNormal                  = distanceResult.normalB;
-            result.Add(distanceResult.hitpointB, distanceResult.distance);
-            return result;
+            return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
         }
 
         private static bool CapsuleSphereDistance(in CapsuleCollider capsule, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)

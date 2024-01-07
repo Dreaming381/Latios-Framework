@@ -8,13 +8,16 @@ using Unity.Entities;
 using UnityEditor.Animations;
 using UnityEngine;
 
-namespace Latios.Mimic.Mecanim.Authoring
+namespace Latios.Mimic.Addons.Mecanim.Authoring
 {
     [TemporaryBakingType]
     internal struct MecanimSmartBakeItem : ISmartBakeItem<Animator>
     {
         private SmartBlobberHandle<SkeletonClipSetBlob> m_clipSetBlobHandle;
         private SmartBlobberHandle<MecanimControllerBlob> m_controllerBlobHandle;
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+        private NativeArray<SmartBlobberHandle<ParameterClipSetBlob> > m_blendShapesBlobHandles;
+#endif
 
         public bool Bake(Animator authoring, IBaker baker)
         {
@@ -26,25 +29,121 @@ namespace Latios.Mimic.Mecanim.Authoring
                 return false;
             }
 
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+            const int CLIP_SAMPLE_RATE = 60;
+
+            // Get a list of skinned mesh renderers for blend shape baking
+            var skinnedMeshRenderersWithBlendShapes = authoring
+                                                      .GetComponentsInChildren<SkinnedMeshRenderer>()
+                                                      .Where(x => x.sharedMesh != null && x.sharedMesh.blendShapeCount > 0)
+                                                      .ToArray();
+            var blendShapeEntities = new NativeList<Entity>(skinnedMeshRenderersWithBlendShapes.Length, Allocator.Temp);
+            for (int i = 0; i < skinnedMeshRenderersWithBlendShapes.Length; i++)
+            {
+                var renderer       = skinnedMeshRenderersWithBlendShapes[i];
+                var rendererEntity = baker.GetEntity(renderer, TransformUsageFlags.None);
+                if (rendererEntity != default)
+                {
+                    blendShapeEntities.Add(rendererEntity);
+                }
+            }
+#endif
+
             // Bake clips
-            var clips       = new NativeArray<SkeletonClipConfig>(runtimeAnimatorController.animationClips.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            var sourceClips = runtimeAnimatorController.animationClips;
+            var sourceClips         = runtimeAnimatorController.animationClips;
+            var sleletonClipConfigs = new NativeArray<SkeletonClipConfig>(sourceClips.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+            var blendShapeEntityClipConfigs = new NativeParallelMultiHashMap<Entity, BlendShapeParameterConfig>(skinnedMeshRenderersWithBlendShapes.Length * sourceClips.Length,
+                                                                                                                Allocator.Temp);
+#endif
             for (int i = 0; i < sourceClips.Length; i++)
             {
                 var sourceClip = sourceClips[i];
 
-                clips[i] = new SkeletonClipConfig
+                sleletonClipConfigs[i] = new SkeletonClipConfig
                 {
                     clip     = sourceClip,
                     events   = sourceClip.ExtractKinemationClipEvents(Allocator.Temp),
                     settings = SkeletonClipCompressionSettings.kDefaultSettings
                 };
+
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+                //Create clip configs for blend shapes
+                var bindings = AnimationUtility.GetCurveBindings(sourceClip);
+                for (int j = 0; j < skinnedMeshRenderersWithBlendShapes.Length; j++)
+                {
+                    var renderer       = skinnedMeshRenderersWithBlendShapes[j];
+                    var rendererEntity = blendShapeEntities[j];
+
+                    //Bake sample data for blend shapes
+                    for (int k = 0; k < renderer.sharedMesh.blendShapeCount; k++)
+                    {
+                        const float MAX_BLEND_SHAPE_WEIGHT = 100f;
+                        var shapeName              = renderer.sharedMesh.GetBlendShapeName(k);
+                        var samples                = new NativeList<float>(Allocator.Temp);
+                        bool foundMatchingBinding   = false;
+                        foreach (var binding in bindings)
+                        {
+                            if (binding.type == typeof(SkinnedMeshRenderer))
+                            {
+                                if (AnimationUtility.CalculateTransformPath(renderer.transform, authoring.avatarRoot) ==
+                                    binding.path &&
+                                    $"blendShape.{shapeName}" == binding.propertyName)
+                                {
+                                    foundMatchingBinding = true;
+                                    // Normally, we could use curve.keys[^ 1].time, but we need to have each curve have the same number of samples
+                                    var curve     = AnimationUtility.GetEditorCurve(sourceClip, binding);
+                                    var curveTime = sourceClip.averageDuration;
+
+                                    var sampleInterval = curveTime / CLIP_SAMPLE_RATE;
+                                    float totalTime      = 0f;
+
+                                    while (totalTime <= curveTime)
+                                    {
+                                        var curveValue = curve.Evaluate(totalTime);
+                                        samples.Add(curveValue / MAX_BLEND_SHAPE_WEIGHT);
+                                        //samples.Add(0.9f);
+                                        totalTime += sampleInterval;
+                                    }
+
+                                    break;
+                                }
+                            }
+                        }
+
+                        //If we don't have a matching binding, add samples so that they won't affect the blend shape
+                        if (!foundMatchingBinding)
+                        {
+                            var curveTime      = sourceClip.averageDuration;
+                            var sampleInterval = curveTime / CLIP_SAMPLE_RATE;
+                            float totalTime      = 0f;
+                            samples = new NativeList<float>(Allocator.Temp);
+                            while (totalTime <= curveTime)
+                            {
+                                samples.Add(float.MinValue);
+                                totalTime += sampleInterval;
+                            }
+                        }
+
+                        blendShapeEntityClipConfigs.Add(rendererEntity, new BlendShapeParameterConfig
+                        {
+                            clipIndex     = i,
+                            shapeIndex    = k,
+                            parameterName = shapeName,
+                            Parameter     = new ParameterClipConfig.Parameter
+                            {
+                                samples = samples.AsArray()
+                            }
+                        });
+                    }
+                }
+#endif
             }
 
             baker.AddBuffer<MecanimActiveClipEvent>(entity);
 
             // Bake controller
-            baker.AddComponent( entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion});
+            baker.AddComponent(entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion });
             baker.SetComponentEnabled<MecanimController>(entity, authoring.enabled);
 
             AnimatorController animatorController = baker.FindAnimatorController(runtimeAnimatorController);
@@ -125,19 +224,85 @@ namespace Latios.Mimic.Mecanim.Authoring
             if (authoring.hasTransformHierarchy)
                 baker.AddBuffer<ExposedSkeletonInertialBlendState>(entity);
 
-            m_clipSetBlobHandle    = baker.RequestCreateBlobAsset(authoring, clips);
+            m_clipSetBlobHandle    = baker.RequestCreateBlobAsset(authoring, sleletonClipConfigs);
             m_controllerBlobHandle = baker.RequestCreateBlobAsset(animatorController);
 
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+            //Bake blend shapes
+            baker.AddBuffer<BlendShapeClipSet>(entity);
+            m_blendShapesBlobHandles = new NativeArray<SmartBlobberHandle<ParameterClipSetBlob> >(blendShapeEntities.Length, Allocator.TempJob);
+            for (int i = 0; i < blendShapeEntities.Length; i++)
+            {
+                var blendShapeEntity = blendShapeEntities[i];
+                var parameterCount   = skinnedMeshRenderersWithBlendShapes[i].sharedMesh.blendShapeCount;
+                baker.AppendToBuffer(entity, new BlendShapeClipSet
+                {
+                    meshEntity = blendShapeEntity
+                });
+
+                // Create clipset config for this entity
+                var blendShapeClipConfigs    = new NativeArray<ParameterClipConfig>(sourceClips.Length, Allocator.Temp);
+                var blendShapeParameterNames = new NativeArray<FixedString128Bytes>(parameterCount, Allocator.Temp);
+                for (int j = 0; j < sourceClips.Length; j++)
+                {
+                    var enumerator           = blendShapeEntityClipConfigs.GetEnumerator();
+                    var blendShapeParameters = new NativeArray<ParameterClipConfig.Parameter>(parameterCount, Allocator.Temp);
+                    while (enumerator.MoveNext())
+                    {
+                        var current = enumerator.Current.Value;
+                        if (enumerator.Current.Key == blendShapeEntity && current.clipIndex == j)
+                        {
+                            blendShapeParameters[current.shapeIndex]     = current.Parameter;
+                            blendShapeParameterNames[current.shapeIndex] = current.parameterName;
+                        }
+                    }
+
+                    blendShapeClipConfigs[j] = new ParameterClipConfig
+                    {
+                        name             = sourceClips[j].name,
+                        sampleRate       = CLIP_SAMPLE_RATE,
+                        parametersInClip = blendShapeParameters,
+                        events           = new NativeArray<ClipEvent>(0, Allocator.Temp)
+                    };
+                }
+
+                var blendShapeClipSetConfig = new ParameterClipSetConfig
+                {
+                    parameterNames = blendShapeParameterNames,
+                    clips          = blendShapeClipConfigs,
+                };
+
+                m_blendShapesBlobHandles[i] = baker.RequestCreateBlobAsset(blendShapeClipSetConfig);
+            }
+#endif
             return true;
         }
 
         public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
         {
             var animatorController = entityManager.GetComponentData<MecanimController>(entity);
-            animatorController.clips      = m_clipSetBlobHandle.Resolve(entityManager);
+            animatorController.clips = m_clipSetBlobHandle.Resolve(entityManager);
+#if LATIOS_MECANIM_EXPERIMENTAL_BLENDSHAPES
+            var blendShapeClipSets = entityManager.GetBuffer<BlendShapeClipSet>(entity);
+            for (int i = 0; i < blendShapeClipSets.Length; i++)
+            {
+                var blendShapeClipSet = blendShapeClipSets[i];
+                blendShapeClipSet.clips = m_blendShapesBlobHandles[i].Resolve(entityManager);
+                blendShapeClipSets[i]   = blendShapeClipSet;
+            }
+            m_blendShapesBlobHandles.Dispose();
+#endif
             animatorController.controller = m_controllerBlobHandle.Resolve(entityManager);
             entityManager.SetComponentData(entity, animatorController);
         }
+    }
+
+    internal struct BlendShapeParameterConfig
+    {
+        public int clipIndex;
+        public int shapeIndex;
+        public FixedString128Bytes parameterName;
+        public ParameterClipConfig.Parameter Parameter;
     }
 
     [DisableAutoCreation]

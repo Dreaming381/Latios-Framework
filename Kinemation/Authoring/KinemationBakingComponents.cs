@@ -10,6 +10,7 @@ using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
 {
+    #region Kinemation Smart Blobber Data
     [BakingType]
     internal struct AutoBindSkinnedMeshToSkeleton : IBufferElementData
     {
@@ -81,5 +82,23 @@ namespace Latios.Kinemation.Authoring
     {
         public ClipEvent clipEvent;
     }
+    #endregion
+
+    #region Entities Graphics Baking Replacements
+    [BakingType]
+    [InternalBufferCapacity(1)]
+    internal struct BakingMaterialMeshSubmesh : IBufferElementData
+    {
+        public UnityObjectRef<Material> material;
+        public UnityObjectRef<Mesh>     mesh;
+        public int                      submesh;
+    }
+
+    [BakingType]
+    internal struct BakingLightmapIndex : IComponentData
+    {
+        public int lightmapIndex;
+    }
+    #endregion
 }
 

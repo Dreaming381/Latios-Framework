@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Calligraphics.Rendering.Authoring;
+using Latios.Kinemation.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Graphics;
@@ -97,18 +98,22 @@ namespace Latios.Calligraphics.Authoring
             DependsOn(fontMaterialPair.font);
             DependsOn(fontMaterialPair.material);
             var layer = GetLayer();
-            this.BakeTextBackendMeshAndMaterial(entity, new RenderMeshDescription
+            this.BakeTextBackendMeshAndMaterial(new MeshRendererBakeSettings
             {
-                FilterSettings = new RenderFilterSettings
+                targetEntity          = entity,
+                renderMeshDescription = new RenderMeshDescription
                 {
-                    Layer              = layer,
-                    RenderingLayerMask = (uint)(1 << layer),
-                    ShadowCastingMode  = ShadowCastingMode.Off,
-                    ReceiveShadows     = false,
-                    MotionMode         = MotionVectorGenerationMode.Object,
-                    StaticShadowCaster = false,
+                    FilterSettings = new RenderFilterSettings
+                    {
+                        Layer              = layer,
+                        RenderingLayerMask = (uint)(1 << layer),
+                        ShadowCastingMode  = ShadowCastingMode.Off,
+                        ReceiveShadows     = false,
+                        MotionMode         = MotionVectorGenerationMode.Object,
+                        StaticShadowCaster = false,
+                    },
+                    LightProbeUsage = LightProbeUsage.Off,
                 },
-                LightProbeUsage = LightProbeUsage.Off,
             }, fontMaterialPair.material);
 
             AddComponent<FontBlobReference>(entity);

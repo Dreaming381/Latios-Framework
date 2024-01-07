@@ -5,8 +5,6 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.Exposed;
 
-// Todo: Copy Enabled bits
-
 namespace Latios
 {
     /// <summary>

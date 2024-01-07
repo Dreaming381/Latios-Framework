@@ -1,7 +1,5 @@
 ﻿using Unity.Entities;
 
-// Todo: The lookup methods need to be replaced with versions that work correctly with the caches.
-
 namespace Latios
 {
     public struct EntityWith<T> where T : unmanaged, IComponentData
