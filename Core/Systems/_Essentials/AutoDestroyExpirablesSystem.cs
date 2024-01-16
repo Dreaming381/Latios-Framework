@@ -8,6 +8,8 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 
+using static Unity.Entities.SystemAPI;
+
 // The strategy for this system is to use an Any query to find all entities
 // which should be kept alive, stored in a NativeParallelHashMap<ArchetypeChunk, v128>.
 // Then, using a job that ignores enabled states to get all the candidate chunks,
@@ -91,7 +93,9 @@ namespace Latios
             {
                 dcb           = destroyCommandBuffer,
                 chunkMasksMap = chunkMasksMap,
-                entityHandle  = SystemAPI.GetEntityTypeHandle()
+                entityHandle  = GetEntityTypeHandle(),
+                legHandle     = GetBufferTypeHandle<LinkedEntityGroup>(false),
+                esil          = GetEntityStorageInfoLookup()
             };
             state.Dependency = destroyJob.ScheduleParallel(m_withAnyIgnoreComponentEnabledStatusQuery, buildDependency);
         }
@@ -125,7 +129,9 @@ namespace Latios
         {
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, v128> chunkMasksMap;
             [ReadOnly] public EntityTypeHandle                            entityHandle;
+            [ReadOnly] public EntityStorageInfoLookup                     esil;
 
+            public BufferTypeHandle<LinkedEntityGroup> legHandle;
             public DestroyCommandBuffer.ParallelWriter dcb;
 
             [BurstCompile]
@@ -135,10 +141,22 @@ namespace Latios
                 var   entities = chunk.GetNativeArray(entityHandle);
                 if (Hint.Unlikely(!chunkMasksMap.TryGetValue(chunk, out var enabledMask)))
                 {
-                    // If the chunk isn't in the map, then all entities in the chunk are expired.
-                    for (int i = 0; i < entities.Length; i++)
+                    if (!chunk.Has(ref legHandle))
                     {
-                        dcb.Add(entities[i], unfilteredChunkIndex);
+                        // If the chunk isn't in the map, then all entities in the chunk are expired.
+                        for (int i = 0; i < entities.Length; i++)
+                        {
+                            dcb.Add(entities[i], unfilteredChunkIndex);
+                        }
+                    }
+                    else
+                    {
+                        var legs = chunk.GetBufferAccessor(ref legHandle);
+                        for (int i = 0; i < entities.Length; i++)
+                        {
+                            RemoveExpirablesFromLinkedEntityGroup(legs[i], entities[i]);
+                            dcb.Add(entities[i], unfilteredChunkIndex);
+                        }
                     }
                 }
                 else if (Hint.Likely(chunkEnabledMask.ULong0 == ones && chunkEnabledMask.ULong1 == ones))
@@ -146,7 +164,7 @@ namespace Latios
                     // All the entities in the chunk need to be kept alive. Early out.
                     return;
                 }
-                else
+                else if (!chunk.Has(ref legHandle))
                 {
                     BitField64 enabledMask1 = new BitField64(~enabledMask.ULong0);
                     BitField64 enabledMask2 = new BitField64(~enabledMask.ULong1);
@@ -154,9 +172,17 @@ namespace Latios
                     DestroyUnsetEntities(enabledMask1, ref entities, unfilteredChunkIndex, 0);
                     DestroyUnsetEntities(enabledMask2, ref entities, unfilteredChunkIndex, 64);
                 }
+                else
+                {
+                    var        legs         = chunk.GetBufferAccessor(ref legHandle);
+                    BitField64 enabledMask1 = new BitField64(~enabledMask.ULong0);
+                    BitField64 enabledMask2 = new BitField64(~enabledMask.ULong1);
+                    DestroyUnsetEntities(enabledMask1, ref entities, unfilteredChunkIndex, 0, legs);
+                    DestroyUnsetEntities(enabledMask2, ref entities, unfilteredChunkIndex, 64);
+                }
             }
 
-            public void DestroyUnsetEntities(BitField64 disabledBitMask, ref NativeArray<Entity> entities, int unfilteredChunkIndex, int offset)
+            void DestroyUnsetEntities(BitField64 disabledBitMask, ref NativeArray<Entity> entities, int unfilteredChunkIndex, int offset)
             {
                 var tzcnt     = disabledBitMask.CountTrailingZeros();
                 var threshold = math.min(64, entities.Length - offset);
@@ -165,6 +191,45 @@ namespace Latios
                     dcb.Add(entities[tzcnt + offset], unfilteredChunkIndex);
                     disabledBitMask.SetBits(tzcnt, false);
                     tzcnt = disabledBitMask.CountTrailingZeros();
+                }
+            }
+
+            void DestroyUnsetEntities(BitField64 disabledBitMask, ref NativeArray<Entity> entities, int unfilteredChunkIndex, int offset,
+                                      BufferAccessor<LinkedEntityGroup> accessor)
+            {
+                var tzcnt     = disabledBitMask.CountTrailingZeros();
+                var threshold = math.min(64, entities.Length - offset);
+                while (tzcnt < threshold)
+                {
+                    RemoveExpirablesFromLinkedEntityGroup(accessor[tzcnt + offset], entities[tzcnt + offset]);
+                    dcb.Add(entities[tzcnt + offset], unfilteredChunkIndex);
+                    disabledBitMask.SetBits(tzcnt, false);
+                    tzcnt = disabledBitMask.CountTrailingZeros();
+                }
+            }
+
+            void RemoveExpirablesFromLinkedEntityGroup(DynamicBuffer<LinkedEntityGroup> linkedEntities, Entity thisEntity)
+            {
+                if (linkedEntities.IsEmpty)
+                    return;
+                var start = math.select(0, 1, linkedEntities[0].Value == thisEntity);
+                for (int i = start; i < linkedEntities.Length; i++)
+                {
+                    var linked = linkedEntities[i].Value;
+                    var info   = esil[linked];
+                    if (chunkMasksMap.TryGetValue(info.Chunk, out var mask))
+                    {
+                        if (info.IndexInChunk >= 64 && new BitField64(mask.ULong1).IsSet(info.IndexInChunk - 64))
+                        {
+                            linkedEntities.RemoveAtSwapBack(i);
+                            i--;
+                        }
+                        else if (new BitField64(mask.ULong0).IsSet(info.IndexInChunk))
+                        {
+                            linkedEntities.RemoveAtSwapBack(i);
+                            i--;
+                        }
+                    }
                 }
             }
         }

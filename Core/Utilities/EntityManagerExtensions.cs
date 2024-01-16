@@ -23,22 +23,22 @@ namespace Latios
             if (componentType.IsZeroSized && !componentType.IsEnableable)
                 return;
 
-            var typeInfo           = TypeManager.GetTypeInfo(componentType.TypeIndex);
-            var size               = typeInfo.SizeInChunk;
-            var typeRO             = componentType;
-            typeRO.AccessModeType  = ComponentType.AccessMode.ReadOnly;
-            var typeRW             = componentType;
-            typeRW.AccessModeType  = ComponentType.AccessMode.ReadWrite;
-            var handleRW           = entityManager.GetDynamicComponentTypeHandle(typeRW);
-            var handleRO           = entityManager.GetDynamicComponentTypeHandle(typeRO);
-            var srcChunk           = entityManager.GetStorageInfo(src);
-            var dstChunk           = entityManager.GetStorageInfo(dst);
-            if (!componentType.IsEnableable)
+            var typeInfo          = TypeManager.GetTypeInfo(componentType.TypeIndex);
+            var size              = typeInfo.SizeInChunk;
+            var typeRO            = componentType;
+            typeRO.AccessModeType = ComponentType.AccessMode.ReadOnly;
+            var typeRW            = componentType;
+            typeRW.AccessModeType = ComponentType.AccessMode.ReadWrite;
+            var handleRW          = entityManager.GetDynamicComponentTypeHandle(typeRW);
+            var handleRO          = entityManager.GetDynamicComponentTypeHandle(typeRO);
+            var srcChunk          = entityManager.GetStorageInfo(src);
+            var dstChunk          = entityManager.GetStorageInfo(dst);
+            if (!componentType.IsZeroSized)
             {
-                var dstPtr = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRW, size).GetUnsafePtr();
-                dstPtr += dstChunk.IndexInChunk * size;
-                var srcPtr = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRO, size).GetUnsafeReadOnlyPtr();
-                srcPtr += srcChunk.IndexInChunk * size;
+                var dstPtr  = (byte*)dstChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRW, size).GetUnsafePtr();
+                dstPtr     += dstChunk.IndexInChunk * size;
+                var srcPtr  = (byte*)srcChunk.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleRO, size).GetUnsafeReadOnlyPtr();
+                srcPtr     += srcChunk.IndexInChunk * size;
                 UnsafeUtility.MemCpy(dstPtr, srcPtr, size);
             }
 

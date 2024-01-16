@@ -5,12 +5,16 @@ using Latios.Authoring;
 using Latios.Compatibility.UnityNetCode;
 using Unity.Entities;
 
+#if !LATIOS_TRANSFORMS_UNITY
+#error The currently active Latios Framework Bootstrap requires LATIOS_TRANSFORMS_UNITY to be defined for correct operation.
+#endif
+
 [UnityEngine.Scripting.Preserve]
 public class LatiosBakingBootstrap : ICustomBakingBootstrap
 {
     public void InitializeBakingForAllWorlds(ref CustomBakingBootstrapContext context)
     {
-        Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
+        //Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
         //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);
     }

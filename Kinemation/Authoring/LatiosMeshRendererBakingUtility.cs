@@ -244,6 +244,8 @@ namespace Latios.Kinemation.Authoring
 
         static void AddMaterialPropertiesFromDeformClassification(IBaker baker, Entity entity, DeformClassification classification)
         {
+            if (classification == DeformClassification.None)
+                return;
             FixedList128Bytes<ComponentType> materialPropertyTypesToAdd = default;
             if ((classification & DeformClassification.LegacyLbs) != DeformClassification.None)
                 materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyLinearBlendSkinningShaderIndex>());

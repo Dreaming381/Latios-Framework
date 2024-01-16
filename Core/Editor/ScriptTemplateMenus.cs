@@ -8,16 +8,16 @@ internal class ScriptTemplateMenus
     public const string TemplatesRootFramework = "Packages/com.latios.latiosframework/Core/Editor/ScriptTemplates";
     public const string TemplatesRootAssets    = "Assets/_Code/Core.Editor/ScriptTemplates";
 
-    [MenuItem("Assets/Create/Latios/Bootstrap/Minimal - Injection Workflow")]
+    [MenuItem("Assets/Create/Latios/Bootstrap/Unity Transforms - Injection Workflow")]
     public static void CreateMinimalInjectionBootstrap()
     {
-        CreateScriptFromTemplate("MinimalInjectionBootstrap.txt", "LatiosBootstrap.cs");
+        CreateScriptFromTemplate("UnityTransformsInjectionBootstrap.txt", "LatiosBootstrap.cs");
     }
 
-    [MenuItem("Assets/Create/Latios/Bootstrap/Minimal - Explicit Workflow")]
+    [MenuItem("Assets/Create/Latios/Bootstrap/Unity Transforms - Explicit Workflow")]
     public static void CreateMinimalExplicitBootstrap()
     {
-        CreateScriptFromTemplate("MinimalExplicitBootstrap.txt", "LatiosBootstrap.cs");
+        CreateScriptFromTemplate("UnityTransformsExplicitBootstrap.txt", "LatiosBootstrap.cs");
     }
 
     [MenuItem("Assets/Create/Latios/Bootstrap/Standard - Injection Workflow")]
@@ -63,12 +63,6 @@ internal class ScriptTemplateMenus
     }
 
 #if NETCODE_PROJECT
-    [MenuItem("Assets/Create/Latios/Bootstrap/NetCode Minimal - Injection Workflow")]
-    public static void CreateNetCodeMinimalInjectionBootstrap()
-    {
-        CreateScriptFromTemplate("NetCodeMinimalInjectionBootstrap.txt", "NetCodeLatiosBootstrap.cs");
-    }
-
     [MenuItem("Assets/Create/Latios/Bootstrap/NetCode Standard - Injection Workflow")]
     public static void CreateNetCodeStandardInjectionBootstrap()
     {

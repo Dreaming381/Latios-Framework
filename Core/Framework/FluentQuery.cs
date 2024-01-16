@@ -219,7 +219,7 @@ namespace Latios
         /// </summary>
         /// <typeparam name="T">The type of component to add</typeparam>
         /// <param name="readOnly">Should the component be marked as ReadOnly?</param>
-        /// <param name="isChunkComponent">Is the component a chunk component for the query?</param>
+        /// <param name="isChunkComponent">Is the component a chunk component for the query? Enabled state is ignored for chunk components.</param>
         public FluentQuery WithAnyEnabled<T>(bool readOnly = false, bool isChunkComponent = false)
         {
             if (isChunkComponent)
@@ -345,6 +345,25 @@ namespace Latios
         public FluentQuery WithCollectionAspect<T>() where T : unmanaged, ICollectionAspect<T>
         {
             return default(T).AppendToQuery(this);
+        }
+
+        /// <summary>
+        /// Adds the required components by the IAspect to the query, with any enableable components
+        /// required to be enabled
+        /// </summary>
+        /// <typeparam name="T">The type of IAspect to add to the query</typeparam>
+        public FluentQuery WithAspect<T>() where T : unmanaged, IAspect, IAspectCreate<T>
+        {
+            var tempList = new UnsafeList<ComponentType>(8, Allocator.Temp);
+            default(T).AddComponentRequirementsTo(ref tempList);
+            foreach (var component in tempList)
+            {
+                if (component.IsEnableable)
+                    m_withEnabled.Add(in component);
+                else
+                    m_with.Add(in component);
+            }
+            return this;
         }
 
         /// <summary>

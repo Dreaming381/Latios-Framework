@@ -405,6 +405,7 @@ namespace Latios.Kinemation.Systems
 
                 var optimizedTypes = new FixedList128Bytes<ComponentType>();
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedBoneTransform>());
+                optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonState>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonTag>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonWorldBounds>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedBoneBounds>());
@@ -458,7 +459,10 @@ namespace Latios.Kinemation.Systems
                     failedBindingEntity = m_failedSkeletonMeshBindingEntity,
                     ops                 = skinnedMeshBindingsStatesToWrite.AsDeferredJobArray(),
                     parentLookup        = m_parentLookup,
-                    stateLookup         = GetComponentLookup<SkeletonDependent>(false)
+                    stateLookup         = GetComponentLookup<SkeletonDependent>(false),
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                    localTransformLookup = GetComponentLookup<Unity.Transforms.LocalTransform>(false)
+#endif
                 }.Schedule(skinnedMeshBindingsStatesToWrite, 16, state.Dependency);
             }
 
@@ -784,36 +788,53 @@ namespace Latios.Kinemation.Systems
                         // the skeleton. We search for it here. This lets the user do things
                         // like bind the mesh to skeleton based on a raycast hitting a bone
                         // entity with a collider.
-                        if (!skeletonRootTagLookup.HasComponent(root))
+                        var  target = root;
+                        bool found  = false;
+                        for (int searchIters = 0; searchIters < 1000; searchIters++)
                         {
-                            bool found = false;
-
-                            if (boneOwningSkeletonReferenceLookup.HasComponent(root))
+                            if (skeletonRootTagLookup.HasComponent(target))
                             {
-                                var skelRef = boneOwningSkeletonReferenceLookup[root];
-                                if (skelRef.skeletonRoot != Entity.Null)
+                                root  = target;
+                                found = true;
+                                break;
+                            }
+                            else
+                            {
+                                bool shouldContinue = false;
+                                if (boneOwningSkeletonReferenceLookup.HasComponent(target))
                                 {
-                                    found = true;
-                                    root  = skelRef.skeletonRoot;
+                                    var skelRef = boneOwningSkeletonReferenceLookup[target];
+                                    if (skelRef.skeletonRoot != Entity.Null)
+                                    {
+                                        target         = skelRef.skeletonRoot;
+                                        shouldContinue = true;
+                                    }
                                 }
-                            }
 
-                            if (!found && bindSkeletonRootLookup.HasComponent(root))
-                            {
-                                var skelRef = bindSkeletonRootLookup[root];
-                                if (skelRef.root != Entity.Null)
+                                if (bindSkeletonRootLookup.HasComponent(target))
                                 {
-                                    found = true;
-                                    root  = skelRef.root;
+                                    var skelRef = bindSkeletonRootLookup[target];
+                                    if (skelRef.root != Entity.Null)
+                                    {
+                                        target         = skelRef.root;
+                                        shouldContinue = true;
+                                    }
                                 }
-                            }
 
-                            if (!found)
-                            {
-                                UnityEngine.Debug.LogError(
-                                    $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is not a skeleton nor references one.");
-                                continue;
+                                if (!shouldContinue)
+                                    break;
+
+                                if (searchIters >= 999)
+                                    UnityEngine.Debug.LogError(
+                                        "Searched through BindSkeletonRoot for 1000 iterations but did not find a skeleton root. If you see this message, please report it to the Latios Framework developers. Thanks!");
                             }
+                        }
+
+                        if (!found)
+                        {
+                            UnityEngine.Debug.LogError(
+                                $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is not a skeleton nor references one.");
+                            continue;
                         }
 
                         var meshBlob = meshBlobs[i].blob;
@@ -1624,6 +1645,9 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public NativeArray<SkinnedMeshWriteStateOperation>                   ops;
             public Entity                                                                   failedBindingEntity;
 
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+            [NativeDisableParallelForRestriction] public ComponentLookup<Unity.Transforms.LocalTransform> localTransformLookup;
+#endif
             public void Execute(int index)
             {
                 var op                     = ops[index];
@@ -1633,6 +1657,10 @@ namespace Latios.Kinemation.Systems
                     parentAspect.parent = failedBindingEntity;
                 else
                     parentAspect.parent = op.skinnedState.root;
+
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                localTransformLookup[op.meshEntity] = Unity.Transforms.LocalTransform.Identity;
+#endif
             }
         }
 

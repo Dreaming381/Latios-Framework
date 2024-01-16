@@ -256,8 +256,8 @@ namespace Latios.Kinemation
         /// <param name="normalizationBlob">The part of the MeshDeformDataBlob that identifies unique vertex positions</param>
         /// <remarks>"Unique Positions" refers to vertices where their original undeformed position is the first instance
         /// in the mesh.</remarks>
-        public static void ExtractUniquePositions(ref NativeArray<float3>            uniquePositions,
-                                                  ref NativeArray<DynamicMeshVertex> meshVertices,
+        public static void ExtractUniquePositions(ref NativeArray<float3>                 uniquePositions,
+                                                  NativeArray<DynamicMeshVertex>.ReadOnly meshVertices,
                                                   ref MeshNormalizationBlob normalizationBlob)
         {
             int dst = 0;

@@ -383,7 +383,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform.rotation = value;
                 if (m_index > 0)
-                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -405,7 +405,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform.scale = value;
                 if (m_index > 0)
-                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -449,7 +449,7 @@ namespace Latios.Kinemation
                 else
                     root.boneTransform.rotation = value;
                 if (m_index > 0)
-                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
             }
         }
 

@@ -1,42 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.Exposed;
-using Unity.Entities.Exposed.Dangerous;
 
 namespace Latios
 {
     /// <summary>
-    /// A SuperSystem that does not require its parent ComponentSystemGroup to support ShouldUpdateSystem().
-    /// Use this for custom SuperSystems that need to be injected into raw ComponentSystemGroup types, or
-    /// as the root injected systems when using an explicit system ordering (explicit workflow bootstrap).
-    /// Note that nearly all Latios Framework ComponentSystemGroup types already support ShouldUpdateSystem().
+    /// A SuperSystem that typically serves as a root when using Explicit System Ordering.
+    /// These systems will be injected using attribute ordering, and explicitly specify
+    /// child systems they update.
     /// </summary>
     public abstract partial class RootSuperSystem : SuperSystem
     {
-        bool m_recursiveContext = false;
-
-        protected override void OnUpdate()
-        {
-            if (m_recursiveContext)
-                return;
-
-            bool shouldUpdate = ShouldUpdateSystem();
-            if (!shouldUpdate)
-            {
-                Enabled            = false;
-                m_recursiveContext = true;
-                Update();
-                m_recursiveContext = false;
-                Enabled            = true;
-            }
-            else
-            {
-                base.OnUpdate();
-            }
-        }
     }
 
     /// <summary>
