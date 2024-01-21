@@ -217,12 +217,21 @@ namespace Latios.Kinemation.Systems
 
                     if (Unity.Burst.CompilerServices.Hint.Unlikely(verticesCount * 3 != buffer.Length))
                     {
-                        currentPtr  = blobs[i].meshBlob.Value.undeformedVertices.GetUnsafePtr();
-                        previousPtr = currentPtr;
-                        twoAgoPtr   = currentPtr;
+                        if (buffer.Length == verticesCount)
+                        {
+                            currentPtr  = buffer.AsNativeArray().GetSubArray(verticesCount * currentRotation, verticesCount).GetUnsafeReadOnlyPtr();
+                            previousPtr = currentPtr;
+                            twoAgoPtr   = currentPtr;
+                        }
+                        else
+                        {
+                            currentPtr  = blobs[i].meshBlob.Value.undeformedVertices.GetUnsafePtr();
+                            previousPtr = currentPtr;
+                            twoAgoPtr   = currentPtr;
 
-                        UnityEngine.Debug.LogError(
-                            $"Entity {entities[i]} has the wrong number of vertices ({buffer.Length / 3} vs expected {verticesCount}) in DynamicBuffer<DynamicMeshVertex>. Uploading default mesh instead.");
+                            UnityEngine.Debug.LogError(
+                                $"Entity {entities[i]} has the wrong number of vertices ({buffer.Length / 3} vs expected {verticesCount}) in DynamicBuffer<DynamicMeshVertex>. Uploading default mesh instead.");
+                        }
                     }
                     else
                     {

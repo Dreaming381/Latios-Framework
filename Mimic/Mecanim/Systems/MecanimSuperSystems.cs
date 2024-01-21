@@ -1,5 +1,3 @@
-using Latios.Transforms;
-using Latios.Transforms.Systems;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -14,9 +12,9 @@ namespace Latios.Mimic.Addons.Mecanim.Systems
     /// </summary>
     [UpdateInGroup(typeof(SimulationSystemGroup))]
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-    [UpdateBefore(typeof(TransformSuperSystem))]
+    [UpdateBefore(typeof(Latios.Transforms.Systems.TransformSuperSystem))]
 #else
-    [UpdateBefore(typeof(TransformSystemGroup))]
+    [UpdateBefore(typeof(Unity.Transforms.TransformSystemGroup))]
 #endif
     [DisableAutoCreation]
     public partial class MecanimSuperSystem : SuperSystem  // Todo: Make name more specific?

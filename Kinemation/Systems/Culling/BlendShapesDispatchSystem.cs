@@ -228,12 +228,21 @@ namespace Latios.Kinemation.Systems
 
                     if (Unity.Burst.CompilerServices.Hint.Unlikely(weightsCount * 3 != buffer.Length))
                     {
-                        currentPtr  = null;
-                        previousPtr = currentPtr;
-                        twoAgoPtr   = currentPtr;
+                        if (weightsCount == buffer.Length)
+                        {
+                            currentPtr  = buffer.AsNativeArray().GetSubArray(weightsCount * currentRotation, weightsCount).GetUnsafeReadOnlyPtr();
+                            previousPtr = currentPtr;
+                            twoAgoPtr   = currentPtr;
+                        }
+                        else
+                        {
+                            currentPtr  = null;
+                            previousPtr = currentPtr;
+                            twoAgoPtr   = currentPtr;
 
-                        UnityEngine.Debug.LogError(
-                            $"Entity {entities[i]} has the wrong number of weights ({buffer.Length / 3} vs expected {weightsCount}) in DynamicBuffer<BlendShapeWeight>. Uploading zero weights instead.");
+                            UnityEngine.Debug.LogError(
+                                $"Entity {entities[i]} has the wrong number of weights ({buffer.Length / 3} vs expected {weightsCount}) in DynamicBuffer<BlendShapeWeight>. Uploading zero weights instead.");
+                        }
                     }
                     else
                     {

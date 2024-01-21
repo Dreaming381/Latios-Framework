@@ -3,10 +3,8 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
-using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEditor.PackageManager;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
@@ -168,7 +166,7 @@ namespace Latios.Kinemation.Authoring
     }
 
     /// <summary>
-    /// Input for the SkeletonClipSetBlob Smart Blobber
+    /// Input for the ParameterClipSetBlob Smart Blobber
     /// </summary>
     public struct ParameterClipSetBakeData : ISmartBlobberRequestFilter<ParameterClipSetBlob>
     {

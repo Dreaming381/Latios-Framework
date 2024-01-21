@@ -11,6 +11,11 @@ namespace Latios.Kinemation.Authoring.Systems
     {
         EntityQuery m_query;
 
+        protected override void OnCreate()
+        {
+            m_query = CheckedStateRef.Fluent().With<ShadowHierarchyRequest>(true).IncludePrefabs().IncludeDisabledEntities().Build();
+        }
+
         protected override void OnUpdate()
         {
             int hashmapCapacity = m_query.CalculateEntityCountWithoutFiltering();
@@ -19,11 +24,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             CompleteDependency();
 
-            Entities.ForEach((in ShadowHierarchyRequest request) =>
-            {
-                if (hashmap.TryAdd(request, default))
-                    list.Add(request);
-            }).WithStoreEntityQueryInField(ref m_query).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
+            new AddToMapJob { hashmap = hashmap, list = list }.Run();
 
             foreach (var request in list)
             {
@@ -38,13 +39,34 @@ namespace Latios.Kinemation.Authoring.Systems
 
             EntityManager.AddComponent<ShadowHierarchyReference>(m_query);
 
-            Entities.ForEach((ref ShadowHierarchyReference reference, in ShadowHierarchyRequest request) =>
-            {
-                reference = hashmap[request];
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
+            new ApplyJob { hashmap = hashmap }.Run();
 
             hashmap.Dispose();
             list.Dispose();
+        }
+
+        [BurstCompile]
+        partial struct AddToMapJob : IJobEntity
+        {
+            public NativeHashMap<ShadowHierarchyRequest, ShadowHierarchyReference> hashmap;
+            public NativeList<ShadowHierarchyRequest>                              list;
+
+            public void Execute(in ShadowHierarchyRequest request)
+            {
+                if (hashmap.TryAdd(request, default))
+                    list.Add(request);
+            }
+        }
+
+        [BurstCompile]
+        partial struct ApplyJob : IJobEntity
+        {
+            [ReadOnly] public NativeHashMap<ShadowHierarchyRequest, ShadowHierarchyReference> hashmap;
+
+            public void Execute(ref ShadowHierarchyReference reference, in ShadowHierarchyRequest request)
+            {
+                reference = hashmap[request];
+            }
         }
     }
 }

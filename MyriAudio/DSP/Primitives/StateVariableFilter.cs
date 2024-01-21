@@ -1,5 +1,4 @@
 using Unity.Collections;
-using Unity.Entities.UniversalDelegates;
 using Unity.Mathematics;
 
 namespace Latios.Myri.DSP

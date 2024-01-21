@@ -1,15 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.9.0-beta.2]
-
-**This is a prerelease version of the Latios Framework version 0.9 which is
-still under development. Changelogs and Documentation are currently being
-updated to reflect the new features and changes in 0.9.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**This version of the beta uses Unity 2022.3.13 with Entities 1.1.0-pre.3.**
+# Latios Framework for Unity ECS – [0.9.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -120,15 +111,17 @@ is a world-space text rendering module. It uses TextCore fonts and formats text
 to be rendered via the Kinemation rendering pipeline, complete with custom ECS
 material property support. The text can be animated with the built-in tweening
 engine, or you can make your own animations with the glyph mapping API. A subset
-of rich text tags is also supported.
+of rich text tags is also supported. Use Calligraphics for world-space dialog,
+player names, and damage numbers.
 
 ### Mimic
 
-Mimic provides behavioral replicas of popular solutions within the Unity
-ecosystem, rewritten to leverage the features of the other modules and the
-performance benefits of Unity’s ECS. With Mimic, teams can continue to use
-familiar and proven authoring tools and workflows while simultaneously being
-fully invested into Unity ECS and the Latios Framework.
+[Mimic](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Mimic/README.md)
+provides behavioral replicas of popular solutions within the Unity ecosystem,
+rewritten to leverage the features of the other modules and the performance
+benefits of Unity’s ECS. With Mimic, teams can continue to use familiar and
+proven authoring tools and workflows while simultaneously being fully invested
+into Unity ECS and the Latios Framework.
 
 -   Addons
     -   Mecanim by Sovogal – Replication of Unity’s Animator Controller state
@@ -141,8 +134,6 @@ fully invested into Unity ECS and the Latios Framework.
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
--   Mimic – Community-driven solutions for replicating common GameObject tools
-    and workflows inside Unity ECS
 
 ## Why Use the Latios Framework?
 
@@ -296,6 +287,8 @@ for how to get started.
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support
+-   Everyone else who reported bugs and made the Latios Framework more stable
+    for everyone
 
 ## A Word of Caution
 

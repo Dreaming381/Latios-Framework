@@ -175,114 +175,114 @@ namespace Latios.Mimic.Addons.Mecanim
 
         #region Parameters
         /// <summary>
-        /// Returns the stableSeed of the given float parameter.
+        /// Returns the value of the given float parameter.
         /// </summary>
         /// <param name="index">The parameter index in the mecanim controller's list of parameters. (fastest)</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public float GetFloat(short index) => GetFloatParameter(index);
 
         /// <summary>
-        /// Returns the stableSeed of the given float parameter.
+        /// Returns the value of the given float parameter.
         /// </summary>
         /// <param name="name">The parameter name.</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public float GetFloat(FixedString64Bytes name) => GetFloatParameter(GetParameterIndex(name));
 
         /// <summary>
-        /// Returns the stableSeed of the given float parameter.
+        /// Returns the value of the given float parameter.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public float GetFloat(int nameHash, bool isEditorHash) => GetFloatParameter(GetParameterIndex(nameHash, isEditorHash));
 
         /// <summary>
-        /// Returns the stableSeed of the given int parameter.
+        /// Returns the value of the given int parameter.
         /// </summary>
         /// <param name="index">The parameter index in the mecanim controller's list of parameters. (fastest)</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public int GetInt(short index) => GetIntParameter(index);
 
         /// <summary>
-        /// Returns the stableSeed of the given int parameter.
+        /// Returns the value of the given int parameter.
         /// </summary>
         /// <param name="name">The parameter name.</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public int GetInt(FixedString64Bytes name) => GetIntParameter(GetParameterIndex(name));
 
         /// <summary>
-        /// Returns the stableSeed of the given int parameter.
+        /// Returns the value of the given int parameter.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public int GetInt(int nameHash, bool isEditorHash) => GetIntParameter(GetParameterIndex(nameHash, isEditorHash));
 
         /// <summary>
-        /// Returns the stableSeed of the given bool parameter.
+        /// Returns the value of the given bool parameter.
         /// </summary>
         /// <param name="index">The parameter index in the mecanim controller's list of parameters. (fastest)</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetBool(short index) => GetBoolParameter(index);
 
         /// <summary>
-        /// Returns the stableSeed of the given bool parameter.
+        /// Returns the value of the given bool parameter.
         /// </summary>
         /// <param name="name">The parameter name.</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetBool(FixedString64Bytes name) => GetBoolParameter(GetParameterIndex(name));
 
         /// <summary>
-        /// Returns the stableSeed of the given bool parameter.
+        /// Returns the value of the given bool parameter.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetBool(int nameHash, bool isEditorHash) => GetBoolParameter(GetParameterIndex(nameHash, isEditorHash));
 
         /// <summary>
-        /// Returns the stableSeed of the given Trigger parameter.
+        /// Returns the value of the given Trigger parameter.
         /// </summary>
         /// <param name="index">The parameter index in the mecanim controller's list of parameters. (fastest)</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetTrigger(short index) => GetTriggerParameter(index);
 
         /// <summary>
-        /// Returns the stableSeed of the given Trigger parameter.
+        /// Returns the value of the given Trigger parameter.
         /// </summary>
         /// <param name="name">The parameter name.</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetTrigger(FixedString64Bytes name) => GetTriggerParameter(GetParameterIndex(name));
 
         /// <summary>
-        /// Returns the stableSeed of the given Trigger parameter.
+        /// Returns the value of the given Trigger parameter.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         /// <returns>
-        /// The stableSeed of the parameter.
+        /// The value of the parameter.
         /// </returns>
         public bool GetTrigger(int nameHash, bool isEditorHash) => GetTriggerParameter(GetParameterIndex(nameHash, isEditorHash));
 
@@ -290,21 +290,21 @@ namespace Latios.Mimic.Addons.Mecanim
         /// Send float values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter index in the mecanim controller's list of parameters.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetFloat(short index, float value) => SetFloatParameter(index, value);
 
         /// <summary>
         /// Send float values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetFloat(FixedString64Bytes name, float value) => SetFloatParameter(GetParameterIndex(name), value);
 
         /// <summary>
         /// Send float values to affect transitions.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         public void SetFloat(int nameHash, float value, bool isEditorHash) => SetFloatParameter(GetParameterIndex(nameHash, isEditorHash), value);
 
@@ -312,21 +312,21 @@ namespace Latios.Mimic.Addons.Mecanim
         /// Send int values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter index in the mecanim controller's list of parameters.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetInt(short index, int value) => SetIntParameter(index, value);
 
         /// <summary>
         /// Send int values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetInt(FixedString64Bytes name, int value) => SetIntParameter(GetParameterIndex(name), value);
 
         /// <summary>
         /// Send int values to affect transitions.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         public void SetInt(int nameHash, int value, bool isEditorHash) => SetIntParameter(GetParameterIndex(nameHash, isEditorHash), value);
 
@@ -334,21 +334,21 @@ namespace Latios.Mimic.Addons.Mecanim
         /// Send bool values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter index in the mecanim controller's list of parameters.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetBool(short index, bool value) => SetBoolParameter(index, value);
 
         /// <summary>
         /// Send bool values to affect transitions.
         /// </summary>
         /// <param name="name">The parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         public void SetBool(FixedString64Bytes name, bool value) => SetBoolParameter(GetParameterIndex(name), value);
 
         /// <summary>
         /// Send bool values to affect transitions.
         /// </summary>
         /// <param name="nameHash">The hashed parameter name.</param>
-        /// <param name="value">The new parameter stableSeed.</param>
+        /// <param name="value">The new parameter value.</param>
         /// <param name="isEditorHash">True if the hash was the baked editor hash, false if the hash is FixedString64Bytes.GetHashCode()</param>
         public void SetBool(int nameHash, bool value, bool isEditorHash) => SetBoolParameter(GetParameterIndex(nameHash, isEditorHash), value);
 

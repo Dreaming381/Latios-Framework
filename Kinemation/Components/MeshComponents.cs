@@ -1,9 +1,7 @@
 using System;
 using System.Diagnostics;
-using Latios.Transforms;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Mathematics;
 using Unity.Rendering;
 
