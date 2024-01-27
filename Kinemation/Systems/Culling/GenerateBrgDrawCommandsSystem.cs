@@ -615,9 +615,13 @@ namespace Latios.Kinemation.Systems
                         qword             ^= mask;
                         int instanceIndex  = (i << 6) + bitIndex;
 
-                        int visibilityIndex                 = startIndex + instanceIndex;
-                        outputInstances[numInstances]       = visibilityIndex;
+                        int visibilityIndex           = startIndex + instanceIndex;
+                        outputInstances[numInstances] = visibilityIndex;
+#if !LATIOS_TRANSFORMS_UNITY
                         outputSortingPosition[numInstances] = transforms[instanceIndex].position;
+#else
+                        outputSortingPosition[numInstances] = ((float4x4*)transforms)[instanceIndex].c3.xyz;
+#endif
 
                         ++numInstances;
                     }

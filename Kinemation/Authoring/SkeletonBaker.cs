@@ -43,7 +43,7 @@ namespace Latios.Kinemation.Authoring
 
                 var sharedMesh = skinnedMesh.sharedMesh;
                 DependsOn(sharedMesh);
-                if (sharedMesh.bindposeCount == 0)
+                if (sharedMesh == null || sharedMesh.bindposeCount == 0)
                     continue;
 
                 skinnedMeshesToBind.Add(GetEntity(skinnedMesh, TransformUsageFlags.Dynamic));
@@ -81,7 +81,8 @@ namespace Latios.Kinemation.Authoring
                     for (int i = 0; i < GetChildCount(bone); i++)
                     {
                         var child = GetChild(bone, i);
-                        if (GetComponent<SkinnedMeshRenderer>(child) == null && GetComponentInParent<Animator>(child) == authoring)
+                        if (GetComponent<SkinnedMeshRenderer>(child) == null && GetComponent<ExcludeFromSkeletonAuthoring>(child) == null &&
+                            GetComponentInParent<Animator>(child) == authoring)
                             m_breadthQueue.Enqueue((child, currentIndex));
                     }
                 }
@@ -113,7 +114,7 @@ namespace Latios.Kinemation.Authoring
                 for (int i = 0; i < GetChildCount(); i++)
                 {
                     var child = GetChild(i);
-                    if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<Animator>(child) != null)
+                    if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<ExcludeFromSkeletonAuthoring>(child) != null || GetComponent<Animator>(child) != null)
                         continue;
 
                     boneGoBuffer.Add(new ExportedBoneGameObjectRef { authoringGameObjectForBone = child });

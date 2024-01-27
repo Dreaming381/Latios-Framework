@@ -55,6 +55,14 @@ namespace Latios.Kinemation
             var twoAgoLocals   = bufferAsArray.GetSubArray(m_twoAgoBaseRootIndex + boneCount, boneCount);
             var currentLocals  = isDirty ? bufferAsArray.GetSubArray(m_currentBaseRootIndexWrite + boneCount, boneCount) : previousLocals;
 
+            if (m_bonesInertialBlendStates.Length < boneCount)
+            {
+                for (int i = m_bonesInertialBlendStates.Length; i < boneCount; i++)
+                {
+                    m_bonesInertialBlendStates.Add(default);
+                }
+            }
+
             // We go unsafe here to avoid copying as these are large
             var inertialBlends = (InertialBlendingTransformState*)m_bonesInertialBlendStates.Reinterpret<InertialBlendingTransformState>().GetUnsafePtr();
 

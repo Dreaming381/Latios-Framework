@@ -45,6 +45,7 @@ namespace Latios.Kinemation.Authoring.Systems
             list.Dispose();
         }
 
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct AddToMapJob : IJobEntity
         {
@@ -58,6 +59,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct ApplyJob : IJobEntity
         {

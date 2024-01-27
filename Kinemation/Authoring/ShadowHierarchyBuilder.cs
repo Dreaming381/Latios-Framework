@@ -62,7 +62,8 @@ namespace Latios.Kinemation.Authoring
                 var shadowChild = shadow.GetChild(i);
 
                 // If the child has an Animator or SkinnedMeshRenderer, it shouldn't be animated, so delete it.
-                if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null)
+                if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null ||
+                    shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
                 {
                     s_immediateChildrenToDestroy.Add(shadowChild);
                     continue;
@@ -90,7 +91,8 @@ namespace Latios.Kinemation.Authoring
                 var shadowChild = shadowRoot.GetChild(i);
 
                 // If the child has an Animator or SkinnedMeshRenderer, it shouldn't be animated, so delete it.
-                if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null)
+                if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null ||
+                    shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
                 {
                     RecurseTagSkinnedOrDelete(sourceChild, shadowChild);
                     continue;

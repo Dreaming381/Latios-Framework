@@ -248,6 +248,8 @@ namespace Latios.Kinemation.Authoring.Systems
                     // Create MMI from ranges
                     int rangesStartIndex = rangesList.Length;
 
+                    // Todo: Deduplicate ranges
+
                     foreach (var element in buffer)
                     {
                         rangesList.Add(new MaterialMeshIndex

@@ -469,7 +469,7 @@ namespace Latios
 #else
 
             var types = new List<System.Type>();
-            var type  = typeof(ICustomEditorBootstrap);
+            var type  = typeof(T);
             foreach (var assembly in System.AppDomain.CurrentDomain.GetAssemblies())
             {
                 if (!BootstrapTools.IsAssemblyReferencingLatios(assembly))
