@@ -302,11 +302,11 @@ namespace Latios.Kinemation
         /// <summary>
         /// The root-space transform of the bone from two frames ago
         /// </summary>
-        public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_previousRootIndex].boneTransform;
+        public TransformQvvs twoAgoRootTransform => m_boneTransforms[m_twoAgoRootIndex].boneTransform;
         /// <summary>
         /// The local-space transform of the bone from two frames ago
         /// </summary>
-        public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_previousRootIndex + m_boneCount].boneTransform;
+        public TransformQvvs twoAgoLocalTransform => m_boneTransforms[m_twoAgoRootIndex + m_boneCount].boneTransform;
 
         // Todo: More ReadOnly Properties
 

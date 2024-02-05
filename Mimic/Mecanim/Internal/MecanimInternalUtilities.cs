@@ -418,10 +418,10 @@ namespace Latios.Mimic.Addons.Mecanim
 
                                 float2 parametricVector =
                                     new float2((math.length(blendParameter) - math.length(motionPosition)) /
-                                               (math.length(referenceMotionPosition) + math.length(motionPosition)) / 2f, blendParameter.angleSigned(motionPosition));
+                                               ((math.length(referenceMotionPosition) + math.length(motionPosition)) / 2f), blendParameter.angleSigned(motionPosition));
                                 float2 referenceVector =
                                     new float2((math.length(referenceMotionPosition) - math.length(motionPosition)) /
-                                               (math.length(referenceMotionPosition) + math.length(motionPosition)) / 2f, referenceMotionPosition.angleSigned(motionPosition));
+                                               ((math.length(referenceMotionPosition) + math.length(motionPosition)) / 2f), referenceMotionPosition.angleSigned(motionPosition));
                                 float dot    = math.dot(parametricVector, referenceVector);
                                 float weight = math.abs(1f - dot);
                                 if (weight < minWeight)
