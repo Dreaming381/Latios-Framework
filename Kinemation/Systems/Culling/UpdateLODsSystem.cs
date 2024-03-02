@@ -34,9 +34,8 @@ namespace Latios.Kinemation.Systems
 
         EntityQuery m_query;
 
-        int  m_lastLodRangeOrderVersion;
-        int  m_lastChunkInfoOrderVersion;
-        bool m_firstRun;
+        int m_lastLodRangeOrderVersion;
+        int m_lastChunkInfoOrderVersion;
 
         SelectLodEnabledJob                 m_job;
         CopyLodsToPerCameraVisisbilitiesJob m_copyJob;
@@ -48,7 +47,6 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_query     = state.Fluent().With<ChunkHeader>(true).With<EntitiesGraphicsChunkInfo>(false).With<ChunkPerCameraCullingMask>(false).Build();
-            m_firstRun  = true;
 
             m_job = new SelectLodEnabledJob
             {
@@ -76,11 +74,13 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var lodParams = LODGroupExtensions.CalculateLODParams(latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().lodParameters);
+            var context           = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
+            var firstRunThisFrame = context.cullIndexThisFrame == 0;
+            var lodParams         = LODGroupExtensions.CalculateLODParams(context.lodParameters);
 
             bool lodParamsMatchPrev  = lodParams.Equals(m_PrevLODParams);
             var  resetLod            = !lodParamsMatchPrev;
-            resetLod                |= m_firstRun;
+            resetLod                |= firstRunThisFrame;
             resetLod                |= (state.EntityManager.GetComponentOrderVersion<LODRange>() - m_lastLodRangeOrderVersion) > 0;
             resetLod                |= (state.EntityManager.GetComponentOrderVersion<EntitiesGraphicsChunkInfo>() - m_lastChunkInfoOrderVersion) > 0;
 
@@ -110,7 +110,6 @@ namespace Latios.Kinemation.Systems
                 m_PrevLODParams        = lodParams;
                 m_PrevLodDistanceScale = lodParams.distanceScale;
                 m_PrevCameraPos        = lodParams.cameraPos;
-                m_firstRun             = false;
             }
             m_lastLodRangeOrderVersion  = state.EntityManager.GetComponentOrderVersion<LODRange>();
             m_lastChunkInfoOrderVersion = state.EntityManager.GetComponentOrderVersion<EntitiesGraphicsChunkInfo>();

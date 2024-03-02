@@ -695,7 +695,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                 // We write the bindpose in the second part of groupshared
                 gs_transforms[meshBonesCount + i] = _bindPoses[meshBindposesStart + i];
                 
-                Qvvs boneQvvs = transformUnionQvvsToQvvs(_skeletonQvvsTransforms[skeletonTransformStartIndex + i]);
+                Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + i];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
                 // We write the world DQS in the first part of groupshared.
                 gs_transforms[i] = dqsToTransformUnionDqs(boneDqs);
@@ -756,7 +756,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     boneOffset = boneOffset >> 16;
                 boneOffset = boneOffset & 0x7fff;
 
-                Qvvs boneQvvs = transformUnionQvvsToQvvs(_skeletonQvvsTransforms[skeletonTransformStartIndex + boneOffset]);
+                Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + boneOffset];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
                 // We write the world DQS in the first part of groupshared.
                 gs_transforms[i] = dqsToTransformUnionDqs(boneDqs);
@@ -768,7 +768,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             // Compute World Dual Quaternions with pre-offset skeleton in memory and write to groupshared.
             for (uint i = threadId; i < meshBonesCount; i += THREAD_GROUP_SIZE)
             {
-                Qvvs boneQvvs = transformUnionQvvsToQvvs(_skeletonQvvsTransforms[skeletonTransformStartIndex + i]);
+                Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + i];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
                 gs_transforms[i] = dqsToTransformUnionDqs(boneDqs);
             }

@@ -476,6 +476,7 @@ namespace Latios.Kinemation.Systems
                     boneTransformLookup     = GetBufferLookup<OptimizedBoneTransform>(true),
                     boundMeshLookup         = GetComponentLookup<BoundMesh>(true),
                     dependentsLookup        = GetBufferLookup<DependentSkinnedMesh>(false),
+                    hierarchyLookup         = GetComponentLookup<OptimizedSkeletonHierarchyBlobReference>(true),
                     meshGpuManager          = meshGpuManager,
                     skeletonDependentLookup = GetComponentLookup<SkeletonDependent>(false),
                     operations              = skeletonBindingOps.AsDeferredJobArray(),
@@ -1667,13 +1668,14 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct ProcessBindingOpsJob : IJobParallelForDefer
         {
-            [ReadOnly] public NativeArray<BindUnbindOperation>     operations;
-            [ReadOnly] public NativeArray<int2>                    startsAndCounts;
-            [ReadOnly] public BufferLookup<OptimizedBoneTransform> boneTransformLookup;
-            [ReadOnly] public BufferLookup<BoneReference>          boneRefsLookup;
-            [ReadOnly] public ComponentLookup<BoundMesh>           boundMeshLookup;
-            [ReadOnly] public MeshGpuManager                       meshGpuManager;
-            [ReadOnly] public BoneOffsetsGpuManager                boneOffsetsGpuManager;
+            [ReadOnly] public NativeArray<BindUnbindOperation>                         operations;
+            [ReadOnly] public NativeArray<int2>                                        startsAndCounts;
+            [ReadOnly] public BufferLookup<OptimizedBoneTransform>                     boneTransformLookup;
+            [ReadOnly] public BufferLookup<BoneReference>                              boneRefsLookup;
+            [ReadOnly] public ComponentLookup<BoundMesh>                               boundMeshLookup;
+            [ReadOnly] public ComponentLookup<OptimizedSkeletonHierarchyBlobReference> hierarchyLookup;
+            [ReadOnly] public MeshGpuManager                                           meshGpuManager;
+            [ReadOnly] public BoneOffsetsGpuManager                                    boneOffsetsGpuManager;
 
             [NativeDisableParallelForRestriction] public BufferLookup<DependentSkinnedMesh> dependentsLookup;
             [NativeDisableParallelForRestriction] public BufferLookup<OptimizedBoneBounds>  optimizedBoundsLookup;
@@ -1754,7 +1756,10 @@ namespace Latios.Kinemation.Systems
                     var boundsBuffer = optimizedBoundsLookup[skeletonEntity];
                     if (boundsBuffer.IsEmpty)
                     {
-                        boundsBuffer.Resize(boneTransformLookup[skeletonEntity].Length, NativeArrayOptions.ClearMemory);
+                        if (hierarchyLookup.TryGetComponent(skeletonEntity, out var hierarchyRef))
+                            boundsBuffer.Resize(hierarchyRef.blob.Value.parentIndices.Length, NativeArrayOptions.ClearMemory);
+                        else
+                            boundsBuffer.Resize(boneTransformLookup[skeletonEntity].Length / 6, NativeArrayOptions.ClearMemory);
                     }
                     var boundsArray = boundsBuffer.Reinterpret<float>().AsNativeArray();
 

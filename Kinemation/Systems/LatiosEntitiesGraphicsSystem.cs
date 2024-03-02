@@ -1150,6 +1150,8 @@ namespace Latios.Kinemation.Systems
 
                 m_ChunkMetadataAllocator.Release(metadataAllocation);
             }
+
+            m_ThreadedBatchContext.RemoveBatch(new BatchID { value = (uint) batchIndex });
         }
 
         static int NumInstancesInChunk(ArchetypeChunk chunk) => chunk.Capacity;
