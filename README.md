@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.9.3]
+# Latios Framework for Unity ECS – [0.9.4]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -46,6 +46,9 @@ are community contributed features, and consequently may have different design
 philosophies or support guarantees as other features. With that said, some addon
 authors are very active and offer support and reliability that surpasses native
 features.
+
+Modules and addons are disabled by default and are installed via a custom
+bootstrap. Bootstrap templates are provided in the Assets Create menu.
 
 ### Core
 
@@ -134,6 +137,9 @@ into Unity ECS and the Latios Framework.
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
+-   Unnamed Environment – Terrain, water, vegetation, weather, proc-gen, and
+    many other things to build worlds
+-   Unnamed Networking – Something fast and flexible at scale
 
 ## Why Use the Latios Framework?
 
@@ -150,6 +156,13 @@ alternatives for fundamental design issues in the official ECS packages. For
 technical reasons, it is a “framework”, but the individual APIs act more like a
 toolkit and stay out of the way. A developer using it should always feel in
 control. If not, there’s likely an issue worth bringing to attention.
+
+In addition, the Latios Framework strives to fix multiple fundamental
+performance and behavior issues within Unity’s ECS packages. The results of such
+efforts are best demonstrated in [this video](https://youtu.be/AgcRePkWoFc). For
+a complete breakdown of these changes with each configuration and bootstrap,
+[check out this
+guide](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/What%20Parts%20of%20ECS%20Does%20the%20Latios%20Framework%20Change.md).
 
 0.5 marked the end of Phase II, where focus was placed on enabling technologies
 in Unity ECS such as audio and animation. Current Phase III development focuses

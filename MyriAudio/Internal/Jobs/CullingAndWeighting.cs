@@ -254,15 +254,15 @@ namespace Latios.Myri
                 if (!perfectMatch)
                 {
                     //No perfect match.
-                    int4              bestMinMaxXYIndices = default;  //This should always be overwritten
-                    float4            bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
+                    int4                     bestMinMaxXYIndices = default;  //This should always be overwritten
+                    float4                   bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
                     FixedList128Bytes<int>   candidateChannels   = default;
                     FixedList128Bytes<float> candidateDistances  = default;
 
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerLeftChannel);
-                    var                 leftChannelDeltas  = scratchCache.AsArray();
+                    var                      leftChannelDeltas  = scratchCache.AsArray();
                     FixedList512Bytes<bool2> leftChannelInsides = default;
 
                     for (int i = 0; i < leftChannelDeltas.Length; i++)
@@ -439,15 +439,15 @@ namespace Latios.Myri
                 if (!perfectMatch)
                 {
                     //No perfect match.
-                    int4              bestMinMaxXYIndices = default;  //This should always be overwritten
-                    float4            bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
+                    int4                     bestMinMaxXYIndices = default;  //This should always be overwritten
+                    float4                   bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
                     FixedList128Bytes<int>   candidateChannels   = default;
                     FixedList128Bytes<float> candidateDistances  = default;
 
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerRightChannel);
-                    var                 rightChannelDeltas  = scratchCache.AsArray();
+                    var                      rightChannelDeltas  = scratchCache.AsArray();
                     FixedList512Bytes<bool2> rightChannelInsides = default;
 
                     for (int i = 0; i < rightChannelDeltas.Length; i++)
@@ -604,25 +604,19 @@ namespace Latios.Myri
                     }
                 }
 
-                //Combine left and right
-                float combinedWeightSum = 0f;
+                // Filter out zero-weights
+                // Todo: Pre-compute and cache
                 for (int i = 0; i < profile.anglesPerLeftChannel.Length; i++)
                 {
-                    weights.channelWeights[i] *= profile.filterVolumesPerLeftChannel[i] * (1f - profile.passthroughFractionsPerLeftChannel[i]) +
-                                                 profile.passthroughVolumesPerLeftChannel[i] * profile.passthroughFractionsPerLeftChannel[i];
-                    combinedWeightSum += weights.channelWeights[i];
+                    if (profile.filterVolumesPerLeftChannel[i] * (1f - profile.passthroughFractionsPerLeftChannel[i]) +
+                        profile.passthroughVolumesPerLeftChannel[i] * profile.passthroughFractionsPerLeftChannel[i] <= 0f)
+                        weights.channelWeights[i] = 0f;
                 }
                 for (int i = 0; i < profile.anglesPerRightChannel.Length; i++)
                 {
-                    weights.channelWeights[i + profile.anglesPerLeftChannel.Length] *= profile.filterVolumesPerRightChannel[i] *
-                                                                                       (1f - profile.passthroughFractionsPerRightChannel[i]) +
-                                                                                       profile.passthroughVolumesPerRightChannel[i] *
-                                                                                       profile.passthroughFractionsPerRightChannel[i];
-                    combinedWeightSum += weights.channelWeights[i + profile.anglesPerLeftChannel.Length];
-                }
-                for (int i = 0; i < weights.channelWeights.Length; i++)
-                {
-                    weights.channelWeights[i] /= combinedWeightSum;
+                    if (profile.filterVolumesPerRightChannel[i] * (1f - profile.passthroughFractionsPerRightChannel[i]) +
+                        profile.passthroughVolumesPerRightChannel[i] * profile.passthroughFractionsPerRightChannel[i] <= 0f)
+                        weights.channelWeights[i + profile.anglesPerLeftChannel.Length] = 0f;
                 }
             }
         }

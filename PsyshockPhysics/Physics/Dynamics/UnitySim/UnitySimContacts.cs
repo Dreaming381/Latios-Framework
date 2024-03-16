@@ -74,8 +74,9 @@ namespace Latios.Psyshock
             public void Add(ContactOnB contact)
             {
                 CheckCapacityBeforeAdd();
-                this[contactCount] = contact;
+                var index = contactCount;
                 contactCount++;
+                this[index] = contact;
             }
 
             public void Add(float3 locationOnB, float distanceToA)
