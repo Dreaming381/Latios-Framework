@@ -15,7 +15,7 @@ namespace Latios.Psyshock
             // Todo: SAT algorithm similar to box vs box.
             var bInATransform = math.mul(math.inverse(aTransform), bTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(triangleA, triangleB, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
+            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
             SphereTriangle.DistanceBetween(in triangleA,
                                            in RigidTransform.identity,
                                            new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
@@ -160,7 +160,7 @@ namespace Latios.Psyshock
 
                 if (math.abs(math.dot(bPlane.normal, aLocalContactNormal)) > 0.05f)
                 {
-                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
 
                     // Project and clip edges of A onto the face of B.
                     for (int edgeIndex = 0; edgeIndex < 3; edgeIndex++)
@@ -202,7 +202,7 @@ namespace Latios.Psyshock
                     for (int i = 0; i < 3; i++)
                     {
                         var vertex = bVertices[i];
-                        if (math.all(simd.dot(aEdgePlaneNormals, vertex) + aEdgePlaneDistances <= 0f))
+                        if (math.all(simd.dot(aEdgePlaneNormals, vertex) < aEdgePlaneDistances))
                         {
                             var distance = mathex.SignedDistance(aPlane, vertex) * distanceScalarAlongContactNormalA;
                             result.Add(math.transform(aTransform, vertex), distance);

@@ -27,6 +27,17 @@ Dictionary<string, string> colliderLowerNames = new Dictionary<string, string>()
 	{"Compound" , "compound" }
 };
 
+Dictionary<string, string> colliderPropertyNames = new Dictionary<string, string>()
+{
+	{"Sphere"   , "sphere" },
+	{"Capsule"  , "capsule" },
+	{"Box"      , "box" },
+	{"Triangle" , "triangle" },
+	{"Convex"   , "convex" },
+	{"TriMesh"  , "triMesh()" },
+	{"Compound" , "compound()" }
+};
+
 int firstComposite = 5;
 #>
 using Unity.Burst;
@@ -50,11 +61,11 @@ namespace Latios.Psyshock
 int i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderLowerNames[colliderTypeNameA];
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderLowerNames[colliderTypeNameB];
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
@@ -111,11 +122,11 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderLowerNames[colliderTypeNameA];
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderLowerNames[colliderTypeNameB];
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
@@ -123,9 +134,11 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 		{
 #>
 				{
-					<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result);
-					result.FlipInPlace();
-					processor.Execute(in result);
+					if (<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result))
+					{
+					    result.FlipInPlace();
+					    processor.Execute(in result);
+					}
 					break;
 				}
 <#
@@ -134,8 +147,8 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 		{
 #>
 				{
-					<#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, out result);
-					processor.Execute(in result);
+					if (<#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, out result))
+					    processor.Execute(in result);
 					break;
 				}
 <#
@@ -175,11 +188,11 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderLowerNames[colliderTypeNameA];
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderLowerNames[colliderTypeNameB];
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
@@ -218,11 +231,11 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
-	var colliderNameA = colliderLowerNames[colliderTypeNameA];
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
 	int j = 0;
 	foreach (var colliderTypeNameB in colliderTypeNames)
 	{
-		var colliderNameB = colliderLowerNames[colliderTypeNameB];
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
 #>
 				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
@@ -230,7 +243,7 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 		{
 #>
 				{
-					var result = <#= colliderTypeNameA #><#= colliderTypeNameB #>.UnityContactsBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, in distanceResult);
+					var result = <#= colliderTypeNameA #><#= colliderTypeNameB #>.UnityContactsBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, distanceResult.ToFlipped());
 					result.FlipInPlace();
 					return result;
 				}

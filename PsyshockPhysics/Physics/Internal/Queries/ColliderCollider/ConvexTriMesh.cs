@@ -14,14 +14,17 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var convexInTriMeshTransform = math.mul(math.inverse(triMeshTransform), convexTransform);
-            var aabb                     = Physics.AabbFrom(convex, in convexInTriMeshTransform);
-            var processor                = new ConvexDistanceProcessor
+            var convexInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), convexTransform);
+            var aabb                      = Physics.AabbFrom(convex, in convexInTriMeshTransform);
+            aabb.min                     -= maxDistance;
+            aabb.max                     += maxDistance;
+            var processor                 = new ConvexDistanceProcessor
             {
                 blob            = triMesh.triMeshColliderBlob,
                 convex          = convex,
                 convexTransform = convexInTriMeshTransform,
                 maxDistance     = maxDistance,
+                bestDistance    = float.MaxValue,
                 found           = false,
                 scale           = triMesh.scale
             };
@@ -52,9 +55,11 @@ namespace Latios.Psyshock
                                                         float maxDistance,
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            var convexInTriMeshTransform = math.mul(math.inverse(triMeshTransform), convexTransform);
-            var aabb                     = Physics.AabbFrom(convex, convexInTriMeshTransform);
-            var triProcessor             = new DistanceAllProcessor<T>
+            var convexInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), convexTransform);
+            var aabb                      = Physics.AabbFrom(convex, convexInTriMeshTransform);
+            aabb.min                     -= maxDistance;
+            aabb.max                     += maxDistance;
+            var triProcessor              = new DistanceAllProcessor<T>
             {
                 triMesh          = triMesh,
                 triMeshTransform = triMeshTransform,

@@ -20,10 +20,10 @@ namespace Latios.Psyshock
                 Physics.TransformAabb(new TransformQvvs(transformAinB.pos, transformAinB.rot, 1f, triMeshA.scale), in triMeshA.triMeshColliderBlob.Value.localAabb);
             var aabbBinA =
                 Physics.TransformAabb(new TransformQvvs(transformBinA.pos, transformBinA.rot, 1f, triMeshB.scale), in triMeshB.triMeshColliderBlob.Value.localAabb);
-            aabbAinB.min *= maxDistance;
-            aabbAinB.max *= maxDistance;
-            aabbBinA.min *= maxDistance;
-            aabbBinA.max *= maxDistance;
+            aabbAinB.min -= maxDistance;
+            aabbAinB.max += maxDistance;
+            aabbBinA.min -= maxDistance;
+            aabbBinA.max += maxDistance;
 
             var processor = new TriMeshDistanceOuterProcessor
             {
@@ -31,13 +31,15 @@ namespace Latios.Psyshock
                 {
                     blobA         = triMeshA.triMeshColliderBlob,
                     maxDistance   = maxDistance,
+                    bestDistance  = float.MaxValue,
                     scaleA        = triMeshA.scale,
                     transformBinA = transformBinA,
                 },
-                aabbBinA = aabbBinA,
-                blobB    = triMeshB.triMeshColliderBlob,
-                found    = false,
-                scaleB   = triMeshB.scale,
+                aabbBinA     = aabbBinA,
+                blobB        = triMeshB.triMeshColliderBlob,
+                bestDistance = float.MaxValue,
+                found        = false,
+                scaleB       = triMeshB.scale,
             };
 
             triMeshB.triMeshColliderBlob.Value.FindTriangles(in aabbAinB, ref processor, triMeshB.scale);

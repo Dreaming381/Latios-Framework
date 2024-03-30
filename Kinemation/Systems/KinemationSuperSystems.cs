@@ -132,6 +132,7 @@ namespace Latios.Kinemation.Systems
             EnableSystemSorting = false;
 
             GetOrCreateAndAddManagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
+            GetOrCreateAndAddUnmanagedSystem<PrepareLODsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<CombineExposedBonesSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkinnedPostProcessMatrixBoundsSystem>();

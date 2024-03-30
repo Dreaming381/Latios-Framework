@@ -29,13 +29,13 @@ namespace Latios.Transforms.Authoring
 
             var original = current;
             GetScaleAndStretch(current.localScale, out var scale, out var stretch);
-            var currentQvvs = new TransformQvvs(current.position, current.rotation, scale, stretch);
+            var currentQvvs = new TransformQvvs(current.localPosition, current.localRotation, scale, stretch);
 
-            while (current != targetSpace && current.parent != null)
+            while (current.parent != null && current.parent != targetSpace)
             {
                 current = current.parent;
                 GetScaleAndStretch(current.localScale, out scale, out stretch);
-                var parentQvvs = new TransformQvvs(current.position, current.rotation, scale, stretch);
+                var parentQvvs = new TransformQvvs(current.localPosition, current.localRotation, scale, stretch);
                 currentQvvs    = qvvs.mul(in parentQvvs, in currentQvvs);
             }
 
@@ -43,13 +43,13 @@ namespace Latios.Transforms.Authoring
                 return currentQvvs;
 
             GetScaleAndStretch(targetSpace.localScale, out scale, out stretch);
-            var targetToWorldQvvs = new TransformQvvs(targetSpace.position, targetSpace.rotation, scale, stretch);
+            var targetToWorldQvvs = new TransformQvvs(targetSpace.localPosition, targetSpace.localRotation, scale, stretch);
 
-            while (targetSpace != original && targetSpace.parent != null)
+            while (targetSpace.parent != null && targetSpace != original)
             {
                 targetSpace = targetSpace.parent;
                 GetScaleAndStretch(targetSpace.localScale, out scale, out stretch);
-                var parentQvvs    = new TransformQvvs(targetSpace.position, targetSpace.rotation, scale, stretch);
+                var parentQvvs    = new TransformQvvs(targetSpace.localPosition, targetSpace.localRotation, scale, stretch);
                 targetToWorldQvvs = qvvs.mul(in parentQvvs, in targetToWorldQvvs);
             }
 

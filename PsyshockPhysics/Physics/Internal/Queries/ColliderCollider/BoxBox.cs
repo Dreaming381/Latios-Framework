@@ -184,7 +184,7 @@ namespace Latios.Psyshock
                 bEdgePlaneNormals                      = simd.mul(bInATransform.rot, bEdgePlaneNormals);
                 var  bEdgePlaneDistances               = simd.dot(bEdgePlaneNormals, bVertices.bcda);
                 bool needsClosestPoint                 = true;
-                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
 
                 // Project and clip edges of A onto the face of B.
                 for (int edgeIndex = 0; edgeIndex < 4; edgeIndex++)
@@ -226,7 +226,7 @@ namespace Latios.Psyshock
                 for (int i = 0; i < 4; i++)
                 {
                     var vertex = bVertices[i];
-                    if (math.all(simd.dot(aEdgePlaneNormals, vertex) + aEdgePlaneDistances <= 0f))
+                    if (math.all(simd.dot(aEdgePlaneNormals, vertex) < aEdgePlaneDistances))
                     {
                         var distance = mathex.SignedDistance(aPlane, vertex) * distanceScalarAlongContactNormalA;
                         result.Add(math.transform(aTransform, vertex), distance);

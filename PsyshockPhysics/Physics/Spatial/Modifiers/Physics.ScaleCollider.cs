@@ -22,28 +22,28 @@ namespace Latios.Psyshock
             switch (collider.type)
             {
                 case ColliderType.Sphere:
-                    ScaleStretchCollider(ref collider.m_sphere,   scale, stretch);
+                    ScaleStretchCollider(ref collider.m_sphere,       scale, stretch);
                     break;
                 case ColliderType.Capsule:
-                    ScaleStretchCollider(ref collider.m_capsule,  scale, stretch);
+                    ScaleStretchCollider(ref collider.m_capsule,      scale, stretch);
                     break;
                 case ColliderType.Box:
-                    ScaleStretchCollider(ref collider.m_box,      scale, stretch);
+                    ScaleStretchCollider(ref collider.m_box,          scale, stretch);
                     break;
                 case ColliderType.Triangle:
-                    ScaleStretchCollider(ref collider.m_triangle, scale, stretch);
+                    ScaleStretchCollider(ref collider.m_triangle,     scale, stretch);
                     break;
                 case ColliderType.Convex:
-                    ScaleStretchCollider(ref collider.m_convex,   scale, stretch);
+                    ScaleStretchCollider(ref collider.m_convex,       scale, stretch);
                     break;
                 case ColliderType.TriMesh:
-                    ScaleStretchCollider(ref collider.m_triMesh,  scale, stretch);
+                    ScaleStretchCollider(ref collider.m_triMeshRW(),  scale, stretch);
                     break;
                 case ColliderType.Compound:
-                    ScaleStretchCollider(ref collider.m_compound, scale, stretch);
+                    ScaleStretchCollider(ref collider.m_compoundRW(), scale, stretch);
                     break;
                 default:
-                    ThrowUnsupportedType();
+                    ThrowUnsupportedType(collider.type);
                     break;
             }
         }

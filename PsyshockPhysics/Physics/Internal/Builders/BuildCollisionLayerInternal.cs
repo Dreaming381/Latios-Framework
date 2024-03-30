@@ -1,8 +1,11 @@
-﻿using Latios.Transforms;
+﻿using System;
+using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -18,11 +21,20 @@ namespace Latios.Psyshock
             public Entity        entity;
         }
 
+        public struct FilteredChunkCache
+        {
+            public ArchetypeChunk chunk;
+            public v128           mask;
+            public int            firstEntityIndex;
+            public int            countInChunk;
+            public bool           usesMask;
+        }
+
         #region Jobs
-        //Parallel
-        //Calculate RigidTransform, AABB, and target bucket. Write the targetBucket as the layerIndex
+        // Parallel
+        // Calculate Aabb and target bucket. Write the targetBucket as the layerIndex
         [BurstCompile]
-        public struct Part1FromQueryJob : IJobChunk
+        public struct Part1FromUnfilteredQueryJob : IJobChunk
         {
             [ReadOnly] public CollisionLayer                                                   layer;
             [NoAlias, NativeDisableParallelForRestriction] public NativeArray<int>             layerIndices;
@@ -33,7 +45,114 @@ namespace Latios.Psyshock
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
+                var chunkEntities   = chunk.GetNativeArray(typeGroup.entity);
+                var chunkColliders  = chunk.GetNativeArray(ref typeGroup.collider);
+                var chunkTransforms = typeGroup.worldTransform.Resolve(chunk);
+                for (int src = 0, dst = firstEntityInChunkIndices[unfilteredChunkIndex]; src < chunk.Count; src++, dst++)
+                {
+                    var collider  = chunkColliders[src];
+                    var transform = chunkTransforms[src];
+                    var entity    = chunkEntities[src];
+
+                    Aabb aabb = Physics.AabbFrom(in collider, transform.worldTransformQvvs);
+
+                    colliderAoS[dst] = new ColliderAoSData
+                    {
+                        collider  = collider,
+                        transform = transform.worldTransformQvvs,
+                        aabb      = aabb,
+                        entity    = entity
+                    };
+                    xMinMaxs[dst] = new float2(aabb.min.x, aabb.max.x);
+
+                    int3 minBucket = math.int3(math.floor((aabb.min - layer.worldMin) / layer.worldAxisStride));
+                    int3 maxBucket = math.int3(math.floor((aabb.max - layer.worldMin) / layer.worldAxisStride));
+                    minBucket      = math.clamp(minBucket, 0, layer.worldSubdivisionsPerAxis - 1);
+                    maxBucket      = math.clamp(maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
+
+                    if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
+                    {
+                        layerIndices[dst] = layer.bucketStartsAndCounts.Length - 1;
+                    }
+                    else if (math.all(minBucket == maxBucket))
+                    {
+                        layerIndices[dst] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                    }
+                    else
+                    {
+                        layerIndices[dst] = layer.bucketStartsAndCounts.Length - 2;
+                    }
+                }
+            }
+        }
+
+        // Single
+        // Create a cache of chunks, their masks, and their counts to preallocate the arrays without having to process filters twice.
+        [BurstCompile]
+        public struct Part0PrefilterQueryJob : IJobChunk
+        {
+            public NativeList<FilteredChunkCache> filteredChunkCache;
+            int                                   countAccumulated;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                int filteredCount = math.select(chunk.Count, math.countbits(chunkEnabledMask.ULong0) + math.countbits(chunkEnabledMask.ULong1), useEnabledMask);
+                filteredChunkCache.AddNoResize(new FilteredChunkCache
+                {
+                    chunk            = chunk,
+                    mask             = chunkEnabledMask,
+                    firstEntityIndex = countAccumulated,
+                    countInChunk     = filteredCount,
+                    usesMask         = useEnabledMask
+                });
+                countAccumulated += filteredCount;
+            }
+        }
+
+        // Single
+        // Allocate the CollisionLayer NativeLists and temp lists to the correct size using the gathers cached chunks.
+        [BurstCompile]
+        public struct AllocateCollisionLayerFromFilteredQueryJob : IJob
+        {
+            public CollisionLayer                             layer;
+            public NativeList<int>                            layerIndices;
+            public NativeList<float2>                         xMinMaxs;
+            public NativeList<ColliderAoSData>                colliderAoS;
+            [ReadOnly] public NativeArray<FilteredChunkCache> filteredChunkCache;
+
+            public void Execute()
+            {
+                if (filteredChunkCache.Length == 0)
+                    return;
+
+                var last  = filteredChunkCache[filteredChunkCache.Length - 1];
+                var count = last.firstEntityIndex + last.countInChunk;
+                layer.ResizeUninitialized(count);
+                layerIndices.ResizeUninitialized(count);
+                xMinMaxs.ResizeUninitialized(count);
+                colliderAoS.ResizeUninitialized(count);
+            }
+        }
+
+        // Parallel
+        // Calculate Aabb and target bucket. Write the targetBucket as the layerIndex
+        [BurstCompile]
+        public struct Part1FromFilteredQueryJob : IJobParallelForDefer
+        {
+            [ReadOnly] public CollisionLayer                                                   layer;
+            [NoAlias, NativeDisableParallelForRestriction] public NativeArray<int>             layerIndices;
+            [NoAlias, NativeDisableParallelForRestriction] public NativeArray<ColliderAoSData> colliderAoS;
+            [NoAlias, NativeDisableParallelForRestriction] public NativeArray<float2>          xMinMaxs;
+            [ReadOnly] public BuildCollisionLayerTypeHandles                                   typeGroup;
+            [ReadOnly] public NativeArray<FilteredChunkCache>                                  filteredChunkCache;
+
+            public void Execute(int chunkIndex)
+            {
+                var filteredChunk    = filteredChunkCache[chunkIndex];
+                var chunk            = filteredChunk.chunk;
+                var firstEntityIndex = filteredChunk.firstEntityIndex;
+                var useEnabledMask   = filteredChunk.usesMask;
+                var chunkEnabledMask = filteredChunk.mask;
 
                 var chunkEntities   = chunk.GetNativeArray(typeGroup.entity);
                 var chunkColliders  = chunk.GetNativeArray(ref typeGroup.collider);
@@ -77,12 +196,41 @@ namespace Latios.Psyshock
             }
         }
 
-        //Parallel
-        //Calculated Target Bucket and write as layer index
+        // Single
+        // Allocate the CollisionLayer NativeLists and temp lists to the correct size using the bodies list
         [BurstCompile]
-        public struct Part1FromColliderBodyArrayJob : IJob, IJobParallelFor
+        public struct AllocateCollisionLayerFromBodiesListJob : IJob
         {
             public CollisionLayer                       layer;
+            public NativeList<int>                      layerIndices;
+            public NativeList<float2>                   xMinMaxs;
+            public NativeList<Aabb>                     aabbs;
+            [ReadOnly] public NativeArray<ColliderBody> bodies;
+
+            public bool aabbsAreProvided;
+
+            public void Execute()
+            {
+                layer.ResizeUninitialized(bodies.Length);
+                layerIndices.ResizeUninitialized(bodies.Length);
+                xMinMaxs.ResizeUninitialized(bodies.Length);
+                if (aabbsAreProvided)
+                {
+                    ValidateOverrideAabbsAreRightLength(aabbs.AsArray(), bodies.Length);
+                }
+                else
+                {
+                    aabbs.ResizeUninitialized(bodies.Length);
+                }
+            }
+        }
+
+        // Parallel
+        // Calculate target bucket and write as layer index
+        [BurstCompile]
+        public struct Part1FromColliderBodyArrayJob : IJob, IJobParallelForDefer
+        {
+            [ReadOnly] public CollisionLayer            layer;
             [NoAlias] public NativeArray<int>           layerIndices;
             [ReadOnly] public NativeArray<ColliderBody> colliderBodies;
             [NoAlias] public NativeArray<Aabb>          aabbs;
@@ -120,12 +268,12 @@ namespace Latios.Psyshock
             }
         }
 
-        //Parallel
-        //Calculated Target Bucket and write as layer index using the override AABB
+        // Parallel
+        // Calculate target bucket and write as layer index using the override Aabb
         [BurstCompile]
-        public struct Part1FromDualArraysJob : IJob, IJobParallelFor
+        public struct Part1FromDualArraysJob : IJob, IJobParallelForDefer
         {
-            public CollisionLayer                layer;
+            [ReadOnly] public CollisionLayer     layer;
             [NoAlias] public NativeArray<int>    layerIndices;
             [ReadOnly] public NativeArray<Aabb>  aabbs;
             [NoAlias] public NativeArray<float2> xMinMaxs;
@@ -138,6 +286,8 @@ namespace Latios.Psyshock
 
             public void Execute(int i)
             {
+                ValidateOverrideAabbsAreRightLength(aabbs, layerIndices.Length);
+
                 var aabb    = aabbs[i];
                 xMinMaxs[i] = new float2(aabb.min.x, aabb.max.x);
 
@@ -161,8 +311,8 @@ namespace Latios.Psyshock
             }
         }
 
-        //Single
-        //Count total in each bucket and assign global array position to layerIndex
+        // Single
+        // Count total in each bucket and assign global array position to layerIndex
         [BurstCompile]
         public struct Part2Job : IJob
         {
@@ -194,13 +344,13 @@ namespace Latios.Psyshock
             }
         }
 
-        //Parallel
-        //Reverse array of dst indices to array of src indices
-        //Todo: Might be faster as an IJob due to potential false sharing
+        // Parallel
+        // Reverse array of dst indices to array of src indices
+        // Todo: Might be faster as an IJob due to potential false sharing
         [BurstCompile]
-        public struct Part3Job : IJob, IJobParallelFor
+        public struct Part3Job : IJob, IJobParallelForDefer
         {
-            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<int>          layerIndices;
+            [ReadOnly] public NativeArray<int>                                     layerIndices;
             [NoAlias, NativeDisableParallelForRestriction] public NativeArray<int> unsortedSrcIndices;
 
             public void Execute()
@@ -216,14 +366,14 @@ namespace Latios.Psyshock
             }
         }
 
-        //Parallel
-        //Sort buckets
+        // Parallel
+        // Sort buckets and build interval trees
         [BurstCompile]
         public struct Part4Job : IJob, IJobParallelFor
         {
             [NoAlias, NativeDisableParallelForRestriction] public NativeArray<int>              unsortedSrcIndices;
             [NoAlias, NativeDisableParallelForRestriction] public NativeArray<IntervalTreeNode> trees;
-            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<float2>                    xMinMaxs;
+            [ReadOnly] public NativeArray<float2>                                               xMinMaxs;
             [ReadOnly] public NativeArray<int2>                                                 bucketStartAndCounts;
 
             public void Execute()
@@ -261,15 +411,15 @@ namespace Latios.Psyshock
             }
            }*/
 
-        //Parallel
-        //Copy AoS data to SoA layer
+        // Parallel
+        // Copy AoS data to SoA layer
         [BurstCompile]
-        public struct Part5FromQueryJob : IJob, IJobParallelFor
+        public struct Part5FromAoSJob : IJob, IJobParallelForDefer
         {
             [NoAlias, NativeDisableParallelForRestriction]
             public CollisionLayer layer;
 
-            [ReadOnly, DeallocateOnJobCompletion]
+            [ReadOnly]
             public NativeArray<ColliderAoSData> colliderAoS;
 
             public void Execute()
@@ -293,10 +443,10 @@ namespace Latios.Psyshock
             }
         }
 
-        //Parallel
-        //Copy array data to layer
+        // Parallel
+        // Copy array data to layer
         [BurstCompile]
-        public struct Part5FromArraysJob : IJob, IJobParallelFor
+        public struct Part5FromSplitArraysJob : IJob, IJobParallelForDefer
         {
             [NativeDisableParallelForRestriction]
             public CollisionLayer layer;
@@ -320,8 +470,23 @@ namespace Latios.Psyshock
             }
         }
 
-        //Single
-        //All five steps for custom arrays
+        // Single
+        // All five steps plus allocation for chunk caches
+        [BurstCompile]
+        public struct BuildFromFilteredChunkCacheSingleJob : IJob
+        {
+            public CollisionLayer                             layer;
+            [ReadOnly] public NativeArray<FilteredChunkCache> filteredChunkCache;
+            public BuildCollisionLayerTypeHandles             handles;
+
+            public void Execute()
+            {
+                BuildImmediate(ref layer, filteredChunkCache, in handles);
+            }
+        }
+
+        // Single
+        // All five steps for custom bodies array
         [BurstCompile]
         public struct BuildFromColliderArraySingleJob : IJob
         {
@@ -335,8 +500,8 @@ namespace Latios.Psyshock
             }
         }
 
-        //Single
-        //All five steps for custom arrays
+        // Single
+        // All five steps for custom arrays
         [BurstCompile]
         public struct BuildFromDualArraysSingleJob : IJob
         {
@@ -354,11 +519,44 @@ namespace Latios.Psyshock
         #endregion
 
         #region Immediate
+        public static void BuildImmediate(ref CollisionLayer layer, NativeArray<FilteredChunkCache> filteredChunkCache, in BuildCollisionLayerTypeHandles handles)
+        {
+            int count = 0;
+            if (filteredChunkCache.Length != 0)
+            {
+                var last = filteredChunkCache[filteredChunkCache.Length - 1];
+                count    = last.firstEntityIndex + last.countInChunk;
+            }
+            layer.ResizeUninitialized(count);
+
+            var layerIndices = new NativeArray<int>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var xMinMaxs     = new NativeArray<float2>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+            var colliderAoS  = new NativeArray<ColliderAoSData>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+
+            var p1 = new Part1FromFilteredQueryJob
+            {
+                colliderAoS        = colliderAoS,
+                layer              = layer,
+                layerIndices       = layerIndices,
+                xMinMaxs           = xMinMaxs,
+                filteredChunkCache = filteredChunkCache,
+                typeGroup          = handles
+            };
+            for (int i = 0; i < layer.count; i++)
+            {
+                p1.Execute(i);
+            }
+
+            BuildImmediateAoS2To5(ref layer, colliderAoS, layerIndices, xMinMaxs);
+        }
+
         public static void BuildImmediate(ref CollisionLayer layer, NativeArray<ColliderBody> bodies)
         {
             var aabbs        = new NativeArray<Aabb>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             var layerIndices = new NativeArray<int>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             var xMinMaxs     = new NativeArray<float2>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+
+            layer.ResizeUninitialized(bodies.Length);
 
             var p1 = new Part1FromColliderBodyArrayJob
             {
@@ -373,50 +571,17 @@ namespace Latios.Psyshock
                 p1.Execute(i);
             }
 
-            new Part2Job
-            {
-                layer        = layer,
-                layerIndices = layerIndices
-            }.Execute();
-
-            var p3 = new Part3Job
-            {
-                layerIndices       = layerIndices,
-                unsortedSrcIndices = layer.srcIndices
-            };
-            for (int i = 0; i < layer.count; i++)
-            {
-                p3.Execute(i);
-            }
-
-            var p4 = new Part4Job
-            {
-                bucketStartAndCounts = layer.bucketStartsAndCounts,
-                unsortedSrcIndices   = layer.srcIndices,
-                trees                = layer.intervalTrees,
-                xMinMaxs             = xMinMaxs
-            };
-            for (int i = 0; i < layer.bucketCount; i++)
-            {
-                p4.Execute(i);
-            }
-
-            var p5 = new Part5FromArraysJob
-            {
-                aabbs  = aabbs,
-                bodies = bodies,
-                layer  = layer,
-            };
-            for (int i = 0; i < layer.count; i++)
-            {
-                p5.Execute(i);
-            }
+            BuildImmediateSplit2To5(ref layer, bodies, aabbs, layerIndices, xMinMaxs);
         }
 
         public static void BuildImmediate(ref CollisionLayer layer, NativeArray<ColliderBody> bodies, NativeArray<Aabb> aabbs)
         {
+            ValidateOverrideAabbsAreRightLength(aabbs, bodies.Length);
+
             var layerIndices = new NativeArray<int>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             var xMinMaxs     = new NativeArray<float2>(bodies.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+
+            layer.ResizeUninitialized(bodies.Length);
 
             var p1 = new Part1FromDualArraysJob
             {
@@ -430,6 +595,14 @@ namespace Latios.Psyshock
                 p1.Execute(i);
             }
 
+            BuildImmediateSplit2To5(ref layer, bodies, aabbs, layerIndices, xMinMaxs);
+        }
+
+        static void BuildImmediateAoS2To5(ref CollisionLayer layer,
+                                          NativeArray<ColliderAoSData> colliderAoS,
+                                          NativeArray<int>             layerIndices,
+                                          NativeArray<float2>          xMinMaxs)
+        {
             new Part2Job
             {
                 layer        = layer,
@@ -439,7 +612,7 @@ namespace Latios.Psyshock
             var p3 = new Part3Job
             {
                 layerIndices       = layerIndices,
-                unsortedSrcIndices = layer.srcIndices
+                unsortedSrcIndices = layer.srcIndices.AsArray()
             };
             for (int i = 0; i < layer.count; i++)
             {
@@ -448,8 +621,9 @@ namespace Latios.Psyshock
 
             var p4 = new Part4Job
             {
-                bucketStartAndCounts = layer.bucketStartsAndCounts,
-                unsortedSrcIndices   = layer.srcIndices,
+                bucketStartAndCounts = layer.bucketStartsAndCounts.AsArray(),
+                trees                = layer.intervalTrees.AsArray(),
+                unsortedSrcIndices   = layer.srcIndices.AsArray(),
                 xMinMaxs             = xMinMaxs
             };
             for (int i = 0; i < layer.bucketCount; i++)
@@ -457,7 +631,52 @@ namespace Latios.Psyshock
                 p4.Execute(i);
             }
 
-            var p5 = new Part5FromArraysJob
+            var p5 = new Part5FromAoSJob
+            {
+                colliderAoS = colliderAoS,
+                layer       = layer,
+            };
+            for (int i = 0; i < layer.count; i++)
+            {
+                p5.Execute(i);
+            }
+        }
+
+        static void BuildImmediateSplit2To5(ref CollisionLayer layer,
+                                            NativeArray<ColliderBody> bodies,
+                                            NativeArray<Aabb>         aabbs,
+                                            NativeArray<int>          layerIndices,
+                                            NativeArray<float2>       xMinMaxs)
+        {
+            new Part2Job
+            {
+                layer        = layer,
+                layerIndices = layerIndices
+            }.Execute();
+
+            var p3 = new Part3Job
+            {
+                layerIndices       = layerIndices,
+                unsortedSrcIndices = layer.srcIndices.AsArray()
+            };
+            for (int i = 0; i < layer.count; i++)
+            {
+                p3.Execute(i);
+            }
+
+            var p4 = new Part4Job
+            {
+                bucketStartAndCounts = layer.bucketStartsAndCounts.AsArray(),
+                trees                = layer.intervalTrees.AsArray(),
+                unsortedSrcIndices   = layer.srcIndices.AsArray(),
+                xMinMaxs             = xMinMaxs
+            };
+            for (int i = 0; i < layer.bucketCount; i++)
+            {
+                p4.Execute(i);
+            }
+
+            var p5 = new Part5FromSplitArraysJob
             {
                 aabbs  = aabbs,
                 bodies = bodies,
@@ -691,6 +910,16 @@ namespace Latios.Psyshock
             }
         }
 
+        #endregion
+
+        #region Safety
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        private static void ValidateOverrideAabbsAreRightLength(NativeArray<Aabb> aabbs, int count)
+        {
+            if (aabbs.Length != count)
+                throw new InvalidOperationException(
+                    $"The number of elements in overrideAbbs does not match the number of bodies in the bodies array");
+        }
         #endregion
     }
 }

@@ -13,7 +13,8 @@ namespace Latios.Psyshock
             set => m_normalAndDistance.xyz = value;
         }
 
-        public float distanceFromOrigin
+        // Distance to the origin along the normal
+        public float distanceToOrigin
         {
             get => m_normalAndDistance.w;
             set => m_normalAndDistance.w = value;

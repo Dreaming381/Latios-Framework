@@ -157,9 +157,7 @@ namespace Latios.Psyshock
                                                                  in colliderTransform,
                                                                  maxDistance,
                                                                  out result);
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return sphereResult;
                 case ColliderType.Capsule:
                     var capsuleResult = CapsuleBox.DistanceBetween(in box,
@@ -168,9 +166,7 @@ namespace Latios.Psyshock
                                                                    in colliderTransform,
                                                                    maxDistance,
                                                                    out result);
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return capsuleResult;
                 case ColliderType.Box:
                     return BoxBox.DistanceBetween(in collider.m_box, in colliderTransform, in box, in boxTransform, maxDistance, out result);

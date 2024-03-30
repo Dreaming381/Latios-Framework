@@ -69,14 +69,14 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         public SafeEntity entity => new SafeEntity
         {
-            entity = new Entity
+            m_entity = new Entity
             {
                 Index   = math.select(-body.entity.Index - 1, body.entity.Index, m_isThreadSafe),
                 Version = body.entity.Version
             }
         };
 #else
-        public SafeEntity entity => new SafeEntity { entity = body.entity };
+        public SafeEntity entity => new SafeEntity { m_entity = body.entity };
 #endif
 
         /// <summary>
@@ -183,7 +183,7 @@ namespace Latios.Psyshock
         /// </summary>
         public void Run()
         {
-            new FindObjectsInternal.Single
+            new FindObjectsInternal.SingleJob
             {
                 layer     = layer,
                 processor = processor,
@@ -198,7 +198,7 @@ namespace Latios.Psyshock
         /// <returns>The JobHandle of the scheduled job</returns>
         public JobHandle ScheduleSingle(JobHandle inputDeps = default)
         {
-            return new FindObjectsInternal.Single
+            return new FindObjectsInternal.SingleJob
             {
                 layer     = layer,
                 processor = processor,

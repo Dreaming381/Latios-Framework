@@ -41,6 +41,12 @@ namespace Unity.Entities.Exposed
         {
             return Mathematics.math.asuint(chunk.m_Chunk);
         }
+
+        // Todo: Move to dedicated file if more extensions are needed.
+        public static unsafe bool UsesEnabledFiltering(in this EntityQuery query)
+        {
+            return query._GetImpl()->_QueryData->HasEnableableComponents != 0;
+        }
     }
 }
 

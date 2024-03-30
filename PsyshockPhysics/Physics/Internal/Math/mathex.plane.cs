@@ -32,7 +32,7 @@ namespace Latios.Psyshock
         internal static Plane TransformPlane(RigidTransform transform, Plane plane)
         {
             float3 normal = math.rotate(transform.rot, plane.normal);
-            return new Plane(normal, plane.distanceFromOrigin - math.dot(normal, transform.pos));
+            return new Plane(normal, plane.distanceToOrigin - math.dot(normal, transform.pos));
         }
     }
 }

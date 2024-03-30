@@ -4,7 +4,7 @@ namespace Latios.Authoring
 {
     public static class ObjectAuthoringExtensions
     {
-        public static void DestroyDuringConversion(this Object unityEngineObject)
+        public static void DestroySafelyFromAnywhere(this Object unityEngineObject)
         {
 #if UNITY_EDITOR
             if (Application.isPlaying)

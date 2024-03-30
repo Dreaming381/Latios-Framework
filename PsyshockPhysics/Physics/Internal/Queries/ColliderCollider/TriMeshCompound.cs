@@ -158,9 +158,7 @@ namespace Latios.Psyshock
                                                                      in colliderTransform,
                                                                      maxDistance,
                                                                      out result);
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return sphereResult;
                 case ColliderType.Capsule:
                     var capsuleResult = CapsuleTriMesh.DistanceBetween(in triMesh,
@@ -169,9 +167,7 @@ namespace Latios.Psyshock
                                                                        in colliderTransform,
                                                                        maxDistance,
                                                                        out result);
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return capsuleResult;
                 case ColliderType.Box:
                     var boxResult = BoxTriMesh.DistanceBetween(in triMesh,
@@ -180,9 +176,7 @@ namespace Latios.Psyshock
                                                                in colliderTransform,
                                                                maxDistance,
                                                                out result);
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return boxResult;
                 default:
                     result = default;

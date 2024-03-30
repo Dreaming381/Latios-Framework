@@ -1,4 +1,6 @@
 ﻿using Latios.Transforms;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -180,6 +182,30 @@ namespace Latios.Psyshock
         /// The transform in the CollisionLayer that generated the corresponding result
         /// </summary>
         public TransformQvvs transform => body.transform;
+    }
+
+    /// <summary>
+    /// A collector you can use in a call to Physics.DistanceBetweenAll() to gather all
+    /// results in a list and then iterate over them in a foreach statement.
+    /// </summary>
+    public struct DistanceBetweenAllCache : IDistanceBetweenAllProcessor
+    {
+        UnsafeList<ColliderDistanceResult> results;
+
+        public void Begin(in DistanceBetweenAllContext context) => results.Length = 0;
+
+        public void Execute(in ColliderDistanceResult result)
+        {
+            if (!results.IsCreated)
+                results = new UnsafeList<ColliderDistanceResult>(8, Allocator.Temp);
+            results.Add(result);
+        }
+
+        public int length => results.Length;
+
+        public ColliderDistanceResult this[int index] => results[index];
+
+        public UnsafeList<ColliderDistanceResult>.Enumerator GetEnumerator() => results.GetEnumerator();
     }
 }
 

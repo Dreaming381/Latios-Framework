@@ -52,35 +52,34 @@ namespace Latios.Psyshock
     /// </remarks>
     public struct CollisionLayer : INativeDisposable
     {
-        internal NativeArray<int2>                                                   bucketStartsAndCounts;
-        [NativeDisableParallelForRestriction] internal NativeArray<float>            xmins;
-        [NativeDisableParallelForRestriction] internal NativeArray<float>            xmaxs;
-        [NativeDisableParallelForRestriction] internal NativeArray<float4>           yzminmaxs;
-        [NativeDisableParallelForRestriction] internal NativeArray<IntervalTreeNode> intervalTrees;
-        [NativeDisableParallelForRestriction] internal NativeArray<ColliderBody>     bodies;
-        [NativeDisableParallelForRestriction] internal NativeArray<int>              srcIndices;
-        internal float3                                                              worldMin;
-        internal float3                                                              worldAxisStride;
-        internal int3                                                                worldSubdivisionsPerAxis;
-        AllocatorManager.AllocatorHandle                                             allocator;
+        internal NativeList<int2>             bucketStartsAndCounts;
+        internal NativeList<float>            xmins;
+        internal NativeList<float>            xmaxs;
+        internal NativeList<float4>           yzminmaxs;
+        internal NativeList<IntervalTreeNode> intervalTrees;
+        internal NativeList<ColliderBody>     bodies;
+        internal NativeList<int>              srcIndices;
+        internal float3                       worldMin;
+        internal float3                       worldAxisStride;
+        internal int3                         worldSubdivisionsPerAxis;
+        internal int                          bucketCountExcludingNan;
 
-        internal CollisionLayer(int bodyCount, CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
+        internal CollisionLayer(CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
             worldMin                 = settings.worldAabb.min;
             worldAxisStride          = (settings.worldAabb.max - worldMin) / settings.worldSubdivisionsPerAxis;
             worldSubdivisionsPerAxis = settings.worldSubdivisionsPerAxis;
 
-            bucketStartsAndCounts = CollectionHelper.CreateNativeArray<int2>(
-                settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 2,
-                allocator,
-                NativeArrayOptions.UninitializedMemory);
-            xmins          = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            xmaxs          = CollectionHelper.CreateNativeArray<float>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            yzminmaxs      = CollectionHelper.CreateNativeArray<float4>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            intervalTrees  = CollectionHelper.CreateNativeArray<IntervalTreeNode>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            bodies         = CollectionHelper.CreateNativeArray<ColliderBody>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            srcIndices     = CollectionHelper.CreateNativeArray<int>(bodyCount, allocator, NativeArrayOptions.UninitializedMemory);
-            this.allocator = allocator;
+            var buckets           = settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 2;
+            bucketStartsAndCounts = new NativeList<int2>(buckets, allocator);
+            bucketStartsAndCounts.Resize(buckets, NativeArrayOptions.ClearMemory);
+            xmins                   = new NativeList<float>(allocator);
+            xmaxs                   = new NativeList<float>(allocator);
+            yzminmaxs               = new NativeList<float4>(allocator);
+            intervalTrees           = new NativeList<IntervalTreeNode>(allocator);
+            bodies                  = new NativeList<ColliderBody>(allocator);
+            srcIndices              = new NativeList<int>(allocator);
+            bucketCountExcludingNan = buckets - 1;
         }
 
         /// <summary>
@@ -93,15 +92,15 @@ namespace Latios.Psyshock
             worldMin                 = sourceLayer.worldMin;
             worldAxisStride          = sourceLayer.worldAxisStride;
             worldSubdivisionsPerAxis = sourceLayer.worldSubdivisionsPerAxis;
+            bucketCountExcludingNan  = sourceLayer.bucketCountExcludingNan;
 
-            bucketStartsAndCounts = CollectionHelper.CreateNativeArray(sourceLayer.bucketStartsAndCounts, allocator);
-            xmins                 = CollectionHelper.CreateNativeArray(sourceLayer.xmins, allocator);
-            xmaxs                 = CollectionHelper.CreateNativeArray(sourceLayer.xmaxs, allocator);
-            yzminmaxs             = CollectionHelper.CreateNativeArray(sourceLayer.yzminmaxs, allocator);
-            intervalTrees         = CollectionHelper.CreateNativeArray(sourceLayer.intervalTrees, allocator);
-            bodies                = CollectionHelper.CreateNativeArray(sourceLayer.bodies, allocator);
-            srcIndices            = CollectionHelper.CreateNativeArray(sourceLayer.srcIndices, allocator);
-            this.allocator        = allocator;
+            bucketStartsAndCounts = sourceLayer.bucketStartsAndCounts.Clone(allocator);
+            xmins                 = sourceLayer.xmins.Clone(allocator);
+            xmaxs                 = sourceLayer.xmaxs.Clone(allocator);
+            yzminmaxs             = sourceLayer.yzminmaxs.Clone(allocator);
+            intervalTrees         = sourceLayer.intervalTrees.Clone(allocator);
+            bodies                = sourceLayer.bodies.Clone(allocator);
+            srcIndices            = sourceLayer.srcIndices.Clone(allocator);
         }
 
         /// <summary>
@@ -110,10 +109,10 @@ namespace Latios.Psyshock
         /// </summary>
         /// <param name="settings">The settings to use for the layer. You typically want to match this with other layers when using FindPairs.</param>
         /// <param name="allocator">The Allocator to use for this layer. Despite being empty, this layer is still allocated and may require disposal.</param>
-        /// <returns>A CollisionLayer with zero bodies, but with the bucket distribution matching the specified settings</returns>
+        /// <returns>A CollisionLayer with zero bodiesArray, but with the bucket distribution matching the specified settings</returns>
         public static CollisionLayer CreateEmptyCollisionLayer(CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
-            var layer = new CollisionLayer(0, settings, allocator);
+            var layer = new CollisionLayer(settings, allocator);
             for (int i = 0; i < layer.bucketStartsAndCounts.Length; i++)
                 layer.bucketStartsAndCounts[i] = 0;
             layer.worldSubdivisionsPerAxis.x   = math.max(1, layer.worldSubdivisionsPerAxis.x);  // Ensure IsCreated is true.
@@ -126,13 +125,13 @@ namespace Latios.Psyshock
         public void Dispose()
         {
             worldSubdivisionsPerAxis = 0;
-            CollectionHelper.DisposeNativeArray(bucketStartsAndCounts, allocator);
-            CollectionHelper.DisposeNativeArray(xmins,                 allocator);
-            CollectionHelper.DisposeNativeArray(xmaxs,                 allocator);
-            CollectionHelper.DisposeNativeArray(yzminmaxs,             allocator);
-            CollectionHelper.DisposeNativeArray(intervalTrees,         allocator);
-            CollectionHelper.DisposeNativeArray(bodies,                allocator);
-            CollectionHelper.DisposeNativeArray(srcIndices,            allocator);
+            bucketStartsAndCounts.Dispose();
+            xmins.Dispose();
+            xmaxs.Dispose();
+            yzminmaxs.Dispose();
+            intervalTrees.Dispose();
+            bodies.Dispose();
+            srcIndices.Dispose();
         }
 
         /// <summary>
@@ -143,14 +142,7 @@ namespace Latios.Psyshock
         public unsafe JobHandle Dispose(JobHandle inputDeps)
         {
             worldSubdivisionsPerAxis = 0;
-            if (allocator.IsCustomAllocator)
-            {
-                // Todo: No DisposeJob for NativeArray from CollectionHelper
-                inputDeps.Complete();
-                Dispose();
-                return default;
-            }
-            JobHandle* deps = stackalloc JobHandle[7]
+            JobHandle* deps          = stackalloc JobHandle[7]
             {
                 bucketStartsAndCounts.Dispose(inputDeps),
                 xmins.Dispose(inputDeps),
@@ -170,18 +162,18 @@ namespace Latios.Psyshock
         /// <summary>
         /// The number of cells in the layer, including the "catch-all" cell but ignoring the NaN cell
         /// </summary>
-        public int bucketCount => bucketStartsAndCounts.Length - 1;  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
+        public int bucketCount => bucketCountExcludingNan;  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
         /// <summary>
         /// True if the CollisionLayer has been created
         /// </summary>
         public bool IsCreated => worldSubdivisionsPerAxis.x > 0;
         /// <summary>
-        /// Read-Only access to the collider bodies stored in the CollisionLayer ordered by bodyIndex
+        /// Read-Only access to the collider bodiesArray stored in the CollisionLayer ordered by bodyIndex
         /// </summary>
         public NativeArray<ColliderBody>.ReadOnly colliderBodies => bodies.AsReadOnly();
         /// <summary>
         /// Read-Only access to the source indices corresponding to each bodyIndex. CollisionLayers
-        /// reorder bodies for better performance. The source indices specify the original index of
+        /// reorder bodiesArray for better performance. The source indices specify the original index of
         /// each body in an EntityQuery or NativeArray of ColliderBody.
         /// </summary>
         public NativeArray<int>.ReadOnly sourceIndices => srcIndices.AsReadOnly();
@@ -203,15 +195,25 @@ namespace Latios.Psyshock
 
             return new BucketSlices
             {
-                xmins             = xmins.GetSubArray(start, count),
-                xmaxs             = xmaxs.GetSubArray(start, count),
-                yzminmaxs         = yzminmaxs.GetSubArray(start, count),
-                intervalTree      = intervalTrees.GetSubArray(start, count),
-                bodies            = bodies.GetSubArray(start, count),
-                srcIndices        = srcIndices.GetSubArray(start, count),
+                xmins             = xmins.AsArray().GetSubArray(start, count),
+                xmaxs             = xmaxs.AsArray().GetSubArray(start, count),
+                yzminmaxs         = yzminmaxs.AsArray().GetSubArray(start, count),
+                intervalTree      = intervalTrees.AsArray().GetSubArray(start, count),
+                bodies            = bodies.AsArray().GetSubArray(start, count),
+                srcIndices        = srcIndices.AsArray().GetSubArray(start, count),
                 bucketIndex       = bucketIndex,
                 bucketGlobalStart = start
             };
+        }
+
+        internal void ResizeUninitialized(int newCount)
+        {
+            xmins.ResizeUninitialized(newCount);
+            xmaxs.ResizeUninitialized(newCount);
+            yzminmaxs.ResizeUninitialized(newCount);
+            intervalTrees.ResizeUninitialized(newCount);
+            bodies.ResizeUninitialized(newCount);
+            srcIndices.ResizeUninitialized(newCount);
         }
     }
 

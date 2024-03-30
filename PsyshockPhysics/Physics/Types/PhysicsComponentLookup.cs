@@ -18,12 +18,14 @@ namespace Latios.Psyshock
     [NativeContainer]
     public struct SafeEntity
     {
-        internal Entity entity;
+        internal Entity m_entity;
+
+        public Entity entity => (Entity)this;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         public static implicit operator Entity(SafeEntity e) => new Entity
         {
-            Index = math.select(e.entity.Index, math.abs(e.entity.Index + 1), e.entity.Index < 0), Version = e.entity.Version
+            Index = math.select(e.m_entity.Index, math.abs(e.m_entity.Index + 1), e.m_entity.Index < 0), Version = e.m_entity.Version
         };
 #else
         public static implicit operator Entity(SafeEntity e) => e.entity;
@@ -52,12 +54,12 @@ namespace Latios.Psyshock
             get
             {
                 ValidateSafeEntityIsSafe(safeEntity);
-                return lookup[safeEntity.entity];
+                return lookup[safeEntity.m_entity];
             }
             set
             {
                 ValidateSafeEntityIsSafe(safeEntity);
-                lookup[safeEntity.entity] = value;
+                lookup[safeEntity.m_entity] = value;
             }
         }
 
@@ -149,7 +151,7 @@ namespace Latios.Psyshock
         static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (safeEntity.entity.Index < 0)
+            if (safeEntity.m_entity.Index < 0)
             {
                 throw new InvalidOperationException("PhysicsComponentDataFromEntity cannot be used inside a RunImmediate context. Use ComponentDataFromEntity instead.");
             }
@@ -180,7 +182,7 @@ namespace Latios.Psyshock
             get
             {
                 ValidateSafeEntityIsSafe(safeEntity);
-                return lookup[safeEntity.entity];
+                return lookup[safeEntity.m_entity];
             }
         }
 
@@ -203,7 +205,7 @@ namespace Latios.Psyshock
         /// This check is always valid regardless of whether such a buffer would be
         /// safe to access.
         /// </summary>
-        public bool HasBuffer(SafeEntity safeEntity) => lookup.HasBuffer(safeEntity.entity);
+        public bool HasBuffer(SafeEntity safeEntity) => lookup.HasBuffer(safeEntity.m_entity);
 
         /// <summary>
         /// This is identical to BufferFromEntity<typeparamref name="T"/>.DidChange().
@@ -259,7 +261,7 @@ namespace Latios.Psyshock
         static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (safeEntity.entity.Index < 0)
+            if (safeEntity.m_entity.Index < 0)
             {
                 throw new InvalidOperationException("PhysicsBufferFromEntity cannot be used inside a RunImmediate context. Use BufferFromEntity instead.");
             }
@@ -322,7 +324,7 @@ namespace Latios.Psyshock
         static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (safeEntity.entity.Index < 0)
+            if (safeEntity.m_entity.Index < 0)
             {
                 throw new InvalidOperationException("PhysicsBufferFromEntity cannot be used inside a RunImmediate context. Use BufferFromEntity instead.");
             }

@@ -49,6 +49,16 @@ namespace Latios.Psyshock
             };
         }
 
+        public static int GetSubcolliders(in Collider collider)
+        {
+            switch(collider.type)
+            {
+                case ColliderType.TriMesh: return collider.m_triMesh().triMeshColliderBlob.Value.triangles.Length;
+                case ColliderType.Compound: return collider.m_compound().compoundColliderBlob.Value.blobColliders.Length;
+                default: return 1;
+            }
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         internal static void CheckMprResolved(bool somethingWentWrong)
         {

@@ -149,17 +149,11 @@ namespace Latios.Psyshock
                     return SphereSphere.DistanceBetween(in colliderA.m_sphere, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Sphere, ColliderType.Capsule):
                     var sphereCapsuleResult = SphereCapsule.DistanceBetween(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return sphereCapsuleResult;
                 case (ColliderType.Sphere, ColliderType.Box):
                     var sphereBoxResult = SphereBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return sphereBoxResult;
                 case (ColliderType.Capsule, ColliderType.Sphere):
                     return SphereCapsule.DistanceBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
@@ -167,10 +161,7 @@ namespace Latios.Psyshock
                     return CapsuleCapsule.DistanceBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance, out result);
                 case (ColliderType.Capsule, ColliderType.Box):
                     var capsuleBoxResult = CapsuleBox.DistanceBetween(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
-
-                    (result.hitpointA, result.hitpointB)                 = (result.hitpointB, result.hitpointA);
-                    (result.normalA, result.normalB)                     = (result.normalB, result.normalA);
-                    (result.subColliderIndexA, result.subColliderIndexB) = (result.subColliderIndexB, result.subColliderIndexA);
+                    result.FlipInPlace();
                     return capsuleBoxResult;
                 case (ColliderType.Box, ColliderType.Sphere):
                     return SphereBox.DistanceBetween(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);

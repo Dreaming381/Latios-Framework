@@ -19,10 +19,11 @@ namespace Latios.Psyshock
             var aabb           = Physics.AabbFrom(pointInTriMesh - maxDistance, pointInTriMesh + maxDistance);
             var processor      = new PointRayTriMesh.PointProcessor
             {
-                blob        = triMesh.triMeshColliderBlob,
-                point       = pointInTriMesh,
-                maxDistance = maxDistance + sphere.radius,
-                found       = false
+                blob         = triMesh.triMeshColliderBlob,
+                point        = pointInTriMesh,
+                maxDistance  = maxDistance + sphere.radius,
+                bestDistance = float.MaxValue,
+                found        = false
             };
             triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor);
             if (processor.found)
@@ -43,9 +44,11 @@ namespace Latios.Psyshock
                                                         float maxDistance,
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            var sphereInTriMeshTransform = math.mul(math.inverse(triMeshTransform), sphereTransform);
-            var aabb                     = Physics.AabbFrom(sphere, sphereInTriMeshTransform);
-            var triProcessor             = new DistanceAllProcessor<T>
+            var sphereInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), sphereTransform);
+            var aabb                      = Physics.AabbFrom(sphere, sphereInTriMeshTransform);
+            aabb.min                     -= maxDistance;
+            aabb.max                     += maxDistance;
+            var triProcessor              = new DistanceAllProcessor<T>
             {
                 triMesh          = triMesh,
                 triMeshTransform = triMeshTransform,

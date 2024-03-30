@@ -15,7 +15,7 @@ namespace Latios.Psyshock
         {
             var bInATransform = math.mul(math.inverse(convexTransform), triangleTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(convex, triangle, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
+            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
             SphereConvex.DistanceBetween(in convex,
                                          in RigidTransform.identity,
                                          new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
@@ -166,10 +166,11 @@ namespace Latios.Psyshock
                                                            out var bVertices);
                 bool                        needsClosestPoint = true;
                 UnityContactManifoldExtra3D result            = default;
+                result.baseStorage.contactNormal              = contactNormal;
 
                 if (math.abs(math.dot(bPlane.normal, aLocalContactNormal)) > 0.05f)
                 {
-                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
 
                     bool projectBOnA        = math.abs(math.dot(aPlane.normal, aLocalContactNormal)) < 0.05f;
                     int4 positiveSideCounts = 0;
@@ -220,9 +221,9 @@ namespace Latios.Psyshock
                         {
                             var aEdgePlaneNormal   = math.cross(rayDisplacement, aLocalContactNormal);
                             var edgePlaneDistance  = math.dot(aEdgePlaneNormal, rayStart);
-                            var projection         = simd.dot(bVertices, aEdgePlaneNormal) + edgePlaneDistance;
-                            positiveSideCounts    += math.select(int4.zero, 1, projection > 0f);
-                            negativeSideCounts    += math.select(int4.zero, 1, projection < 0f);
+                            var projection         = simd.dot(bVertices, aEdgePlaneNormal);
+                            positiveSideCounts    += math.select(int4.zero, 1, projection > edgePlaneDistance);
+                            negativeSideCounts    += math.select(int4.zero, 1, projection < edgePlaneDistance);
                         }
                     }
                     if (projectBOnA)
@@ -469,7 +470,7 @@ namespace Latios.Psyshock
 
                 if (math.abs(math.dot(bPlane.normal, aLocalContactNormal)) > 0.05f)
                 {
-                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+                    var distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
 
                     bool projectBOnA        = math.abs(math.dot(aPlane.normal, aLocalContactNormal)) < 0.05f;
                     int4 positiveSideCounts = 0;
@@ -530,9 +531,9 @@ namespace Latios.Psyshock
                         {
                             var aEdgePlaneNormal   = math.cross(rayDisplacement, aLocalContactNormal);
                             var edgePlaneDistance  = math.dot(aEdgePlaneNormal, rayStart);
-                            var projection         = simd.dot(bVertices, aEdgePlaneNormal) + edgePlaneDistance;
-                            positiveSideCounts    += math.select(int4.zero, 1, projection > 0f);
-                            negativeSideCounts    += math.select(int4.zero, 1, projection < 0f);
+                            var projection         = simd.dot(bVertices, aEdgePlaneNormal);
+                            positiveSideCounts    += math.select(int4.zero, 1, projection > edgePlaneDistance);
+                            negativeSideCounts    += math.select(int4.zero, 1, projection < edgePlaneDistance);
                         }
                     }
                     if (projectBOnA)

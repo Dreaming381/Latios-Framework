@@ -19,6 +19,18 @@ namespace Latios.Transforms.Systems
             EnableSystemSorting = true;
         }
     }
+
+    [DisableAutoCreation]
+    [UpdateInGroup(typeof(LatiosWorldSyncGroup))]
+    public partial struct GameObjectEntityBindingSystem : ISystem {}
+
+    [DisableAutoCreation]
+    [UpdateInGroup(typeof(TransformSystemGroup), OrderFirst = true)]
+    public partial struct CopyGameObjectTransformToEntitySystem : ISystem {}
+
+    [DisableAutoCreation]
+    [UpdateInGroup(typeof(TransformSystemGroup), OrderLast = true)]
+    public partial struct CopyGameObjectTransformFromEntitySystem : ISystem {}
 }
 #endif
 

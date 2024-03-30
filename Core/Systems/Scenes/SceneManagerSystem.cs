@@ -24,7 +24,10 @@ namespace Latios.Systems
         private EntityQuery m_rlsQuery;
         private EntityQuery m_unitySubsceneLoadQuery;
         private EntityQuery m_dontDestroyOnSceneChangeQuery;
+        private EntityQuery m_newSubsceneReferenceQuery;
         private bool        m_paused = false;
+
+        private struct ObservedSubsceneReferenceTag : IComponentData { }
 
         protected override void OnCreate()
         {
@@ -36,8 +39,9 @@ namespace Latios.Systems
             };
             worldBlackboardEntity.AddComponentData(curr);
 
-            m_unitySubsceneLoadQuery        = Fluent.With<Unity.Entities.RequestSceneLoaded>().Build();
+            m_unitySubsceneLoadQuery        = Fluent.With<Unity.Entities.RequestSceneLoaded>().Without<DisableSynchronousSubsceneLoadingTag>().Build();
             m_dontDestroyOnSceneChangeQuery = Fluent.With<Unity.Entities.SceneTag>().With<DontDestroyOnSceneChangeTag>().IncludeDisabledEntities().IncludePrefabs().Build();
+            m_newSubsceneReferenceQuery     = Fluent.With<Unity.Scenes.SubScene>().Without<ObservedSubsceneReferenceTag>().Build();
         }
 
         protected override void OnUpdate()
@@ -100,6 +104,31 @@ namespace Latios.Systems
             }
             worldBlackboardEntity.SetComponentData(currentScene);
 
+            if (!m_newSubsceneReferenceQuery.IsEmptyIgnoreFilter)
+            {
+                var newSubsceneEntities = m_newSubsceneReferenceQuery.ToEntityArray(Allocator.Temp);
+                foreach (var e in newSubsceneEntities)
+                {
+                    var subsceneRef = EntityManager.GetComponentObject<Unity.Scenes.SubScene>(e);
+                    if (subsceneRef.TryGetComponent<SubsceneLoadOptions>(out var options))
+                    {
+                        if (options.loadOptions == SubsceneLoadOptions.LoadOptions.Asynchronous)
+                        {
+                            EntityManager.AddComponent<DisableSynchronousSubsceneLoadingTag>(e);
+                            if (EntityManager.HasComponent<Unity.Scenes.ResolvedSectionEntity>(e))
+                            {
+                                foreach (var s in EntityManager.GetBuffer<Unity.Scenes.ResolvedSectionEntity>(e))
+                                    EntityManager.AddComponent<DisableSynchronousSubsceneLoadingTag>(s.SectionEntity);
+                            }
+                        }
+                    }
+                }
+                EntityManager.AddComponent<ObservedSubsceneReferenceTag>(m_newSubsceneReferenceQuery);
+            }
+
+            if (m_unitySubsceneLoadQuery.IsEmptyIgnoreFilter)
+                return;
+
             var subsceneRequests = m_unitySubsceneLoadQuery.ToComponentDataArray<RequestSceneLoaded>(Allocator.Temp);
             var subsceneEntities = m_unitySubsceneLoadQuery.ToEntityArray(Allocator.Temp);
             for (int i = 0; i < subsceneEntities.Length; i++)
@@ -109,12 +138,21 @@ namespace Latios.Systems
                 if ((request.LoadFlags & SceneLoadFlags.DisableAutoLoad) == 0)
                 {
                     request.LoadFlags |= SceneLoadFlags.BlockOnStreamIn;
-                    EntityManager.SetComponentData(subsceneEntity, request);
                     if (EntityManager.HasComponent<Unity.Scenes.ResolvedSectionEntity>(subsceneEntity))
                     {
                         foreach (var s in EntityManager.GetBuffer<Unity.Scenes.ResolvedSectionEntity>(subsceneEntity))
                             EntityManager.AddComponentData(s.SectionEntity, request);
                     }
+                    else if (EntityManager.HasComponent<Unity.Scenes.SceneEntityReference>(subsceneEntity))
+                    {
+                        var actualSubscene = EntityManager.GetComponentData<Unity.Scenes.SceneEntityReference>(subsceneEntity).SceneEntity;
+                        if (EntityManager.HasComponent<DisableSynchronousSubsceneLoadingTag>(actualSubscene))
+                        {
+                            EntityManager.AddComponent<DisableSynchronousSubsceneLoadingTag>(subsceneEntity);
+                            continue;
+                        }
+                    }
+                    EntityManager.SetComponentData(subsceneEntity, request);
                 }
             }
         }

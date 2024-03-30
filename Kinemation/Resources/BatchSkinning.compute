@@ -97,7 +97,7 @@ uniform RWByteAddressBuffer        _dstTransforms : register(u2);
 // However, we pad out DQ + float3 to 12 floats to help GPUs
 // with larger than 32-bit bank accesses.
 // So we always end up with a TransformUnion of 682
-groupshared TransformUnion gs_transforms[682]; 
+groupshared TransformUnion gs_transforms[682];
 
 uint _startOffset;
 
@@ -269,7 +269,7 @@ float3x4 mul3x4(float3x4 a, float3x4 b)
 void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 {
     const uint groupId = groupIds.x;
-    const uint4 skeletonCommands = _metaBuffer.Load4((groupId + _startOffset) * 16 );
+    const uint4 skeletonCommands = _metaBuffer.Load4((groupId + _startOffset) * 16);
 
     const uint skeletonCount = skeletonCommands.x & 0xffff;
     const uint skeletonOperation = skeletonCommands.x >> 16;
@@ -694,12 +694,12 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             {
                 // We write the bindpose in the second part of groupshared
                 gs_transforms[meshBonesCount + i] = _bindPoses[meshBindposesStart + i];
-                
+
                 Qvvs boneQvvs = _skeletonQvvsTransforms[skeletonTransformStartIndex + i];
                 Dqs boneDqs = qvvsToDqs(boneQvvs);
                 // We write the world DQS in the first part of groupshared.
                 gs_transforms[i] = dqsToTransformUnionDqs(boneDqs);
-                
+
             }
             GroupMemoryBarrierWithGroupSync();
         }
@@ -836,7 +836,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
                         localScale += dqs.scale.xyz * weight;
@@ -852,7 +852,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         bpQvvs.rotation = bindposeReal;
                         bindposeReal.xyz = -bindposeReal.xyz;
                         bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                        bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                        bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                         float3x4 deform = qvvsToMatrix(bpQvvs);
                         float3x4 scale = float3x4(
@@ -863,7 +863,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         deform = mul3x4(scale, deform);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
@@ -927,7 +927,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
                         localScale += dqs.scale.xyz * weight;
@@ -943,18 +943,18 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         bpQvvs.rotation = bindposeReal;
                         bindposeReal.xyz = -bindposeReal.xyz;
                         bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                        bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                        bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                         float3x4 deform = qvvsToMatrix(bpQvvs);
                         float3x4 scale = float3x4(
-                            1, 0, 0, 0,
-                            0, 1, 0, 0,
-                            0, 0, 1, 0
+                            localScale.x, 0, 0, 0,
+                            0, localScale.y, 0, 0,
+                            0, 0, localScale.z, 0
                             );
                         deform = mul3x4(scale, deform);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _srcVertices[meshVerticesStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
@@ -1031,7 +1031,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
                         localScale += dqs.scale.xyz * weight;
@@ -1047,7 +1047,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         bpQvvs.rotation = bindposeReal;
                         bindposeReal.xyz = -bindposeReal.xyz;
                         bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                        bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                        bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                         float3x4 deform = qvvsToMatrix(bpQvvs);
                         float3x4 scale = float3x4(
@@ -1058,7 +1058,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         deform = mul3x4(scale, deform);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
@@ -1122,7 +1122,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
                         localScale += dqs.scale.xyz * weight;
@@ -1138,18 +1138,18 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         bpQvvs.rotation = bindposeReal;
                         bindposeReal.xyz = -bindposeReal.xyz;
                         bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                        bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                        bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                         float3x4 deform = qvvsToMatrix(bpQvvs);
                         float3x4 scale = float3x4(
-                            1, 0, 0, 0,
-                            0, 1, 0, 0,
-                            0, 0, 1, 0
+                            localScale.x, 0, 0, 0,
+                            0, localScale.y, 0, 0,
+                            0, 0, localScale.z, 0
                             );
                         deform = mul3x4(scale, deform);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
@@ -1226,7 +1226,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         worldReal += dqs.r * weight;
                         worldDual += dqs.d * weight;
                     }
@@ -1245,7 +1245,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         float3x4 deform = qvvsToMatrix(worldQvvs);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];
@@ -1311,7 +1311,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
                         localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
-                            dqs.r.w = -dqs.r.w;
+                            weight = -weight;
                         worldReal += dqs.r * weight;
                         worldDual += dqs.d * weight;
                     }
@@ -1330,7 +1330,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         float3x4 deform = qvvsToMatrix(worldQvvs);
 
                         // This forces the load to be deferred until after deform is computed, saving VGPRs
-                        uint cancel = any(deform != 0) ? 1 : 0;
+                        uint cancel = any(deform) ? 1 : 0;
 
                         Vertex dstVertex = (Vertex)0;
                         Vertex vertex = _dstVertices[dstStart + vertexIndexBase + threadId * cancel + inner * THREAD_GROUP_SIZE];

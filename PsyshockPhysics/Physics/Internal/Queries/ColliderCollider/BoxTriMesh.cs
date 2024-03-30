@@ -14,14 +14,17 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var boxInTriMeshTransform = math.mul(math.inverse(triMeshTransform), boxTransform);
-            var aabb                  = Physics.AabbFrom(box, in boxInTriMeshTransform);
-            var processor             = new BoxDistanceProcessor
+            var boxInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), boxTransform);
+            var aabb                   = Physics.AabbFrom(box, in boxInTriMeshTransform);
+            aabb.min                  -= maxDistance;
+            aabb.max                  += maxDistance;
+            var processor              = new BoxDistanceProcessor
             {
                 blob         = triMesh.triMeshColliderBlob,
                 box          = box,
                 boxTransform = boxInTriMeshTransform,
                 maxDistance  = maxDistance,
+                bestDistance = float.MaxValue,
                 found        = false,
                 scale        = triMesh.scale
             };
@@ -49,9 +52,11 @@ namespace Latios.Psyshock
                                                         float maxDistance,
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            var boxInTriMeshTransform = math.mul(math.inverse(triMeshTransform), boxTransform);
-            var aabb                  = Physics.AabbFrom(box, boxInTriMeshTransform);
-            var triProcessor          = new DistanceAllProcessor<T>
+            var boxInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), boxTransform);
+            var aabb                   = Physics.AabbFrom(box, boxInTriMeshTransform);
+            aabb.min                  -= maxDistance;
+            aabb.max                  += maxDistance;
+            var triProcessor           = new DistanceAllProcessor<T>
             {
                 triMesh          = triMesh,
                 triMeshTransform = triMeshTransform,

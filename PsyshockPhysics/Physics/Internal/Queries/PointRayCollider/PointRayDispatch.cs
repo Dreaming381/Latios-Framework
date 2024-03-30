@@ -32,11 +32,11 @@ namespace Latios.Psyshock
                     Physics.ScaleStretchCollider(ref convex, transform.scale, transform.stretch);
                     return PointRayConvex.DistanceBetween(point, in convex, in rigidTransform, maxDistance, out result);
                 case ColliderType.TriMesh:
-                    var triMesh = collider.m_triMesh;
+                    var triMesh = collider.m_triMesh();
                     Physics.ScaleStretchCollider(ref triMesh, transform.scale, transform.stretch);
                     return PointRayTriMesh.DistanceBetween(point, in triMesh, in rigidTransform, maxDistance, out result);
                 case ColliderType.Compound:
-                    var compound = collider.m_compound;
+                    var compound = collider.m_compound();
                     Physics.ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
                     return PointRayCompound.DistanceBetween(point, in compound, in rigidTransform, maxDistance, out result);
                 default:
@@ -71,11 +71,11 @@ namespace Latios.Psyshock
                     Physics.ScaleStretchCollider(ref convex, transform.scale, transform.stretch);
                     return PointRayConvex.Raycast(in ray, in convex, in rigidTransform, out result);
                 case ColliderType.TriMesh:
-                    var triMesh = collider.m_triMesh;
+                    var triMesh = collider.m_triMesh();
                     Physics.ScaleStretchCollider(ref triMesh, transform.scale, transform.stretch);
                     return PointRayTriMesh.Raycast(in ray, in triMesh, in rigidTransform, out result);
                 case ColliderType.Compound:
-                    var compound = collider.m_compound;
+                    var compound = collider.m_compound();
                     Physics.ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
                     return PointRayCompound.Raycast(in ray, in compound, in rigidTransform, out result);
                 default:

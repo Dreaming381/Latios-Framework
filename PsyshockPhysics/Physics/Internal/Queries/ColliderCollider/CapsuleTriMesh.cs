@@ -18,14 +18,17 @@ namespace Latios.Psyshock
             var capsuleInTriMesh      = new CapsuleCollider(math.transform(capInTriMeshTransform, capsule.pointA),
                                                             math.transform(capInTriMeshTransform, capsule.pointB),
                                                             capsule.radius);
-            var aabb      = Physics.AabbFrom(capsuleInTriMesh, RigidTransform.identity);
-            var processor = new CapsuleDistanceProcessor
+            var aabb       = Physics.AabbFrom(capsuleInTriMesh, RigidTransform.identity);
+            aabb.min      -= maxDistance;
+            aabb.max      += maxDistance;
+            var processor  = new CapsuleDistanceProcessor
             {
-                blob        = triMesh.triMeshColliderBlob,
-                capsule     = capsuleInTriMesh,
-                maxDistance = maxDistance,
-                found       = false,
-                scale       = triMesh.scale
+                blob         = triMesh.triMeshColliderBlob,
+                capsule      = capsuleInTriMesh,
+                maxDistance  = maxDistance,
+                bestDistance = float.MaxValue,
+                found        = false,
+                scale        = triMesh.scale
             };
             triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor, triMesh.scale);
             if (processor.found)
@@ -46,9 +49,11 @@ namespace Latios.Psyshock
                                                         float maxDistance,
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            var capsuleInTriMeshTransform = math.mul(math.inverse(triMeshTransform), capsuleTransform);
-            var aabb                      = Physics.AabbFrom(capsule, capsuleInTriMeshTransform);
-            var triProcessor              = new DistanceAllProcessor<T>
+            var capsuleInTriMeshTransform  = math.mul(math.inverse(triMeshTransform), capsuleTransform);
+            var aabb                       = Physics.AabbFrom(capsule, capsuleInTriMeshTransform);
+            aabb.min                      -= maxDistance;
+            aabb.max                      += maxDistance;
+            var triProcessor               = new DistanceAllProcessor<T>
             {
                 triMesh          = triMesh,
                 triMeshTransform = triMeshTransform,

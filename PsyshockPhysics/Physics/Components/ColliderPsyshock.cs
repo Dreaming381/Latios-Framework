@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -74,28 +77,30 @@ namespace Latios.Psyshock
         internal ConvexCollider m_convex;
 
         // Unity crashes when there are aliased BlobAssetReferences.
-        // So we reinterpret the pointer instead.
-        internal ref TriMeshCollider m_triMesh
-        {
-            get
-            {
-                TriMeshCollider* ret;
-                fixed (void*     ptr = &m_convex)
-                ret                  = (TriMeshCollider*)ptr;
-                return ref *ret;
-            }
-        }
+        // So we have to use ColliderBlobHelpers instead.
+        //internal ref TriMeshCollider m_triMesh => ref ColliderBlobHelpers.AsTriMesh(ref m_convex);
+        //{
+        //    get
+        //    {
+        //        UnsafeUtility.As<TriMeshCollider>()
+        //
+        //        TriMeshCollider* ret;
+        //        fixed (void*     ptr = &m_convex)
+        //        ret                  = (TriMeshCollider*)ptr;
+        //        return ref *ret;
+        //    }
+        //}
 
-        internal ref CompoundCollider m_compound
-        {
-            get
-            {
-                CompoundCollider* ret;
-                fixed (void*      ptr = &m_convex)
-                ret                   = (CompoundCollider*)ptr;
-                return ref *ret;
-            }
-        }
+        //internal ref CompoundCollider m_compound
+        //{
+        //    get
+        //    {
+        //        CompoundCollider* ret;
+        //        fixed (void*      ptr = &m_convex)
+        //        ret                   = (CompoundCollider*)ptr;
+        //        return ref *ret;
+        //    }
+        //}
 
         private struct Storage
         {
@@ -180,30 +185,30 @@ namespace Latios.Psyshock
 
         public static implicit operator Collider(TriMeshCollider triMeshCollider)
         {
-            Collider collider  = default;
-            collider.m_type    = ColliderType.TriMesh;
-            collider.m_triMesh = triMeshCollider;
+            Collider collider      = default;
+            collider.m_type        = ColliderType.TriMesh;
+            collider.m_triMeshRW() = triMeshCollider;
             return collider;
         }
 
         public static implicit operator TriMeshCollider(Collider collider)
         {
             CheckColliderIsCastTargetType(in collider, ColliderType.TriMesh);
-            return collider.m_triMesh;
+            return collider.m_triMesh();
         }
 
         public static implicit operator Collider(CompoundCollider compoundCollider)
         {
-            Collider collider   = default;
-            collider.m_type     = ColliderType.Compound;
-            collider.m_compound = compoundCollider;
+            Collider collider       = default;
+            collider.m_type         = ColliderType.Compound;
+            collider.m_compoundRW() = compoundCollider;
             return collider;
         }
 
         public static implicit operator CompoundCollider(Collider collider)
         {
             CheckColliderIsCastTargetType(in collider, ColliderType.Compound);
-            return collider.m_compound;
+            return collider.m_compound();
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
@@ -226,6 +231,16 @@ namespace Latios.Psyshock
             }
         }
         #endregion
+    }
+
+    internal static class ColliderBlobHelpers
+    {
+        public static ref TriMeshCollider m_triMeshRW(ref this Collider collider) => ref UnsafeUtility.As<ConvexCollider, TriMeshCollider>(ref collider.m_convex);
+        public static ref CompoundCollider m_compoundRW(ref this Collider collider) => ref UnsafeUtility.As<ConvexCollider, CompoundCollider>(ref collider.m_convex);
+        public static ref TriMeshCollider m_triMesh(in this Collider collider) => ref UnsafeUtility.As<ConvexCollider,
+                                                                                                       TriMeshCollider>(ref UnsafeUtilityExtensions.AsRef(in collider.m_convex));
+        public static ref CompoundCollider m_compound(in this Collider collider) => ref UnsafeUtility.As<ConvexCollider,
+                                                                                                         CompoundCollider>(ref UnsafeUtilityExtensions.AsRef(in collider.m_convex));
     }
 }
 

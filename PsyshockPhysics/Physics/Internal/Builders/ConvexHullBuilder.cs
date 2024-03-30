@@ -591,7 +591,7 @@ namespace Latios.Psyshock
                             numFrontTriangles++;
 
                             Plane plane    = ComputePlane(triangleIndex, true);
-                            float distance = math.dot(plane.normal, floatPoint) + plane.distanceFromOrigin;
+                            float distance = math.dot(plane.normal, floatPoint) + plane.distanceToOrigin;
                             maxDistance    = math.max(distance, maxDistance);
                         }
                         else
@@ -1522,12 +1522,12 @@ namespace Latios.Psyshock
                 if (maxAxis.x)
                 {
                     planeOk    = Solve(m_count, m_sums.yzx, m_squareSums.yzx, m_productSums.yzx, out Plane plane);
-                    this.plane = new Plane(plane.normal.zxy, plane.distanceFromOrigin);
+                    this.plane = new Plane(plane.normal.zxy, plane.distanceToOrigin);
                 }
                 else if (maxAxis.y)
                 {
                     planeOk    = Solve(m_count, m_sums.zxy, m_squareSums.zxy, m_productSums.zxy, out Plane plane);
-                    this.plane = new Plane(plane.normal.yzx, plane.distanceFromOrigin);
+                    this.plane = new Plane(plane.normal.yzx, plane.distanceToOrigin);
                 }
                 else
                 {
@@ -1746,7 +1746,7 @@ namespace Latios.Psyshock
                             int    vertexIndex1           = neighborTriangle.GetVertex(neighborEdge.edgeIndex);
                             int    edgePlaneIndex         = numPlanes + edgeIndex;
                             Plane  edgePlane              = GetEdgePlane(vertexIndex0, vertexIndex1, normal0, normal1);
-                            edgePlane.distanceFromOrigin -= simplificationTolerance / 2.0f;  // push the edge plane out slightly so it only becomes active if the face planes change significiantly
+                            edgePlane.distanceToOrigin -= simplificationTolerance / 2.0f;  // push the edge plane out slightly so it only becomes active if the face planes change significiantly
                             planes[edgePlaneIndex]        = edgePlane;
 
                             // Build its OLS data
@@ -2030,7 +2030,7 @@ namespace Latios.Psyshock
                 }
                 else
                 {
-                    planes[i] = new Plane(planes[i].normal, planes[i].distanceFromOrigin + offset);
+                    planes[i] = new Plane(planes[i].normal, planes[i].distanceToOrigin + offset);
                 }
             }
 
@@ -2040,7 +2040,7 @@ namespace Latios.Psyshock
             for (int i = 0; i < numPlanes - 1; i++)
             {
                 Plane  plane0 = planes[i];
-                float3 point0 = -plane0.normal * plane0.distanceFromOrigin;  // A point on plane0
+                float3 point0 = -plane0.normal * plane0.distanceToOrigin;  // A point on plane0
                 for (int j = i + 1; j < numPlanes; j++)
                 {
                     Plane  plane1 = planes[j];
@@ -2107,7 +2107,7 @@ namespace Latios.Psyshock
                             }
                             double invDet = 1.0f / det;
                             x             =
-                                (float3)((planes[i].distanceFromOrigin * jkCross - planes[j].distanceFromOrigin * ikCross + planes[k].distanceFromOrigin * ijCross) * -invDet);
+                                (float3)((planes[i].distanceToOrigin * jkCross - planes[j].distanceToOrigin * ikCross + planes[k].distanceToOrigin * ijCross) * -invDet);
                         }
 
                         // Test if the point is inside of all of the other planes
@@ -2116,7 +2116,7 @@ namespace Latios.Psyshock
                             for (int l = 0; l < numPlanes; l++)
                             {
                                 const float tolerance = 1e-5f;
-                                if (math.dot(planes[l].normal, x) > tolerance - planes[l].distanceFromOrigin)
+                                if (math.dot(planes[l].normal, x) > tolerance - planes[l].distanceToOrigin)
                                 {
                                     inside = false;
                                     break;

@@ -189,29 +189,29 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         if (boneWeights.y > 0.0)
         {
             dqs = transformUnionDqsToDqs(_latiosBindPoses[skeletonBase.y + boneIndices.y]);
+            localScale += dqs.scale.xyz * boneWeights.y;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.y = -boneWeights.y;
             bindposeReal += dqs.r * boneWeights.y;
             bindposeDual += dqs.d * boneWeights.y;
-            localScale += dqs.scale.xyz * boneWeights.y;
         }
         if (boneWeights.z > 0.0)
         {
             dqs = transformUnionDqsToDqs(_latiosBindPoses[skeletonBase.y + boneIndices.z]);
+            localScale += dqs.scale.xyz * boneWeights.z;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.z = -boneWeights.z;
             bindposeReal += dqs.r * boneWeights.z;
             bindposeDual += dqs.d * boneWeights.z;
-            localScale += dqs.scale.xyz * boneWeights.z;
         }
         if (boneWeights.w > 0.0)
         {
             dqs = transformUnionDqsToDqs(_latiosBindPoses[skeletonBase.y + boneIndices.w]);
+            localScale += dqs.scale.xyz * boneWeights.w;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.w = -boneWeights.w;
             bindposeReal += dqs.r * boneWeights.w;
             bindposeDual += dqs.d * boneWeights.w;
-            localScale += dqs.scale.xyz * boneWeights.w;
         }
 
         {
@@ -224,7 +224,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
             bpQvvs.rotation = bindposeReal;
             bindposeReal.xyz = -bindposeReal.xyz;
             bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-            bpQvvs.stretchScale = float4(0, 0, 0, 1);
+            bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
             float3x4 deform = qvvsToMatrix(bpQvvs);
             float3x4 scale = float3x4(
@@ -250,29 +250,29 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
         if (boneWeights.y > 0.0)
         {
             dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.y));
+            localScale += dqs.scale.xyz * boneWeights.y;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.y = -boneWeights.y;
             worldReal += dqs.r * boneWeights.y;
             worldDual += dqs.d * boneWeights.y;
-            localScale += dqs.scale.xyz * boneWeights.y;
         }
         if (boneWeights.z > 0.0)
         {
             dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.z));
+            localScale += dqs.scale.xyz * boneWeights.z;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.z = -boneWeights.z;
             worldReal += dqs.r * boneWeights.z;
             worldDual += dqs.d * boneWeights.z;
-            localScale += dqs.scale.xyz * boneWeights.z;
         }
         if (boneWeights.w > 0.0)
         {
             dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.w));
+            localScale += dqs.scale.xyz * boneWeights.w;
             if (dot(dqs.r, firstBoneRot) < 0)
-                dqs.r.w = -dqs.r.w;
+                boneWeights.w = -boneWeights.w;
             worldReal += dqs.r * boneWeights.w;
             worldDual += dqs.d * boneWeights.w;
-            localScale += dqs.scale.xyz * boneWeights.w;
         }
 
         {

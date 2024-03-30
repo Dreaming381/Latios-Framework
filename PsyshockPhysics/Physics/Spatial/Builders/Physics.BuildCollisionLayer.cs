@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Latios.Transforms.Abstract;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -68,16 +69,17 @@ namespace Latios.Psyshock
         internal BuildCollisionLayerTypeHandles typeGroup;
         internal EntityQuery                    query;
 
-        internal NativeArray<Aabb>         aabbs;
-        internal NativeArray<ColliderBody> bodies;
+        internal NativeArray<Aabb>         aabbsArray;
+        internal NativeArray<ColliderBody> bodiesArray;
+        internal NativeList<Aabb>          aabbsList;
+        internal NativeList<ColliderBody>  bodiesList;
 
         internal CollisionLayerSettings settings;
 
         internal bool hasQueryData;
         internal bool hasBodiesArray;
         internal bool hasAabbsArray;
-
-        internal int count;
+        internal bool usesLists;
 
         /// <summary>
         /// The default CollisionLayerSettings used when none is specified.
@@ -109,12 +111,13 @@ namespace Latios.Psyshock
         /// <param name="system">The system used for extracting ComponentTypeHandles</param>
         public static BuildCollisionLayerConfig BuildCollisionLayer(EntityQuery query, SystemBase system)
         {
-            var config          = new BuildCollisionLayerConfig();
-            config.query        = query;
-            config.typeGroup    = new BuildCollisionLayerTypeHandles(system);
-            config.hasQueryData = true;
-            config.settings     = BuildCollisionLayerConfig.defaultSettings;
-            config.count        = query.CalculateEntityCount();
+            var config = new BuildCollisionLayerConfig
+            {
+                query        = query,
+                typeGroup    = new BuildCollisionLayerTypeHandles(system),
+                hasQueryData = true,
+                settings     = BuildCollisionLayerConfig.defaultSettings,
+            };
             return config;
         }
 
@@ -126,12 +129,13 @@ namespace Latios.Psyshock
         /// <param name="system">The system used for extracting ComponentTypeHandles</param>
         public static BuildCollisionLayerConfig BuildCollisionLayer(EntityQuery query, ref SystemState system)
         {
-            var config          = new BuildCollisionLayerConfig();
-            config.query        = query;
-            config.typeGroup    = new BuildCollisionLayerTypeHandles(ref system);
-            config.hasQueryData = true;
-            config.settings     = BuildCollisionLayerConfig.defaultSettings;
-            config.count        = query.CalculateEntityCount();
+            var config = new BuildCollisionLayerConfig
+            {
+                query        = query,
+                typeGroup    = new BuildCollisionLayerTypeHandles(ref system),
+                hasQueryData = true,
+                settings     = BuildCollisionLayerConfig.defaultSettings,
+            };
             return config;
         }
 
@@ -143,12 +147,13 @@ namespace Latios.Psyshock
         /// <param name="requiredTypeHandles">Cached type handles that must be updated before invoking this method</param>
         public static BuildCollisionLayerConfig BuildCollisionLayer(EntityQuery query, in BuildCollisionLayerTypeHandles requiredTypeHandles)
         {
-            var config          = new BuildCollisionLayerConfig();
-            config.query        = query;
-            config.typeGroup    = requiredTypeHandles;
-            config.hasQueryData = true;
-            config.settings     = BuildCollisionLayerConfig.defaultSettings;
-            config.count        = query.CalculateEntityCount();
+            var config = new BuildCollisionLayerConfig
+            {
+                query        = query,
+                typeGroup    = requiredTypeHandles,
+                hasQueryData = true,
+                settings     = BuildCollisionLayerConfig.defaultSettings,
+            };
             return config;
         }
 
@@ -158,11 +163,12 @@ namespace Latios.Psyshock
         /// <param name="bodies">The array of ColliderBody instances which should be baked into the CollisionLayer</param>
         public static BuildCollisionLayerConfig BuildCollisionLayer(NativeArray<ColliderBody> bodies)
         {
-            var config            = new BuildCollisionLayerConfig();
-            config.bodies         = bodies;
-            config.hasBodiesArray = true;
-            config.settings       = BuildCollisionLayerConfig.defaultSettings;
-            config.count          = bodies.Length;
+            var config = new BuildCollisionLayerConfig
+            {
+                bodiesArray    = bodies,
+                hasBodiesArray = true,
+                settings       = BuildCollisionLayerConfig.defaultSettings,
+            };
             return config;
         }
 
@@ -171,18 +177,57 @@ namespace Latios.Psyshock
         /// but uses the AABBs provided by the overrideAabbs array instead of calculating AABBs from the bodies
         /// </summary>
         /// <param name="bodies">The array of ColliderBody instances which should be baked into the CollisionLayer</param>
-        /// <param name="overrideAabbs">The array of AABBs parallel to the bodies array specifying different AABBs to use for each body</param>
+        /// <param name="overrideAabbs">The array of AABBs parallel to the bodiesArray array specifying different AABBs to use for each body</param>
         public static BuildCollisionLayerConfig BuildCollisionLayer(NativeArray<ColliderBody> bodies, NativeArray<Aabb> overrideAabbs)
         {
-            var config = new BuildCollisionLayerConfig();
-            ValidateOverrideAabbsAreRightLength(overrideAabbs, bodies.Length, false);
+            var config = new BuildCollisionLayerConfig
+            {
+                aabbsArray     = overrideAabbs,
+                bodiesArray    = bodies,
+                hasAabbsArray  = true,
+                hasBodiesArray = true,
+                settings       = BuildCollisionLayerConfig.defaultSettings
+            };
+            return config;
+        }
 
-            config.aabbs          = overrideAabbs;
-            config.bodies         = bodies;
-            config.hasAabbsArray  = true;
-            config.hasBodiesArray = true;
-            config.settings       = BuildCollisionLayerConfig.defaultSettings;
-            config.count          = bodies.Length;
+        /// <summary>
+        /// Creates a new CollisionLayer using the collider and transform data provided by the bodies list.
+        /// If using a job scheduler, the list does not need to be populated at this time.
+        /// </summary>
+        /// <param name="bodies">The list of ColliderBody instances which should be baked into the CollisionLayer</param>
+        public static BuildCollisionLayerConfig BuildCollisionLayer(NativeList<ColliderBody> bodies)
+        {
+            var config = new BuildCollisionLayerConfig
+            {
+                bodiesList     = bodies,
+                hasBodiesArray = true,
+                usesLists      = true,
+                settings       = BuildCollisionLayerConfig.defaultSettings,
+            };
+            return config;
+        }
+
+        /// <summary>
+        /// Creates a new CollisionLayer using the collider and transform data provided by the bodies list,
+        /// but uses the AABBs provided by the overrideAabbs list instead of calculating AABBs from the bodies.
+        /// If using a job scheduler, the lists do not need to be populated at this time.
+        /// </summary>
+        /// <param name="bodies">The array of ColliderBody instances which should be baked into the CollisionLayer</param>
+        /// <param name="overrideAabbs">The array of AABBs parallel to the bodiesArray array specifying different AABBs to use for each body</param>
+        public static BuildCollisionLayerConfig BuildCollisionLayer(NativeList<ColliderBody> bodies, NativeList<Aabb> overrideAabbs)
+        {
+            //ValidateOverrideAabbsAreRightLength(overrideAabbs, bodies.Length, false);
+
+            var config = new BuildCollisionLayerConfig
+            {
+                aabbsList      = overrideAabbs,
+                bodiesList     = bodies,
+                hasAabbsArray  = true,
+                hasBodiesArray = true,
+                usesLists      = true,
+                settings       = BuildCollisionLayerConfig.defaultSettings
+            };
             return config;
         }
         #endregion
@@ -269,13 +314,24 @@ namespace Latios.Psyshock
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies, config.aabbs);
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsArray();
+                    config.aabbsArray  = config.aabbsList.AsArray();
+                }
+
+                layer = new CollisionLayer(config.settings, allocator);
+                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodiesArray, config.aabbsArray);
             }
             else if (config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodies);
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsArray();
+                }
+
+                layer = new CollisionLayer(config.settings, allocator);
+                BuildCollisionLayerInternal.BuildImmediate(ref layer, config.bodiesArray);
             }
             else
             {
@@ -307,68 +363,50 @@ namespace Latios.Psyshock
 
             if (config.hasQueryData)
             {
-                int count        = config.count;
-                layer            = new CollisionLayer(count, config.settings, allocator);
-                var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
-                var part1Indices = config.query.CalculateBaseEntityIndexArray(Allocator.TempJob);
-                new BuildCollisionLayerInternal.Part1FromQueryJob
+                layer                  = new CollisionLayer(config.settings, allocator);
+                var filteredChunkCache = new NativeList<BuildCollisionLayerInternal.FilteredChunkCache>(config.query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
+                new BuildCollisionLayerInternal.Part0PrefilterQueryJob
                 {
-                    typeGroup                 = config.typeGroup,
-                    layer                     = layer,
-                    layerIndices              = layerIndices,
-                    colliderAoS               = aos,
-                    xMinMaxs                  = xMinMaxs,
-                    firstEntityInChunkIndices = part1Indices
+                    filteredChunkCache = filteredChunkCache
                 }.Run(config.query);
-
-                new BuildCollisionLayerInternal.Part2Job
+                new BuildCollisionLayerInternal.BuildFromFilteredChunkCacheSingleJob
                 {
-                    layer        = layer,
-                    layerIndices = layerIndices
+                    filteredChunkCache = filteredChunkCache.AsArray(),
+                    handles            = config.typeGroup,
+                    layer              = layer
                 }.Run();
-
-                new BuildCollisionLayerInternal.Part3Job
-                {
-                    layerIndices       = layerIndices,
-                    unsortedSrcIndices = layer.srcIndices
-                }.Run(count);
-
-                new BuildCollisionLayerInternal.Part4Job
-                {
-                    bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = layer.srcIndices,
-                    trees                = layer.intervalTrees,
-                    xMinMaxs             = xMinMaxs
-                }.Run(layer.bucketCount);
-
-                new BuildCollisionLayerInternal.Part5FromQueryJob
-                {
-                    colliderAoS = aos,
-                    layer       = layer,
-                }.Run(count);
+                filteredChunkCache.Dispose();
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.aabbs.Length, config.settings, allocator);
+                layer = new CollisionLayer(config.settings, allocator);
+
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsArray();
+                    config.aabbsArray  = config.aabbsList.AsArray();
+                }
 
                 new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
                 {
                     layer  = layer,
-                    aabbs  = config.aabbs,
-                    bodies = config.bodies
+                    aabbs  = config.aabbsArray,
+                    bodies = config.bodiesArray
                 }.Run();
             }
             else if (config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
+                layer = new CollisionLayer(config.settings, allocator);
+
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsArray();
+                }
 
                 new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
                 {
                     layer  = layer,
-                    bodies = config.bodies
+                    bodies = config.bodiesArray
                 }.Run();
             }
             else
@@ -389,79 +427,53 @@ namespace Latios.Psyshock
         {
             config.ValidateSettings();
 
-            var jh = inputDeps;
-
             if (config.hasQueryData)
             {
-                int count        = config.count;
-                layer            = new CollisionLayer(count, config.settings, allocator);
-                var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
-                var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
-                jh               = new BuildCollisionLayerInternal.Part1FromQueryJob
+                layer                  = new CollisionLayer(config.settings, allocator);
+                var filteredChunkCache = new NativeList<BuildCollisionLayerInternal.FilteredChunkCache>(config.query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
+                var jh                 = new BuildCollisionLayerInternal.Part0PrefilterQueryJob
                 {
-                    typeGroup                 = config.typeGroup,
-                    layer                     = layer,
-                    layerIndices              = layerIndices,
-                    colliderAoS               = aos,
-                    xMinMaxs                  = xMinMaxs,
-                    firstEntityInChunkIndices = part1Indices
-                }.Schedule(config.query, jh);
-
-                jh = new BuildCollisionLayerInternal.Part2Job
+                    filteredChunkCache = filteredChunkCache
+                }.Schedule(config.query, inputDeps);
+                jh = new BuildCollisionLayerInternal.BuildFromFilteredChunkCacheSingleJob
                 {
-                    layer        = layer,
-                    layerIndices = layerIndices
+                    filteredChunkCache = filteredChunkCache.AsArray(),
+                    handles            = config.typeGroup,
+                    layer              = layer
                 }.Schedule(jh);
-
-                jh = new BuildCollisionLayerInternal.Part3Job
-                {
-                    layerIndices       = layerIndices,
-                    unsortedSrcIndices = layer.srcIndices
-                }.Schedule(jh);
-
-                jh = new BuildCollisionLayerInternal.Part4Job
-                {
-                    bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = layer.srcIndices,
-                    trees                = layer.intervalTrees,
-                    xMinMaxs             = xMinMaxs
-                }.Schedule(jh);
-
-                jh = new BuildCollisionLayerInternal.Part5FromQueryJob
-                {
-                    colliderAoS = aos,
-                    layer       = layer,
-                }.Schedule(jh);
-
-                return jh;
+                return filteredChunkCache.Dispose(jh);
             }
             else if (config.hasAabbsArray && config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.aabbs.Length, config.settings, allocator);
+                layer = new CollisionLayer(config.settings, allocator);
 
-                jh = new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsDeferredJobArray();
+                    config.aabbsArray  = config.aabbsList.AsDeferredJobArray();
+                }
+
+                return new BuildCollisionLayerInternal.BuildFromDualArraysSingleJob
                 {
                     layer  = layer,
-                    aabbs  = config.aabbs,
-                    bodies = config.bodies
-                }.Schedule(jh);
-
-                return jh;
+                    aabbs  = config.aabbsArray,
+                    bodies = config.bodiesArray
+                }.Schedule(inputDeps);
             }
             else if (config.hasBodiesArray)
             {
-                layer = new CollisionLayer(config.bodies.Length, config.settings, allocator);
+                layer = new CollisionLayer(config.settings, allocator);
 
-                jh = new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
+                if (config.usesLists)
+                {
+                    config.bodiesArray = config.bodiesList.AsDeferredJobArray();
+                }
+
+                return new BuildCollisionLayerInternal.BuildFromColliderArraySingleJob
                 {
                     layer  = layer,
-                    bodies = config.bodies
-                }.Schedule(jh);
-
-                return jh;
+                    bodies = config.bodiesArray
+                }.Schedule(inputDeps);
             }
             else
                 throw new InvalidOperationException("Something went wrong with the BuildCollisionError configuration.");
@@ -481,117 +493,200 @@ namespace Latios.Psyshock
         {
             config.ValidateSettings();
 
+            layer = new CollisionLayer(config.settings, allocator);
+
             var jh = inputDeps;
 
             if (config.hasQueryData)
             {
-                int count        = config.query.CalculateEntityCount();
-                layer            = new CollisionLayer(count, config.settings, allocator);
-                var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var aos          = new NativeArray<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                NativeList<int>                                         layerIndices;
+                NativeList<float2>                                      xMinMaxs;
+                NativeList<BuildCollisionLayerInternal.ColliderAoSData> aos;
 
-                var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
-                jh               = new BuildCollisionLayerInternal.Part1FromQueryJob
+                JobHandle filteredCacheDisposeHandle = default;
+
+                if (config.query.HasFilter() || config.query.UsesEnabledFiltering())
                 {
-                    layer                     = layer,
-                    typeGroup                 = config.typeGroup,
-                    layerIndices              = layerIndices,
-                    xMinMaxs                  = xMinMaxs,
-                    colliderAoS               = aos,
-                    firstEntityInChunkIndices = part1Indices
-                }.ScheduleParallel(config.query, jh);
+                    var filteredChunkCache = new NativeList<BuildCollisionLayerInternal.FilteredChunkCache>(config.query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
+                    jh                     = new BuildCollisionLayerInternal.Part0PrefilterQueryJob
+                    {
+                        filteredChunkCache = filteredChunkCache
+                    }.Schedule(config.query, jh);
+
+                    layerIndices = new NativeList<int>(Allocator.TempJob);
+                    xMinMaxs     = new NativeList<float2>(Allocator.TempJob);
+                    aos          = new NativeList<BuildCollisionLayerInternal.ColliderAoSData>(Allocator.TempJob);
+
+                    jh = new BuildCollisionLayerInternal.AllocateCollisionLayerFromFilteredQueryJob
+                    {
+                        layer              = layer,
+                        filteredChunkCache = filteredChunkCache.AsDeferredJobArray(),
+                        colliderAoS        = aos,
+                        layerIndices       = layerIndices,
+                        xMinMaxs           = xMinMaxs
+                    }.Schedule(jh);
+
+                    jh = new BuildCollisionLayerInternal.Part1FromFilteredQueryJob
+                    {
+                        layer              = layer,
+                        filteredChunkCache = filteredChunkCache.AsDeferredJobArray(),
+                        colliderAoS        = aos.AsDeferredJobArray(),
+                        layerIndices       = layerIndices.AsDeferredJobArray(),
+                        typeGroup          = config.typeGroup,
+                        xMinMaxs           = xMinMaxs.AsDeferredJobArray()
+                    }.Schedule(filteredChunkCache, 1, jh);
+
+                    filteredCacheDisposeHandle = filteredChunkCache.Dispose(jh);
+                }
+                else
+                {
+                    int count    = config.query.CalculateEntityCountWithoutFiltering();
+                    layerIndices = new NativeList<int>(count, Allocator.TempJob);
+                    layerIndices.ResizeUninitialized(count);
+                    xMinMaxs = new NativeList<float2>(count, Allocator.TempJob);
+                    xMinMaxs.ResizeUninitialized(count);
+                    aos = new NativeList<BuildCollisionLayerInternal.ColliderAoSData>(count, Allocator.TempJob);
+                    aos.ResizeUninitialized(count);
+                    layer.ResizeUninitialized(count);
+                    var part1Indices = config.query.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, jh, out jh);
+
+                    jh = new BuildCollisionLayerInternal.Part1FromUnfilteredQueryJob
+                    {
+                        layer                     = layer,
+                        typeGroup                 = config.typeGroup,
+                        layerIndices              = layerIndices.AsDeferredJobArray(),
+                        xMinMaxs                  = xMinMaxs.AsDeferredJobArray(),
+                        colliderAoS               = aos.AsDeferredJobArray(),
+                        firstEntityInChunkIndices = part1Indices
+                    }.ScheduleParallel(config.query, jh);
+                }
 
                 jh = new BuildCollisionLayerInternal.Part2Job
                 {
                     layer        = layer,
-                    layerIndices = layerIndices
+                    layerIndices = layerIndices.AsDeferredJobArray()
                 }.Schedule(jh);
+
+                if (filteredCacheDisposeHandle != default)
+                    jh = JobHandle.CombineDependencies(filteredCacheDisposeHandle, jh);
 
                 jh = new BuildCollisionLayerInternal.Part3Job
                 {
-                    layerIndices       = layerIndices,
-                    unsortedSrcIndices = layer.srcIndices
-                }.Schedule(count, 512, jh);
+                    layerIndices       = layerIndices.AsDeferredJobArray(),
+                    unsortedSrcIndices = layer.srcIndices.AsDeferredJobArray()
+                }.Schedule(layerIndices, 512, jh);
 
                 jh = new BuildCollisionLayerInternal.Part4Job
                 {
-                    unsortedSrcIndices   = layer.srcIndices,
-                    xMinMaxs             = xMinMaxs,
-                    trees                = layer.intervalTrees,
-                    bucketStartAndCounts = layer.bucketStartsAndCounts
+                    unsortedSrcIndices   = layer.srcIndices.AsDeferredJobArray(),
+                    xMinMaxs             = xMinMaxs.AsDeferredJobArray(),
+                    trees                = layer.intervalTrees.AsDeferredJobArray(),
+                    bucketStartAndCounts = layer.bucketStartsAndCounts.AsDeferredJobArray()
                 }.Schedule(layer.bucketCount, 1, jh);
 
-                jh = new BuildCollisionLayerInternal.Part5FromQueryJob
+                jh = new BuildCollisionLayerInternal.Part5FromAoSJob
                 {
                     layer       = layer,
-                    colliderAoS = aos,
-                }.Schedule(count, 128, jh);
+                    colliderAoS = aos.AsDeferredJobArray(),
+                }.Schedule(aos, 128, jh);
 
-                return jh;
+                return JobHandle.CombineDependencies(layerIndices.Dispose(jh), xMinMaxs.Dispose(jh), aos.Dispose(jh));
             }
             else if (config.hasBodiesArray)
             {
-                layer            = new CollisionLayer(config.bodies.Length, config.settings, allocator);
-                int count        = config.bodies.Length;
-                var layerIndices = new NativeArray<int>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                var xMinMaxs     = new NativeArray<float2>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
-                NativeArray<Aabb> aabbs = config.hasAabbsArray ? config.aabbs : new NativeArray<Aabb>(count, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                NativeList<int>    layerIndices;
+                NativeList<float2> xMinMaxs;
+                if (config.usesLists)
+                {
+                    if (!config.hasAabbsArray)
+                    {
+                        config.aabbsList = new NativeList<Aabb>(Allocator.TempJob);
+                    }
+                    layerIndices = new NativeList<int>(Allocator.TempJob);
+                    xMinMaxs     = new NativeList<float2>(Allocator.TempJob);
+                    jh           = new BuildCollisionLayerInternal.AllocateCollisionLayerFromBodiesListJob
+                    {
+                        aabbs            = config.aabbsList,
+                        aabbsAreProvided = config.hasAabbsArray,
+                        bodies           = config.bodiesList.AsDeferredJobArray(),
+                        layer            = layer,
+                        layerIndices     = layerIndices,
+                        xMinMaxs         = xMinMaxs
+                    }.Schedule(jh);
+                    config.aabbsArray  = config.aabbsList.AsDeferredJobArray();
+                    config.bodiesArray = config.bodiesList.AsDeferredJobArray();
+                }
+                else
+                {
+                    int count = config.bodiesArray.Length;
+                    if (!config.hasAabbsArray)
+                    {
+                        config.aabbsList = new NativeList<Aabb>(count, Allocator.TempJob);
+                        config.aabbsList.ResizeUninitialized(count);
+                        config.aabbsArray = config.aabbsList.AsDeferredJobArray();
+                    }
+                    layerIndices = new NativeList<int>(count, Allocator.TempJob);
+                    layerIndices.ResizeUninitialized(count);
+                    xMinMaxs = new NativeList<float2>(count, Allocator.TempJob);
+                    xMinMaxs.ResizeUninitialized(count);
+                    layer.ResizeUninitialized(count);
+                }
 
                 if (config.hasAabbsArray)
                 {
                     jh = new BuildCollisionLayerInternal.Part1FromDualArraysJob
                     {
                         layer        = layer,
-                        aabbs        = aabbs,
-                        layerIndices = layerIndices,
-                        xMinMaxs     = xMinMaxs
-                    }.Schedule(count, 64, jh);
+                        aabbs        = config.aabbsArray,
+                        layerIndices = layerIndices.AsDeferredJobArray(),
+                        xMinMaxs     = xMinMaxs.AsDeferredJobArray()
+                    }.Schedule(layerIndices, 64, jh);
                 }
                 else
                 {
                     jh = new BuildCollisionLayerInternal.Part1FromColliderBodyArrayJob
                     {
                         layer          = layer,
-                        aabbs          = aabbs,
-                        colliderBodies = config.bodies,
-                        layerIndices   = layerIndices,
-                        xMinMaxs       = xMinMaxs
-                    }.Schedule(count, 64, jh);
+                        aabbs          = config.aabbsArray,
+                        colliderBodies = config.bodiesArray,
+                        layerIndices   = layerIndices.AsDeferredJobArray(),
+                        xMinMaxs       = xMinMaxs.AsDeferredJobArray()
+                    }.Schedule(layerIndices, 64, jh);
                 }
 
                 jh = new BuildCollisionLayerInternal.Part2Job
                 {
                     layer        = layer,
-                    layerIndices = layerIndices
+                    layerIndices = layerIndices.AsDeferredJobArray()
                 }.Schedule(jh);
 
                 jh = new BuildCollisionLayerInternal.Part3Job
                 {
-                    layerIndices       = layerIndices,
-                    unsortedSrcIndices = layer.srcIndices
-                }.Schedule(count, 512, jh);
+                    layerIndices       = layerIndices.AsDeferredJobArray(),
+                    unsortedSrcIndices = layer.srcIndices.AsDeferredJobArray()
+                }.Schedule(layerIndices, 512, jh);
 
                 jh = new BuildCollisionLayerInternal.Part4Job
                 {
-                    bucketStartAndCounts = layer.bucketStartsAndCounts,
-                    unsortedSrcIndices   = layer.srcIndices,
-                    trees                = layer.intervalTrees,
-                    xMinMaxs             = xMinMaxs
+                    bucketStartAndCounts = layer.bucketStartsAndCounts.AsDeferredJobArray(),
+                    unsortedSrcIndices   = layer.srcIndices.AsDeferredJobArray(),
+                    trees                = layer.intervalTrees.AsDeferredJobArray(),
+                    xMinMaxs             = xMinMaxs.AsDeferredJobArray()
                 }.Schedule(layer.bucketCount, 1, jh);
 
-                jh = new BuildCollisionLayerInternal.Part5FromArraysJob
+                jh = new BuildCollisionLayerInternal.Part5FromSplitArraysJob
                 {
-                    aabbs  = aabbs,
-                    bodies = config.bodies,
+                    aabbs  = config.aabbsArray,
+                    bodies = config.bodiesArray,
                     layer  = layer,
-                }.Schedule(count, 128, jh);
+                }.Schedule(layer.bodies, 128, jh);
 
+                JobHandle aabbDispose = default;
                 if (!config.hasAabbsArray)
-                    jh = aabbs.Dispose(jh);
-
-                return jh;
+                {
+                    aabbDispose = config.aabbsList.Dispose(jh);
+                }
+                return JobHandle.CombineDependencies(aabbDispose, xMinMaxs.Dispose(jh), layerIndices.Dispose(jh));
             }
             else
                 throw new InvalidOperationException("Something went wrong with the BuildCollisionError configuration.");
@@ -608,13 +703,6 @@ namespace Latios.Psyshock
                 throw new InvalidOperationException("BuildCollisionLayer requires positive Subdivision values per axis");
         }
 
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void ValidateOverrideAabbsAreRightLength(NativeArray<Aabb> aabbs, int count, bool query)
-        {
-            if (aabbs.Length != count)
-                throw new InvalidOperationException(
-                    $"The number of elements in overrideAbbs does not match the { (query ? "number of entities in the query" : "number of bodies in the bodies array")}");
-        }
         #endregion
     }
 }

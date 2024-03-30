@@ -909,9 +909,11 @@ namespace Latios.Kinemation.Systems
 
             Profiler.EndSample();
 
-            var numNewChunksArray = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
-            totalChunks           = m_EntitiesGraphicsRenderedQuery.CalculateChunkCountWithoutFiltering();
-            var newChunks         = CollectionHelper.CreateNativeArray<ArchetypeChunk>(totalChunks, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+            var numNewChunksArray          = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
+            var totalChunksFromNormalQuery = m_EntitiesGraphicsRenderedQuery.CalculateChunkCountWithoutFiltering();
+            var totalChunksFromMetaQuery   = m_MetaEntitiesForHybridRenderableChunksQuery.CalculateEntityCountWithoutFiltering();
+            totalChunks                    = math.max(totalChunksFromNormalQuery, totalChunksFromMetaQuery);  // If these are different for some reason, reserve the larger.
+            var newChunks                  = CollectionHelper.CreateNativeArray<ArchetypeChunk>(totalChunks, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
             var classifyNewChunksJob = new ClassifyNewChunksJobLatiosVersion
             {

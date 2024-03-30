@@ -98,8 +98,8 @@ namespace Latios
         /// <summary>
         /// Disposes the EntityOperationCommandBuffer after the jobs which use it have finished.
         /// </summary>
-        /// <param name="inputDeps">The JobHandle for any jobs previously using this EnableCommandBuffer</param>
-        /// <returns></returns>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this EntityOperationCommandBuffer</param>
+        /// <returns>The JobHandle for the disposing job scheduled</returns>
         public JobHandle Dispose(JobHandle inputDeps)
         {
             var jobHandle = new DisposeJob

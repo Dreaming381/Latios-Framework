@@ -28,6 +28,12 @@ namespace Latios.Myri.DSP
             public int frameIndex { get; internal set; }
             public bool connected { get; internal set; }
         }
+
+        public void ClearToZero()
+        {
+            left.AsSpan().Clear();
+            right.AsSpan().Clear();
+        }
     }
 
     // General reminder: Adding dB is like multiplying raw, and subtracting dB is like dividing.

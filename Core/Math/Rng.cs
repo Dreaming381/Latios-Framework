@@ -154,6 +154,30 @@ namespace Latios
         }
     }
 
+    public static class SystemRngStateExtensions
+    {
+        public static void InitSystemRng(this ref SystemState state, uint seed)
+        {
+            state.EntityManager.AddComponentData(state.SystemHandle, new SystemRng(seed));
+        }
+
+        public static void InitSystemRng(this ref SystemState state, FixedString128Bytes seedString)
+        {
+            state.EntityManager.AddComponentData(state.SystemHandle, new SystemRng(seedString));
+        }
+
+        public static SystemRng GetJobRng(this ref SystemState state)
+        {
+            return state.EntityManager.GetComponentDataRW<SystemRng>(state.SystemHandle).ValueRW.Shuffle();
+        }
+
+        public static Rng.RngSequence GetMainThreadRng(this ref SystemState state)
+        {
+            var srng = GetJobRng(ref state);
+            return srng.rng.GetSequence(int.MaxValue);  // Do something most people won't encounter in jobs for extra randomness.
+        }
+    }
+
     public struct SystemRng : IComponentData
     {
         public Rng             rng;
@@ -238,5 +262,60 @@ namespace Latios
         public void ShuffleElements<T>(NativeArray<T> array) where T : unmanaged => currentSequence.ShuffleElements(array);
         public void ShuffleElements<T, U>(T list) where T : unmanaged, INativeList<U> where U : unmanaged => currentSequence.ShuffleElements<T, U>(list);
     }
+
+    // Todo: In order for the below to work, Unity would need to change the source generators to invoke these interface methods
+    // via interface-constrained generics, rather than calling them directly. Calling them directly doesn't export the symbols
+    // to the struct type for easy call access.
+    // An alternative would be to write a source generator that adds the IJobEntityChunkBeginEnd interface and implementation
+    // if it isn't already present. That could even define the SystemRng property, though we'd probably need to validate
+    // the SystemRng instance if we went that route.
+
+    // /// <summary>
+    // /// An interface to implement in IJobEntity jobs to automatically set up SystemRng.
+    // /// You simply need to define a SystemRng autoproperty named "rng" in your job for everything
+    // /// to function correctly within the job.
+    // /// </summary>
+    // public interface IJobEntityRng : IJobEntityChunkBeginEnd
+    // {
+    //     public SystemRng rng { get; set; }
+    //
+    //     new public bool OnChunkBegin(in ArchetypeChunk chunk,
+    //                                  int unfilteredChunkIndex,
+    //                                  bool useEnabledMask,
+    //                                  in Unity.Burst.Intrinsics.v128 chunkEnabledMask)
+    //     {
+    //         var instance = rng;
+    //         instance.BeginChunk(unfilteredChunkIndex);
+    //         rng = instance;
+    //         return true;
+    //     }
+    //
+    //     new public void OnChunkEnd(in ArchetypeChunk chunk,
+    //                                int unfilteredChunkIndex,
+    //                                bool useEnabledMask,
+    //                                in Unity.Burst.Intrinsics.v128 chunkEnabledMask,
+    //                                bool chunkWasExecuted)
+    //     {
+    //     }
+    //
+    //     bool IJobEntityChunkBeginEnd.OnChunkBegin(in ArchetypeChunk chunk,
+    //                                               int unfilteredChunkIndex,
+    //                                               bool useEnabledMask,
+    //                                               in Unity.Burst.Intrinsics.v128 chunkEnabledMask)
+    //     {
+    //         var instance = rng;
+    //         instance.BeginChunk(unfilteredChunkIndex);
+    //         rng = instance;
+    //         return true;
+    //     }
+    //
+    //     void IJobEntityChunkBeginEnd.OnChunkEnd(in ArchetypeChunk chunk,
+    //                                             int unfilteredChunkIndex,
+    //                                             bool useEnabledMask,
+    //                                             in Unity.Burst.Intrinsics.v128 chunkEnabledMask,
+    //                                             bool chunkWasExecuted)
+    //     {
+    //     }
+    // }
 }
 

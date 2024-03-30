@@ -197,11 +197,11 @@ namespace Latios.Psyshock.Authoring.Systems
 
                 Physics.BuildCollisionLayer(bodies.AsArray()).WithSubdivisions(1).RunImmediate(out var layer, Allocator.Temp);
 
-                builder.ConstructFromNativeArray(ref blobRoot.xmins,         layer.xmins);
-                builder.ConstructFromNativeArray(ref blobRoot.xmaxs,         layer.xmaxs);
-                builder.ConstructFromNativeArray(ref blobRoot.yzminmaxs,     layer.yzminmaxs);
-                builder.ConstructFromNativeArray(ref blobRoot.intervalTree,  layer.intervalTrees);
-                builder.ConstructFromNativeArray(ref blobRoot.sourceIndices, layer.srcIndices);
+                builder.ConstructFromNativeArray(ref blobRoot.xmins,         layer.xmins.AsArray());
+                builder.ConstructFromNativeArray(ref blobRoot.xmaxs,         layer.xmaxs.AsArray());
+                builder.ConstructFromNativeArray(ref blobRoot.yzminmaxs,     layer.yzminmaxs.AsArray());
+                builder.ConstructFromNativeArray(ref blobRoot.intervalTree,  layer.intervalTrees.AsArray());
+                builder.ConstructFromNativeArray(ref blobRoot.sourceIndices, layer.srcIndices.AsArray());
 
                 var triangles = builder.Allocate(ref blobRoot.triangles, layer.count);
                 var aabb      = new Aabb(float.MaxValue, float.MinValue);

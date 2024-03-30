@@ -21,6 +21,8 @@ namespace Latios.Calligraphics.Systems
         EntityQuery m_singleFontQuery;
         EntityQuery m_multiFontQuery;
 
+        bool m_skipChangeFilter;
+
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -31,6 +33,7 @@ namespace Latios.Calligraphics.Systems
                                 .With<TextBaseConfiguration>(true)
                                 .With<TextRenderControl>(    false)
                                 .Build();
+            m_skipChangeFilter = (state.WorldUnmanaged.Flags & WorldFlags.Editor) == WorldFlags.Editor;
         }
 
         [BurstCompile]
@@ -45,6 +48,7 @@ namespace Latios.Calligraphics.Systems
                 renderGlyphHandle           = GetBufferTypeHandle<RenderGlyph>(false),
                 textBaseConfigurationHandle = GetComponentTypeHandle<TextBaseConfiguration>(true),
                 textRenderControlHandle     = GetComponentTypeHandle<TextRenderControl>(false),
+                lastSystemVersion           = m_skipChangeFilter ? 0 : state.LastSystemVersion
             }.ScheduleParallel(m_singleFontQuery, state.Dependency);
         }
 
@@ -60,6 +64,8 @@ namespace Latios.Calligraphics.Systems
             [ReadOnly] public ComponentTypeHandle<TextBaseConfiguration> textBaseConfigurationHandle;
             [ReadOnly] public ComponentTypeHandle<FontBlobReference>     fontBlobReferenceHandle;
 
+            public uint lastSystemVersion;
+
             [NativeDisableContainerSafetyRestriction]
             private NativeList<RichTextTag> m_richTextTags;
 
@@ -68,6 +74,12 @@ namespace Latios.Calligraphics.Systems
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                if (!(chunk.DidChange(ref glyphMappingMaskHandle, lastSystemVersion) ||
+                      chunk.DidChange(ref calliByteHandle, lastSystemVersion) ||
+                      chunk.DidChange(ref textBaseConfigurationHandle, lastSystemVersion) ||
+                      chunk.DidChange(ref fontBlobReferenceHandle, lastSystemVersion)))
+                    return;
+
                 var calliBytesBuffers      = chunk.GetBufferAccessor(ref calliByteHandle);
                 var renderGlyphBuffers     = chunk.GetBufferAccessor(ref renderGlyphHandle);
                 var glyphMappingBuffers    = chunk.GetBufferAccessor(ref glyphMappingElementHandle);

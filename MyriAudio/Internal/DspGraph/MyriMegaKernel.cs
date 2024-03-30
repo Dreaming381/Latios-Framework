@@ -28,12 +28,17 @@ namespace Latios.Myri.DSP
         DspUpdateBuffer             m_dspUpdateBuffer;
         UnsafeList<DspUpdateBuffer> m_queuedDspUpdateBuffers;
 
-        ChunkedList128<EffectMetadata.Ptr>        m_effectIdToPtrMap;
-        ChunkedList128<SpatialEffectMetadata.Ptr> m_spatialEffectIdToPtrMap;
-        ChunkedList128<SourceStackMetadata.Ptr>   m_sourceStackIdToPtrMap;
-        ChunkedList128<ListenerState>             m_listenerStackIdToStateMap;
+        ChunkedList128<EffectMetadata.Ptr>            m_effectIdToPtrMap;
+        ChunkedList128<SpatialEffectMetadata.Ptr>     m_spatialEffectIdToPtrMap;
+        ChunkedList128<SourceStackMetadata.Ptr>       m_sourceStackIdToPtrMap;
+        ChunkedList128<ListenerState>                 m_listenerStackIdToStateMap;
+        ChunkedList128<ResourceComponentMetadata.Ptr> m_resourceComponentIdToPtrMap;
+        ChunkedList128<ResourceBufferMetadata.Ptr>    m_resourceBufferIdToPtrMap;
 
+        NativeHashMap<ResourceKey, ResourceValue>      m_resourceKeyToPtrMap;
         NativeHashMap<Entity, VirtualOutputEffect.Ptr> m_entityToVirtualOutputMap;
+
+        BrickwallLimiter m_masterLimiter;
 
         SampleFramePool m_framePool;
 
@@ -46,32 +51,49 @@ namespace Latios.Myri.DSP
         //AllocatorHelper<RewindableAllocator> m_rewindableAllocator;
 
         ProfilerMarker m_profilingReceivedBuffers;
+        ProfilerMarker m_profilingSourceStacks;
+        ProfilerMarker m_profilingSpatializers;
+        ProfilerMarker m_profilingListenerStacks;
+        ProfilerMarker m_profilingMixdown;
 
         public void Initialize()
         {
             // We start on frame 1 so that a buffer ID and frame of both 0 means uninitialized.
             // The audio components use this at the time of writing this comment.
-            m_currentFrame              = 1;
-            m_nextUpdateFrame           = 0;
-            m_lastProcessedBufferID     = -1;
-            m_listenersDirty            = false;
-            m_hasFirstDspBuffer         = false;
-            m_hasValidDspBuffer         = false;
-            m_queuedDspUpdateBuffers    = new UnsafeList<DspUpdateBuffer>(16, Allocator.AudioKernel);
-            m_effectIdToPtrMap          = new ChunkedList128<EffectMetadata.Ptr>(Allocator.AudioKernel);
-            m_spatialEffectIdToPtrMap   = new ChunkedList128<SpatialEffectMetadata.Ptr>(Allocator.AudioKernel);
-            m_sourceStackIdToPtrMap     = new ChunkedList128<SourceStackMetadata.Ptr>(Allocator.AudioKernel);
-            m_listenerStackIdToStateMap = new ChunkedList128<ListenerState>(Allocator.AudioKernel);
-            m_entityToVirtualOutputMap  = new NativeHashMap<Entity, VirtualOutputEffect.Ptr>(128, Allocator.AudioKernel);
-            m_framePool                 = new SampleFramePool(Allocator.AudioKernel);
-            m_listenersByLayer          = new UnsafeList<UnsafeList<ListenerStackMetadata.Ptr> >(32, Allocator.AudioKernel);
+            m_currentFrame                = 1;
+            m_nextUpdateFrame             = 0;
+            m_lastProcessedBufferID       = -1;
+            m_listenersDirty              = false;
+            m_hasFirstDspBuffer           = false;
+            m_hasValidDspBuffer           = false;
+            m_queuedDspUpdateBuffers      = new UnsafeList<DspUpdateBuffer>(16, Allocator.AudioKernel);
+            m_effectIdToPtrMap            = new ChunkedList128<EffectMetadata.Ptr>(Allocator.AudioKernel);
+            m_spatialEffectIdToPtrMap     = new ChunkedList128<SpatialEffectMetadata.Ptr>(Allocator.AudioKernel);
+            m_sourceStackIdToPtrMap       = new ChunkedList128<SourceStackMetadata.Ptr>(Allocator.AudioKernel);
+            m_listenerStackIdToStateMap   = new ChunkedList128<ListenerState>(Allocator.AudioKernel);
+            m_resourceComponentIdToPtrMap = new ChunkedList128<ResourceComponentMetadata.Ptr>(Allocator.AudioKernel);
+            m_resourceBufferIdToPtrMap    = new ChunkedList128<ResourceBufferMetadata.Ptr>(Allocator.AudioKernel);
+            m_resourceKeyToPtrMap         = new NativeHashMap<ResourceKey, ResourceValue>(256, Allocator.AudioKernel);
+            m_entityToVirtualOutputMap    = new NativeHashMap<Entity, VirtualOutputEffect.Ptr>(64, Allocator.AudioKernel);
+            m_framePool                   = new SampleFramePool(Allocator.AudioKernel);
+            m_listenersByLayer            = new UnsafeList<UnsafeList<ListenerStackMetadata.Ptr> >(32, Allocator.AudioKernel);
             for (int i = 0; i < 32; i++)
                 m_listenersByLayer.Add(new UnsafeList<ListenerStackMetadata.Ptr>(8, Allocator.AudioKernel));
             m_samplingCache = new SamplingCache(Allocator.AudioKernel);
             //m_rewindableAllocator = new AllocatorHelper<RewindableAllocator>(Allocator.AudioKernel);
             //m_rewindableAllocator.Allocator.Initialize(64 * 1024);
 
+            m_masterLimiter = new BrickwallLimiter(BrickwallLimiter.kDefaultPreGain,
+                                                   BrickwallLimiter.kDefaultLimitDB,
+                                                   BrickwallLimiter.kDefaultReleaseDBPerSample,
+                                                   BrickwallLimiter.kDefaultLookaheadSampleCount,
+                                                   Allocator.AudioKernel);
+
             m_profilingReceivedBuffers = new ProfilerMarker("ProcessReceivedBuffers");
+            m_profilingSourceStacks    = new ProfilerMarker("SourceStacks");
+            m_profilingSpatializers    = new ProfilerMarker("Spatialization");
+            m_profilingListenerStacks  = new ProfilerMarker("ListenerStacks");
+            m_profilingMixdown         = new ProfilerMarker("Mixdown");
         }
 
         public void Execute(ref ExecuteContext<Parameters, SampleProviders> context)
@@ -80,6 +102,9 @@ namespace Latios.Myri.DSP
             m_sampleRate = context.SampleRate;
 
             ProcessReceivedBuffers();
+            SampleSources();
+            ProcessPresampledChannels();
+            SampleListeners();
         }
 
         public void Dispose()
@@ -108,6 +133,7 @@ namespace Latios.Myri.DSP
             m_framePool.Dispose();
             m_listenersByLayer.Dispose();
             m_samplingCache.Dispose();
+            m_masterLimiter.Dispose();
             //m_rewindableAllocator.Dispose();
         }
 
@@ -135,8 +161,30 @@ namespace Latios.Myri.DSP
                 if (limiter.isCreated)
                     limiter.Dispose();
                 listenerMetadataPtr = default;
+                sampleFrame         = default;
             }
         }
+    }
+
+    internal struct ResourceKey : IEquatable<ResourceKey>
+    {
+        public Entity        entity;
+        public ComponentType componentType;
+
+        public bool Equals(ResourceKey other)
+        {
+            return entity.Equals(other.entity) && componentType.Equals(other.componentType);
+        }
+
+        public override int GetHashCode()
+        {
+            return new int2(entity.GetHashCode(), componentType.GetHashCode()).GetHashCode();
+        }
+    }
+
+    internal unsafe struct ResourceValue
+    {
+        public void* metadataPtr;  // Determine which from key's componentType
     }
 
     internal unsafe struct ChunkedList128<T> : IDisposable where T : unmanaged

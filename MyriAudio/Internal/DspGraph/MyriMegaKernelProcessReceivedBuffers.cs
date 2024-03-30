@@ -71,20 +71,29 @@ namespace Latios.Myri.DSP
                         ProcessDestroyedSpatialEffects(ref updateBuffer);
                         ProcessDestroyedSourceStacks(ref updateBuffer);
                         ProcessDestroyedListenerStacks(ref updateBuffer);
+                        ProcessDestroyedResourceComponents(ref updateBuffer);
+                        ProcessDestroyedResourceBuffers(ref updateBuffer);
 
                         ProcessCreatedEffects(ref updateBuffer);
                         ProcessCreatedSpatialEffects(ref updateBuffer);
                         ProcessCreatedSourceStacks(ref updateBuffer);
                         ProcessCreatedListenerStacks(ref updateBuffer);
+                        ProcessCreatedResourceComponents(ref updateBuffer);
+                        ProcessCreatedResourceBuffers(ref updateBuffer);
 
                         ProcessUpdatedEffects(ref updateBuffer);
                         ProcessUpdatedSpatialEffects(ref updateBuffer);
-                        ProcessFullyUpdatedSourceStacks(ref updateBuffer);
+                        ProcessUpdatedSourceStacks(ref updateBuffer);
                         ProcessTransformUpdatedSourceStacks(ref updateBuffer);
-                        ProcessFullyUpdatedListenerStacks(ref updateBuffer);
+                        ProcessUpdatedListenerStacks(ref updateBuffer);
                         ProcessTransformUpdatedListenerStacks(ref updateBuffer);
+                        ProcessUpdatedResourceComponents(ref updateBuffer);
+                        ProcessUpdatedResourceBuffers(ref updateBuffer);
+
+                        ProcessUpdatedEnabledStates(ref updateBuffer);
                     }
                     m_dspUpdateBuffer = m_queuedDspUpdateBuffers[bestIndex];
+                    ProcessMaster(ref m_dspUpdateBuffer);
                     m_queuedDspUpdateBuffers.RemoveRange(0, bestIndex + 1);
                     m_hasFirstDspBuffer = true;
                     m_hasValidDspBuffer = true;
@@ -134,11 +143,8 @@ namespace Latios.Myri.DSP
                     persistentAllocator = Allocator.AudioKernel,
                     //tempAllocator       = m_rewindableAllocator.Allocator.Handle
                 },
-                effectPtr                                = null,
-                parametersPtr                            = null,
-                requiresUpdateWhenCulled                 = false,
-                requiresUpdateWhenInputFrameDisconnected = false,
-                isVirtualOutput                          = false,
+                effectPtr     = null,
+                parametersPtr = null,
             };
 
             foreach (var newEffectPtr in updateBuffer.effectsUpdateBuffer.newEffects)
@@ -147,12 +153,9 @@ namespace Latios.Myri.DSP
                 op.parametersPtr              = newEffectPtr.ptr->parametersPtr;
                 op.effectPtr                  = newEffectPtr.ptr->effectPtr;
                 EffectOperations.InitEffect(ref op, newEffectPtr.ptr->functionPtr);
-                newEffectPtr.ptr->requiresUpdateWhenCulled                 = op.requiresUpdateWhenCulled;
-                newEffectPtr.ptr->requiresUpdateWhenInputFrameDisconnected = op.requiresUpdateWhenInputFrameDisconnected;
-                newEffectPtr.ptr->isVirtualOutput                          = op.isVirtualOutput;
-                m_effectIdToPtrMap[newEffectPtr.ptr->effectId]             = newEffectPtr;
+                m_effectIdToPtrMap[newEffectPtr.ptr->effectId] = newEffectPtr;
 
-                if (op.isVirtualOutput)
+                if (newEffectPtr.ptr->isVirtualOutput)
                 {
                     m_entityToVirtualOutputMap.Add(op.effectContext.effectEntity, new VirtualOutputEffect.Ptr
                     {
@@ -229,9 +232,7 @@ namespace Latios.Myri.DSP
                 op.parametersPtr              = newEffectPtr.ptr->parametersPtr;
                 op.effectPtr                  = newEffectPtr.ptr->effectPtr;
                 EffectOperations.InitSpatialEffect(ref op, newEffectPtr.ptr->functionPtr);
-                newEffectPtr.ptr->requiresUpdateWhenCulled                 = op.requiresUpdateWhenCulled;
-                newEffectPtr.ptr->requiresUpdateWhenInputFrameDisconnected = op.requiresUpdateWhenInputFrameDisconnected;
-                m_spatialEffectIdToPtrMap[newEffectPtr.ptr->effectId]      = newEffectPtr;
+                m_spatialEffectIdToPtrMap[newEffectPtr.ptr->effectId] = newEffectPtr;
             }
         }
 
@@ -278,23 +279,6 @@ namespace Latios.Myri.DSP
         {
             foreach (var newStack in updateBuffer.sourceStacksUpdateBuffer.newSourceStacks)
             {
-                for (int i = 0; i < newStack.ptr->effectIDsCount; i++)
-                {
-                    ref var element = ref newStack.ptr->effectIDs[i];
-
-                    if (element.isSpatialEffect)
-                    {
-                        var ptr                                          = m_spatialEffectIdToPtrMap[element.effectId].ptr;
-                        element.requiresUpdateWhenCulled                 = ptr->requiresUpdateWhenCulled;
-                        element.requiresUpdateWhenInputFrameDisconnected = ptr->requiresUpdateWhenInputFrameDisconnected;
-                    }
-                    else
-                    {
-                        var ptr                                          = m_effectIdToPtrMap[element.effectId].ptr;
-                        element.requiresUpdateWhenCulled                 = ptr->requiresUpdateWhenCulled;
-                        element.requiresUpdateWhenInputFrameDisconnected = ptr->requiresUpdateWhenInputFrameDisconnected;
-                    }
-                }
                 m_sourceStackIdToPtrMap[newStack.ptr->sourceId] = newStack;
             }
         }
@@ -307,33 +291,14 @@ namespace Latios.Myri.DSP
             }
         }
 
-        void ProcessFullyUpdatedSourceStacks(ref DspUpdateBuffer updateBuffer)
+        void ProcessUpdatedSourceStacks(ref DspUpdateBuffer updateBuffer)
         {
             foreach (var newStack in updateBuffer.sourceStacksUpdateBuffer.updatedSourceStacks)
             {
-                ref var storedStackPtr = ref m_sourceStackIdToPtrMap[newStack.ptr->sourceId];
-                var     oldPtr         = storedStackPtr.ptr;
-                storedStackPtr         = newStack;
-                if (oldPtr->effectIDs != newStack.ptr->effectIDs)
-                {
-                    for (int i = 0; i < newStack.ptr->effectIDsCount; i++)
-                    {
-                        ref var element = ref newStack.ptr->effectIDs[i];
-
-                        if (element.isSpatialEffect)
-                        {
-                            var ptr                                          = m_spatialEffectIdToPtrMap[element.effectId].ptr;
-                            element.requiresUpdateWhenCulled                 = ptr->requiresUpdateWhenCulled;
-                            element.requiresUpdateWhenInputFrameDisconnected = ptr->requiresUpdateWhenInputFrameDisconnected;
-                        }
-                        else
-                        {
-                            var ptr                                          = m_effectIdToPtrMap[element.effectId].ptr;
-                            element.requiresUpdateWhenCulled                 = ptr->requiresUpdateWhenCulled;
-                            element.requiresUpdateWhenInputFrameDisconnected = ptr->requiresUpdateWhenInputFrameDisconnected;
-                        }
-                    }
-                }
+                ref var meta             = ref m_sourceStackIdToPtrMap[newStack.sourceId];
+                meta.ptr->effectIDs      = newStack.effectIDs;
+                meta.ptr->effectIDsCount = newStack.effectIDsCount;
+                meta.ptr->layerIndex     = newStack.layerIndex;
             }
         }
 
@@ -351,15 +316,6 @@ namespace Latios.Myri.DSP
         {
             foreach (var newStack in updateBuffer.listenerStacksUpdateBuffer.newListenerStacks)
             {
-                newStack.ptr->hasVirtualOutput = false;
-                for (int i = 0; i < newStack.ptr->effectIDsCount; i++)
-                {
-                    if (m_effectIdToPtrMap[newStack.ptr->effectIDs[i].effectId].ptr->isVirtualOutput)
-                    {
-                        newStack.ptr->hasVirtualOutput = true;
-                        break;
-                    }
-                }
                 ref var state             = ref m_listenerStackIdToStateMap[newStack.ptr->listenerId];
                 state                     = default;
                 state.listenerMetadataPtr = newStack.ptr;
@@ -376,29 +332,21 @@ namespace Latios.Myri.DSP
             }
         }
 
-        void ProcessFullyUpdatedListenerStacks(ref DspUpdateBuffer updateBuffer)
+        void ProcessUpdatedListenerStacks(ref DspUpdateBuffer updateBuffer)
         {
             foreach (var newStack in updateBuffer.listenerStacksUpdateBuffer.updatedListenerStacks)
             {
-                m_listenersDirty                     = true;
-                ref var storedStackState             = ref m_listenerStackIdToStateMap[newStack.ptr->listenerId];
-                var     oldPtr                       = storedStackState.listenerMetadataPtr;
-                storedStackState.listenerMetadataPtr = newStack.ptr;
-                if (oldPtr->effectIDs != newStack.ptr->effectIDs)
+                m_listenersDirty                            = true;
+                ref var state                               = ref m_listenerStackIdToStateMap[newStack.listenerId];
+                state.listenerMetadataPtr->effectIDs        = newStack.effectIDs;
+                state.listenerMetadataPtr->effectIDsCount   = newStack.effectIDsCount;
+                state.listenerMetadataPtr->hasVirtualOutput = newStack.hasVirtualOutput;
+                state.listenerMetadataPtr->layerMask        = newStack.layerMask;
+                state.listenerMetadataPtr->limiterSettings  = newStack.limiterSettings;
+                if (state.listenerMetadataPtr->listenerProfileBlob != newStack.listenerProfileBlob)
                 {
-                    newStack.ptr->hasVirtualOutput = false;
-                    for (int i = 0; i < newStack.ptr->effectIDsCount; i++)
-                    {
-                        if (m_effectIdToPtrMap[newStack.ptr->effectIDs[i].effectId].ptr->isVirtualOutput)
-                        {
-                            newStack.ptr->hasVirtualOutput = true;
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    newStack.ptr->hasVirtualOutput = oldPtr->hasVirtualOutput;
+                    state.listenerMetadataPtr->listenerProfileBlob    = newStack.listenerProfileBlob;
+                    state.listenerMetadataPtr->listenerProfileFilters = newStack.listenerProfileFilters;
                 }
             }
         }
@@ -408,6 +356,131 @@ namespace Latios.Myri.DSP
             foreach (var stackTransform in updateBuffer.listenerStacksUpdateBuffer.updatedListenerStackTransforms)
             {
                 ((ListenerStackMetadata*)stackTransform.StackMetadataPtr)->worldTransform = stackTransform.worldTransform;
+            }
+        }
+        #endregion
+
+        #region Resources
+        void ProcessCreatedResourceComponents(ref DspUpdateBuffer buffer)
+        {
+            foreach (var newResource in buffer.resourcesUpdateBuffer.newComponentResources)
+            {
+                ref var metadata = ref m_resourceComponentIdToPtrMap[newResource.ptr->resourceComponentId];
+                metadata         = newResource;
+                m_resourceKeyToPtrMap.Add(new ResourceKey
+                {
+                    componentType = newResource.ptr->resourceType,
+                    entity        = newResource.ptr->resourceEntity
+                },
+                                          new ResourceValue { metadataPtr = metadata.ptr });
+            }
+        }
+
+        void ProcessUpdatedResourceComponents(ref DspUpdateBuffer buffer)
+        {
+            foreach (var updatedResource in buffer.resourcesUpdateBuffer.updatedComponentResources)
+            {
+                updatedResource.metadataPtr->componentPtr = updatedResource.newComponentPtr;
+            }
+        }
+
+        void ProcessDestroyedResourceComponents(ref DspUpdateBuffer buffer)
+        {
+            foreach (var destroyedResource in buffer.resourcesUpdateBuffer.deadComponentResourceIDs)
+            {
+                ref var old                                                  = ref m_resourceComponentIdToPtrMap[destroyedResource];
+                m_resourceKeyToPtrMap.Remove(new ResourceKey { componentType = old.ptr->resourceType, entity = old.ptr->resourceEntity });
+                old                                                          = default;
+            }
+        }
+
+        void ProcessCreatedResourceBuffers(ref DspUpdateBuffer buffer)
+        {
+            foreach (var newResource in buffer.resourcesUpdateBuffer.newBufferResources)
+            {
+                ref var metadata = ref m_resourceBufferIdToPtrMap[newResource.ptr->resourceBufferId];
+                metadata         = newResource;
+                m_resourceKeyToPtrMap.Add(new ResourceKey
+                {
+                    componentType = newResource.ptr->resourceType,
+                    entity        = newResource.ptr->resourceEntity
+                },
+                                          new ResourceValue { metadataPtr = metadata.ptr });
+            }
+        }
+
+        void ProcessUpdatedResourceBuffers(ref DspUpdateBuffer buffer)
+        {
+            foreach (var updatedResource in buffer.resourcesUpdateBuffer.updatedBufferResources)
+            {
+                updatedResource.metadataPtr->bufferPtr    = updatedResource.newBufferPtr;
+                updatedResource.metadataPtr->elementCount = updatedResource.newElementCount;
+            }
+        }
+
+        void ProcessDestroyedResourceBuffers(ref DspUpdateBuffer buffer)
+        {
+            foreach (var destroyedResource in buffer.resourcesUpdateBuffer.deadBufferResourceIDs)
+            {
+                ref var old                                                  = ref m_resourceBufferIdToPtrMap[destroyedResource];
+                m_resourceKeyToPtrMap.Remove(new ResourceKey { componentType = old.ptr->resourceType, entity = old.ptr->resourceEntity });
+                old                                                          = default;
+            }
+        }
+        #endregion
+
+        #region Enabled States
+        void ProcessUpdatedEnabledStates(ref DspUpdateBuffer updateBuffer)
+        {
+            foreach (var updatedState in updateBuffer.enabledStatesUpdateBuffer.updatedEnabledStates)
+            {
+                switch (updatedState.type)
+                {
+                    case EnabledStatusMetadataType.Effect:
+                    {
+                        var metadata      = (EffectMetadata*)updatedState.metadataPtr;
+                        metadata->enabled = updatedState.enabled;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.SpatialEffect:
+                    {
+                        var metadata      = (SpatialEffectMetadata*)updatedState.metadataPtr;
+                        metadata->enabled = updatedState.enabled;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.SourceStack:
+                    {
+                        var metadata      = (SourceStackMetadata*)updatedState.metadataPtr;
+                        metadata->enabled = updatedState.enabled;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.Listener:
+                    {
+                        var metadata              = (ListenerStackMetadata*)updatedState.metadataPtr;
+                        metadata->listenerEnabled = updatedState.enabled;
+                        m_listenersDirty          = true;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.ListenerStack:
+                    {
+                        var metadata           = (ListenerStackMetadata*)updatedState.metadataPtr;
+                        metadata->stackEnabled = updatedState.enabled;
+                        m_listenersDirty       = true;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.ResourceComponent:
+                    {
+                        var metadata      = (ResourceComponentMetadata*)updatedState.metadataPtr;
+                        metadata->enabled = updatedState.enabled;
+                        break;
+                    }
+                    case EnabledStatusMetadataType.ResourceBuffer:
+                    {
+                        var metadata      = (ResourceBufferMetadata*)updatedState.metadataPtr;
+                        metadata->enabled = updatedState.enabled;
+                        break;
+                    }
+                }
             }
         }
         #endregion
@@ -447,6 +520,8 @@ namespace Latios.Myri.DSP
                 ref var state = ref m_listenerStackIdToStateMap[i];
                 if (state.listenerMetadataPtr == null)
                     continue;
+                if (!state.listenerMetadataPtr->listenerEnabled)
+                    continue;
 
                 BitField32 layerMask = default;
                 layerMask.Value      = state.listenerMetadataPtr->layerMask;
@@ -459,6 +534,16 @@ namespace Latios.Myri.DSP
                     }
                 }
             }
+        }
+        #endregion
+
+        #region Master
+        void ProcessMaster(ref DspUpdateBuffer dspUpdateBuffer)
+        {
+            m_masterLimiter.preGain            = dspUpdateBuffer.masterLimiterSettings.preGain;
+            m_masterLimiter.limitDB            = dspUpdateBuffer.masterLimiterSettings.limitDB;
+            m_masterLimiter.releasePerSampleDB = dspUpdateBuffer.masterLimiterSettings.releaseDBPerSample;
+            m_masterLimiter.SetLookaheadSampleCount(dspUpdateBuffer.masterLimiterSettings.lookaheadSampleCount);
         }
         #endregion
     }

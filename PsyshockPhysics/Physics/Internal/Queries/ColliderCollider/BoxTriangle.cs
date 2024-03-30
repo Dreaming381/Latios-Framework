@@ -15,15 +15,15 @@ namespace Latios.Psyshock
             // Todo: SAT algorithm similar to box vs box.
             var bInATransform = math.mul(math.inverse(triangleTransform), boxTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(triangle, box, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
+            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
             SphereTriangle.DistanceBetween(in triangle,
-                                           in triangleTransform,
+                                           in RigidTransform.identity,
                                            new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
                                            RigidTransform.identity,
                                            float.MaxValue,
                                            out var closestOnA);
             SphereBox.DistanceBetween(in box,
-                                      in boxTransform,
+                                      in bInATransform,
                                       new SphereCollider(gjkResult.hitpointOnBInASpace - epsilon, 0f),
                                       RigidTransform.identity,
                                       float.MaxValue,
@@ -241,7 +241,7 @@ namespace Latios.Psyshock
                                                            out var aVertices);
                 PointRayBox.BestFacePlanesAndVertices(in box, bLocalContactNormal, out var bEdgePlaneNormals, out var bEdgePlaneDistances, out var bPlane, out var bVertices);
                 bool needsClosestPoint                 = true;
-                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(aLocalContactNormal, bPlane.normal));
+                var  distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
 
                 // Project and clip edges of A onto the face of B.
                 for (int edgeIndex = 0; edgeIndex < 3; edgeIndex++)
@@ -285,7 +285,7 @@ namespace Latios.Psyshock
                     for (int i = 0; i < 4; i++)
                     {
                         var vertex = bVertices[i];
-                        if (math.all(simd.dot(aEdgePlaneNormals, vertex) + aEdgePlaneDistances <= 0f))
+                        if (math.all(simd.dot(aEdgePlaneNormals, vertex) < aEdgePlaneDistances))
                         {
                             var distance = mathex.SignedDistance(aPlane, vertex) * distanceScalarAlongContactNormalA;
                             result.Add(math.transform(boxTransform, vertex), distance);

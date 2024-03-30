@@ -36,6 +36,8 @@ namespace Latios.Myri.Interop
         public EffectsUpdateBuffer             effectsUpdateBuffer;
         public SourceStacksUpdateBuffer        sourceStacksUpdateBuffer;
         public ListenerStacksUpdateBuffer      listenerStacksUpdateBuffer;
+        public ResourcesUpdateBuffer           resourcesUpdateBuffer;
+        public EnabledStatesUpdateBuffer       enabledStatesUpdateBuffer;
 
         public BrickwallLimiterSettings masterLimiterSettings;
     }
@@ -86,11 +88,10 @@ namespace Latios.Myri.Interop
         public void*                                                                    parametersPtr;
         public void*                                                                    effectPtr;
         public int                                                                      effectId;
-
-        // Written in DSP Thread
-        public bool requiresUpdateWhenCulled;
-        public bool requiresUpdateWhenInputFrameDisconnected;
-        public bool isVirtualOutput;
+        public bool                                                                     enabled;
+        public bool                                                                     requiresUpdateWhenCulled;
+        public bool                                                                     requiresUpdateWhenInputFrameDisconnected;
+        public bool                                                                     isVirtualOutput;
 
         internal unsafe struct Ptr
         {
@@ -106,10 +107,9 @@ namespace Latios.Myri.Interop
         public void*                                                                           parametersPtr;
         public void*                                                                           effectPtr;
         public int                                                                             effectId;
-
-        // Written in DSP Thread
-        public bool requiresUpdateWhenCulled;
-        public bool requiresUpdateWhenInputFrameDisconnected;
+        public bool                                                                            enabled;
+        public bool                                                                            requiresUpdateWhenCulled;
+        public bool                                                                            requiresUpdateWhenInputFrameDisconnected;
 
         internal unsafe struct Ptr
         {
@@ -129,10 +129,9 @@ namespace Latios.Myri.Interop
     {
         public int  effectId;
         public bool isSpatialEffect;
-
-        // Written in DSP Thread
         public bool requiresUpdateWhenCulled;
         public bool requiresUpdateWhenInputFrameDisconnected;
+        public bool isVirtualOutput;
     }
 
     internal unsafe struct StackTransformUpdate
@@ -146,7 +145,7 @@ namespace Latios.Myri.Interop
     internal unsafe struct SourceStacksUpdateBuffer
     {
         public UnsafeList<SourceStackMetadata.Ptr> newSourceStacks;
-        public UnsafeList<SourceStackMetadata.Ptr> updatedSourceStacks;
+        public UnsafeList<SourceStackUpdate>       updatedSourceStacks;
         public UnsafeList<StackTransformUpdate>    updatedSourceStackTransforms;
         public UnsafeList<int>                     deadSourceStackIDs;
     }
@@ -159,11 +158,20 @@ namespace Latios.Myri.Interop
         public int              sourceId;
         public int              effectIDsCount;
         public byte             layerIndex;
+        public bool             enabled;
 
         internal unsafe struct Ptr
         {
             public SourceStackMetadata* ptr;
         }
+    }
+
+    internal unsafe struct SourceStackUpdate
+    {
+        public EffectIDInStack* effectIDs;
+        public int              sourceId;
+        public int              effectIDsCount;
+        public byte             layerIndex;
     }
 
     #endregion
@@ -172,7 +180,7 @@ namespace Latios.Myri.Interop
     internal struct ListenerStacksUpdateBuffer
     {
         public UnsafeList<ListenerStackMetadata.Ptr> newListenerStacks;
-        public UnsafeList<ListenerStackMetadata.Ptr> updatedListenerStacks;
+        public UnsafeList<ListenerStackUpdate>       updatedListenerStacks;
         public UnsafeList<StackTransformUpdate>      updatedListenerStackTransforms;
         public UnsafeList<int>                       deadListenerStackIDs;
     }
@@ -184,15 +192,13 @@ namespace Latios.Myri.Interop
         public BlobAssetReference<ListenerProfileBlobV2> listenerProfileBlob;
         public Entity                                    listenerEntity;
         public EffectIDInStack*                          effectIDs;
-        public ListenerPropertyPtr*                      listenerProperties;
         public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
         public int                                       listenerId;
         public int                                       effectIDsCount;
-        public int                                       listenerPropertiesCount;
         public uint                                      layerMask;
-
-        // Written by DSP Thread
-        public bool hasVirtualOutput;
+        public bool                                      listenerEnabled;
+        public bool                                      stackEnabled;
+        public bool                                      hasVirtualOutput;
 
         internal unsafe struct Ptr
         {
@@ -200,10 +206,95 @@ namespace Latios.Myri.Interop
         }
     }
 
-    internal unsafe struct ListenerPropertyPtr
+    internal unsafe struct ListenerStackUpdate
     {
-        public void*         propertyPtr;
-        public ComponentType propertyType;
+        public BrickwallLimiterSettings                  limiterSettings;
+        public BlobAssetReference<ListenerProfileBlobV2> listenerProfileBlob;
+        public EffectIDInStack*                          effectIDs;
+        public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
+        public int                                       listenerId;
+        public int                                       effectIDsCount;
+        public uint                                      layerMask;
+        public bool                                      hasVirtualOutput;
+    }
+    #endregion
+
+    #region Resources
+    internal struct ResourcesUpdateBuffer
+    {
+        public UnsafeList<ResourceComponentMetadata.Ptr> newComponentResources;
+        public UnsafeList<ResourceComponentUpdate>       updatedComponentResources;
+        public UnsafeList<int>                           deadComponentResourceIDs;
+        public UnsafeList<ResourceBufferMetadata.Ptr>    newBufferResources;
+        public UnsafeList<ResourceBufferUpdate>          updatedBufferResources;
+        public UnsafeList<int>                           deadBufferResourceIDs;
+    }
+
+    internal unsafe struct ResourceComponentMetadata
+    {
+        public void*         componentPtr;
+        public Entity        resourceEntity;
+        public ComponentType resourceType;
+        public int           resourceComponentId;
+        public bool          enabled;
+
+        internal unsafe struct Ptr
+        {
+            public ResourceComponentMetadata* ptr;
+        }
+    }
+
+    internal unsafe struct ResourceComponentUpdate
+    {
+        public ResourceComponentMetadata* metadataPtr;
+        public void*                      newComponentPtr;
+    }
+
+    internal unsafe struct ResourceBufferMetadata
+    {
+        public void*         bufferPtr;
+        public Entity        resourceEntity;
+        public ComponentType resourceType;
+        public int           resourceBufferId;
+        public int           elementCount;
+        public bool          enabled;
+
+        internal unsafe struct Ptr
+        {
+            public ResourceBufferMetadata* ptr;
+        }
+    }
+
+    internal unsafe struct ResourceBufferUpdate
+    {
+        public ResourceBufferMetadata* metadataPtr;
+        public void*                   newBufferPtr;
+        public int                     newElementCount;
+    }
+    #endregion
+
+    #region EnabledStatuses
+    internal struct EnabledStatesUpdateBuffer
+    {
+        public UnsafeList<EnabledStatusUpdate> updatedEnabledStates;
+    }
+
+    internal enum EnabledStatusMetadataType
+    {
+        Effect,
+        SpatialEffect,
+        SourceStack,
+        Listener,
+        ListenerStack,
+        ResourceComponent,
+        ResourceBuffer,
+    }
+
+    internal unsafe struct EnabledStatusUpdate
+    {
+        public void*                     metadataPtr;
+        public EnabledStatusMetadataType type;
+        public bool                      enabled;
     }
     #endregion
 }

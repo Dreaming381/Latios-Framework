@@ -1,5 +1,4 @@
 using System;
-using Latios.Myri.DSP;
 using Latios.Myri.InternalSourceGen;
 using Latios.Transforms;
 using Unity.Collections;
@@ -31,6 +30,8 @@ namespace Latios.Myri.DSP
 
         void SampleSources()
         {
+            m_profilingSourceStacks.Begin();
+
             var preSplitFrame  = m_framePool.Acquire(m_frameSize);
             var postSplitFrame = m_framePool.Acquire(m_frameSize);
 
@@ -45,9 +46,13 @@ namespace Latios.Myri.DSP
             updateContexts.updateContext.currentFrame      = m_currentFrame;
             updateContexts.updateContext.stackType         = StackType.Source;
             updateContexts.updateContext.virtualOutputsMap = m_entityToVirtualOutputMap;
+            updateContexts.updateContext.resourcesMap      = m_resourceKeyToPtrMap;
+
+            updateContexts.spatialCullingContext.resourcesMap = m_resourceKeyToPtrMap;
 
             updateContexts.spatialUpdateContext.currentFrame      = m_currentFrame;
             updateContexts.spatialUpdateContext.virtualOutputsMap = m_entityToVirtualOutputMap;
+            updateContexts.spatialUpdateContext.resourcesMap      = m_resourceKeyToPtrMap;
 
             for (int sourceStackId = 0; sourceStackId < m_sourceStackIdToPtrMap.length; sourceStackId++)
             {
@@ -55,6 +60,8 @@ namespace Latios.Myri.DSP
                 if (sourcePtr == null)
                     continue;
                 ref var sourceStackMeta = ref *sourcePtr;
+                if (!sourceStackMeta.enabled)
+                    continue;
 
                 // Setup cull data
                 var listeners = m_listenersByLayer[sourceStackMeta.layerIndex];
@@ -63,9 +70,7 @@ namespace Latios.Myri.DSP
                     m_samplingCache.cullList.AddReplicate(true, listeners.Length);
 
                 // Setup state from source meta
-                updateContexts.updateContext.layerMask         = 1u << sourceStackMeta.layerIndex;
-                updateContexts.updateContext.stackEntity       = sourceStackMeta.sourceEntity;
-                updateContexts.updateContext.stackTransformPtr = (TransformQvvs*)UnsafeUtility.AddressOf(ref sourceStackMeta.worldTransform);
+                updateContexts.updateContext.metadataPtr = sourcePtr;
 
                 updateContexts.spatialCullingContext.listeners = listeners;
                 updateContexts.spatialCullingContext.sourcePtr = sourcePtr;
@@ -78,7 +83,7 @@ namespace Latios.Myri.DSP
                 for (int i = 0; i < listeners.Length; i++)
                 {
                     var listener = listeners[i].ptr;
-                    if (!listener->hasVirtualOutput && listener->limiterSettings.preGain == 0f)
+                    if (!listener->hasVirtualOutput && listener->limiterSettings.preGain == 0f) // Disabled listeners aren't in the layer list
                         updateContexts.cullArray.Cull(i);
                 }
 
@@ -88,10 +93,14 @@ namespace Latios.Myri.DSP
                 {
                     if (sourceStackMeta.effectIDs[i].isSpatialEffect)
                     {
+                        ref var effectMeta = ref *m_spatialEffectIdToPtrMap[sourceStackMeta.effectIDs[i].effectId].ptr;
+
+                        if (!effectMeta.enabled)
+                            continue;
+
                         if (firstSpatialIndex < 0)
                             firstSpatialIndex = i;
 
-                        ref var effectMeta                        = ref *m_spatialEffectIdToPtrMap[sourceStackMeta.effectIDs[i].effectId].ptr;
                         updateContexts.effectContext.effectEntity = effectMeta.effectEntity;
                         updateContexts.parametersPtr              = effectMeta.parametersPtr;
                         updateContexts.effectPtr                  = effectMeta.effectPtr;
@@ -105,8 +114,11 @@ namespace Latios.Myri.DSP
                 preSplitFrame.frameIndex      = m_currentFrame;
                 updateContexts.sampleFramePtr = &preSplitFrame;
 
-                bool fullyCulled                      = updateContexts.cullArray.cullArray.Contains(true);
-                updateContexts.updateContext.isCulled = fullyCulled;
+                int aliveListenerCount = 0;
+                foreach (var alive in updateContexts.cullArray.cullArray)
+                    aliveListenerCount                += math.select(0, 1, alive);
+                bool fullyCulled                       = aliveListenerCount == 0;
+                updateContexts.updateContext.isCulled  = fullyCulled;
 
                 if (firstSpatialIndex < 0)
                     firstSpatialIndex = sourceStackMeta.effectIDsCount;
@@ -119,7 +131,11 @@ namespace Latios.Myri.DSP
                     if (!requiresUpdate)
                         continue;
 
-                    ref var effectMeta                        = ref *m_effectIdToPtrMap[effect.effectId].ptr;
+                    ref var effectMeta = ref *m_effectIdToPtrMap[effect.effectId].ptr;
+
+                    if (!effectMeta.enabled)
+                        continue;
+
                     updateContexts.effectContext.effectEntity = effectMeta.effectEntity;
                     updateContexts.updateContext.indexInStack = i;
                     updateContexts.parametersPtr              = effectMeta.parametersPtr;
@@ -142,12 +158,12 @@ namespace Latios.Myri.DSP
 
                     // Forward the pre-split sample frame
                     ref var splitFrame = ref preSplitFrame;
-                    if (listeners.Length != 1)
+                    if (aliveListenerCount != 1 || isCulled)
                     {
                         splitFrame                    = ref postSplitFrame;
                         splitFrame.frameIndex         = m_currentFrame;
                         updateContexts.sampleFramePtr = &postSplitFrame;
-                        if (preSplitFrame.connected)
+                        if (preSplitFrame.connected && !isCulled)
                         {
                             splitFrame.left.CopyFrom(preSplitFrame.left);
                             splitFrame.right.CopyFrom(preSplitFrame.right);
@@ -159,7 +175,7 @@ namespace Latios.Myri.DSP
                         }
                     }
 
-                    // Update post-splits
+                    // Update post-split effects
                     for (int i = firstSpatialIndex; i <= sourceStackMeta.effectIDsCount; i++)
                     {
                         var  effect          = sourceStackMeta.effectIDs[i];
@@ -170,7 +186,11 @@ namespace Latios.Myri.DSP
 
                         if (effect.isSpatialEffect)
                         {
-                            ref var effectMeta                               = ref *m_spatialEffectIdToPtrMap[effect.effectId].ptr;
+                            ref var effectMeta = ref *m_spatialEffectIdToPtrMap[effect.effectId].ptr;
+
+                            if (!effectMeta.enabled)
+                                continue;
+
                             updateContexts.effectContext.effectEntity        = effectMeta.effectEntity;
                             updateContexts.spatialUpdateContext.indexInStack = i;
                             updateContexts.parametersPtr                     = effectMeta.parametersPtr;
@@ -180,7 +200,11 @@ namespace Latios.Myri.DSP
                         }
                         else
                         {
-                            ref var effectMeta                        = ref *m_effectIdToPtrMap[effect.effectId].ptr;
+                            ref var effectMeta = ref *m_effectIdToPtrMap[effect.effectId].ptr;
+
+                            if (!effectMeta.enabled)
+                                continue;
+
                             updateContexts.effectContext.effectEntity = effectMeta.effectEntity;
                             updateContexts.updateContext.indexInStack = i;
                             updateContexts.parametersPtr              = effectMeta.parametersPtr;
@@ -224,10 +248,14 @@ namespace Latios.Myri.DSP
 
             m_framePool.Release(preSplitFrame);
             m_framePool.Release(postSplitFrame);
+
+            m_profilingSourceStacks.End();
         }
 
         void ProcessPresampledChannels()
         {
+            m_profilingSpatializers.Begin();
+
             ListenerState dummy              = default;
             ref var       listener           = ref dummy;
             int           listenerId         = -1;
@@ -248,8 +276,7 @@ namespace Latios.Myri.DSP
                 }
                 if (listener.sampleFrame.frameIndex != m_currentFrame)
                 {
-                    listener.sampleFrame.left.AsSpan().Clear();
-                    listener.sampleFrame.right.AsSpan().Clear();
+                    listener.sampleFrame.ClearToZero();
                     listener.sampleFrame.frameIndex = m_currentFrame;
                 }
 
@@ -278,9 +305,86 @@ namespace Latios.Myri.DSP
                         }
                         outSample += sample;
                     }
-                    output[sampleIndex] = outSample;
+                    output[sampleIndex] += outSample;
                 }
             }
+
+            m_profilingSpatializers.End();
+        }
+
+        void SampleListeners()
+        {
+            m_profilingListenerStacks.Begin();
+
+            EffectOperations.CullUpdateOpData updateContexts = default;
+            updateContexts.effectContext.currentFrame        = m_currentFrame;
+            updateContexts.effectContext.frameSize           = m_frameSize;
+            updateContexts.effectContext.persistentAllocator = Allocator.AudioKernel;
+            updateContexts.effectContext.sampleFramePool     = (SampleFramePool*)UnsafeUtility.AddressOf(ref m_framePool);
+            updateContexts.effectContext.sampleRate          = m_sampleRate;
+            //updateContexts.effectContext.tempAllocator       = m_rewindableAllocator.Allocator.Handle;
+
+            updateContexts.updateContext.currentFrame      = m_currentFrame;
+            updateContexts.updateContext.stackType         = StackType.Listener;
+            updateContexts.updateContext.virtualOutputsMap = m_entityToVirtualOutputMap;
+            updateContexts.updateContext.resourcesMap      = m_resourceKeyToPtrMap;
+
+            for (int listenerIndex = 0; listenerIndex < m_listenerStackIdToStateMap.length; listenerIndex++)
+            {
+                ref var listener = ref m_listenerStackIdToStateMap[listenerIndex];
+                if (listener.listenerMetadataPtr == null)
+                    continue;
+
+                ref var listenerMeta = ref *listener.listenerMetadataPtr;
+                if (!listenerMeta.listenerEnabled || !listenerMeta.stackEnabled)
+                    continue;
+
+                bool culled               = !listenerMeta.hasVirtualOutput && listenerMeta.limiterSettings.preGain == 0f;
+                int  effectCountNotCulled = listenerMeta.effectIDsCount;
+                if (listenerMeta.hasVirtualOutput && listenerMeta.limiterSettings.preGain == 0f)
+                {
+                    do
+                    {
+                        effectCountNotCulled--;
+                        var effect = listenerMeta.effectIDs[effectCountNotCulled];
+                        if (effect.isVirtualOutput)
+                            break;
+                    }
+                    while (effectCountNotCulled >= 0);
+                    effectCountNotCulled++;
+                }
+
+                updateContexts.updateContext.metadataPtr = listener.listenerMetadataPtr;
+                updateContexts.sampleFramePtr            = (SampleFrame*)UnsafeUtility.AddressOf(ref listener.sampleFrame);
+
+                for (int i = 0; i <= listenerMeta.effectIDsCount; i++)
+                {
+                    culled &= i < effectCountNotCulled;
+
+                    var  effect          = listenerMeta.effectIDs[i];
+                    bool requiresUpdate  = effect.requiresUpdateWhenInputFrameDisconnected || listener.sampleFrame.connected;
+                    requiresUpdate      &= effect.requiresUpdateWhenCulled || culled;
+                    if (!requiresUpdate)
+                        continue;
+
+                    ref var effectMeta = ref *m_effectIdToPtrMap[effect.effectId].ptr;
+
+                    if (!effectMeta.enabled)
+                        continue;
+
+                    if (culled)
+                        updateContexts.sampleFramePtr->connected = false;
+
+                    updateContexts.effectContext.effectEntity = effectMeta.effectEntity;
+                    updateContexts.updateContext.indexInStack = i;
+                    updateContexts.parametersPtr              = effectMeta.parametersPtr;
+                    updateContexts.effectPtr                  = effectMeta.effectPtr;
+
+                    EffectOperations.UpdateEffect(ref updateContexts, effectMeta.functionPtr);
+                }
+            }
+
+            m_profilingListenerStacks.End();
         }
     }
 }

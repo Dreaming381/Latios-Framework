@@ -14,9 +14,6 @@ namespace Latios.Myri.InternalSourceGen
             public DSP.EffectContext effectContext;
             public void*             parametersPtr;
             public void*             effectPtr;
-            public bool              requiresUpdateWhenCulled;
-            public bool              requiresUpdateWhenInputFrameDisconnected;
-            public bool              isVirtualOutput;
         }
 
         public static void InitEffect(ref InitDestroyOpData data, FunctionPointer<StaticAPI.BurstDispatchEffectDelegate> functionPtr)

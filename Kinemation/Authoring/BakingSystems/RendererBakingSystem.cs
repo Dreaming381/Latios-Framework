@@ -10,6 +10,8 @@ using UnityEngine;
 
 using Hash128 = Unity.Entities.Hash128;
 using static Unity.Entities.SystemAPI;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Mathematics;
 
 namespace Latios.Kinemation.Authoring.Systems
 {
@@ -94,11 +96,12 @@ namespace Latios.Kinemation.Authoring.Systems
 
             var renderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo, BakingMaterialMeshSubmesh>()
                                                 .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
-            var meshMap      = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, Allocator.TempJob);
-            var materialMap  = new NativeHashMap<UnityObjectRef<Material>, int>(128, Allocator.TempJob);
-            var meshList     = new NativeList<UnityObjectRef<Mesh> >(Allocator.TempJob);
-            var materialList = new NativeList<UnityObjectRef<Material> >(Allocator.TempJob);
-            var rangesList   = new NativeList<MaterialMeshIndex>(Allocator.TempJob);
+            var meshMap       = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, Allocator.TempJob);
+            var materialMap   = new NativeHashMap<UnityObjectRef<Material>, int>(128, Allocator.TempJob);
+            var meshList      = new NativeList<UnityObjectRef<Mesh> >(Allocator.TempJob);
+            var materialList  = new NativeList<UnityObjectRef<Material> >(Allocator.TempJob);
+            var rangesList    = new NativeList<MaterialMeshIndex>(Allocator.TempJob);
+            var duplicatesMap = new NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>(128, Allocator.TempJob);
             if (!renderablesWithLightmapsQuery.IsEmptyIgnoreFilter)
             {
                 new CollectUniqueMeshesAndMaterialsJob
@@ -110,9 +113,12 @@ namespace Latios.Kinemation.Authoring.Systems
                 }.Run(renderablesWithLightmapsQuery);
                 new BuildMaterialMeshInfoJob
                 {
-                    materialMap = materialMap,
-                    meshMap     = meshMap,
-                    rangesList  = rangesList
+                    materialMap              = materialMap,
+                    meshMap                  = meshMap,
+                    rangesList               = rangesList,
+                    bufferLookup             = SystemAPI.GetBufferLookup<BakingMaterialMeshSubmesh>(true),
+                    mmiLookup                = SystemAPI.GetComponentLookup<MaterialMeshInfo>(),
+                    duplicateRangesFilterMap = duplicatesMap
                 }.Run(renderablesWithLightmapsQuery);
                 var rma = CreateRenderMeshArrayFromRefArrays(meshList.AsArray(), materialList.AsArray(), rangesList.AsArray());
                 state.EntityManager.SetSharedComponentManaged(renderablesWithLightmapsQuery, rma);
@@ -122,6 +128,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 materialMap.Clear();
                 materialList.Clear();
                 rangesList.Clear();
+                duplicatesMap.Clear();
             }
             var renderablesWithoutLightmapsQuery = QueryBuilder().WithAll<MaterialMeshInfo, BakingMaterialMeshSubmesh>().WithAbsent<LightMaps>()
                                                    .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
@@ -136,9 +143,12 @@ namespace Latios.Kinemation.Authoring.Systems
                 }.Run(renderablesWithoutLightmapsQuery);
                 new BuildMaterialMeshInfoJob
                 {
-                    materialMap = materialMap,
-                    meshMap     = meshMap,
-                    rangesList  = rangesList
+                    materialMap              = materialMap,
+                    meshMap                  = meshMap,
+                    rangesList               = rangesList,
+                    bufferLookup             = SystemAPI.GetBufferLookup<BakingMaterialMeshSubmesh>(true),
+                    mmiLookup                = SystemAPI.GetComponentLookup<MaterialMeshInfo>(),
+                    duplicateRangesFilterMap = duplicatesMap
                 }.Run(renderablesWithoutLightmapsQuery);
                 var rma = CreateRenderMeshArrayFromRefArrays(meshList.AsArray(), materialList.AsArray(), rangesList.AsArray());
                 state.EntityManager.SetSharedComponentManaged(renderablesWithoutLightmapsQuery, rma);
@@ -149,6 +159,7 @@ namespace Latios.Kinemation.Authoring.Systems
             materialMap.Dispose();
             materialList.Dispose();
             rangesList.Dispose();
+            duplicatesMap.Dispose();
 
             m_lightmapBakingContext.EndConversion();
         }
@@ -225,14 +236,42 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
+        struct PossiblyUniqueMMI : IEquatable<PossiblyUniqueMMI>
+        {
+            public UnityObjectRef<Mesh>     firstMesh;
+            public UnityObjectRef<Mesh>     lastMesh;
+            public UnityObjectRef<Material> firstMaterial;
+            public UnityObjectRef<Material> lastMaterial;
+            public int                      firstSubmesh;
+            public int                      lastSubmesh;
+            public int                      count;
+
+            public bool Equals(PossiblyUniqueMMI other)
+            {
+                return (firstSubmesh == other.firstSubmesh && lastSubmesh == other.lastSubmesh &&
+                        count == other.count && firstMesh.Equals(other.firstMesh) && lastMesh.Equals(other.lastMesh) &&
+                        firstMaterial.Equals(other.firstMaterial) && lastMaterial.Equals(other.lastMaterial));
+            }
+
+            public override int GetHashCode()
+            {
+                int4x2 hash = new int4x2(new int4(firstMesh.GetHashCode(), lastMesh.GetHashCode(), firstMaterial.GetHashCode(), lastMesh.GetHashCode()),
+                                         new int4(firstSubmesh, lastSubmesh, count, count));
+                return hash.GetHashCode();
+            }
+        }
+
         [BurstCompile]
         partial struct BuildMaterialMeshInfoJob : IJobEntity
         {
-            [ReadOnly] public NativeHashMap<UnityObjectRef<Mesh>, int>     meshMap;
-            [ReadOnly] public NativeHashMap<UnityObjectRef<Material>, int> materialMap;
-            public NativeList<MaterialMeshIndex>                           rangesList;
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Mesh>, int>                         meshMap;
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Material>, int>                     materialMap;
+            [ReadOnly] public BufferLookup<BakingMaterialMeshSubmesh>                          bufferLookup;
+            public NativeList<MaterialMeshIndex>                                               rangesList;
+            public NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>                       duplicateRangesFilterMap;
+            [NativeDisableContainerSafetyRestriction] public ComponentLookup<MaterialMeshInfo> mmiLookup;
 
-            public void Execute(ref MaterialMeshInfo mmi, in DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
+            public unsafe void Execute(Entity entity, ref MaterialMeshInfo mmi, in DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
             {
                 if (buffer.Length == 1)
                 {
@@ -245,10 +284,33 @@ namespace Latios.Kinemation.Authoring.Systems
                 }
                 else
                 {
+                    var first = buffer[0];
+                    var last  = buffer[buffer.Length - 1];
+                    var key   = new PossiblyUniqueMMI
+                    {
+                        firstMaterial = first.material,
+                        firstMesh     = first.mesh,
+                        firstSubmesh  = first.submesh,
+                        lastMaterial  = last.material,
+                        lastMesh      = last.mesh,
+                        lastSubmesh   = last.submesh,
+                        count         = buffer.Length
+                    };
+
+                    foreach (var candidateEntity in duplicateRangesFilterMap.GetValuesForKey(key))
+                    {
+                        var candidateBuffer = bufferLookup[candidateEntity];
+                        var match           = UnsafeUtility.MemCmp(candidateBuffer.GetUnsafeReadOnlyPtr(), buffer.GetUnsafeReadOnlyPtr(),
+                                                                   buffer.Length * UnsafeUtility.SizeOf<BakingMaterialMeshSubmesh>());
+                        if (match == 0)
+                        {
+                            mmi = mmiLookup[candidateEntity];
+                            return;
+                        }
+                    }
+
                     // Create MMI from ranges
                     int rangesStartIndex = rangesList.Length;
-
-                    // Todo: Deduplicate ranges
 
                     foreach (var element in buffer)
                     {
@@ -261,6 +323,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     }
 
                     mmi = MaterialMeshInfo.FromMaterialMeshIndexRange(rangesStartIndex, buffer.Length);
+                    duplicateRangesFilterMap.Add(key, entity);
                 }
             }
         }

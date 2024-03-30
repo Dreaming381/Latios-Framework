@@ -4,6 +4,7 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
+    [EffectOptions(EffectOptionFlags.RequireUpdateWhenCulled | EffectOptionFlags.RequireUpdateWhenInputFrameDisconnected)]
     internal struct VirtualOutputEffect : IEffect<VirtualOutputEffect, VirtualOutputParameters>
     {
         internal unsafe struct Ptr
@@ -28,19 +29,21 @@ namespace Latios.Myri.DSP
 
             if (m_isInListenerStack)
             {
-                if (m_listenerPreviousStackFrame.frameIndex == currentFrame)
+                if (m_currentStackFrame.frameIndex == currentFrame)
+                {
                     frame = m_listenerPreviousStackFrame.readOnly;
-                else
+                    return true;
+                }
+                else if (m_currentStackFrame.frameIndex == currentFrame - 1)
+                {
                     frame = m_currentStackFrame.readOnly;
-                return true;
+                    return true;
+                }
             }
 
             frame = default;
             return false;
         }
-
-        public bool RequireUpdateWhenCulled => true;
-        public bool RequireUpdateWhenInputFrameDisconnected => true;
 
         public void OnAwake(in EffectContext context, in VirtualOutputParameters parameters)
         {

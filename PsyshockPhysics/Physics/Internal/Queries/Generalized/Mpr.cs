@@ -437,7 +437,7 @@ namespace Latios.Psyshock
                 fractions        = math.select(float.MaxValue, fractions, hit);
                 return (1f - math.cmin(fractions)) * rayLength;
             }
-            return math.abs(plane.distanceFromOrigin / denom);
+            return math.abs(plane.distanceToOrigin / denom);
         }
 
         private static bool DoPlanarMpr(in Collider colliderA,
@@ -782,7 +782,7 @@ namespace Latios.Psyshock
             // We don't use triangle raycast here because precision issues could cause our ray to miss.
             Plane plane = mathex.PlaneFrom(portalA.pos, portalB.pos - portalA.pos, portalC.pos - portalA.pos);
             float denom = math.dot(plane.normal, normalizedSearchDirectionInASpace);
-            UnityEngine.Debug.Log($"plane: {plane.normal}, {plane.distanceFromOrigin}, denom: {denom}");
+            UnityEngine.Debug.Log($"plane: {plane.normal}, {plane.distanceToOrigin}, denom: {denom}");
             if (math.abs(denom) < math.EPSILON)
             {
                 // The triangle is coplanar with the ray.
@@ -853,7 +853,7 @@ namespace Latios.Psyshock
                 UnityEngine.Debug.Log("Coplanar portal is triangle. hit: {hit}");
                 return (1f - math.cmin(fractions)) * rayLength;
             }
-            return math.abs(plane.distanceFromOrigin / denom);
+            return math.abs(plane.distanceToOrigin / denom);
         }
 
         private static bool DoPlanarMprDebug(in Collider colliderA,

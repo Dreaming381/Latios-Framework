@@ -73,7 +73,7 @@ namespace Latios.Kinemation
         /// <param name="pathIndex">The index into pathsInReversedNotation, which is also a boneIndex</param>
         /// <param name="searchString">The string to search</param>
         /// <returns>Returns true if the string matches the start</returns>
-        public unsafe bool StartsWith(int pathIndex, in FixedString64Bytes searchString)
+        public unsafe bool StartsWith<T>(int pathIndex, in T searchString) where T : unmanaged, INativeList<byte>, IUTF8Bytes
         {
             if (searchString.Length > pathsInReversedNotation[pathIndex].Length)
                 return false;
@@ -87,7 +87,7 @@ namespace Latios.Kinemation
         /// <param name="searchString">The string to search</param>
         /// <param name="foundPathIndex">The first path index that began with the search string. This index corresponds to a bone index.</param>
         /// <returns>Returns true if a match was found</returns>
-        public bool TryGetFirstPathIndexThatStartsWith(in FixedString64Bytes searchString, out int foundPathIndex)
+        public bool TryGetFirstPathIndexThatStartsWith<T>(in T searchString, out int foundPathIndex) where T : unmanaged, INativeList<byte>, IUTF8Bytes
         {
             for (foundPathIndex = 0; foundPathIndex < pathsInReversedNotation.Length; foundPathIndex++)
             {

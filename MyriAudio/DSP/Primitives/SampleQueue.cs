@@ -60,6 +60,13 @@ namespace Latios.Myri.DSP
             }
         }
 
+        public void Clear()
+        {
+            m_nextEnqueueIndex = 0;
+            m_nextDequeueIndex = 0;
+            m_count            = 0;
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckEnqueue()
         {

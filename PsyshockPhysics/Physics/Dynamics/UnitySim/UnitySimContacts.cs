@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Collections;
@@ -57,10 +58,24 @@ namespace Latios.Psyshock
         /// </summary>
         public unsafe struct ContactsBetweenResult
         {
-            public float3      contactNormal;
-            public int         contactCount;
+            /// <summary>
+            /// A vector that points from a non-penetrating contact on collider "B"
+            /// to the surface on collider "A". The normal should always be outward
+            /// from "B".
+            /// </summary>
+            public float3 contactNormal;
+            /// <summary>
+            /// The number of contacts contained
+            /// </summary>
+            public int contactCount;
+            /// <summary>
+            /// The raw memory storage of the contacts
+            /// </summary>
             public fixed float contactsData[128];
 
+            /// <summary>
+            /// Retrieves the contact at the specified index
+            /// </summary>
             public ref ContactOnB this[int index]
             {
                 get
@@ -71,6 +86,9 @@ namespace Latios.Psyshock
                 }
             }
 
+            /// <summary>
+            /// Adds a new contact point. The safety check will fail if there are already 32 contacts.
+            /// </summary>
             public void Add(ContactOnB contact)
             {
                 CheckCapacityBeforeAdd();
@@ -79,11 +97,18 @@ namespace Latios.Psyshock
                 this[index] = contact;
             }
 
+            /// <summary>
+            /// Adds a new contact point. The safety check will fail if there are already 32 contacts.
+            /// </summary>
             public void Add(float3 locationOnB, float distanceToA)
             {
                 Add(new ContactOnB { location = locationOnB, distanceToA = distanceToA });
             }
 
+            /// <summary>
+            /// Removes the contact at the specified index, and the contact at the highest index will
+            /// take its place (as long as that is not the contact being removed).
+            /// </summary>
             public void RemoveAtSwapBack(int index)
             {
                 CheckInRange(index);
@@ -91,6 +116,10 @@ namespace Latios.Psyshock
                 contactCount--;
             }
 
+            /// <summary>
+            /// Flips the perspective of the contacts such that they lie on "A"
+            /// with the contact normal pointed in the opposite direction.
+            /// </summary>
             public void FlipInPlace()
             {
                 for (int i = 0; i < contactCount; i++)
@@ -102,6 +131,10 @@ namespace Latios.Psyshock
                 contactNormal = -contactNormal;
             }
 
+            /// <summary>
+            /// Creates a flipped perspective of the contacts such that they lie on "A"
+            /// with the contact normal pointed in the opposite direction.
+            /// </summary>
             public ContactsBetweenResult ToFlipped()
             {
                 var result = this;
@@ -109,14 +142,38 @@ namespace Latios.Psyshock
                 return result;
             }
 
+            /// <summary>
+            /// Acquires a span of the contacts. The Span MUST only be used while this
+            /// ContactsBetweenResult instance is valid.
+            /// </summary>
+            /// <returns></returns>
+            public Span<ContactOnB> AsSpan()
+            {
+                fixed (ContactOnB* ptr = &this[0])
+                return new Span<ContactOnB>(ptr, contactCount);
+            }
+
+            /// <summary>
+            /// A contact that lies on the "B" collider in a pair of colliders
+            /// </summary>
             public struct ContactOnB
             {
+                /// <summary>
+                /// A packed representation of the contact
+                /// </summary>
                 public float4 contactData;
+                /// <summary>
+                /// The position of the contact on the surface of the "B" collider
+                /// </summary>
                 public float3 location
                 {
                     get => contactData.xyz;
                     set => contactData.xyz = value;
                 }
+                /// <summary>
+                /// The distance of the contact to the surface of the "A" collider
+                /// along the contact normal. Negative if the contact is penetrating.
+                /// </summary>
                 public float distanceToA
                 {
                     get => contactData.w;

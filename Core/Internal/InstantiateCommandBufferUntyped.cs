@@ -302,7 +302,7 @@ namespace Latios
                 var chunkRanges       = new NativeList<int2>(Allocator.Temp);
                 var chunks            = new NativeList<ArchetypeChunk>(Allocator.Temp);
                 var indicesInChunks   = new NativeList<int>(Allocator.Temp);
-                var componentDataPtrs = new NativeList<UnsafeParallelBlockList.ElementPtr>(Allocator.Temp);
+                var componentDataPtrs = new NativeList<UnsafeIndexedBlockList.ElementPtr>(Allocator.Temp);
                 em->CompleteAllTrackedJobs();
 
                 var job0 = new InstantiateAndBuildListsJob
@@ -345,10 +345,10 @@ namespace Latios
                 [ReadOnly] public InstantiateCommandBufferUntyped icb;
                 public EntityManager                              em;
 
-                public NativeList<ArchetypeChunk>                     chunks;
-                public NativeList<int2>                               chunkRanges;
-                public NativeList<int>                                indicesInChunks;
-                public NativeList<UnsafeParallelBlockList.ElementPtr> componentDataPtrs;
+                public NativeList<ArchetypeChunk>                    chunks;
+                public NativeList<int2>                              chunkRanges;
+                public NativeList<int>                               indicesInChunks;
+                public NativeList<UnsafeIndexedBlockList.ElementPtr> componentDataPtrs;
 
                 public void Execute()
                 {
@@ -357,14 +357,14 @@ namespace Latios
                     var prefabSortkeyArray = new NativeArray<PrefabSortkey>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     icb.m_prefabSortkeyBlockList->GetElementValues(prefabSortkeyArray);
                     //Step 2: Get the componentData pointers
-                    var unsortedComponentDataPtrs = new NativeArray<UnsafeParallelBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                    var unsortedComponentDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     icb.m_componentDataBlockList->GetElementPtrs(unsortedComponentDataPtrs);
                     //Step 3: Sort the arrays by sort key and collapse unique entities
                     var ranks = new NativeArray<int>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     RadixSort.RankSortInt3(ranks, prefabSortkeyArray);
                     var    sortedPrefabs           = new NativeList<Entity>(count, Allocator.Temp);
                     var    sortedPrefabCounts      = new NativeList<int>(count, Allocator.Temp);
-                    var    sortedComponentDataPtrs = new NativeArray<UnsafeParallelBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                    var    sortedComponentDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                     Entity lastEntity              = Entity.Null;
                     for (int i = 0; i < count; i++)
                     {
@@ -455,17 +455,17 @@ namespace Latios
 
             private struct WriteComponentDataJob
             {
-                [ReadOnly] public InstantiateCommandBufferUntyped                 icb;
-                [ReadOnly] public NativeArray<ArchetypeChunk>                     chunks;
-                [ReadOnly] public NativeArray<int2>                               chunkRanges;
-                [ReadOnly] public NativeArray<int>                                indicesInChunks;
-                [ReadOnly] public NativeArray<UnsafeParallelBlockList.ElementPtr> componentDataPtrs;
-                [ReadOnly] public EntityTypeHandle                                entityHandle;
-                public DynamicComponentTypeHandle                                 t0;
-                public DynamicComponentTypeHandle                                 t1;
-                public DynamicComponentTypeHandle                                 t2;
-                public DynamicComponentTypeHandle                                 t3;
-                public DynamicComponentTypeHandle                                 t4;
+                [ReadOnly] public InstantiateCommandBufferUntyped                icb;
+                [ReadOnly] public NativeArray<ArchetypeChunk>                    chunks;
+                [ReadOnly] public NativeArray<int2>                              chunkRanges;
+                [ReadOnly] public NativeArray<int>                               indicesInChunks;
+                [ReadOnly] public NativeArray<UnsafeIndexedBlockList.ElementPtr> componentDataPtrs;
+                [ReadOnly] public EntityTypeHandle                               entityHandle;
+                public DynamicComponentTypeHandle                                t0;
+                public DynamicComponentTypeHandle                                t1;
+                public DynamicComponentTypeHandle                                t2;
+                public DynamicComponentTypeHandle                                t3;
+                public DynamicComponentTypeHandle                                t4;
 
                 public void Execute(int i)
                 {
@@ -483,7 +483,7 @@ namespace Latios
                     }
                 }
 
-                void DoT0(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeParallelBlockList.ElementPtr> dataPtrs)
+                void DoT0(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeIndexedBlockList.ElementPtr> dataPtrs)
                 {
                     var   entities = chunk.GetNativeArray(entityHandle);
                     var   t0Size   = icb.m_state->typesSizes[0];
@@ -497,7 +497,7 @@ namespace Latios
                     }
                 }
 
-                void DoT1(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeParallelBlockList.ElementPtr> dataPtrs)
+                void DoT1(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeIndexedBlockList.ElementPtr> dataPtrs)
                 {
                     var   entities = chunk.GetNativeArray(entityHandle);
                     var   t0Size   = icb.m_state->typesSizes[0];
@@ -516,7 +516,7 @@ namespace Latios
                     }
                 }
 
-                void DoT2(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeParallelBlockList.ElementPtr> dataPtrs)
+                void DoT2(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeIndexedBlockList.ElementPtr> dataPtrs)
                 {
                     var   entities = chunk.GetNativeArray(entityHandle);
                     var   t0Size   = icb.m_state->typesSizes[0];
@@ -541,7 +541,7 @@ namespace Latios
                     }
                 }
 
-                void DoT3(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeParallelBlockList.ElementPtr> dataPtrs)
+                void DoT3(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeIndexedBlockList.ElementPtr> dataPtrs)
                 {
                     var   entities = chunk.GetNativeArray(entityHandle);
                     var   t0Size   = icb.m_state->typesSizes[0];
@@ -570,7 +570,7 @@ namespace Latios
                     }
                 }
 
-                void DoT4(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeParallelBlockList.ElementPtr> dataPtrs)
+                void DoT4(ArchetypeChunk chunk, NativeArray<int> indices, NativeArray<UnsafeIndexedBlockList.ElementPtr> dataPtrs)
                 {
                     var   entities = chunk.GetNativeArray(entityHandle);
                     var   t0Size   = icb.m_state->typesSizes[0];

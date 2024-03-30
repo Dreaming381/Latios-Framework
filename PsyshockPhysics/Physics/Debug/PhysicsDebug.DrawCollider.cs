@@ -21,7 +21,7 @@ namespace Latios.Psyshock
             float2 previous   = new float2(1f, 0f);
 
             var tf  = transform;
-            tf.pos += sphere.center;
+            tf.pos += math.rotate(transform, sphere.center);
 
             for (int segment = 0; segment < segmentsPerPi; segment++)
             {
@@ -262,25 +262,25 @@ namespace Latios.Psyshock
             switch (collider.type)
             {
                 case ColliderType.Sphere:
-                    DrawCollider(in collider.m_sphere,   transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_sphere,     transform, color, segmentsPerPi);
                     break;
                 case ColliderType.Capsule:
-                    DrawCollider(in collider.m_capsule,  transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_capsule,    transform, color, segmentsPerPi);
                     break;
                 case ColliderType.Box:
-                    DrawCollider(in collider.m_box,      transform, color);
+                    DrawCollider(in collider.m_box,        transform, color);
                     break;
                 case ColliderType.Triangle:
-                    DrawCollider(in collider.m_triangle, transform, color);
+                    DrawCollider(in collider.m_triangle,   transform, color);
                     break;
                 case ColliderType.Convex:
-                    DrawCollider(in collider.m_convex,   transform, color);
+                    DrawCollider(in collider.m_convex,     transform, color);
                     break;
                 case ColliderType.TriMesh:
-                    DrawCollider(in collider.m_triMesh,  transform, color);
+                    DrawCollider(in collider.m_triMesh(),  transform, color);
                     break;
                 case ColliderType.Compound:
-                    DrawCollider(in collider.m_compound, transform, color, segmentsPerPi);
+                    DrawCollider(in collider.m_compound(), transform, color, segmentsPerPi);
                     break;
             }
         }

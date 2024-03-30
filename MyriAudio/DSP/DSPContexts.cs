@@ -29,15 +29,18 @@ namespace Latios.Myri.DSP
 
     internal unsafe struct UpdateContext
     {
-        public Entity stackEntity;
-        public TransformQvvs stackTransform => *stackTransformPtr;
-        public int       indexInStack;
-        public uint      layerMask;
+        public Entity stackEntity => stackType == StackType.Source ? sourcePtr->sourceEntity : listenerPtr->listenerEntity;
+        public TransformQvvs stackTransform => stackType == StackType.Source ? sourcePtr->worldTransform : listenerPtr->worldTransform;
+        public int indexInStack;
+        public uint layerMask => stackType == StackType.Source ? (1u << sourcePtr->layerIndex) : listenerPtr->layerMask;
         public bool      isCulled;
         public StackType stackType;
 
-        internal TransformQvvs*                                 stackTransformPtr;
+        internal void* metadataPtr;
+        internal Interop.SourceStackMetadata* sourcePtr => (Interop.SourceStackMetadata*)metadataPtr;
+        internal Interop.ListenerStackMetadata* listenerPtr => (Interop.ListenerStackMetadata*)metadataPtr;
         internal NativeHashMap<Entity, VirtualOutputEffect.Ptr> virtualOutputsMap;
+        internal NativeHashMap<ResourceKey, ResourceValue>      resourcesMap;
         internal int                                            currentFrame;
 
         public bool TryGetVirtualOutput(Entity virtualOutputEffectEntity, out SampleFrame.ReadOnly virtualFrame)
@@ -49,12 +52,41 @@ namespace Latios.Myri.DSP
             virtualFrame = default;
             return false;
         }
+
+        public bool TryGetResourceComponent<T>(Entity resourceEntity, out DSPRef<T> resource) where T : unmanaged, IResourceComponent
+        {
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceComponentMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
+            {
+                resource = new DSPRef<T>((T*)metadataPtr->componentPtr);
+                return true;
+            }
+            resource = default;
+            return false;
+        }
+
+        public bool TryGetResourceBuffer<T>(Entity resourceEntity, out ReadOnlySpan<T> resource) where T : unmanaged, IResourceBuffer
+        {
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceBufferMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
+            {
+                resource = new ReadOnlySpan<T>(metadataPtr->bufferPtr, metadataPtr->elementCount);
+                return true;
+            }
+            resource = default;
+            return false;
+        }
     }
 
     internal unsafe struct SpatialCullingContext
     {
         internal UnsafeList<Interop.ListenerStackMetadata.Ptr> listeners;
         internal Interop.SourceStackMetadata*                  sourcePtr;
+        internal NativeHashMap<ResourceKey, ResourceValue>     resourcesMap;
 
         public int listenerCount => listeners.Length;
         public Entity sourceEntity => sourcePtr->sourceEntity;
@@ -64,20 +96,32 @@ namespace Latios.Myri.DSP
         public Entity GetListenerEntity(int index) => listeners[index].ptr->listenerEntity;
         public TransformQvvs GetListenerTransform(int index) => listeners[index].ptr->worldTransform;
         public uint GetListenerLayerMask(int index) => listeners[index].ptr->layerMask;
-        public bool TryGetListenerProperty<T>(int index, out DSPRef<T> property) where T : unmanaged, IListenerProperty
-        {
-            var ptr           = listeners[index];
-            var requestedType = ComponentType.ReadWrite<T>();
-            for (int i = 0; i < ptr.ptr->listenerPropertiesCount; i++)
-            {
-                if (ptr.ptr->listenerProperties[i].propertyType.TypeIndex == requestedType.TypeIndex)
-                {
-                    property = new DSPRef<T>((T*)ptr.ptr->listenerProperties[i].propertyPtr);
-                    return true;
-                }
-            }
 
-            property = default;
+        public bool TryGetResourceComponent<T>(Entity resourceEntity, out DSPRef<T> resource) where T : unmanaged, IResourceComponent
+        {
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceComponentMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
+            {
+                resource = new DSPRef<T>((T*)metadataPtr->componentPtr);
+                return true;
+            }
+            resource = default;
+            return false;
+        }
+
+        public bool TryGetResourceBuffer<T>(Entity resourceEntity, out ReadOnlySpan<T> resource) where T : unmanaged, IResourceBuffer
+        {
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceBufferMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
+            {
+                resource = new ReadOnlySpan<T>(metadataPtr->bufferPtr, metadataPtr->elementCount);
+                return true;
+            }
+            resource = default;
             return false;
         }
     }
@@ -107,21 +151,34 @@ namespace Latios.Myri.DSP
         internal Interop.SourceStackMetadata*                   sourcePtr;
         internal Interop.ListenerStackMetadata*                 listenerPtr;
         internal NativeHashMap<Entity, VirtualOutputEffect.Ptr> virtualOutputsMap;
+        internal NativeHashMap<ResourceKey, ResourceValue>      resourcesMap;
         internal int                                            currentFrame;
 
-        public bool TryGetListenerProperty<T>(out DSPRef<T> property) where T : unmanaged, IListenerProperty
+        public bool TryGetResourceComponent<T>(Entity resourceEntity, out DSPRef<T> resource) where T : unmanaged, IResourceComponent
         {
-            var requestedType = ComponentType.ReadWrite<T>();
-            for (int i = 0; i < listenerPtr->listenerPropertiesCount; i++)
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceComponentMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
             {
-                if (listenerPtr->listenerProperties[i].propertyType.TypeIndex == requestedType.TypeIndex)
-                {
-                    property = new DSPRef<T>((T*)listenerPtr->listenerProperties[i].propertyPtr);
-                    return true;
-                }
+                resource = new DSPRef<T>((T*)metadataPtr->componentPtr);
+                return true;
             }
+            resource = default;
+            return false;
+        }
 
-            property = default;
+        public bool TryGetResourceBuffer<T>(Entity resourceEntity, out ReadOnlySpan<T> resource) where T : unmanaged, IResourceBuffer
+        {
+            var key         = new ResourceKey { componentType = ComponentType.ReadWrite<T>(), entity = resourceEntity };
+            var result                                                                               = resourcesMap.TryGetValue(key, out var candidate);
+            var metadataPtr                                                                          = (Interop.ResourceBufferMetadata*)candidate.metadataPtr;
+            if (metadataPtr->enabled)
+            {
+                resource = new ReadOnlySpan<T>(metadataPtr->bufferPtr, metadataPtr->elementCount);
+                return true;
+            }
+            resource = default;
             return false;
         }
 

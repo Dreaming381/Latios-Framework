@@ -144,7 +144,8 @@ namespace Latios.Psyshock
         /// <param name="transformB">The transform of the second of the two colliders</param>
         /// <param name="maxDistance">The signed distance the surface points must be less than in order for a "hit" to be registered. A value less than 0 requires that
         /// the colliders be overlapping.</param>
-        /// <param name="processor">The processor that will receive a ColliderDistanceResult for each found pair of subcolliders.</param>
+        /// <param name="processor">The processor that will receive a ColliderDistanceResult for each found pair of subcolliders.
+        /// Use DistanceBetweenAllCache if you need a simple collector.</param>
         public static void DistanceBetweenAll<T>(in Collider colliderA,
                                                  in TransformQvvs transformA,
                                                  in Collider colliderB,
@@ -155,14 +156,22 @@ namespace Latios.Psyshock
             var scaledColliderA = colliderA;
             var scaledColliderB = colliderB;
 
+            var context = new DistanceBetweenAllContext
+            {
+                numSubcollidersA = InternalQueryTypeUtilities.GetSubcolliders(in colliderA),
+                numSubcollidersB = InternalQueryTypeUtilities.GetSubcolliders(in colliderB)
+            };
+
             ScaleStretchCollider(ref scaledColliderA, transformA.scale, transformA.stretch);
             ScaleStretchCollider(ref scaledColliderB, transformB.scale, transformB.stretch);
+            processor.Begin(in context);
             ColliderColliderDispatch.DistanceBetweenAll(in scaledColliderA,
                                                         new RigidTransform(transformA.rotation, transformA.position),
                                                         in scaledColliderB,
                                                         new RigidTransform(transformB.rotation, transformB.position),
                                                         maxDistance,
                                                         ref processor);
+            processor.End(in context);
         }
         #endregion
 
@@ -269,7 +278,33 @@ namespace Latios.Psyshock
     /// </summary>
     public interface IDistanceBetweenAllProcessor
     {
+        /// <summary>
+        /// Called whenever a pair is found between any two subcolliders from each collider
+        /// </summary>
         void Execute(in ColliderDistanceResult result);
+
+        /// <summary>
+        /// Called before any Execute() call. Used to initialize or reset resources.
+        /// </summary>
+        public void Begin(in DistanceBetweenAllContext context)
+        {
+        }
+
+        /// <summary>
+        /// Called after all Execute() calls. Used to finalize and reorganize any backing resources.
+        /// </summary>
+        public void End(in DistanceBetweenAllContext context)
+        {
+        }
+    }
+
+    /// <summary>
+    /// A context used to provide additional info about the colliders being processed in a DistanceBetweenAll() operation.
+    /// </summary>
+    public struct DistanceBetweenAllContext
+    {
+        public int numSubcollidersA;
+        public int numSubcollidersB;
     }
     #endregion
 }

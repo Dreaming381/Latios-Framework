@@ -160,6 +160,13 @@ namespace Latios.Myri.DSP
         }
 
         public void ResetAttenuation() => m_currentAttenuationDB = 0f;
+
+        public void ClearLookahead()
+        {
+            m_delayQueueL.Clear();
+            m_delayQueueR.Clear();
+            m_delayAmplitudeDB.Clear();
+        }
     }
 }
 

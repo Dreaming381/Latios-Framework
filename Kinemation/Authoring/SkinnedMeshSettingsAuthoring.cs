@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Entities;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
@@ -15,6 +16,11 @@ namespace Latios.Kinemation.Authoring
         /// Specifies how the SkinnedMeshRenderer is generated.
         /// </summary>
         public BindingMode bindingMode = BindingMode.BakeTime;
+
+        /// <summary>
+        /// Enables Dual Quaternion Skinning instead of Linear Blend (Matrix) Skinning.
+        /// </summary>
+        public bool useDualQuaternionSkinning = false;
 
         /// <summary>
         /// Assign a list of bone name hierarchy paths (leaf to root delineated with '/') corresponding to each bone index in the mesh
@@ -39,6 +45,17 @@ namespace Latios.Kinemation.Authoring
             /// which is used to deform the mesh by the skeleton at runtime.
             /// </summary>
             OverridePaths
+        }
+    }
+
+    public class SkinnedMeshSettingsBaker : Baker<SkinnedMeshSettingsAuthoring>
+    {
+        public override void Bake(SkinnedMeshSettingsAuthoring authoring)
+        {
+            if (authoring.useDualQuaternionSkinning)
+            {
+                AddComponent<DualQuaternionSkinningDeformTag>(GetEntity(TransformUsageFlags.Renderable));
+            }
         }
     }
 }

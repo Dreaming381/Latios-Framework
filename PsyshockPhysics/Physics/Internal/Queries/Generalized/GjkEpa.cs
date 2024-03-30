@@ -249,7 +249,7 @@ namespace Latios.Psyshock
                             if (hull.triangles[triangleIndex].uid != uidsCache[triangleIndex])
                             {
                                 uidsCache[triangleIndex]      = hull.triangles[triangleIndex].uid;
-                                distancesCache[triangleIndex] = hull.ComputePlane(triangleIndex).distanceFromOrigin;
+                                distancesCache[triangleIndex] = hull.ComputePlane(triangleIndex).distanceToOrigin;
                             }
                             if (closestTriangleIndex == -1 || distancesCache[closestTriangleIndex] < distancesCache[triangleIndex])
                             {
@@ -260,7 +260,7 @@ namespace Latios.Psyshock
 
                         // Add supporting vertex or exit.
                         var   sv  = MinkowskiSupports.GetSupport(colliderA, colliderB, closestPlane.normal, bInASpace);
-                        float d2P = math.dot(closestPlane.normal, sv.pos) + closestPlane.distanceFromOrigin;
+                        float d2P = math.dot(closestPlane.normal, sv.pos) + closestPlane.distanceToOrigin;
                         if (math.abs(d2P) > stopThreshold && hull.AddPoint(sv.pos, sv.id))
                             stopThreshold *= 1.3f;
                         else
@@ -271,7 +271,7 @@ namespace Latios.Psyshock
                     // There could be multiple triangles in the closest plane, pick the one that has the closest point to the origin on its face
                     foreach (int triangleIndex in hull.triangles.indices)
                     {
-                        if (distancesCache[triangleIndex] >= closestPlane.distanceFromOrigin - k_epaEpsilon)
+                        if (distancesCache[triangleIndex] >= closestPlane.distanceToOrigin - k_epaEpsilon)
                         {
                             ConvexHullBuilder.Triangle triangle = hull.triangles[triangleIndex];
                             float3                     a        = hull.vertices[triangle.vertex0].position;
@@ -303,11 +303,11 @@ namespace Latios.Psyshock
                         simplex.b.pos                                 = hull.vertices[triangle.vertex1].position; simplex.b.id = hull.vertices[triangle.vertex1].userData;
                         simplex.c.pos                                 = hull.vertices[triangle.vertex2].position; simplex.c.id = hull.vertices[triangle.vertex2].userData;
                         simplex.originToClosestPointUnscaledDirection = -closestPlane.normal;
-                        simplex.scaledDistance                        = closestPlane.distanceFromOrigin;
+                        simplex.scaledDistance                        = closestPlane.distanceToOrigin;
 
                         // Set normal and distance.
                         normalizedOriginToClosestCsoPoint = -closestPlane.normal;
-                        result.distance                   = closestPlane.distanceFromOrigin;
+                        result.distance                   = closestPlane.distanceToOrigin;
                     }
                 }
             }

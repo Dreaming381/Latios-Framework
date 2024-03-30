@@ -31,7 +31,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
         public enum Algorithm
         {
             Matrix = 0,
-            //DualQuaternion = 1
+            DualQuaternion = 1
         }
 
         public enum Source

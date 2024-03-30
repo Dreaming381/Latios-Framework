@@ -15,7 +15,7 @@ namespace Latios.Psyshock
         {
             var bInATransform = math.mul(math.inverse(convexTransform), capsuleTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(convex, capsule, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(1e-4f, -1e-4f, gjkResult.distance < 0f);
+            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
             SphereConvex.DistanceBetween(in convex,
                                          in RigidTransform.identity,
                                          new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
@@ -93,7 +93,7 @@ namespace Latios.Psyshock
                 float4 obbX             = new float4(planeA.normal.x, planeB.normal.x, planeC.normal.x, planeD.normal.x);
                 float4 obbY             = new float4(planeA.normal.y, planeB.normal.y, planeC.normal.y, planeD.normal.y);
                 float4 obbZ             = new float4(planeA.normal.z, planeB.normal.z, planeC.normal.z, planeD.normal.z);
-                float4 obbD             = new float4(planeA.distanceFromOrigin, planeB.distanceFromOrigin, planeC.distanceFromOrigin, planeD.distanceFromOrigin);
+                float4 obbD             = new float4(planeA.distanceToOrigin, planeB.distanceToOrigin, planeC.distanceToOrigin, planeD.distanceToOrigin);
 
                 for (int i = 0; i < blob.vertexIndicesInEdges.Length; i++)
                 {
@@ -197,7 +197,7 @@ namespace Latios.Psyshock
                 float4 obbX             = new float4(planeA.normal.x, planeB.normal.x, planeC.normal.x, planeD.normal.x);
                 float4 obbY             = new float4(planeA.normal.y, planeB.normal.y, planeC.normal.y, planeD.normal.y);
                 float4 obbZ             = new float4(planeA.normal.z, planeB.normal.z, planeC.normal.z, planeD.normal.z);
-                float4 obbD             = new float4(planeA.distanceFromOrigin, planeB.distanceFromOrigin, planeC.distanceFromOrigin, planeD.distanceFromOrigin);
+                float4 obbD             = new float4(planeA.distanceToOrigin, planeB.distanceToOrigin, planeC.distanceToOrigin, planeD.distanceToOrigin);
 
                 for (int i = 0; i < blob.vertexIndicesInEdges.Length; i++)
                 {

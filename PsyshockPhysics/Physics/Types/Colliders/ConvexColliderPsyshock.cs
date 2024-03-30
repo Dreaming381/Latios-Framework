@@ -80,6 +80,11 @@ namespace Latios.Psyshock
 
         public Aabb localAabb;
 
+        public float3     centerOfMass;
+        public float3x3   inertiaTensor;
+        public quaternion unscaledInertiaTensorOrientation;
+        public float3     unscaledInertiaTensorDiagonal;
+
         public FixedString128Bytes meshName;
 
         public struct IndexPair

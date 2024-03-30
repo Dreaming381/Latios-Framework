@@ -134,7 +134,7 @@ namespace Latios.Psyshock
     internal struct BlobCollider
     {
 #pragma warning disable CS0649
-        internal float4x4 storage;
+        internal float3x4 storage;
 #pragma warning restore CS0649
     }
 
@@ -154,6 +154,11 @@ namespace Latios.Psyshock
         /// A local space Aabb encompassing all of the subcolliders
         /// </summary>
         public Aabb localAabb;
+
+        public float3     centerOfMass;
+        public float3x3   inertiaTensor;
+        public quaternion unscaledInertiaTensorOrientation;
+        public float3     unscaledInertiaTensorDiagonal;
 
         /// <summary>
         /// The array of subcolliders

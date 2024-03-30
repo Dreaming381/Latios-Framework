@@ -54,11 +54,11 @@ namespace Latios.Psyshock
                 case ColliderType.Convex:
                     return AabbFrom(collider.m_convex, in transform);
                 case ColliderType.TriMesh:
-                    return AabbFrom(collider.m_triMesh, in transform);
+                    return AabbFrom(collider.m_triMesh(), in transform);
                 case ColliderType.Compound:
-                    return AabbFrom(collider.m_compound, in transform);
+                    return AabbFrom(collider.m_compound(), in transform);
                 default:
-                    ThrowUnsupportedType();
+                    ThrowUnsupportedType(collider.type);
                     return new Aabb();
             }
         }
@@ -93,11 +93,11 @@ namespace Latios.Psyshock
                 case ColliderType.Convex:
                     return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
                 case ColliderType.TriMesh:
-                    return AabbFrom(colliderToCast.m_triMesh, in castStart, castEnd);
+                    return AabbFrom(colliderToCast.m_triMesh(), in castStart, castEnd);
                 case ColliderType.Compound:
-                    return AabbFrom(colliderToCast.m_compound, in castStart, castEnd);
+                    return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
                 default:
-                    ThrowUnsupportedType();
+                    ThrowUnsupportedType(colliderToCast.type);
                     return new Aabb();
             }
         }
@@ -117,11 +117,11 @@ namespace Latios.Psyshock
                 case ColliderType.Convex:
                     return AabbFrom(collider.m_convex, in transform);
                 case ColliderType.TriMesh:
-                    return AabbFrom(collider.m_triMesh, in transform);
+                    return AabbFrom(collider.m_triMesh(), in transform);
                 case ColliderType.Compound:
-                    return AabbFrom(collider.m_compound, in transform);
+                    return AabbFrom(collider.m_compound(), in transform);
                 default:
-                    ThrowUnsupportedType();
+                    ThrowUnsupportedType(collider.type);
                     return new Aabb();
             }
         }
@@ -141,17 +141,17 @@ namespace Latios.Psyshock
                 case ColliderType.Convex:
                     return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
                 case ColliderType.Compound:
-                    return AabbFrom(colliderToCast.m_compound, in castStart, castEnd);
+                    return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
                 default:
-                    ThrowUnsupportedType();
+                    ThrowUnsupportedType(colliderToCast.type);
                     return new Aabb();
             }
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void ThrowUnsupportedType()
+        private static void ThrowUnsupportedType(ColliderType type)
         {
-            throw new InvalidOperationException("Collider type not supported yet");
+            throw new InvalidOperationException($"Collider type not supported yet. Type code is {(int)type}");
         }
         #endregion
 

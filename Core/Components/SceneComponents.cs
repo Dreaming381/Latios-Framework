@@ -36,5 +36,10 @@ namespace Latios
         public FixedString128Bytes previous => previousScene;
         public bool isFirstFrame => isSceneFirstFrame;
     }
+
+    /// <summary>
+    /// Add this component to the subscene entity to disable forcing the subscene to load synchronously.
+    /// </summary>
+    public struct DisableSynchronousSubsceneLoadingTag : IComponentData { }
 }
 

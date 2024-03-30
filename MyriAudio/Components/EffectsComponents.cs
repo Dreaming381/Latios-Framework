@@ -18,8 +18,30 @@ namespace Latios.Myri
     {
     }
 
-    internal interface IListenerProperty : IComponentData
+    internal interface IResourceComponent : IComponentData
     {
+    }
+
+    internal interface IResourceBuffer : IBufferElementData
+    {
+    }
+
+    internal interface IFeedbackComponent : IComponentData, IEnableableComponent
+    {
+    }
+
+    internal interface IFeedbackBuffer : IBufferElementData, IEnableableComponent
+    {
+    }
+
+    /// <summary>
+    /// Provides more granular control of sending to the DSP thread than change filters
+    /// </summary>
+    internal struct DspSubmitFlag : IComponentData, IEnableableComponent { }
+
+    internal struct EffectStackElement : IBufferElementData, IEnableableComponent
+    {
+        public Entity effectEntity;
     }
 }
 

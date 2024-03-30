@@ -49,8 +49,9 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public unsafe void OnUpdate(ref SystemState state)
         {
-            var brgCullingContext = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>();
-            var cullingContext    = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
+            var brgCullingContext  = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>();
+            var lodCrossfadePtrMap = latiosWorld.worldBlackboardEntity.GetCollectionComponent<LODCrossfadePtrMap>(true);
+            var cullingContext     = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
 
             var chunkList = new NativeList<ArchetypeChunk>(m_metaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
 
@@ -83,6 +84,7 @@ namespace Latios.Kinemation.Systems
                 EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                 LastSystemVersion         = state.LastSystemVersion,
                 LightMaps                 = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                lodCrossfadeHandle        = GetComponentTypeHandle<LodCrossfade>(true),
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<WorldTransform>(true),
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
@@ -127,6 +129,7 @@ namespace Latios.Kinemation.Systems
             var expandInstancesJob = new ExpandVisibleInstancesJob
             {
                 DrawCommandOutput = chunkDrawCommandOutput,
+                crossfadesPtrMap  = lodCrossfadePtrMap.chunkIdentifierToPtrMap
             };
 
             var generateDrawCommandsJob = new GenerateDrawCommandsJob
@@ -234,6 +237,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public NativeArray<ArchetypeChunk>                          chunksToProcess;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<LodCrossfade>                    lodCrossfadeHandle;
             public bool                                                            splitsAreValid;
 
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
@@ -302,6 +306,7 @@ namespace Latios.Kinemation.Systems
                     bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
                     bool isDepthSorted       = chunk.Has(ref DepthSorted);
                     bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+                    bool hasLodCrossfade     = chunk.Has(ref lodCrossfadeHandle);
 
                     // Check if the chunk has statically disabled motion (i.e. never in motion pass)
                     // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
@@ -372,6 +377,9 @@ namespace Latios.Kinemation.Systems
 
                             if (isLightMapped)
                                 drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
+
+                            if (hasLodCrossfade)
+                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
 
                             // Depth sorted draws are emitted with access to entity transforms,
                             // so they can also be written out for sorting
@@ -473,7 +481,8 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         internal unsafe struct ExpandVisibleInstancesJob : IJobParallelForDefer
         {
-            public ChunkDrawCommandOutput DrawCommandOutput;
+            public ChunkDrawCommandOutput                                                                        DrawCommandOutput;
+            [ReadOnly] public NativeHashMap<LODCrossfadePtrMap.ChunkIdentifier, LODCrossfadePtrMap.CrossfadePtr> crossfadesPtrMap;
 
             public void Execute(int index)
             {
@@ -482,11 +491,12 @@ namespace Latios.Kinemation.Systems
                 var transformHeader = workItem.TransformArrays;
                 int binIndex        = workItem.BinIndex;
 
-                var bin                    = DrawCommandOutput.BinIndices.ElementAt(binIndex);
-                int binInstanceOffset      = bin.InstanceOffset;
-                int binPositionOffset      = bin.PositionOffset;
-                int workItemInstanceOffset = workItem.PrefixSumNumInstances;
-                int headerInstanceOffset   = 0;
+                ref var settings               = ref DrawCommandOutput.UnsortedBins.ElementAt(binIndex);
+                var     bin                    = DrawCommandOutput.BinIndices.ElementAt(binIndex);
+                int     binInstanceOffset      = bin.InstanceOffset;
+                int     binPositionOffset      = bin.PositionOffset;
+                int     workItemInstanceOffset = workItem.PrefixSumNumInstances;
+                int     headerInstanceOffset   = 0;
 
                 int*    visibleInstances = DrawCommandOutput.CullingOutputDrawCommands->visibleInstances;
                 float3* sortingPositions = (float3*)DrawCommandOutput.CullingOutputDrawCommands->instanceSortingPositions;
@@ -495,10 +505,11 @@ namespace Latios.Kinemation.Systems
                 {
                     while (header != null)
                     {
-                        ExpandArray(
-                            visibleInstances,
-                            header,
-                            binInstanceOffset + workItemInstanceOffset + headerInstanceOffset);
+                        ExpandArray(visibleInstances,
+                                    header,
+                                    binInstanceOffset + workItemInstanceOffset + headerInstanceOffset,
+                                    settings.BatchID.value,
+                                    (settings.Flags & BatchDrawCommandFlags.LODCrossFade) == BatchDrawCommandFlags.LODCrossFade);
 
                         headerInstanceOffset += header->NumInstances;
                         header                = header->Next;
@@ -513,13 +524,14 @@ namespace Latios.Kinemation.Systems
                         int instanceOffset = binInstanceOffset + workItemInstanceOffset + headerInstanceOffset;
                         int positionOffset = binPositionOffset + workItemInstanceOffset + headerInstanceOffset;
 
-                        ExpandArrayWithPositions(
-                            visibleInstances,
-                            sortingPositions,
-                            header,
-                            transformHeader,
-                            instanceOffset,
-                            positionOffset);
+                        ExpandArrayWithPositions(visibleInstances,
+                                                 sortingPositions,
+                                                 header,
+                                                 transformHeader,
+                                                 instanceOffset,
+                                                 positionOffset,
+                                                 settings.BatchID.value,
+                                                 (settings.Flags & BatchDrawCommandFlags.LODCrossFade) == BatchDrawCommandFlags.LODCrossFade);
 
                         headerInstanceOffset += header->NumInstances;
                         header                = header->Next;
@@ -531,14 +543,26 @@ namespace Latios.Kinemation.Systems
             private int ExpandArray(
                 int*                                      visibleInstances,
                 DrawStream<DrawCommandVisibility>.Header* header,
-                int instanceOffset)
+                int instanceOffset,
+                uint batchID,
+                bool usesCrossfades)
             {
                 int numStructs = header->NumElements;
 
                 for (int i = 0; i < numStructs; ++i)
                 {
-                    var visibility   = *header->Element(i);
-                    int numInstances = ExpandVisibility(visibleInstances + instanceOffset, visibility);
+                    var visibility = *header->Element(i);
+                    int numInstances;
+                    if (usesCrossfades)
+                    {
+                        var ptr = crossfadesPtrMap[new LODCrossfadePtrMap.ChunkIdentifier { batchID = batchID, batchStartIndex = visibility.ChunkStartIndex }];
+                        numInstances                                                                                           = ExpandVisibilityCrossfade(
+                            visibleInstances + instanceOffset,
+                            visibility,
+                            ptr.ptr);
+                    }
+                    else
+                        numInstances = ExpandVisibility(visibleInstances + instanceOffset, visibility);
                     Assert.IsTrue(numInstances > 0);
                     instanceOffset += numInstances;
                 }
@@ -552,19 +576,35 @@ namespace Latios.Kinemation.Systems
                 DrawStream<DrawCommandVisibility>.Header* header,
                 DrawStream<System.IntPtr>.Header*         transformHeader,
                 int instanceOffset,
-                int positionOffset)
+                int positionOffset,
+                uint batchID,
+                bool usesCrossfades)
             {
                 int numStructs = header->NumElements;
 
                 for (int i = 0; i < numStructs; ++i)
                 {
-                    var visibility   = *header->Element(i);
-                    var transforms   = (TransformQvvs*)(*transformHeader->Element(i));
-                    int numInstances = ExpandVisibilityWithPositions(
-                        visibleInstances + instanceOffset,
-                        sortingPositions + positionOffset,
-                        visibility,
-                        transforms);
+                    var visibility = *header->Element(i);
+                    var transforms = (TransformQvvs*)(*transformHeader->Element(i));
+                    int numInstances;
+                    if (usesCrossfades)
+                    {
+                        var ptr = crossfadesPtrMap[new LODCrossfadePtrMap.ChunkIdentifier { batchID = batchID, batchStartIndex = visibility.ChunkStartIndex }];
+                        numInstances                                                                                           = ExpandVisibilityWithPositionsCrossfade(
+                            visibleInstances + instanceOffset,
+                            sortingPositions + positionOffset,
+                            visibility,
+                            transforms,
+                            ptr.ptr
+                            );
+                    }
+                    else
+                    {
+                        numInstances = ExpandVisibilityWithPositions(visibleInstances + instanceOffset,
+                                                                     sortingPositions + positionOffset,
+                                                                     visibility,
+                                                                     transforms);
+                    }
                     Assert.IsTrue(numInstances > 0);
                     instanceOffset += numInstances;
                     positionOffset += numInstances;
@@ -588,6 +628,29 @@ namespace Latios.Kinemation.Systems
                         qword                         ^= mask;
                         int instanceIndex              = (i << 6) + bitIndex;
                         int visibilityIndex            = startIndex + instanceIndex;
+                        outputInstances[numInstances]  = visibilityIndex;
+                        ++numInstances;
+                    }
+                }
+
+                return numInstances;
+            }
+
+            private int ExpandVisibilityCrossfade(int* outputInstances, DrawCommandVisibility visibility, byte* crossfades)
+            {
+                int numInstances = 0;
+                int startIndex   = visibility.ChunkStartIndex;
+
+                for (int i = 0; i < 2; ++i)
+                {
+                    ulong qword = visibility.VisibleInstances[i];
+                    while (qword != 0)
+                    {
+                        int   bitIndex                 = math.tzcnt(qword);
+                        ulong mask                     = 1ul << bitIndex;
+                        qword                         ^= mask;
+                        int instanceIndex              = (i << 6) + bitIndex;
+                        int visibilityIndex            = ((startIndex + instanceIndex) & 0x00ffffff) | (crossfades[instanceIndex] << 24);
                         outputInstances[numInstances]  = visibilityIndex;
                         ++numInstances;
                     }
@@ -629,6 +692,41 @@ namespace Latios.Kinemation.Systems
 
                 return numInstances;
             }
+
+            private int ExpandVisibilityWithPositionsCrossfade(
+                int*                  outputInstances,
+                float3*               outputSortingPosition,
+                DrawCommandVisibility visibility,
+                TransformQvvs*        transforms,
+                byte*                 crossfades)
+            {
+                int numInstances = 0;
+                int startIndex   = visibility.ChunkStartIndex;
+
+                for (int i = 0; i < 2; ++i)
+                {
+                    ulong qword = visibility.VisibleInstances[i];
+                    while (qword != 0)
+                    {
+                        int   bitIndex     = math.tzcnt(qword);
+                        ulong mask         = 1ul << bitIndex;
+                        qword             ^= mask;
+                        int instanceIndex  = (i << 6) + bitIndex;
+
+                        int visibilityIndex           = startIndex + instanceIndex;
+                        outputInstances[numInstances] = (visibilityIndex & 0x00ffffff) | (crossfades[instanceIndex] << 24);
+#if !LATIOS_TRANSFORMS_UNITY
+                        outputSortingPosition[numInstances] = transforms[instanceIndex].position;
+#else
+                        outputSortingPosition[numInstances] = ((float4x4*)transforms)[instanceIndex].c3.xyz;
+#endif
+
+                        ++numInstances;
+                    }
+                }
+
+                return numInstances;
+            }
         }
 #endif
 
@@ -639,6 +737,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<LodCrossfade> lodCrossfadeHandle;
             public bool splitsAreValid;
 
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
@@ -707,6 +806,7 @@ namespace Latios.Kinemation.Systems
                     bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
                     bool isDepthSorted       = chunk.Has(ref DepthSorted);
                     bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+                    bool hasLodCrossfade     = chunk.Has(ref lodCrossfadeHandle);
 
                     // Check if the chunk has statically disabled motion (i.e. never in motion pass)
                     // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
@@ -777,6 +877,9 @@ namespace Latios.Kinemation.Systems
 
                             if (isLightMapped)
                                 drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
+
+                            if (hasLodCrossfade)
+                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
 
                             // Depth sorted draws are emitted with access to entity transforms,
                             // so they can also be written out for sorting

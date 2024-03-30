@@ -16,8 +16,9 @@ namespace Latios.Psyshock
         {
             var pairsTypes   = UnityEditor.TypeCache.GetTypesDerivedFrom<IFindPairsProcessor>();
             var objectsTypes = UnityEditor.TypeCache.GetTypesDerivedFrom<IFindObjectsProcessor>();
+            var foreachTypes = UnityEditor.TypeCache.GetTypesDerivedFrom<IForEachPairProcessor>();
 
-            InitProcessors(pairsTypes, objectsTypes);
+            InitProcessors(pairsTypes, objectsTypes, foreachTypes);
         }
 #else
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
@@ -25,8 +26,10 @@ namespace Latios.Psyshock
         {
             var pairsTypes   = new List<Type>();
             var objectsTypes = new List<Type>();
+            var foreachTypes = new List<Type>();
             var pairsType    = typeof(IFindPairsProcessor);
             var objectsType  = typeof(IFindObjectsProcessor);
+            var foreachType  = typeof(IForEachPairProcessor);
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 if (!BootstrapTools.IsAssemblyReferencingSubstring(assembly, "Psyshock"))
@@ -41,6 +44,8 @@ namespace Latios.Psyshock
                             pairsTypes.Add(t);
                         if (objectsType.IsAssignableFrom(t))
                             objectsTypes.Add(t);
+                        if (foreachType.IsAssignableFrom(t))
+                            foreachTypes.Add(t);
                     }
                 }
                 catch (ReflectionTypeLoadException e)
@@ -51,17 +56,19 @@ namespace Latios.Psyshock
                             pairsTypes.Add(t);
                         if (t != null && objectsType.IsAssignableFrom(t))
                             objectsTypes.Add(t);
+                        if (t != null && foreachType.IsAssignableFrom(t))
+                            foreachTypes.Add(t);
                     }
 
                     Debug.LogWarning($"Psyshock BurstEarlyInit.cs failed loading assembly: {(assembly.IsDynamic ? assembly.ToString() : assembly.Location)}");
                 }
             }
 
-            InitProcessors(pairsTypes, objectsTypes);
+            InitProcessors(pairsTypes, objectsTypes, foreachTypes);
         }
 #endif
 
-        static void InitProcessors(IEnumerable<Type> findPairsTypes, IEnumerable<Type> findObjectsTypes)
+        static void InitProcessors(IEnumerable<Type> findPairsTypes, IEnumerable<Type> findObjectsTypes, IEnumerable<Type> foreachTypes)
         {
             RuntimeConstants.InitConstants();
 
@@ -102,6 +109,25 @@ namespace Latios.Psyshock
                     Debug.LogException(ex);
                 }
             }
+
+            var foreachIniterType = typeof(ForeachIniter<>);
+
+            foreach (var foreachType in foreachTypes)
+            {
+                try
+                {
+                    if (foreachType.IsGenericType || foreachType.IsInterface)
+                        continue;
+
+                    var type   = foreachIniterType.MakeGenericType(foreachType);
+                    var initer = Activator.CreateInstance(type) as IIniter;
+                    initer.Init();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogException(ex);
+                }
+            }
         }
 
         interface IIniter
@@ -109,38 +135,28 @@ namespace Latios.Psyshock
             void Init();
         }
 
-        struct FindPairsIniter<T> : IIniter where T : struct, IFindPairsProcessor
+        public struct FindPairsIniter<T> : IIniter where T : struct, IFindPairsProcessor
         {
             public void Init()
             {
-                IJobExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfSingle>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfPart1>();
-                IJobExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfPart2>();
-                IJobForExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfParallelUnsafe>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerSelfWithCrossCacheConfig<T>.FindPairsInternal.LayerSelfPart1>();
-                IJobExtensions.EarlyJobInit<FindPairsLayerSelfWithCrossCacheConfig<T>.FindPairsInternal.LayerSelfPart2>();
-
-                IJobExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerSingle>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerPart1>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerPart2>();
-                IJobForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerParallelUnsafe>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerWithCrossCacheConfig<T>.FindPairsInternal.LayerLayerPart1>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerWithCrossCacheConfig<T>.FindPairsInternal.LayerLayerPart2>();
-
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                IJobForExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfPart2_WithSafety>();
-                IJobForExtensions.EarlyJobInit<FindPairsLayerSelfWithCrossCacheConfig<T>.FindPairsInternal.LayerSelfPart2_WithSafety>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerPart2_WithSafety>();
-                IJobParallelForExtensions.EarlyJobInit<FindPairsLayerLayerWithCrossCacheConfig<T>.FindPairsInternal.LayerLayerPart2_WithSafety>();
-#endif
+                IJobForExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfJob>();
+                IJobForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerJob>();
             }
         }
 
-        struct FindObjectsIniter<T> : IIniter where T : struct, IFindObjectsProcessor
+        public struct FindObjectsIniter<T> : IIniter where T : struct, IFindObjectsProcessor
         {
             public void Init()
             {
-                IJobExtensions.EarlyJobInit<FindObjectsConfig<T>.FindObjectsInternal.Single>();
+                IJobExtensions.EarlyJobInit<FindObjectsConfig<T>.FindObjectsInternal.SingleJob>();
+            }
+        }
+
+        public struct ForeachIniter<T> : IIniter where T : struct, IForEachPairProcessor
+        {
+            public void Init()
+            {
+                IJobForExtensions.EarlyJobInit<ForEachPairConfig<T>.ForEachPairInternal.ForEachPairJob>();
             }
         }
     }
