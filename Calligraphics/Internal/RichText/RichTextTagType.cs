@@ -1,6 +1,6 @@
 namespace Latios.Calligraphics
 {
-    internal enum RichTextTagType : byte
+    public enum RichTextTagType : byte
     {
         INVALID,
         Anchor,  //<a>

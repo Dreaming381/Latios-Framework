@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.TextCore.LowLevel;
@@ -9,6 +8,11 @@ public static class TextCoreExtensions
     public static Dictionary<uint, GlyphPairAdjustmentRecord> GetGlyphPairAdjustmentRecordLookup(this FontAsset font)
     {
         return font.fontFeatureTable.m_GlyphPairAdjustmentRecordLookup;
+    }
+
+    public static List<GlyphPairAdjustmentRecord> GetGlyphPairAdjustmentRecords(this FontAsset font)
+    {
+        return font.fontFeatureTable.glyphPairAdjustmentRecords;
     }
 
     public static bool s_initialized = false;

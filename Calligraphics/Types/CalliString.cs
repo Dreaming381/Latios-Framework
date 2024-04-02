@@ -147,8 +147,9 @@ namespace Latios.Calligraphics
         /// </remarks>
         public struct Enumerator : IEnumerator<Unicode.Rune>
         {
-            CalliString  target;
-            int          offset;
+            CalliString target;
+            int m_currentByteIndex;
+            int m_currentCharIndex;
             Unicode.Rune current;
 
             /// <summary>
@@ -157,8 +158,9 @@ namespace Latios.Calligraphics
             /// <param name="source">A NativeText for which to create an enumerator.</param>
             public Enumerator(CalliString source)
             {
-                target  = source;
-                offset  = 0;
+                target = source;
+                m_currentByteIndex = 0;
+                m_currentCharIndex = 0;
                 current = default;
             }
 
@@ -170,18 +172,34 @@ namespace Latios.Calligraphics
             }
 
             /// <summary>
+            /// Sets offset to provided byte (not character!) position <see cref="Current"/> is valid to read afterwards.
+            /// </summary>
+            /// <returns>True if <see cref="Current"/> is valid to read after the call.</returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool GotoByteIndex(int bytePosition)
+            {
+                if (bytePosition >= target.Length)
+                    return false;
+
+                m_currentByteIndex = bytePosition;
+
+                return true;
+            }
+
+            /// <summary>
             /// Advances the enumerator to the next character, returning true if <see cref="Current"/> is valid to read afterwards.
             /// </summary>
             /// <returns>True if <see cref="Current"/> is valid to read after the call.</returns>
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
             {
-                if (offset >= target.Length)
+                if (m_currentByteIndex >= target.Length)
                     return false;
 
                 unsafe
                 {
-                    Unicode.Utf8ToUcs(out current, target.GetUnsafeReadOnlyPtr(), ref offset, target.Length);
+                    Unicode.Utf8ToUcs(out current, target.GetUnsafeReadOnlyPtr(), ref m_currentByteIndex, target.Length);
+                    m_currentCharIndex += 1;
                 }
 
                 return true;
@@ -189,9 +207,9 @@ namespace Latios.Calligraphics
 
             public bool MovePrevious()
             {
-                if (offset >= current.LengthInUtf8Bytes())
+                if (m_currentByteIndex >= current.LengthInUtf8Bytes())
                 {
-                    offset -= current.LengthInUtf8Bytes();
+                    m_currentByteIndex -= current.LengthInUtf8Bytes();
                     return true;
                 }
                 return false;
@@ -202,7 +220,7 @@ namespace Latios.Calligraphics
             /// </summary>
             public void Reset()
             {
-                offset  = 0;
+                m_currentByteIndex = 0;
                 current = default;
             }
 
@@ -217,6 +235,17 @@ namespace Latios.Calligraphics
             /// </summary>
             /// <value>The current character.</value>
             public Unicode.Rune Current => current;
+
+            /// <summary>
+            /// The startIndex in bytes of the current character.
+            /// </summary>
+            /// <value>The current character byte index.</value>
+            public int CurrentByteIndex => m_currentByteIndex;
+            /// <summary>
+            /// The index of the current character in chars.
+            /// </summary>
+            /// <value>The current character char index</value>
+            public int CurrentCharIndex => m_currentCharIndex;
         }
 
         /// <summary>

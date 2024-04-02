@@ -1,8 +1,8 @@
-using System;
-using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Calligraphics.Rendering.Authoring;
 using Latios.Kinemation.Authoring;
+using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Graphics;
@@ -18,40 +18,28 @@ namespace Latios.Calligraphics.Authoring
     [AddComponentMenu("Latios/Calligraphics/Text Renderer")]
     public class TextRendererAuthoring : MonoBehaviour
     {
-        [Multiline]
+        [TextArea(5, 10)]
         public string text;
 
-        public float               fontSize            = 12f;
-        public bool                wordWrap            = true;
-        public float               maxLineWidth        = float.MaxValue;
-        public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
-        public VerticalAlignment   verticalAlignment   = VerticalAlignment.Top;
+        public float fontSize = 12f;
+        public bool wordWrap = true;
+        public float maxLineWidth = float.MaxValue;
+        public HorizontalAlignmentOptions horizontalAlignment = HorizontalAlignmentOptions.Left;
+        public VerticalAlignmentOptions verticalAlignment = VerticalAlignmentOptions.Top;
+        public bool isOrthographic;
+        public FontStyles fontStyle;
+        public FontWeight fontWeight;
 
         public Color32 color = UnityEngine.Color.white;
 
         public List<FontMaterialPair> fontsAndMaterials;
-
-        public enum HorizontalAlignment : byte
-        {
-            Left = 0x0,
-            Right = 0x1,
-            Center = 0x2,
-            Justified = 0x3
-        }
-
-        public enum VerticalAlignment : byte
-        {
-            Top = 0x0,
-            Middle = 0x1 << 2,
-            Bottom = 0x2 << 2,
-        }
     }
 
     [Serializable]
     public struct FontMaterialPair
     {
         public FontAsset font;
-        public Material  overrideMaterial;
+        public Material overrideMaterial;
 
         public Material material => overrideMaterial == null ? font.material : overrideMaterial;
     }
@@ -84,10 +72,14 @@ namespace Latios.Calligraphics.Authoring
             calliString.Append(authoring.text);
             AddComponent(entity, new TextBaseConfiguration
             {
-                fontSize     = authoring.fontSize,
-                color        = authoring.color,
+                fontSize = authoring.fontSize,
+                color = authoring.color,
                 maxLineWidth = math.select(float.MaxValue, authoring.maxLineWidth, authoring.wordWrap),
-                alignMode    = (AlignMode)(((byte)authoring.horizontalAlignment) | ((byte)authoring.verticalAlignment))
+                lineJustification = authoring.horizontalAlignment,
+                verticalAlignment = authoring.verticalAlignment,
+                isOrthographic = authoring.isOrthographic,
+                fontStyle = authoring.fontStyle,
+                fontWeight = authoring.fontWeight,
             });
         }
 
@@ -100,16 +92,16 @@ namespace Latios.Calligraphics.Authoring
             var layer = GetLayer();
             this.BakeTextBackendMeshAndMaterial(new MeshRendererBakeSettings
             {
-                targetEntity          = entity,
+                targetEntity = entity,
                 renderMeshDescription = new RenderMeshDescription
                 {
                     FilterSettings = new RenderFilterSettings
                     {
-                        Layer              = layer,
+                        Layer = layer,
                         RenderingLayerMask = (uint)(1 << layer),
-                        ShadowCastingMode  = ShadowCastingMode.Off,
-                        ReceiveShadows     = false,
-                        MotionMode         = MotionVectorGenerationMode.Object,
+                        ShadowCastingMode = ShadowCastingMode.Off,
+                        ReceiveShadows = false,
+                        MotionMode = MotionVectorGenerationMode.Object,
                         StaticShadowCaster = false,
                     },
                     LightProbeUsage = LightProbeUsage.Off,
