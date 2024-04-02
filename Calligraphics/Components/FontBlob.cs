@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine.TextCore.LowLevel;
 
 namespace Latios.Calligraphics
 {
@@ -7,11 +8,11 @@ namespace Latios.Calligraphics
     public struct FontBlob
     {
         public BlobArray<GlyphBlob> characters;
-        public float                        ascentLine;
-        public float                        descentLine;
-        public float                        lineHeight;
-        public float                        pointSize;
-        public float                        scale;
+        public float ascentLine;
+        public float descentLine;
+        public float lineHeight;
+        public float pointSize;
+        public float scale;
 
         public float baseLine;
         public float atlasWidth;
@@ -21,9 +22,16 @@ namespace Latios.Calligraphics
         public float regularStyleWeight;
         public float boldStyleSpacing;
         public float boldStyleWeight;
-        public float italicsStyleSlant;
+        public byte italicsStyleSlant;
 
         public float capLine;
+
+        public float subscriptOffset;
+        public float subscriptSize;
+        public float superscriptOffset;
+        public float superscriptSize;
+
+        //public float underlineOffset;
 
         /// <summary>
         /// Padding that is read from material properties
@@ -32,13 +40,14 @@ namespace Latios.Calligraphics
 
         public float baseScale => 1f / pointSize * scale * .1f;
 
-        public const float smallCapsScaleMultiplier    = .8f;
+        public const float smallCapsScaleMultiplier = .8f;
         public const float orthographicScaleMultiplier = 10f;
     }
 
     public struct GlyphBlob
     {
-        public uint              unicode;
+        public uint glyphIndex;
+        public uint unicode;
         public BlobArray<float2> vertices;
         public BlobArray<float2> uv;
         public BlobArray<float2> uv2;
@@ -74,17 +83,26 @@ namespace Latios.Calligraphics
 
         public struct AdjustmentPair
         {
+            public FontFeatureLookupFlags fontFeatureLookupFlags;
             public GlyphAdjustment firstAdjustment;
             public GlyphAdjustment secondAdjustment;
         }
 
         public struct GlyphAdjustment
         {
-            public uint  glyphUnicode;
+            public uint glyphUnicode;
             public float xPlacement;
             public float yPlacement;
             public float xAdvance;
             public float yAdvance;
+            public static GlyphAdjustment operator +(GlyphAdjustment a, GlyphAdjustment b)
+            => new GlyphAdjustment
+            {
+                xPlacement = a.xPlacement + b.xPlacement,
+                yPlacement = a.yPlacement + b.yPlacement,
+                xAdvance = a.xAdvance + b.xAdvance,
+                yAdvance = a.yAdvance + b.yAdvance,
+            };
         }
     }
 

@@ -1,7 +1,7 @@
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.TextCore.Text;
 
 namespace Latios.Calligraphics
 {
@@ -34,9 +34,16 @@ namespace Latios.Calligraphics
         /// </summary>
         public Color32 color;
         /// <summary>
-        /// The horizontal and vertical alignment modes of the text
+        /// The horizontal alignment modes of the text
         /// </summary>
-        public AlignMode alignMode;
+        public HorizontalAlignmentOptions lineJustification;
+        /// <summary>
+        /// The horizontal alignment modes of the text
+        /// </summary>
+        public VerticalAlignmentOptions verticalAlignment;
+        public bool isOrthographic;
+        public FontStyles fontStyle;
+        public FontWeight fontWeight;
     }
 
     /// <summary>
@@ -102,21 +109,21 @@ namespace Latios.Calligraphics
     }
 
     /// <summary>
-    /// The packed alignment modes for both horizontal and vertical directions.
+    /// Horizontal text alignment options.
     /// </summary>
-    public enum AlignMode : byte
+    public enum HorizontalAlignmentOptions
     {
-        Left = 0x0,
-        Right = 0x1,
-        Center = 0x2,
-        Justified = 0x3,
-        //
-        Top = 0x0,
-        Middle = 0x1 << 2,
-        Bottom = 0x2 << 2,
-        //
-        HorizontalMask = 0x3,
-        VerticalMask = 0xc,
+        Left = 0x1, Center = 0x2, Right = 0x4, Justified = 0x8, Flush = 0x10, Geometry = 0x20
     }
+
+    /// <summary>
+    /// Vertical text alignment options.
+    /// </summary>
+    public enum VerticalAlignmentOptions
+    {
+        Top = 0x100, Middle = 0x200, Bottom = 0x400, Baseline = 0x800, Geometry = 0x1000, Capline = 0x2000,
+    }
+
+    public enum FontWeight { Thin = 100, ExtraLight = 200, Light = 300, Regular = 400, Medium = 500, SemiBold = 600, Bold = 700, Heavy = 800, Black = 900 };
 }
 

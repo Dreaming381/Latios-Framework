@@ -1,6 +1,4 @@
-using Unity.Collections;
 using Unity.Entities;
-using Unity.Mathematics;
 
 namespace Latios.Calligraphics
 {
@@ -9,7 +7,7 @@ namespace Latios.Calligraphics
     /// </summary>
     public readonly partial struct TextRendererAspect : IAspect
     {
-        readonly DynamicBuffer<CalliByte>     m_string;
+        readonly DynamicBuffer<CalliByte> m_string;
         readonly RefRW<TextBaseConfiguration> m_baseConfig;
 
         /// <summary>
@@ -45,12 +43,20 @@ namespace Latios.Calligraphics
         }
 
         /// <summary>
-        /// The horizontal and vertical alignment modes of the text
+        /// The horizontal alignment modes of the text
         /// </summary>
-        public AlignMode alignMode
+        public HorizontalAlignmentOptions lineJustification
         {
-            get => m_baseConfig.ValueRO.alignMode;
-            set => m_baseConfig.ValueRW.alignMode = value;
+            get => m_baseConfig.ValueRO.lineJustification;
+            set => m_baseConfig.ValueRW.lineJustification = value;
+        }
+        /// <summary>
+        /// The vertical alignment modes of the text
+        /// </summary>
+        public VerticalAlignmentOptions verticalAlignment
+        {
+            get => m_baseConfig.ValueRO.verticalAlignment;
+            set => m_baseConfig.ValueRW.verticalAlignment = value;
         }
     }
 }

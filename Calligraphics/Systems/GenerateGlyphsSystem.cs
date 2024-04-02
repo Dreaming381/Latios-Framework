@@ -1,12 +1,8 @@
 using Latios.Calligraphics.Rendering;
-using Latios.Calligraphics.RichText;
-using Latios.Calligraphics.RichText.Parsing;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Mathematics;
 
 using static Unity.Entities.SystemAPI;
 
@@ -21,19 +17,16 @@ namespace Latios.Calligraphics.Systems
         EntityQuery m_singleFontQuery;
         EntityQuery m_multiFontQuery;
 
-        bool m_skipChangeFilter;
-
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             m_singleFontQuery = state.Fluent()
-                                .With<FontBlobReference>(    true)
-                                .With<RenderGlyph>(          false)
-                                .With<CalliByte>(            true)
+                                .With<FontBlobReference>(true)
+                                .With<RenderGlyph>(false)
+                                .With<CalliByte>(true)
                                 .With<TextBaseConfiguration>(true)
-                                .With<TextRenderControl>(    false)
+                                .With<TextRenderControl>(false)
                                 .Build();
-            m_skipChangeFilter = (state.WorldUnmanaged.Flags & WorldFlags.Editor) == WorldFlags.Editor;
         }
 
         [BurstCompile]
@@ -41,76 +34,56 @@ namespace Latios.Calligraphics.Systems
         {
             state.Dependency = new Job
             {
-                calliByteHandle             = GetBufferTypeHandle<CalliByte>(true),
-                fontBlobReferenceHandle     = GetComponentTypeHandle<FontBlobReference>(true),
-                glyphMappingElementHandle   = GetBufferTypeHandle<GlyphMappingElement>(false),
-                glyphMappingMaskHandle      = GetComponentTypeHandle<GlyphMappingMask>(true),
-                renderGlyphHandle           = GetBufferTypeHandle<RenderGlyph>(false),
+                calliByteHandle = GetBufferTypeHandle<CalliByte>(true),
+                fontBlobReferenceHandle = GetComponentTypeHandle<FontBlobReference>(true),
+                glyphMappingElementHandle = GetBufferTypeHandle<GlyphMappingElement>(false),
+                glyphMappingMaskHandle = GetComponentTypeHandle<GlyphMappingMask>(true),
+                renderGlyphHandle = GetBufferTypeHandle<RenderGlyph>(false),
                 textBaseConfigurationHandle = GetComponentTypeHandle<TextBaseConfiguration>(true),
-                textRenderControlHandle     = GetComponentTypeHandle<TextRenderControl>(false),
-                lastSystemVersion           = m_skipChangeFilter ? 0 : state.LastSystemVersion
+                textRenderControlHandle = GetComponentTypeHandle<TextRenderControl>(false),
             }.ScheduleParallel(m_singleFontQuery, state.Dependency);
         }
 
         [BurstCompile]
         public partial struct Job : IJobChunk
         {
-            public BufferTypeHandle<RenderGlyph>          renderGlyphHandle;
-            public BufferTypeHandle<GlyphMappingElement>  glyphMappingElementHandle;
+            public BufferTypeHandle<RenderGlyph> renderGlyphHandle;
+            public BufferTypeHandle<GlyphMappingElement> glyphMappingElementHandle;
             public ComponentTypeHandle<TextRenderControl> textRenderControlHandle;
 
-            [ReadOnly] public ComponentTypeHandle<GlyphMappingMask>      glyphMappingMaskHandle;
-            [ReadOnly] public BufferTypeHandle<CalliByte>                calliByteHandle;
+            [ReadOnly] public ComponentTypeHandle<GlyphMappingMask> glyphMappingMaskHandle;
+            [ReadOnly] public BufferTypeHandle<CalliByte> calliByteHandle;
             [ReadOnly] public ComponentTypeHandle<TextBaseConfiguration> textBaseConfigurationHandle;
-            [ReadOnly] public ComponentTypeHandle<FontBlobReference>     fontBlobReferenceHandle;
-
-            public uint lastSystemVersion;
-
-            [NativeDisableContainerSafetyRestriction]
-            private NativeList<RichTextTag> m_richTextTags;
+            [ReadOnly] public ComponentTypeHandle<FontBlobReference> fontBlobReferenceHandle;
 
             private GlyphMappingWriter m_glyphMappingWriter;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!(chunk.DidChange(ref glyphMappingMaskHandle, lastSystemVersion) ||
-                      chunk.DidChange(ref calliByteHandle, lastSystemVersion) ||
-                      chunk.DidChange(ref textBaseConfigurationHandle, lastSystemVersion) ||
-                      chunk.DidChange(ref fontBlobReferenceHandle, lastSystemVersion)))
-                    return;
-
-                var calliBytesBuffers      = chunk.GetBufferAccessor(ref calliByteHandle);
-                var renderGlyphBuffers     = chunk.GetBufferAccessor(ref renderGlyphHandle);
-                var glyphMappingBuffers    = chunk.GetBufferAccessor(ref glyphMappingElementHandle);
-                var glyphMappingMasks      = chunk.GetNativeArray(ref glyphMappingMaskHandle);
+                var calliBytesBuffers = chunk.GetBufferAccessor(ref calliByteHandle);
+                var renderGlyphBuffers = chunk.GetBufferAccessor(ref renderGlyphHandle);
+                var glyphMappingBuffers = chunk.GetBufferAccessor(ref glyphMappingElementHandle);
+                var glyphMappingMasks = chunk.GetNativeArray(ref glyphMappingMaskHandle);
                 var textBaseConfigurations = chunk.GetNativeArray(ref textBaseConfigurationHandle);
-                var fontBlobReferences     = chunk.GetNativeArray(ref fontBlobReferenceHandle);
-                var textRenderControls     = chunk.GetNativeArray(ref textRenderControlHandle);
+                var fontBlobReferences = chunk.GetNativeArray(ref fontBlobReferenceHandle);
+                var textRenderControls = chunk.GetNativeArray(ref textRenderControlHandle);
 
                 for (int indexInChunk = 0; indexInChunk < chunk.Count; indexInChunk++)
                 {
-                    var calliBytes            = calliBytesBuffers[indexInChunk];
-                    var renderGlyphs          = renderGlyphBuffers[indexInChunk];
-                    var fontBlobReference     = fontBlobReferences[indexInChunk];
+                    var calliBytes = calliBytesBuffers[indexInChunk];
+                    var renderGlyphs = renderGlyphBuffers[indexInChunk];
+                    var fontBlobReference = fontBlobReferences[indexInChunk];
                     var textBaseConfiguration = textBaseConfigurations[indexInChunk];
-                    var textRenderControl     = textRenderControls[indexInChunk];
+                    var textRenderControl = textRenderControls[indexInChunk];
 
                     m_glyphMappingWriter.StartWriter(glyphMappingMasks.Length > 0 ? glyphMappingMasks[indexInChunk].mask : default);
-
-                    if (!m_richTextTags.IsCreated)
-                    {
-                        m_richTextTags = new NativeList<RichTextTag>(Allocator.Temp);
-                    }
-
-                    RichTextParser.ParseTags(ref m_richTextTags, calliBytes);
 
                     GlyphGeneration.CreateRenderGlyphs(ref renderGlyphs,
                                                        ref m_glyphMappingWriter,
                                                        ref fontBlobReference.blob.Value,
                                                        in calliBytes,
-                                                       in textBaseConfiguration,
-                                                       ref m_richTextTags);
+                                                       in textBaseConfiguration);
 
                     if (glyphMappingBuffers.Length > 0)
                     {
@@ -118,7 +91,7 @@ namespace Latios.Calligraphics.Systems
                         m_glyphMappingWriter.EndWriter(ref mapping, renderGlyphs.Length);
                     }
 
-                    textRenderControl.flags          = TextRenderControl.Flags.Dirty;
+                    textRenderControl.flags = TextRenderControl.Flags.Dirty;
                     textRenderControls[indexInChunk] = textRenderControl;
                 }
             }
