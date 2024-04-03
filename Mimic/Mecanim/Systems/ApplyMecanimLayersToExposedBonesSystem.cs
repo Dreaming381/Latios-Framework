@@ -214,7 +214,7 @@ namespace Latios.Mimic.Addons.Mecanim.Systems
                         clipSet.clips[clipWeights[i].mecanimClipIndex].SamplePose(ref blender, time, blendWeight);
                     }
 
-                    blender.NormalizeRotations();
+                    blender.Normalize();
 
                     // Begin write-back with inertial blending
                     bool startInertialBlend = controller.triggerStartInertialBlend;

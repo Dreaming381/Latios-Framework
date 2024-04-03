@@ -14,9 +14,10 @@ struct GlyphVertex
 
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
 uniform ByteAddressBuffer _latiosTextBuffer;
+uniform ByteAddressBuffer _latiosTextMaskBuffer;
 #endif
 
-GlyphVertex sampleGlyph(uint vertexId, uint textBase, uint glyphCount)
+GlyphVertex sampleGlyph(uint vertexId, uint textBase, uint glyphCount, uint maskBase)
 {
     GlyphVertex vertex = (GlyphVertex)0;
 #if defined(UNITY_DOTS_INSTANCING_ENABLED)
@@ -26,15 +27,27 @@ GlyphVertex sampleGlyph(uint vertexId, uint textBase, uint glyphCount)
         vertex.position = asfloat(~0u);
         return vertex;
     }
+    uint glyphBase = 96 * (textBase + (vertexId >> 2));
+    if (maskBase > 0)
+    {
+        uint mask = _latiosTextMaskBuffer.Load(4 * (maskBase + (vertexId >> 6)));
+        uint bit = (vertexId >> 2) & 0xf;
+        bit += 16;
+        if ((mask & (1 << bit)) == 0)
+        {
+            vertex.position = asfloat(~0u);
+            return vertex;
+        }
+        bit -= 16;
+        glyphBase = 96 * (textBase + (mask & 0xffff) + bit);
+    }
 
     const bool isBottomLeft = (vertexId & 0x3) == 0;
     const bool isTopLeft = (vertexId & 0x3) == 1;
     const bool isTopRight = (vertexId & 0x3) == 2;
     const bool isBottomRight = (vertexId & 0x3) == 3;
-    const uint glyphBase = 96 * (textBase + (vertexId >> 2));
 
     const uint4 glyphMeta = _latiosTextBuffer.Load4(glyphBase + 80);
-
     
     vertex.normal = float3(0, 0, -1);
     vertex.tangent = float3(1, 0, 0);

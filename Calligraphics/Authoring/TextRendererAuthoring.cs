@@ -1,8 +1,9 @@
-using Latios.Authoring;
-using Latios.Calligraphics.Rendering.Authoring;
-using Latios.Kinemation.Authoring;
 using System;
 using System.Collections.Generic;
+using Latios.Authoring;
+using Latios.Calligraphics.Rendering;
+using Latios.Calligraphics.Rendering.Authoring;
+using Latios.Kinemation.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Graphics;
@@ -21,14 +22,14 @@ namespace Latios.Calligraphics.Authoring
         [TextArea(5, 10)]
         public string text;
 
-        public float fontSize = 12f;
-        public bool wordWrap = true;
-        public float maxLineWidth = float.MaxValue;
+        public float                      fontSize            = 12f;
+        public bool                       wordWrap            = true;
+        public float                      maxLineWidth        = float.MaxValue;
         public HorizontalAlignmentOptions horizontalAlignment = HorizontalAlignmentOptions.Left;
-        public VerticalAlignmentOptions verticalAlignment = VerticalAlignmentOptions.Top;
-        public bool isOrthographic;
-        public FontStyles fontStyle;
-        public FontWeight fontWeight;
+        public VerticalAlignmentOptions   verticalAlignment   = VerticalAlignmentOptions.Top;
+        public bool                       isOrthographic;
+        public FontStyles                 fontStyle;
+        public FontWeight                 fontWeight;
 
         public Color32 color = UnityEngine.Color.white;
 
@@ -39,7 +40,7 @@ namespace Latios.Calligraphics.Authoring
     public struct FontMaterialPair
     {
         public FontAsset font;
-        public Material overrideMaterial;
+        public Material  overrideMaterial;
 
         public Material material => overrideMaterial == null ? font.material : overrideMaterial;
     }
@@ -58,11 +59,15 @@ namespace Latios.Calligraphics.Authoring
             AddFontRendering(entity, authoring.fontsAndMaterials[0]);
             if (authoring.fontsAndMaterials.Count > 1)
             {
-                var additionalEntities = AddBuffer<AdditionalFontMaterialEntity>(entity).Reinterpret<Entity>();
+                AddComponent<TextMaterialMaskShaderIndex>(entity);
+                AddBuffer<RenderGlyphMask>(entity);
+                var additionalEntities = AddBuffer<Rendering.AdditionalFontMaterialEntity>(entity).Reinterpret<Entity>();
                 for (int i = 1; i < authoring.fontsAndMaterials.Count; i++)
                 {
                     var newEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable);
                     AddFontRendering(newEntity, authoring.fontsAndMaterials[i]);
+                    AddComponent<TextMaterialMaskShaderIndex>(newEntity);
+                    AddBuffer<RenderGlyphMask>(newEntity);
                     additionalEntities.Add(newEntity);
                 }
             }
@@ -72,14 +77,14 @@ namespace Latios.Calligraphics.Authoring
             calliString.Append(authoring.text);
             AddComponent(entity, new TextBaseConfiguration
             {
-                fontSize = authoring.fontSize,
-                color = authoring.color,
-                maxLineWidth = math.select(float.MaxValue, authoring.maxLineWidth, authoring.wordWrap),
+                fontSize          = authoring.fontSize,
+                color             = authoring.color,
+                maxLineWidth      = math.select(float.MaxValue, authoring.maxLineWidth, authoring.wordWrap),
                 lineJustification = authoring.horizontalAlignment,
                 verticalAlignment = authoring.verticalAlignment,
-                isOrthographic = authoring.isOrthographic,
-                fontStyle = authoring.fontStyle,
-                fontWeight = authoring.fontWeight,
+                isOrthographic    = authoring.isOrthographic,
+                fontStyle         = authoring.fontStyle,
+                fontWeight        = authoring.fontWeight,
             });
         }
 
@@ -92,16 +97,16 @@ namespace Latios.Calligraphics.Authoring
             var layer = GetLayer();
             this.BakeTextBackendMeshAndMaterial(new MeshRendererBakeSettings
             {
-                targetEntity = entity,
+                targetEntity          = entity,
                 renderMeshDescription = new RenderMeshDescription
                 {
                     FilterSettings = new RenderFilterSettings
                     {
-                        Layer = layer,
+                        Layer              = layer,
                         RenderingLayerMask = (uint)(1 << layer),
-                        ShadowCastingMode = ShadowCastingMode.Off,
-                        ReceiveShadows = false,
-                        MotionMode = MotionVectorGenerationMode.Object,
+                        ShadowCastingMode  = ShadowCastingMode.Off,
+                        ReceiveShadows     = false,
+                        MotionMode         = MotionVectorGenerationMode.Object,
                         StaticShadowCaster = false,
                     },
                     LightProbeUsage = LightProbeUsage.Off,

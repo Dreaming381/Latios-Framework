@@ -1,6 +1,6 @@
-namespace Latios.Calligraphics
+namespace Latios.Calligraphics.RichText
 {
-    public enum TagUnitType
+    internal enum TagUnitType : byte
     {
         Pixels = 0x0,
         FontUnits = 0x1,

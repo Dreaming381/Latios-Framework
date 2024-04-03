@@ -1,4 +1,5 @@
-﻿using Unity.Collections;
+﻿using System;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 
@@ -21,6 +22,12 @@ namespace Latios
             {
                 res[i] = fixedString[i];
             }
+        }
+
+        // Todo: Find a new home for this?
+        public unsafe static ReadOnlySpan<T> AsSpan<T>(ref this BlobArray<T> blobArray) where T : unmanaged
+        {
+            return new ReadOnlySpan<T>(blobArray.GetUnsafePtr(), blobArray.Length);
         }
     }
 }

@@ -2,10 +2,9 @@ using Unity.Collections;
 
 namespace Latios.Calligraphics
 {
-
-    public struct FixedStack64Bytes<T> where T : unmanaged
+    internal struct FixedStack512Bytes<T> where T : unmanaged
     {
-        FixedList64Bytes<T> m_buffer;
+        FixedList512Bytes<T> m_buffer;
         public bool IsEmpty => m_buffer.IsEmpty;
         public void Add(in T item) => m_buffer.Add(in item);
         public T Pop()

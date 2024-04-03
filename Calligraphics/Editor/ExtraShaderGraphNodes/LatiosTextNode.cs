@@ -96,6 +96,15 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
                 hidden                  = true,
                 value                   = Vector2.zero
             });
+            properties.AddShaderProperty(new Vector1ShaderProperty()
+            {
+                displayName             = $"Text Material Mask Index",
+                overrideReferenceName   = "_latiosTextGlyphMaskBase",
+                overrideHLSLDeclaration = true,
+                hlslDeclarationOverride = HLSLDeclaration.HybridPerInstance,
+                hidden                  = true,
+                value                   = 0f
+            });
 
             base.CollectShaderProperties(properties, generationMode);
         }
@@ -113,7 +122,8 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
             if (generationMode == GenerationMode.ForReals)
             {
                 sb.AppendLine("uint2 baseIndex = asuint(UNITY_ACCESS_HYBRID_INSTANCED_PROP(_latiosTextGlyphBase, float2));");
-                sb.AppendLine("GlyphVertex glyph = sampleGlyph(IN.VertexID, baseIndex.x, baseIndex.y);");
+                sb.AppendLine("uint maskIndex = asuint(UNITY_ACCESS_HYBRID_INSTANCED_PROP(_latiosTextGlyphMaskBase, float));");  // We rely on the default from AddShaderProperty
+                sb.AppendLine("GlyphVertex glyph = sampleGlyph(IN.VertexID, baseIndex.x, baseIndex.y, maskIndex);");
                 sb.AppendLine("{0} = glyph.position;", GetVariableNameForSlot(kPositionOutputSlotId));
                 sb.AppendLine("{0} = glyph.normal;",   GetVariableNameForSlot(kNormalOutputSlotId));
                 sb.AppendLine("{0} = glyph.tangent;",  GetVariableNameForSlot(kTangentOutputSlotId));

@@ -92,6 +92,8 @@ namespace Latios.Kinemation
         /// To ensure the contents are valid, call CopyFromPrevious() if isDirty was false.
         /// This method sets isDirty and needsSync to true. Root-space transforms are not automatically synced
         /// when you make changes to this array. You must call EndSamplingAndSync() when you are done making changes.
+        /// The worldIndex of each transform is treated as a float representing the accumulated weights of all samples.
+        /// Assign any transform's worldIndex with math.asint(1f) to disable normalization fo that transform during sync.
         /// If you want the hierarchy to remain in sync at all times, iterate through the bones property instead.
         /// </summary>
         public NativeArray<TransformQvvs> rawLocalTransformsRW
@@ -100,6 +102,24 @@ namespace Latios.Kinemation
             {
                 m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.IsDirty | OptimizedSkeletonState.Flags.NeedsSync;
                 return m_boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray().GetSubArray(m_currentBaseRootIndexWrite + boneCount, boneCount);
+            }
+        }
+
+        /// <summary>
+        /// Specifies if the next sample will overwrite transforms (true) or if they will be added to existing transforms (false).
+        /// This value will automatically be set to false after each SamplePose() call made on this skeleton.
+        /// InertialBlend(), EndSamplingAndSync(), and CopyFromPrevious() will all set this value to true.
+        /// You may wish to explicitly set this value when using masked sampling to start and end animation override masks.
+        /// </summary>
+        public bool nextSampleWillOverwrite
+        {
+            get => (m_skeletonState.ValueRO.state & OptimizedSkeletonState.Flags.NextSampleShouldAdd) != OptimizedSkeletonState.Flags.NextSampleShouldAdd;
+            set
+            {
+                if (value)
+                    m_skeletonState.ValueRW.state &= ~OptimizedSkeletonState.Flags.NextSampleShouldAdd;
+                else
+                    m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.NextSampleShouldAdd;
             }
         }
         #endregion
@@ -168,6 +188,7 @@ namespace Latios.Kinemation
         {
             var array = m_boneTransforms.AsNativeArray();
             array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).CopyFrom(array.GetSubArray(m_previousBaseRootIndex, boneCount * 2));
+            InitWeights(array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).Reinterpret<TransformQvvs>());
             ref var state  = ref m_skeletonState.ValueRW.state;
             state         |= OptimizedSkeletonState.Flags.IsDirty;
             state         &= ~(OptimizedSkeletonState.Flags.NeedsSync | OptimizedSkeletonState.Flags.NextSampleShouldAdd);
@@ -190,6 +211,7 @@ namespace Latios.Kinemation
             {
                 m_boneTransforms.Resize(requiredBones * 6, NativeArrayOptions.UninitializedMemory);
                 var array = m_boneTransforms.AsNativeArray();
+                InitWeights(array.GetSubArray(0, requiredBones).Reinterpret<TransformQvvs>());
                 array.GetSubArray(requiredBones, requiredBones).CopyFrom(array.GetSubArray(0, requiredBones));
                 Sync(true);
                 array.GetSubArray(requiredBones * 2, requiredBones * 2).CopyFrom(array.GetSubArray(0, requiredBones * 2));

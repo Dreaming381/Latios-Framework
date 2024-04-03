@@ -299,27 +299,27 @@ namespace Latios.Psyshock
             switch (faceIndex)
             {
                 case 0:  // positive X
-                    plane    = new Plane(new float3(1f, 0f, 0f), -box.halfSize.x);
+                    plane    = new Plane(new float3(1f, 0f, 0f), -box.halfSize.x - box.center.x);
                     vertices = new simdFloat3(ones, firstComponent, secondCompPos);
                     break;
                 case 1:  // positive Y
-                    plane    = new Plane(new float3(0f, 1f, 0f), -box.halfSize.y);
+                    plane    = new Plane(new float3(0f, 1f, 0f), -box.halfSize.y - box.center.y);
                     vertices = new simdFloat3(firstComponent, ones, secondCompPos);
                     break;
                 case 2:  // positive Z
-                    plane    = new Plane(new float3(0f, 0f, 1f), -box.halfSize.z);
+                    plane    = new Plane(new float3(0f, 0f, 1f), -box.halfSize.z - box.center.z);
                     vertices = new simdFloat3(firstComponent, secondCompPos, ones);
                     break;
                 case 3:  // negative X
-                    plane    = new Plane(new float3(-1f, 0f, 0f), box.halfSize.x);
+                    plane    = new Plane(new float3(-1f, 0f, 0f), box.halfSize.x - box.center.x);
                     vertices = new simdFloat3(-ones, firstComponent, -secondCompPos);
                     break;
                 case 4:  // negative Y
-                    plane    = new Plane(new float3(0f, -1f, 0f), box.halfSize.y);
+                    plane    = new Plane(new float3(0f, -1f, 0f), box.halfSize.y - box.center.y);
                     vertices = new simdFloat3(firstComponent, -ones, -secondCompPos);
                     break;
                 case 5:  // negative Z
-                    plane    = new Plane(new float3(0f, 0f, -1f), box.halfSize.z);
+                    plane    = new Plane(new float3(0f, 0f, -1f), box.halfSize.z - box.center.z);
                     vertices = new simdFloat3(firstComponent, -secondCompPos, -ones);
                     break;
                 default:  // Should not happen
@@ -328,6 +328,7 @@ namespace Latios.Psyshock
                     break;
             }
             vertices                *= box.halfSize;
+            vertices                += box.center;
             edgePlaneOutwardNormals  = simd.cross(vertices.bcda - vertices, localDirectionToAlign);  // These normals are perpendicular to the contact normal, not the plane.
             edgePlaneDistances       = simd.dot(edgePlaneOutwardNormals, vertices.bcda);
         }

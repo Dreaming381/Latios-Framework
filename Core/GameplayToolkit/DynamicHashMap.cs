@@ -228,7 +228,7 @@ namespace Latios
 
             internal bool isOccupied
             {
-                get => (meta & 0x10000000) != 0;
+                get => (meta & 0x80000000) != 0;
                 set => meta = (meta & 0x7fffffff) | math.select(0u, 1u, value) << 31;
             }
 

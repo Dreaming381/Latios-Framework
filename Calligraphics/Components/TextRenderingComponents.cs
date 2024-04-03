@@ -45,6 +45,13 @@ namespace Latios.Calligraphics.Rendering
         public uint glyphCount;
     }
 
+    // Only present if there are child fonts
+    [MaterialProperty("_latiosTextGlyphMaskBase")]
+    public struct TextMaterialMaskShaderIndex : IComponentData
+    {
+        public uint firstMaskIndex;
+    }
+
     public struct RenderGlyph : IBufferElementData
     {
         public float2 blPosition;
@@ -132,9 +139,47 @@ namespace Latios.Calligraphics.Rendering
         public Flags flags;
     }
 
+    /// <summary>
+    /// An additional rendered text entity containing a different font and material.
+    /// The additional entity shares the RenderGlyph buffer, and uses a mask to identify
+    /// the glyphs to render.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct AdditionalFontMaterialEntity : IBufferElementData
+    {
+        public EntityWith<FontBlobReference> entity;
+    }
+
+    /// <summary>
+    /// A per-glyph index into the font and material that should be used to render it.
+    /// Index 0 is this entity. Index 1 is the first entity in AdditionalFontMaterialEntity buffer.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct FontMaterialSelectorForGlyph : IBufferElementData
+    {
+        public byte fontMaterialIndex;
+    }
+
+    /// <summary>
+    /// A buffer that should be present on every entity posessing or referenced by the
+    /// AdditionalFontMaterialEntity buffer. This buffer contains the GPU mask representation,
+    /// and its contents will automatically be maintained by the Calligraphics rendering backend.
+    /// Public so that you can add/remove it or maybe even read it (if you are brave).
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct RenderGlyphMask : IBufferElementData
+    {
+        public uint lowerOffsetUpperMask16;
+    }
+
     internal struct GlyphCountThisFrame : IComponentData
     {
         public uint glyphCount;
+    }
+
+    internal struct MaskCountThisFrame : IComponentData
+    {
+        public uint maskCount;
     }
 }
 

@@ -1,16 +1,15 @@
-using Latios.Calligraphics.Extensions;
 using UnityEngine;
 
-namespace Latios.Calligraphics
+namespace Latios.Calligraphics.RichText
 {
-    public struct HighlightState
+    internal struct HighlightState
     {
-        public Color32 color;
-        public Calli_Offset padding;
+        public Color32     color;
+        public RectOffsets padding;
 
-        public HighlightState(Color32 color, Calli_Offset padding)
+        public HighlightState(Color32 color, RectOffsets padding)
         {
-            this.color = color;
+            this.color   = color;
             this.padding = padding;
         }
 

@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.10.0-alpha.1]
+# Latios Framework for Unity ECS – [0.10.0-alpha.2]
 
 **This is a prerelease version of the Latios Framework version 0.10 which is
 still under development. Changelogs and Documentation, including the remainder
@@ -308,6 +308,7 @@ for how to get started.
 -   Sovogal – Primary author of Mimic’s Mecanim addon and made significant
     contributions to the Calligraphics module (including the name)
 -   canmom – Android support, Kinemation baking fixes, and build fixes
+-   Fribur – Calligraphics text processing improvements
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support

@@ -1,6 +1,5 @@
 using Latios.Calligraphics.Rendering;
 using Latios.Calligraphics.RichText;
-using Latios.Calligraphics.RichText.Parsing;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;

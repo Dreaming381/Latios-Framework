@@ -99,31 +99,32 @@ namespace Latios.Calligraphics.Authoring.Systems
             }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).WithoutBurst().Run();
         }
 
-        public static BlobAssetReference<FontBlob> BakeFont(FontAsset font, Material material)
+        public static unsafe BlobAssetReference<FontBlob> BakeFont(FontAsset font, Material material)
         {
             float materialPadding = material.GetPaddingForText(false, false);
 
             var          builder             = new BlobBuilder(Allocator.Temp);
-            ref FontBlob FontBlobFont        = ref builder.ConstructRoot<FontBlob>();
-            FontBlobFont.scale               = font.faceInfo.scale;
-            FontBlobFont.pointSize           = font.faceInfo.pointSize;
-            FontBlobFont.baseLine            = font.faceInfo.baseline;
-            FontBlobFont.ascentLine          = font.faceInfo.ascentLine;
-            FontBlobFont.descentLine         = font.faceInfo.descentLine;
-            FontBlobFont.lineHeight          = font.faceInfo.lineHeight;
-            FontBlobFont.regularStyleSpacing = font.regularStyleSpacing;
-            FontBlobFont.regularStyleWeight  = font.regularStyleWeight;
-            FontBlobFont.boldStyleSpacing    = font.boldStyleSpacing;
-            FontBlobFont.boldStyleWeight     = font.boldStyleWeight;
-            FontBlobFont.italicsStyleSlant   = font.italicStyleSlant;
-            FontBlobFont.capLine             = font.faceInfo.capLine;
-            FontBlobFont.atlasWidth          = font.atlasWidth;
-            FontBlobFont.atlasHeight         = font.atlasHeight;
-            FontBlobFont.materialPadding     = materialPadding;
+            ref FontBlob fontBlobRoot        = ref builder.ConstructRoot<FontBlob>();
+            fontBlobRoot.scale               = font.faceInfo.scale;
+            fontBlobRoot.pointSize           = font.faceInfo.pointSize;
+            fontBlobRoot.baseLine            = font.faceInfo.baseline;
+            fontBlobRoot.ascentLine          = font.faceInfo.ascentLine;
+            fontBlobRoot.descentLine         = font.faceInfo.descentLine;
+            fontBlobRoot.lineHeight          = font.faceInfo.lineHeight;
+            fontBlobRoot.regularStyleSpacing = font.regularStyleSpacing;
+            fontBlobRoot.regularStyleWeight  = font.regularStyleWeight;
+            fontBlobRoot.boldStyleSpacing    = font.boldStyleSpacing;
+            fontBlobRoot.boldStyleWeight     = font.boldStyleWeight;
+            fontBlobRoot.italicsStyleSlant   = font.italicStyleSlant;
+            fontBlobRoot.capLine             = font.faceInfo.capLine;
+            fontBlobRoot.atlasWidth          = font.atlasWidth;
+            fontBlobRoot.atlasHeight         = font.atlasHeight;
+            fontBlobRoot.materialPadding     = materialPadding;
 
-            var glyphPairAdjustments = font.GetGlyphPairAdjustmentRecordLookup();
-
-            BlobBuilderArray<GlyphBlob> glyphBuilder = builder.Allocate(ref FontBlobFont.characters, font.characterTable.Count);
+            var       glyphPairAdjustments = font.GetGlyphPairAdjustmentRecordLookup();
+            Span<int> hashCounts           = stackalloc int[64];
+            hashCounts.Clear();
+            BlobBuilderArray<GlyphBlob> glyphBuilder = builder.Allocate(ref fontBlobRoot.characters, font.characterTable.Count);
             for (int i = 0; i < font.characterTable.Count; i++)
             {
                 var character = font.characterTable[i];
@@ -185,7 +186,7 @@ namespace Latios.Calligraphics.Authoring.Systems
                     }
 
                     //Get vertices and uvs
-                    var                      vertices        = GetVertices(character.glyph.metrics, materialPadding, font.atlasPadding / 2f, FontBlobFont.baseScale);
+                    var                      vertices        = GetVertices(character.glyph.metrics, materialPadding, font.atlasPadding / 2f, fontBlobRoot.baseScale);
                     BlobBuilderArray<float2> verticesBuilder = builder.Allocate(ref glyphBlob.vertices, vertices.Length);
                     for (int j = 0; j < vertices.Length; j++)
                     {
@@ -206,16 +207,41 @@ namespace Latios.Calligraphics.Authoring.Systems
                         uv2Builder[j] = uv2s[j];
                     }
 
-                    glyphBuilder[i] = glyphBlob;
+                    hashCounts[BlobTextMeshGlyphExtensions.GetGlyphHash(glyphBlob.unicode)]++;
                 }
+            }
+
+            var             hashes     = builder.Allocate(ref fontBlobRoot.glyphLookupMap, 64);
+            Span<HashArray> hashArrays = stackalloc HashArray[64];
+            for (int i = 0; i < hashes.Length; i++)
+            {
+                hashArrays[i] = new HashArray
+                {
+                    hashArray = (GlyphLookup*)builder.Allocate(ref hashes[i], hashCounts[i]).GetUnsafePtr()
+                };
+                hashCounts[i] = 0;
+            }
+
+            for (int i = 0; i < glyphBuilder.Length; i++)
+            {
+                if (glyphBuilder[i].unicode == 0) // Is this the right way to rule out null glyphs?
+                    continue;
+                var hash                                     = BlobTextMeshGlyphExtensions.GetGlyphHash(glyphBuilder[i].unicode);
+                hashArrays[hash].hashArray[hashCounts[hash]] = new GlyphLookup { unicode = glyphBuilder[i].unicode, index = i };
+                hashCounts[hash]++;
             }
 
             var result = builder.CreateBlobAssetReference<FontBlob>(Allocator.Persistent);
             builder.Dispose();
 
-            FontBlobFont = result.Value;
+            fontBlobRoot = result.Value;
 
             return result;
+        }
+
+        unsafe struct HashArray
+        {
+            public GlyphLookup* hashArray;
         }
 
         private static FixedList64Bytes<float2> GetVertices(GlyphMetrics glyphMetrics, float materialPadding, float stylePadding, float currentElementScale)

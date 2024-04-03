@@ -1,11 +1,11 @@
 using UnityEngine.TextCore.Text;
 
-namespace Latios.Calligraphics
+namespace Latios.Calligraphics.RichText
 {
     /// <summary>
     /// Structure used to track basic XML tags which are binary (on / off)
     /// </summary>
-    public struct Calli_FontStyleStack
+    internal struct FontStyleStack
     {
         public byte bold;
         public byte italic;
@@ -23,16 +23,16 @@ namespace Latios.Calligraphics
         /// </summary>
         public void Clear()
         {
-            bold = 0;
-            italic = 0;
-            underline = 0;
+            bold          = 0;
+            italic        = 0;
+            underline     = 0;
             strikethrough = 0;
-            highlight = 0;
-            superscript = 0;
-            subscript = 0;
-            uppercase = 0;
-            lowercase = 0;
-            smallcaps = 0;
+            highlight     = 0;
+            superscript   = 0;
+            subscript     = 0;
+            uppercase     = 0;
+            lowercase     = 0;
+            smallcaps     = 0;
         }
 
         public byte Add(FontStyles style)

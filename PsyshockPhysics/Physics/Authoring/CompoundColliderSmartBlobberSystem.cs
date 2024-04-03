@@ -176,7 +176,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             var volume            = (4f / 3f) * math.PI * sphere.radius * sphere.radius * sphere.radius;
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], sphere.center);
-                            combinedCenterOfMass += centerOfMass;
+                            combinedCenterOfMass += centerOfMass * volume;
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(sphere, 1f).ToMatrix();
@@ -196,7 +196,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             var volume            = math.PI * capsule.radius * capsule.radius * ((4f / 3f) * capsule.radius + math.distance(capsule.pointA, capsule.pointB));
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], (capsule.pointA + capsule.pointB) / 2f);
-                            combinedCenterOfMass += centerOfMass;
+                            combinedCenterOfMass += centerOfMass * volume;
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(capsule, 1f).ToMatrix();
@@ -216,7 +216,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             var volume            = 8f * box.halfSize.x * box.halfSize.y * box.halfSize.z;
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], box.center);
-                            combinedCenterOfMass += centerOfMass;
+                            combinedCenterOfMass += centerOfMass * volume;
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(box, 1f).ToMatrix();

@@ -20,7 +20,6 @@ namespace AclUnity
             Nearest = 3
         }
 
-        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
         public static void SamplePose(void* compressedTransformsClip, NativeArray<Qvvs> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
@@ -48,7 +47,6 @@ namespace AclUnity
             }
         }
 
-        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
         public static void SamplePoseBlendedFirst(void*                     compressedTransformsClip,
                                                   NativeArray<Qvvs>         outputBuffer,
                                                   float blendFactor,
@@ -121,6 +119,141 @@ namespace AclUnity
             }
         }
 
+        public static void SamplePoseMasked(void*                     compressedTransformsClip,
+                                            NativeArray<Qvvs>         outputBuffer,
+                                            ReadOnlySpan<ulong>       mask,
+                                            float time,
+                                            KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedTransformsClip);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+            CheckMaskSpanIsSufficient(mask, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
+            fixed (ulong* maskPtr = &mask[0])
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                {
+                    AVX.samplePoseMasked(compressedTransformsClip, compressedScalesClip, (float*)outputBuffer.GetUnsafePtr(), maskPtr, time, (byte)keyframeInterpolationMode);
+                }
+                else
+                {
+                    NoExtensions.samplePoseMasked(compressedTransformsClip,
+                                                  compressedScalesClip,
+                                                  (float*)outputBuffer.GetUnsafePtr(),
+                                                  maskPtr,
+                                                  time,
+                                                  (byte)keyframeInterpolationMode);
+                }
+            }
+        }
+
+        public static void SamplePoseMaskedBlendedFirst(void*                     compressedTransformsClip,
+                                                        NativeArray<Qvvs>         outputBuffer,
+                                                        ReadOnlySpan<ulong>       mask,
+                                                        float blendFactor,
+                                                        float time,
+                                                        KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedTransformsClip);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+            CheckMaskSpanIsSufficient(mask, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
+
+            fixed (ulong* maskPtr = &mask[0])
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                {
+                    AVX.samplePoseMaskedBlendedFirst(compressedTransformsClip,
+                                                     compressedScalesClip,
+                                                     (float*)outputBuffer.GetUnsafePtr(),
+                                                     maskPtr,
+                                                     blendFactor,
+                                                     time,
+                                                     (byte)keyframeInterpolationMode);
+                }
+                else
+                {
+                    NoExtensions.samplePoseMaskedBlendedFirst(compressedTransformsClip,
+                                                              compressedScalesClip,
+                                                              (float*)outputBuffer.GetUnsafePtr(),
+                                                              maskPtr,
+                                                              blendFactor,
+                                                              time,
+                                                              (byte)keyframeInterpolationMode);
+                }
+            }
+        }
+
+        public static void SamplePoseMaskedBlendedAdd(void*                     compressedTransformsClip,
+                                                      NativeArray<Qvvs>         outputBuffer,
+                                                      ReadOnlySpan<ulong>       mask,
+                                                      float blendFactor,
+                                                      float time,
+                                                      KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedTransformsClip);
+
+            var header = ClipHeader.Read(compressedTransformsClip);
+
+            if (header.clipType == ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+            CheckMaskSpanIsSufficient(mask, header.trackCount);
+
+            compressedTransformsClip   = (byte*)compressedTransformsClip + 16;
+            void* compressedScalesClip = header.clipType ==
+                                         ClipHeader.ClipType.SkeletonWithUniformScales ? (byte*)compressedTransformsClip + header.offsetToUniformScalesStartInBytes : null;
+
+            fixed (ulong* maskPtr = &mask[0])
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                {
+                    AVX.samplePoseMaskedBlendedAdd(compressedTransformsClip,
+                                                   compressedScalesClip,
+                                                   (float*)outputBuffer.GetUnsafePtr(),
+                                                   maskPtr,
+                                                   blendFactor,
+                                                   time,
+                                                   (byte)keyframeInterpolationMode);
+                }
+                else
+                {
+                    NoExtensions.samplePoseMaskedBlendedAdd(compressedTransformsClip,
+                                                            compressedScalesClip,
+                                                            (float*)outputBuffer.GetUnsafePtr(),
+                                                            maskPtr,
+                                                            blendFactor,
+                                                            time,
+                                                            (byte)keyframeInterpolationMode);
+                }
+            }
+        }
+
         public static Qvvs SampleBone(void* compressedTransformsClip, int boneIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedTransformsClip);
@@ -152,7 +285,6 @@ namespace AclUnity
             return qvv;
         }
 
-        // Warning: If you do not provide enough elements to outputBuffer, this may cause data corruption or even hard crash
         public static void SampleFloats(void* compressedFloatsClip, NativeArray<float> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
         {
             CheckCompressedClipIsValid(compressedFloatsClip);
@@ -175,6 +307,39 @@ namespace AclUnity
             else
             {
                 NoExtensions.sampleFloats(compressedFloatsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+            }
+        }
+
+        public static void SampleFloatsMasked(void*                     compressedFloatsClip,
+                                              NativeArray<float>        outputBuffer,
+                                              ReadOnlySpan<ulong>       mask,
+                                              float time,
+                                              KeyframeInterpolationMode keyframeInterpolationMode)
+        {
+            CheckCompressedClipIsValid(compressedFloatsClip);
+
+            var header = ClipHeader.Read(compressedFloatsClip);
+
+            if (header.clipType != ClipHeader.ClipType.Scalars)
+            {
+                ThrowIfWrongType();
+            }
+
+            CheckOutputArrayIsSufficient(outputBuffer, header.trackCount);
+            CheckMaskSpanIsSufficient(mask, header.trackCount);
+
+            compressedFloatsClip = (byte*)compressedFloatsClip + 16;
+
+            fixed (ulong* maskPtr = &mask[0])
+            {
+                if (X86.Avx2.IsAvx2Supported)
+                {
+                    AVX.sampleFloatsMasked(compressedFloatsClip, (float*)outputBuffer.GetUnsafePtr(), maskPtr, time, (byte)keyframeInterpolationMode);
+                }
+                else
+                {
+                    NoExtensions.sampleFloatsMasked(compressedFloatsClip, (float*)outputBuffer.GetUnsafePtr(), maskPtr, time, (byte)keyframeInterpolationMode);
+                }
             }
         }
 
@@ -234,6 +399,15 @@ namespace AclUnity
                 throw new ArgumentException("outputBuffer is invalid");
             if (outputBuffer.Length < trackCount)
                 throw new ArgumentException("outputBuffer does not contain enough elements");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void CheckMaskSpanIsSufficient(ReadOnlySpan<ulong> mask, short trackCount)
+        {
+            if (mask.IsEmpty)
+                throw new ArgumentException("mask is invalid");
+            if (mask.Length * 64 < trackCount)
+                throw new ArgumentException("mask does not contain enough elements");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]

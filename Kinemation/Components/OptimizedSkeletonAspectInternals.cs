@@ -70,8 +70,8 @@ namespace Latios.Kinemation
 
             for (int i = 0; i < boneCount; i++)
             {
-                var currentNormalized      = currentLocals[i];
-                currentNormalized.rotation = math.normalize(currentNormalized.rotation);
+                var currentNormalized = currentLocals[i];
+                currentNormalized.NormalizeBone();
                 inertialBlends[i].StartNewBlend(in currentNormalized, previousLocals[i], twoAgoLocals[i], rcpTime, maxBlendDuration);
             }
         }
@@ -91,7 +91,7 @@ namespace Latios.Kinemation
                 var ptrs = (TransformQvvs*)currentLocals.GetUnsafePtr();
                 for (int i = 0; i < currentLocals.Length; i++)
                 {
-                    ptrs[i].rotation = math.normalize(ptrs[i].rotation);
+                    ptrs[i].NormalizeBone();
                     inertialBlends[i].Blend(ref ptrs[i], in blendTimes);
                 }
             }
@@ -127,20 +127,27 @@ namespace Latios.Kinemation
             rootTransforms[0]       = TransformQvvs.identity;
             for (int i = 1; i < boneCount; i++)
             {
-                var parent           = math.max(0, parentIndices[i]);
-                var local            = localTransforms[i];
-                local.rotation.value = math.normalize(local.rotation.value);
-                rootTransforms[i]    = qvvs.mul(rootTransforms[parent], in local);
+                var parent = math.max(0, parentIndices[i]);
+                var local  = localTransforms[i];
+                local.NormalizeBone();
+                rootTransforms[i] = qvvs.mul(rootTransforms[parent], in local);
             }
             {
-                var local            = localTransforms[0];
-                local.rotation.value = math.normalize(local.rotation.value);
-                localTransforms[0]   = local;
-                rootTransforms[0]    = local;
+                var local = localTransforms[0];
+                local.NormalizeBone();
+                localTransforms[0] = local;
+                rootTransforms[0]  = local;
             }
             m_skeletonState.ValueRW.state &= ~(OptimizedSkeletonState.Flags.NeedsSync | OptimizedSkeletonState.Flags.NextSampleShouldAdd);
             m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.IsDirty;
             SyncHistory();
+        }
+
+        unsafe void InitWeights(NativeArray<TransformQvvs> bones)
+        {
+            var ptr = (TransformQvvs*)bones.GetUnsafePtr();
+            for (int i = 0; i < bones.Length; i++)
+                ptr[i].worldIndex = math.asint(1f);
         }
     }
 

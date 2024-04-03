@@ -1,9 +1,9 @@
 using Unity.Collections;
 using UnityEngine;
 
-namespace Latios.Calligraphics.Extensions
+namespace Latios.Calligraphics
 {
-    public static class Calli_Ext
+    internal static class CalligraphicsInternalExtensions
     {
         public static void GetSubString(this in CalliString calliString, ref FixedString128Bytes htmlTag, int startIndex, int length)
         {

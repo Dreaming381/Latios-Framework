@@ -18,8 +18,8 @@ namespace Latios.Kinemation
     /// To discard existing sampled poses and begin sampling new poses, simply create a new
     /// instance of BufferPoseBlender using the same input NativeArray.
     ///
-    /// To finish sampling, call NormalizeRotations(). Prior to this, any transforms in the array
-    /// may have unnormalized rotations, which can cause unwanted artifacts if used as is.
+    /// To finish sampling, call Normalize(). Prior to this, any transforms in the array
+    /// may have unnormalized transforms, which can cause unwanted artifacts if used as is.
     ///
     /// You may also use a BufferPoseBlender to compute root-space transforms.
     /// </remarks>
@@ -37,20 +37,25 @@ namespace Latios.Kinemation
         {
             bufferAsQvvs = localSpaceBuffer.Reinterpret<AclUnity.Qvvs>();
             sampledFirst = false;
-            normalized   = true;
+            normalized   = false;
         }
 
         /// <summary>
-        /// Normalizes the rotations to be valid quaternion rotations. Call this once after sampling all blended poses.
-        /// The result of GetLocalTransformsView() will contain valid quaternion rotations after calling this method.
-        /// You can perform IK operations after calling this method but before calling ApplyBoneHierarchyAndFinish().
+        /// Normalizes the transforms to be valid using the accumulated weights stored in translation.w of each bone.
+        /// Call this once after sampling all blended poses.
+        /// The buffer passed in will contain valid local-space transforms after calling this method.
         /// </summary>
-        public unsafe void NormalizeRotations()
+        public unsafe void Normalize()
         {
-            var bufferPtr = (TransformQvvs*)bufferAsQvvs.GetUnsafePtr();
+            var bufferPtr = (AclUnity.Qvvs*)bufferAsQvvs.GetUnsafePtr();
             for (int i = 0; i < bufferAsQvvs.Length; i++, bufferPtr++)
             {
-                bufferPtr->rotation = math.normalize(bufferPtr->rotation);
+                if (bufferPtr->translation.w == 1f)
+                    continue;
+                var weight               = 1f / bufferPtr->translation.w;
+                bufferPtr->rotation      = math.normalize(bufferPtr->rotation);
+                bufferPtr->translation  *= weight;
+                bufferPtr->stretchScale *= weight;
             }
             normalized = true;
         }
@@ -60,41 +65,57 @@ namespace Latios.Kinemation
         /// The transform at index 0 is assumed to represent root motion, and so all other transforms ignore it,
         /// even if they specify index 0 as a parent.
         /// </summary>
-        /// <param name="parentIndices"></param>
-        /// <param name="rootSpaceBuffer"></param>
-        public void ComputeRootSpaceTransforms(ref BlobArray<short> parentIndices, ref NativeArray<TransformQvvs> rootSpaceBuffer)
+        /// <param name="parentIndices">The parent index of each bone</param>
+        /// <param name="rootSpaceBuffer">The buffer to write the destination values. This is allowed to be the same as the local-space buffer.</param>
+        public void ComputeRootSpaceTransforms(ReadOnlySpan<short> parentIndices, ref NativeArray<TransformQvvs> rootSpaceBuffer)
         {
             var localSpaceBuffer = bufferAsQvvs.Reinterpret<TransformQvvs>();
             if (!normalized)
             {
+                var temp = localSpaceBuffer[0];
+                temp.NormalizeBone();
                 rootSpaceBuffer[0] = TransformQvvs.identity;
                 for (int i = 1; i < localSpaceBuffer.Length; i++)
                 {
-                    var parent           = math.max(0, parentIndices[i]);
-                    var local            = localSpaceBuffer[i];
-                    local.rotation.value = math.normalize(local.rotation.value);
-                    rootSpaceBuffer[i]   = qvvs.mul(rootSpaceBuffer[parent], in local);
+                    var parent = math.max(0, parentIndices[i]);
+                    var local  = localSpaceBuffer[i];
+                    local.NormalizeBone();
+                    rootSpaceBuffer[i] = qvvs.mul(rootSpaceBuffer[parent], in local);
                 }
                 {
-                    var local            = localSpaceBuffer[0];
-                    local.rotation.value = math.normalize(local.rotation.value);
-                    localSpaceBuffer[0]  = local;
-                    rootSpaceBuffer[0]   = local;
+                    localSpaceBuffer[0] = temp;
+                    rootSpaceBuffer[0]  = temp;
                 }
             }
             else
             {
+                var temp           = localSpaceBuffer[0];
                 rootSpaceBuffer[0] = TransformQvvs.identity;
                 for (int i = 1; i < localSpaceBuffer.Length; i++)
                 {
                     var parent         = math.max(0, parentIndices[i]);
                     rootSpaceBuffer[i] = qvvs.mul(rootSpaceBuffer[parent], localSpaceBuffer[i]);
                 }
-                rootSpaceBuffer[0] = localSpaceBuffer[0];
+                rootSpaceBuffer[0] = localSpaceBuffer[0] = temp;
             }
         }
 
         // Todo: Baked Root space? Custom parent indices? Convert to Root-Space in-place? Convert to World-Space?
+    }
+
+    public static class BoneNormalizationExtensions
+    {
+        public static void NormalizeBone(ref this TransformQvvs localTransform)
+        {
+            var w = math.asfloat(localTransform.worldIndex);
+            if (w == 1f)
+                return;
+            w               = 1 / w;
+            ref var t       = ref UnsafeUtility.As<TransformQvvs, AclUnity.Qvvs>(ref localTransform);
+            t.rotation      = math.normalize(t.rotation);
+            t.translation  *= w;
+            t.stretchScale *= w;
+        }
     }
 }
 

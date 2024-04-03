@@ -1,6 +1,6 @@
-namespace Latios.Calligraphics
+namespace Latios.Calligraphics.RichText
 {
-    public enum TagValueType : byte
+    internal enum TagValueType : byte
     {
         None,
         NumericalValue,

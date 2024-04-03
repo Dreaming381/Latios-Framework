@@ -124,7 +124,7 @@ namespace Latios.Kinemation
         /// Samples the animation clip for the entire skeleton at the given time weighted by the blendWeight.
         /// This method uses a special fast-path.
         /// </summary>
-        /// <param name="blender">The blender which contains context information about previous sampling operations</param>
+        /// <param name="optimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
         /// <param name="time">The time value to sample the the clip in seconds.
         /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
         /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
@@ -140,10 +140,34 @@ namespace Latios.Kinemation
 
             if (optimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
                 AclUnity.Decompression.SamplePoseBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
-            else if (blendWeight == 1f)
-                AclUnity.Decompression.SamplePose(compressedClipDataAligned16.GetUnsafePtr(), buffer, time, mode);
             else
                 AclUnity.Decompression.SamplePoseBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for parts of the skeleton specified by the mask at the given time weighted by the blendWeight.
+        /// This method uses a special fast-path.
+        /// </summary>
+        /// <param name="optimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePose(ref OptimizedSkeletonAspect optimizedSkeletonAspect,
+                                      ReadOnlySpan<ulong>         mask,
+                                      float time,
+                                      float blendWeight,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckSkeletonIsBigEnoughForClip(in optimizedSkeletonAspect, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (optimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
+                AclUnity.Decompression.SamplePoseMaskedBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
         }
 
         /// <summary>
@@ -166,16 +190,113 @@ namespace Latios.Kinemation
 
             if (blender.sampledFirst)
                 AclUnity.Decompression.SamplePoseBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, blendWeight, time, mode);
-            else if (blendWeight == 1f)
-            {
-                AclUnity.Decompression.SamplePose(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, time, mode);
-                blender.sampledFirst = true;
-            }
             else
             {
                 AclUnity.Decompression.SamplePoseBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, blendWeight, time, mode);
                 blender.sampledFirst = true;
             }
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the transforms selected by the mask at the given time weighted by the blendWeight.
+        /// This method uses a special fast-path.
+        /// </summary>
+        /// <param name="blender">The blender which contains context information about previous sampling operations</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePose(ref BufferPoseBlender blender,
+                                      ReadOnlySpan<ulong>       mask,
+                                      float time,
+                                      float blendWeight               = 1f,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBlenderIsBigEnoughForClip(in blender, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (blender.sampledFirst)
+                AclUnity.Decompression.SamplePoseMaskedBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, mask, blendWeight, time, mode);
+            else
+            {
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, mask, blendWeight, time, mode);
+                blender.sampledFirst = true;
+            }
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the entire set of transforms at the given time raw into a buffer without any blending.
+        /// worldIndex values are undefined. This method uses a special fast-path.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePose(ref NativeArray<TransformQvvs> localTransforms,
+                                      float time,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SamplePose(compressedClipDataAligned16.GetUnsafePtr(), localTransforms.Reinterpret<AclUnity.Qvvs>(), time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the entire set of transforms at the given time raw into a buffer with blending.
+        /// New transforms can be specified to either overwrite existing values or be added via weighting. This method uses a special fast-path.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="overwrite">If true, the existing transforms and accumulated weights are overwritten.
+        /// If false, the new transform values are added to the existing values.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePose(ref NativeArray<TransformQvvs> localTransforms,
+                                      float time,
+                                      float blendWeight,
+                                      bool overwrite,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            if (overwrite)
+                AclUnity.Decompression.SamplePoseBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(), localTransforms.Reinterpret<AclUnity.Qvvs>(), blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(), localTransforms.Reinterpret<AclUnity.Qvvs>(), blendWeight, time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the transforms selected by the mask at the given time raw into a buffer with blending.
+        /// New transforms can be specified to either overwrite existing values or be added via weighting. This method uses a special fast-path.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="overwrite">If true, the existing transforms and accumulated weights are overwritten.
+        /// If false, the new transform values are added to the existing values.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePose(ref NativeArray<TransformQvvs> localTransforms,
+                                      ReadOnlySpan<ulong>            mask,
+                                      float time,
+                                      float blendWeight,
+                                      bool overwrite,
+                                      KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            if (overwrite)
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirst(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                    localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                    mask,
+                                                                    blendWeight,
+                                                                    time,
+                                                                    mode);
+            else
+                AclUnity.Decompression.SamplePoseMaskedBlendedAdd(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                  localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                  mask,
+                                                                  blendWeight,
+                                                                  time,
+                                                                  mode);
         }
 
         /// <summary>
@@ -212,7 +333,7 @@ namespace Latios.Kinemation
         /// <summary>
         /// Equivalent to the FixedString128Bytes.GetHashCode() for each parameter name
         /// </summary>
-        public BlobArray<int>                parameterNameHashes;
+        public BlobArray<int>                 parameterNameHashes;
         public BlobArray<FixedString128Bytes> parameterNames;
     }
 
@@ -298,7 +419,7 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
-        /// Samples the animation clip for all parameters at the given time at once
+        /// Samples the animation clip for all parameters at the given time at once. This method uses a special fast-path.
         /// </summary>
         /// <param name="destination">The array of floats where the parameters should be stored. If the array is not large enough, a safety exception is thrown.</param>
         /// <param name="time">
@@ -312,6 +433,26 @@ namespace Latios.Kinemation
             CheckBufferIsBigEnoughForClip(destination, parameterCount);
             var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
             AclUnity.Decompression.SampleFloats(compressedClipDataAligned16.GetUnsafePtr(), destination, time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the selected set of parameters specified by the mask at the given time at once.
+        /// This method uses a special fast-path.
+        /// </summary>
+        /// <param name="destination">The array of floats where the parameters should be stored. If the array is not large enough, a safety exception is thrown.</param>
+        /// <param name="mask">A bit array where each bit specifies if the parameter at that index should be sampled</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SampleSelectedParameters(NativeArray<float>        destination,
+                                                    ReadOnlySpan<ulong>       mask,
+                                                    float time,
+                                                    KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBufferIsBigEnoughForClip(destination, parameterCount);
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SampleFloatsMasked(compressedClipDataAligned16.GetUnsafePtr(), destination, mask, time, mode);
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
