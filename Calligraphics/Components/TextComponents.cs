@@ -64,6 +64,7 @@ namespace Latios.Calligraphics
             get => (m_alignmentWeightOrtho & 0x8000) != 0;
             set => m_alignmentWeightOrtho = (ushort)((m_alignmentWeightOrtho & 0x7fff) | (value ? 0x8000 : 0));
         }
+        public bool enableKerning;
 
         private ushort m_fontStyleFlags;  // 6 bits unused, but Unity may add more.
         ushort         m_alignmentWeightOrtho;  // 5 bits unused.
