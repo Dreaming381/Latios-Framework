@@ -136,11 +136,6 @@ namespace Latios.Calligraphics
                         scale   = textConfiguration.m_currentFontSize,
                     };
 
-                    fontMaterialSet.WriteFontMaterialIndexForGlyph(0);
-                    mappingWriter.AddCharNoTags(textConfiguration.m_characterCount - 1, true);
-                    mappingWriter.AddCharWithTags(characterEnumerator.CurrentCharIndex, true);
-                    mappingWriter.AddBytes(characterEnumerator.CurrentByteIndex, unicode.LengthInUtf8Bytes(), true);
-
                     // Set Padding based on selected font style
                     #region Handle Style Padding
                     //not yet implemented
