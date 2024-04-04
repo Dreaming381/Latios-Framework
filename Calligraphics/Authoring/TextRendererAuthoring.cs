@@ -28,6 +28,7 @@ namespace Latios.Calligraphics.Authoring
         public HorizontalAlignmentOptions horizontalAlignment = HorizontalAlignmentOptions.Left;
         public VerticalAlignmentOptions   verticalAlignment   = VerticalAlignmentOptions.Top;
         public bool                       isOrthographic;
+        public bool                       enableKerning       = true;
         public FontStyles                 fontStyle;
         public FontWeight                 fontWeight;
 
@@ -83,6 +84,7 @@ namespace Latios.Calligraphics.Authoring
                 lineJustification = authoring.horizontalAlignment,
                 verticalAlignment = authoring.verticalAlignment,
                 isOrthographic    = authoring.isOrthographic,
+                enableKerning     = authoring.enableKerning,
                 fontStyle         = authoring.fontStyle,
                 fontWeight        = authoring.fontWeight,
             });

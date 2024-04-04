@@ -244,7 +244,7 @@ namespace Latios.Calligraphics.RichText
                         textConfiguration.m_fontStyleInternal |= FontStyles.Italic;
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Italic);
 
-                        if (richTextTagIndentifiers.Length > 0 && richTextTagIndentifiers[1].nameHashCode == 276531 || richTextTagIndentifiers[1].nameHashCode == 186899)
+                        if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 276531 || richTextTagIndentifiers[1].nameHashCode == 186899))
                         {
                             // Reject tag if value is invalid.
                             calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
@@ -278,7 +278,7 @@ namespace Latios.Calligraphics.RichText
                         textConfiguration.m_fontStyleInternal |= FontStyles.Strikethrough;
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Strikethrough);
 
-                        if (richTextTagIndentifiers.Length > 0 && richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323)
+                        if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323))
                         {
                             calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
                             charCount                                = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
@@ -309,7 +309,7 @@ namespace Latios.Calligraphics.RichText
                     case 85:  // <U>
                         textConfiguration.m_fontStyleInternal |= FontStyles.Underline;
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Underline);
-                        if (richTextTagIndentifiers.Length > 0 && richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323)
+                        if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323))
                         {
                             calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
                             charCount                            = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
