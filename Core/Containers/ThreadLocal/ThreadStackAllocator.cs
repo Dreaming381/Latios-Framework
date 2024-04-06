@@ -93,6 +93,8 @@ namespace Latios.Unsafe
 
             public byte* Allocate(ulong sizeOfElement, ulong alignOfElement, ulong numElements)
             {
+                if (numElements == 0)
+                    return null;
                 var neededBytes    = numElements * sizeOfElement;
                 int nextBlockIndex = 0;
                 if (!m_allocations.IsEmpty)
@@ -235,7 +237,7 @@ namespace Latios.Unsafe
 #if UNITY_EDITOR
         [UnityEditor.InitializeOnLoadMethod]
 #else
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
+        [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.AfterAssembliesLoaded)]
 #endif
         internal static void Initialize()
         {

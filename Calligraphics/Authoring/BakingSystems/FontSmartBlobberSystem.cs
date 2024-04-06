@@ -121,10 +121,49 @@ namespace Latios.Calligraphics.Authoring.Systems
             fontBlobRoot.atlasHeight         = font.atlasHeight;
             fontBlobRoot.materialPadding     = materialPadding;
 
-            var       glyphPairAdjustments = font.GetGlyphPairAdjustmentRecordLookup();
-            Span<int> hashCounts           = stackalloc int[64];
+            var       adjustmentCacheBefore      = new NativeList<int2>(Allocator.TempJob);
+            var       adjustmentCacheAfter       = new NativeList<int2>(Allocator.TempJob);
+            var       glyphToCharacterMap        = new NativeHashMap<int, int>(font.characterTable.Count, Allocator.TempJob);
+            var       glyphPairAdjustmentsSource = font.GetGlyphPairAdjustmentRecords();
+            Span<int> hashCounts                 = stackalloc int[64];
             hashCounts.Clear();
-            BlobBuilderArray<GlyphBlob> glyphBuilder = builder.Allocate(ref fontBlobRoot.characters, font.characterTable.Count);
+            // Todo: Currently, we allocate a glyph per character and leave characters with null glyphs uninitialized.
+            // We should rework that to only allocate glyphs to save memory.
+            BlobBuilderArray<GlyphBlob>      glyphBuilder    = builder.Allocate(ref fontBlobRoot.characters, font.characterTable.Count);
+            BlobBuilderArray<AdjustmentPair> adjustmentPairs = builder.Allocate(ref fontBlobRoot.adjustmentPairs, glyphPairAdjustmentsSource.Count);
+
+            for (int i = 0; i < font.characterTable.Count; i++)
+            {
+                var c = font.characterTable[i];
+                if (c.glyph != null)
+                    glyphToCharacterMap.Add((int)c.glyph.index, i);
+            }
+
+            for (int i = 0; i < glyphPairAdjustmentsSource.Count; i++)
+            {
+                var src            = glyphPairAdjustmentsSource[i];
+                adjustmentPairs[i] = new AdjustmentPair
+                {
+                    firstAdjustment = new GlyphAdjustment
+                    {
+                        xPlacement = src.firstAdjustmentRecord.glyphValueRecord.xPlacement,
+                        yPlacement = src.firstAdjustmentRecord.glyphValueRecord.yPlacement,
+                        xAdvance   = src.firstAdjustmentRecord.glyphValueRecord.xAdvance,
+                        yAdvance   = src.firstAdjustmentRecord.glyphValueRecord.yAdvance,
+                    },
+                    secondAdjustment = new GlyphAdjustment
+                    {
+                        xPlacement = src.secondAdjustmentRecord.glyphValueRecord.xPlacement,
+                        yPlacement = src.secondAdjustmentRecord.glyphValueRecord.yPlacement,
+                        xAdvance   = src.secondAdjustmentRecord.glyphValueRecord.xAdvance,
+                        yAdvance   = src.secondAdjustmentRecord.glyphValueRecord.yAdvance,
+                    },
+                    fontFeatureLookupFlags = src.featureLookupFlags,
+                    firstGlyphIndex        = glyphToCharacterMap[(int)src.firstAdjustmentRecord.glyphIndex],
+                    secondGlyphIndex       = glyphToCharacterMap[(int)src.secondAdjustmentRecord.glyphIndex]
+                };
+            }
+
             for (int i = 0; i < font.characterTable.Count; i++)
             {
                 var character = font.characterTable[i];
@@ -141,48 +180,34 @@ namespace Latios.Calligraphics.Authoring.Systems
                     glyphBlob.horizontalBearingY = character.glyph.metrics.horizontalBearingY;
                     glyphBlob.scale              = character.glyph.scale;
 
-                    Dictionary<uint, GlyphPairAdjustmentRecord> glyphAdjustments =
-                        new Dictionary<uint, GlyphPairAdjustmentRecord>();
-
                     //Add kerning adjustments
-                    for (int j = 0; j < font.characterTable.Count; j++)
+                    adjustmentCacheBefore.Clear();
+                    adjustmentCacheAfter.Clear();
+                    for (int j = 0; j < adjustmentPairs.Length; j++)
                     {
-                        if (j == i)
-                            continue;
-
-                        uint key = (uint)(i << 16 | j);
-                        if (glyphPairAdjustments.TryGetValue(key, out var adjustmentPair))
-                        {
-                            var pairedCharacter = font.characterTable[j];
-                            glyphAdjustments.Add(pairedCharacter.unicode, adjustmentPair);
-                        }
+                        ref var adj = ref adjustmentPairs[j];
+                        if (adj.firstGlyphIndex == i)
+                            adjustmentCacheAfter.Add(new int2(adj.secondGlyphIndex, j));
+                        if (adj.secondGlyphIndex == i)
+                            adjustmentCacheBefore.Add(new int2(adj.firstGlyphIndex, j));
                     }
-
-                    BlobBuilderArray<GlyphBlob.AdjustmentPair> glyphAdjustmentsBuilder =
-                        builder.Allocate(ref glyphBlob.glyphAdjustments, glyphAdjustments.Count);
-
-                    for (int j = 0; j < glyphAdjustments.Count; j++)
+                    adjustmentCacheBefore.Sort(new XSorter());
+                    var bk = builder.Allocate(ref glyphBlob.glyphAdjustmentsLookup.beforeKeys, adjustmentCacheBefore.Length);
+                    var bv = builder.Allocate(ref glyphBlob.glyphAdjustmentsLookup.beforeIndices, adjustmentCacheBefore.Length);
+                    for (int j = 0; j < bk.Length; j++)
                     {
-                        var adjustmentPair         = glyphAdjustments.ElementAt(j);
-                        glyphAdjustmentsBuilder[j] = new GlyphBlob.AdjustmentPair
-                        {
-                            firstAdjustment = new GlyphBlob.GlyphAdjustment
-                            {
-                                glyphUnicode = character.unicode,
-                                xPlacement   = adjustmentPair.Value.firstAdjustmentRecord.glyphValueRecord.xPlacement,
-                                yPlacement   = adjustmentPair.Value.firstAdjustmentRecord.glyphValueRecord.yPlacement,
-                                xAdvance     = adjustmentPair.Value.firstAdjustmentRecord.glyphValueRecord.xAdvance,
-                                yAdvance     = adjustmentPair.Value.firstAdjustmentRecord.glyphValueRecord.yAdvance,
-                            },
-                            secondAdjustment = new GlyphBlob.GlyphAdjustment
-                            {
-                                glyphUnicode = adjustmentPair.Key,
-                                xPlacement   = adjustmentPair.Value.secondAdjustmentRecord.glyphValueRecord.xPlacement,
-                                yPlacement   = adjustmentPair.Value.secondAdjustmentRecord.glyphValueRecord.yPlacement,
-                                xAdvance     = adjustmentPair.Value.secondAdjustmentRecord.glyphValueRecord.xAdvance,
-                                yAdvance     = adjustmentPair.Value.secondAdjustmentRecord.glyphValueRecord.yAdvance,
-                            }
-                        };
+                        var d = adjustmentCacheBefore[j];
+                        bk[j] = d.x;
+                        bv[j] = d.y;
+                    }
+                    adjustmentCacheAfter.Sort(new XSorter());
+                    var ak = builder.Allocate(ref glyphBlob.glyphAdjustmentsLookup.afterKeys, adjustmentCacheAfter.Length);
+                    var av = builder.Allocate(ref glyphBlob.glyphAdjustmentsLookup.afterIndices, adjustmentCacheAfter.Length);
+                    for (int j = 0; j < ak.Length; j++)
+                    {
+                        var d = adjustmentCacheAfter[j];
+                        ak[j] = d.x;
+                        av[j] = d.y;
                     }
 
                     //Get vertices and uvs
@@ -233,6 +258,9 @@ namespace Latios.Calligraphics.Authoring.Systems
 
             var result = builder.CreateBlobAssetReference<FontBlob>(Allocator.Persistent);
             builder.Dispose();
+            adjustmentCacheBefore.Dispose();
+            adjustmentCacheAfter.Dispose();
+            glyphToCharacterMap.Dispose();
 
             fontBlobRoot = result.Value;
 
@@ -370,6 +398,11 @@ namespace Latios.Calligraphics.Authoring.Systems
             double y0 = (int)(y * 511);
 
             return (float)((x0 * 4096) + y0);
+        }
+
+        struct XSorter : IComparer<int2>
+        {
+            public int Compare(int2 x, int2 y) => x.x.CompareTo(y.x);
         }
     }
 }

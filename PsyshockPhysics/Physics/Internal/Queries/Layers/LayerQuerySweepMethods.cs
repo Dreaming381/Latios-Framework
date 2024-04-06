@@ -74,9 +74,14 @@ namespace Latios.Psyshock
         //   This code is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
         private static unsafe int BinarySearchFirstGreaterOrEqual(float* array, [AssumeRange(0, int.MaxValue)] int count, float searchValue)
         {
-            for (int i = 1; i < count; i++)
+            bool isBurst = true;
+            SkipWithoutBurst(ref isBurst);
+            if (isBurst)
             {
-                Hint.Assume(array[i] >= array[i - 1]);
+                for (int i = 1; i < count; i++)
+                {
+                    Hint.Assume(array[i] >= array[i - 1]);
+                }
             }
 
             var  basePtr = array;
@@ -100,6 +105,9 @@ namespace Latios.Psyshock
 
             return (int)(basePtr - array);
         }
+
+        [BurstDiscard]
+        static void SkipWithoutBurst(ref bool isBurst) => isBurst = false;
 
         private struct AabbSweepRecursiveContext
         {

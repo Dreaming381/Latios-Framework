@@ -21,8 +21,10 @@ namespace Latios.Transforms.Systems
     }
 
     [DisableAutoCreation]
-    [UpdateInGroup(typeof(LatiosWorldSyncGroup))]
-    public partial struct GameObjectEntityBindingSystem : ISystem {}
+    [UpdateInGroup(typeof(Latios.Systems.LatiosWorldSyncGroup))]
+    public partial class GameObjectEntityBindingSystem : SubSystem
+    {
+    }
 
     [DisableAutoCreation]
     [UpdateInGroup(typeof(TransformSystemGroup), OrderFirst = true)]
