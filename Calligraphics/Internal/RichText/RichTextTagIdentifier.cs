@@ -10,11 +10,9 @@ namespace Latios.Calligraphics.RichText
         public int             valueLength;  //byte length, not char!
         public TagUnitType     unitType;
         public TagValueType    valueType;
-        public RichTextTagType tagType;
 
         public static RichTextTagIdentifier Empty => new RichTextTagIdentifier
         {
-            tagType         = RichTextTagType.INVALID,
             nameHashCode    = 0,
             valueHashCode   = 0,
             valueStartIndex = 0,

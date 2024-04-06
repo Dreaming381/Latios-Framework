@@ -1,4 +1,5 @@
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 
@@ -201,7 +202,6 @@ namespace Latios.Calligraphics.RichText
             // Color tag just starting with hex (no assignment)
             if (textConfiguration.m_htmlTag[0] == 35)
             {
-                firstTagIndentifier.tagType = RichTextTagType.Color;
                 // tagCharCount == 4: Color <#FFF> 3 Hex values (short form)
                 // tagCharCount == 5: Color <#FFF7> 4 Hex values with alpha (short form)
                 // tagCharCount == 7: Color <#FF00FF>
@@ -240,7 +240,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 105:  // <i>
                     case 73:  // <I>
-                        firstTagIndentifier.tagType            = RichTextTagType.Italic;
                         textConfiguration.m_fontStyleInternal |= FontStyles.Italic;
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Italic);
 
@@ -449,7 +448,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case -330774850:  // <font-weight>
                     case 2012149182:  // <FONT-WEIGHT>
-                        firstTagIndentifier.tagType = RichTextTagType.FontWeight;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -501,7 +499,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 6380:  // <pos=000.00px> <pos=0em> <pos=50%>
                     case 4556:  // <POS>
-                        firstTagIndentifier.tagType = RichTextTagType.Position;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -525,7 +522,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 16034505:  // <voffset>
                     case 11642281:  // <VOFFSET>
-                        firstTagIndentifier.tagType = RichTextTagType.VerticalOffset;
                         // Reject tag if value is invalid.
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -546,7 +542,6 @@ namespace Latios.Calligraphics.RichText
                         return false;
                     case 54741026:  // </voffset>
                     case 50348802:  // </VOFFSET>
-                        firstTagIndentifier.tagType        = RichTextTagType.VerticalOffset;
                         textConfiguration.m_baselineOffset = 0;
                         return true;
                     //case 43991: // <page>
@@ -575,7 +570,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 45545:  // <size=>
                     case 32745:  // <SIZE>
-                        firstTagIndentifier.tagType = RichTextTagType.Size;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -784,7 +778,6 @@ namespace Latios.Calligraphics.RichText
                     //    }
                     case 320078:  // <space=000.00>
                     case 230446:  // <SPACE>
-                        firstTagIndentifier.tagType = RichTextTagType.Space;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -805,7 +798,6 @@ namespace Latios.Calligraphics.RichText
                         return false;
                     case 276254:  // <alpha=#FF>
                     case 186622:  // <ALPHA>
-                        firstTagIndentifier.tagType = RichTextTagType.Alpha;
                         if (firstTagIndentifier.valueLength != 3)
                             return false;
 
@@ -879,7 +871,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 327550:  // <width=xx>
                     case 237918:  // <WIDTH>
-                        firstTagIndentifier.tagType = RichTextTagType.Width;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -905,7 +896,6 @@ namespace Latios.Calligraphics.RichText
                     case 281955:  // <color> <color=#FF00FF> or <color=#FF00FF00>
                     case 192323:  // <COLOR=#FF00FF>
                                   // <color=#FFF> 3 Hex (short hand)
-                        firstTagIndentifier.tagType = RichTextTagType.Color;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         tagCharCount -= 6;  //remove "color=" from char count
                         if (textConfiguration.m_htmlTag[0] == 35 && tagCharCount == 4)
@@ -1040,7 +1030,6 @@ namespace Latios.Calligraphics.RichText
 
                     case 1983971:  // <cspace=xx.x>
                     case 1356515:  // <CSPACE>
-                        firstTagIndentifier.tagType = RichTextTagType.CharacterSpacing;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1073,7 +1062,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 2152041:  // <mspace=xx.x>
                     case 1524585:  // <MSPACE>
-                        firstTagIndentifier.tagType = RichTextTagType.MonoSpace;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1103,7 +1091,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 2068980:  // <indent=10px> <indent=10em> <indent=50%>
                     case 1441524:  // <INDENT>
-                        firstTagIndentifier.tagType = RichTextTagType.Indent;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1133,7 +1120,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 1109386397:  // <line-indent>
                     case -842656867:  // <LINE-INDENT>
-                        firstTagIndentifier.tagType = RichTextTagType.LineIndent;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1356,7 +1342,6 @@ namespace Latios.Calligraphics.RichText
                         switch (firstTagIndentifier.valueType)
                         {
                             case TagValueType.NumericalValue:
-                                firstTagIndentifier.tagType = RichTextTagType.Margin;
                                 calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                                 // Reject tag if value is invalid.
                                 if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1390,7 +1375,6 @@ namespace Latios.Calligraphics.RichText
                                     switch (nameHashCode)
                                     {
                                         case 42823:  // <margin left=value>
-                                            currentTagIndentifier.tagType = RichTextTagType.Margin;
                                             calliString.GetSubString(ref textConfiguration.m_htmlTag, currentTagIndentifier.valueStartIndex, currentTagIndentifier.valueLength);
                                             // Reject tag if value is invalid.
                                             if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1413,7 +1397,6 @@ namespace Latios.Calligraphics.RichText
                                             break;
 
                                         case 315620:  // <margin right=value>
-                                            currentTagIndentifier.tagType = RichTextTagType.Margin;
                                             calliString.GetSubString(ref textConfiguration.m_htmlTag, currentTagIndentifier.valueStartIndex, currentTagIndentifier.valueLength);
                                             // Reject tag if value is invalid.
                                             if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1447,7 +1430,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 1100728678:  // <margin-left=xx.x>
                     case -855002522:  // <MARGIN-LEFT>
-                        firstTagIndentifier.tagType = RichTextTagType.Margin;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1470,7 +1452,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case -884817987:  // <margin-right=xx.x>
                     case -1690034531:  // <MARGIN-RIGHT>
-                        firstTagIndentifier.tagType = RichTextTagType.Margin;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1493,7 +1474,6 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 1109349752:  // <line-height=xx.x>
                     case -842693512:  // <LINE-HEIGHT>
-                        firstTagIndentifier.tagType = RichTextTagType.LineHeight;
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1546,37 +1526,34 @@ namespace Latios.Calligraphics.RichText
 
                     //    m_actionStack.Remove();
                     //    return true;
-                    //case 315682: // <scale=xx.x>
-                    //case 226050: // <SCALE=xx.x>
-                    //    value = ConvertToFloat(ref richtextAdjustments.m_htmlTag, out value);
-
-                    //    // Reject tag if value is invalid.
-                    //    if (value == Int16.MinValue) return false;
-
-                    //    m_FXMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(value, 1, 1));
-                    //    m_isFXMatrixSet = true;
-
-                    //    return true;
-                    //case 1105611: // </scale>
-                    //case 1015979: // </SCALE>
-                    //    m_isFXMatrixSet = false;
-                    //    return true;
-                    case 2227963:  // <rotate=xx.x>
-                    case 1600507:  // <ROTATE=xx.x>
-                                   // TODO: Add ability to use Random Rotation
-                        firstTagIndentifier.tagType = RichTextTagType.Rotate;
+                    case 315682: // <scale=xx.x>
+                    case 226050: // <SCALE=xx.x>
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
                             return false;
 
-                        textConfiguration.m_fxMatrix      = Matrix4x4.TRS(Vector3.zero, Quaternion.Euler(0, 0, value), Vector3.one);
-                        textConfiguration.m_isFXMatrixSet = true;
+                        textConfiguration.m_FXScale = new Vector3(value, 1, 1);
+
+                        return true;
+                    case 1105611: // </scale>
+                    case 1015979: // </SCALE>
+                        textConfiguration.m_FXScale = 1;
+                        return true;
+                    case 2227963:  // <rotate=xx.x>
+                    case 1600507:  // <ROTATE=xx.x>
+                                   // TODO: Add ability to use Random Rotation
+                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        // Reject tag if value is invalid.
+                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                            return false;
+
+                        textConfiguration.m_FXRotation = quaternion.Euler(0, 0, math.degrees(value));
 
                         return true;
                     case 7757466:  // </rotate>
                     case 7130010:  // </ROTATE>
-                        textConfiguration.m_isFXMatrixSet = false;
+                        textConfiguration.m_FXRotation = quaternion.identity;
                         return true;
                     case 317446:  // <table>
                     case 227814:  // <TABLE>

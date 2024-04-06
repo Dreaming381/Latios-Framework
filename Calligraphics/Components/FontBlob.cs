@@ -1,6 +1,9 @@
+using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine.TextCore;
 using UnityEngine.TextCore.LowLevel;
 
 namespace Latios.Calligraphics
@@ -10,6 +13,7 @@ namespace Latios.Calligraphics
     {
         public BlobArray<GlyphBlob>               characters;
         public BlobArray<BlobArray<GlyphLookup> > glyphLookupMap;
+        public BlobArray<AdjustmentPair>          adjustmentPairs;
         public float                              ascentLine;
         public float                              descentLine;
         public float                              lineHeight;
@@ -50,62 +54,11 @@ namespace Latios.Calligraphics
     {
         public uint              glyphIndex;
         public uint              unicode;
-        public BlobArray<float2> vertices;
-        public BlobArray<float2> uv;
-        public BlobArray<float2> uv2;
+        public GlyphMetrics      glyphMetrics;
+        public GlyphRect         glyphRect;
+        public float             glyphScale;
 
-        public int bottomLeftIndex => 0;
-        public int topLeftIndex => 1;
-        public int topRightIndex => 2;
-        public int bottomRightIndex => 3;
-        public float2 bottomLeftVertex => vertices[bottomLeftIndex];
-        public float2 topLeftVertex => vertices[topLeftIndex];
-        public float2 topRightVertex => vertices[topRightIndex];
-        public float2 bottomRightVertex => vertices[bottomRightIndex];
-
-        public float2 bottomLeftUV => uv[bottomLeftIndex];
-        public float2 topLeftUV => uv[topLeftIndex];
-        public float2 topRightUV => uv[topRightIndex];
-        public float2 bottomRightUV => uv[bottomRightIndex];
-
-        public float2 bottomLeftUV2 => uv2[bottomLeftIndex];
-        public float2 topLeftUV2 => uv2[topLeftIndex];
-        public float2 topRightUV2 => uv2[topRightIndex];
-        public float2 bottomRightUV2 => uv2[bottomRightIndex];
-
-        public float horizontalAdvance;
-        public float horizontalBearingX;
-        public float horizontalBearingY;
-
-        public BlobArray<AdjustmentPair> glyphAdjustments;
-
-        public float scale;
-        public float width;
-        public float height;
-
-        public struct AdjustmentPair
-        {
-            public FontFeatureLookupFlags fontFeatureLookupFlags;
-            public GlyphAdjustment        firstAdjustment;
-            public GlyphAdjustment        secondAdjustment;
-        }
-
-        public struct GlyphAdjustment
-        {
-            public uint  glyphUnicode;
-            public float xPlacement;
-            public float yPlacement;
-            public float xAdvance;
-            public float yAdvance;
-            public static GlyphAdjustment operator +(GlyphAdjustment a, GlyphAdjustment b)
-            => new GlyphAdjustment
-            {
-                xPlacement = a.xPlacement + b.xPlacement,
-                yPlacement = a.yPlacement + b.yPlacement,
-                xAdvance   = a.xAdvance + b.xAdvance,
-                yAdvance   = a.yAdvance + b.yAdvance,
-            };
-        }
+        public AdjustmentPairLookupByGlyph glyphAdjustmentsLookup;
     }
 
     public struct GlyphLookup
@@ -114,8 +67,117 @@ namespace Latios.Calligraphics
         public int  index;
     }
 
+    public struct AdjustmentPair
+    {
+        public int                    firstGlyphIndex;
+        public int                    secondGlyphIndex;
+        public FontFeatureLookupFlags fontFeatureLookupFlags;
+        public GlyphAdjustment        firstAdjustment;
+        public GlyphAdjustment        secondAdjustment;
+    }
+
+    public struct GlyphAdjustment
+    {
+        public float xPlacement;
+        public float yPlacement;
+        public float xAdvance;
+        public float yAdvance;
+        public static GlyphAdjustment operator +(GlyphAdjustment a, GlyphAdjustment b)
+        => new GlyphAdjustment
+        {
+            xPlacement = a.xPlacement + b.xPlacement,
+            yPlacement = a.yPlacement + b.yPlacement,
+            xAdvance   = a.xAdvance + b.xAdvance,
+            yAdvance   = a.yAdvance + b.yAdvance,
+        };
+    }
+
+    public struct AdjustmentPairLookupByGlyph
+    {
+        public BlobArray<int> beforeKeys;
+        public BlobArray<int> beforeIndices;
+        public BlobArray<int> afterKeys;
+        public BlobArray<int> afterIndices;
+
+        public unsafe bool TryGetAdjustmentPairIndexForGlyphBefore(int otherGlyphBefore, out int index)
+        {
+            index = -1;
+            if (beforeKeys.Length == 0)
+                return false;
+
+            var found = BinarySearchFirstGreaterOrEqual((int*)beforeKeys.GetUnsafePtr(), beforeKeys.Length, otherGlyphBefore);
+            if (found < beforeKeys.Length && beforeKeys[found] == otherGlyphBefore)
+            {
+                index = beforeIndices[found];
+                return true;
+            }
+            return false;
+        }
+
+        public unsafe bool TryGetAdjustmentPairIndexForGlyphAfter(int otherGlyphAfter, out int index)
+        {
+            index = -1;
+            if (afterKeys.Length == 0)
+                return false;
+
+            var found = BinarySearchFirstGreaterOrEqual((int*)afterKeys.GetUnsafePtr(), afterKeys.Length, otherGlyphAfter);
+            if (found < afterKeys.Length && afterKeys[found] == otherGlyphAfter)
+            {
+                index = afterIndices[found];
+                return true;
+            }
+            return false;
+        }
+
+        // Returns count if nothing is greater or equal
+        //   The following function is a C# and Burst adaptation of Paul-Virak Khuong and Pat Morin's
+        //   optimized sequential order binary search: https://github.com/patmorin/arraylayout/blob/master/src/sorted_array.h
+        //   This code is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
+        private static unsafe int BinarySearchFirstGreaterOrEqual(int* array, [AssumeRange(0, short.MaxValue)] int count, int searchValue)
+        {
+            bool isBurst = true;
+            SkipWithoutBurst(ref isBurst);
+            if (isBurst)
+            {
+                for (int i = 1; i < count; i++)
+                {
+                    Hint.Assume(array[i] >= array[i - 1]);
+                }
+            }
+
+            var  basePtr = array;
+            uint n       = (uint)count;
+            while (Hint.Likely(n > 1))
+            {
+                var half    = n / 2;
+                n          -= half;
+                var newPtr  = &basePtr[half];
+
+                // As of Burst 1.8.0 prev 2
+                // Burst never loads &basePtr[half] into a register for newPtr, and instead uses dual register addressing instead.
+                // Because of this, instead of loading into the register, performing the comparison, using a cmov, and then a jump,
+                // Burst immediately performs the comparison, conditionally jumps, uses a lea, and then a jump.
+                // This is technically less instructions on average. But branch prediction may suffer as a result.
+                basePtr = *newPtr < searchValue ? newPtr : basePtr;
+            }
+
+            if (*basePtr < searchValue)
+                basePtr++;
+
+            return (int)(basePtr - array);
+        }
+
+        [BurstDiscard]
+        static void SkipWithoutBurst(ref bool isBurst) => isBurst = false;
+    }
+
     public static class BlobTextMeshGlyphExtensions
     {
+        public static bool TryGetGlyphIndex(ref this FontBlob font, Unicode.Rune character, out int index)
+        {
+            return TryGetGlyphIndex(ref font, math.asuint(character.value), out index);
+        }
+
         public static bool TryGetGlyphIndex(ref this FontBlob font, uint character, out int index)
         {
             ref var hashArray = ref font.glyphLookupMap[GetGlyphHash(character)];

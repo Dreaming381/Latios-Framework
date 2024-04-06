@@ -29,7 +29,7 @@ void processGlyph(uint src, uint dst, uint options)
     if ((options & kApplyShearToPositions) != 0)
     {
         float4 fpositions = asfloat(positions);
-        float h = (fpositions.x + fpositions.z) * 0.5;
+        float h = glyphMeta.y * 0.5;
         fpositions.x -= h;
         fpositions.z += h;
         positions = asuint(fpositions);

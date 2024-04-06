@@ -1,11 +1,15 @@
 using Latios.Calligraphics.Rendering;
 using Latios.Calligraphics.RichText;
+using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine;
+using UnityEngine.TextCore;
 using UnityEngine.TextCore.LowLevel;
 using UnityEngine.TextCore.Text;
+using UnityEngine.UIElements;
 
 namespace Latios.Calligraphics
 {
@@ -62,25 +66,26 @@ namespace Latios.Calligraphics
 
                 float smallCapsMultiplier = 1.0f;
 
+                // Todo: Burst does not support language methods, and char only supports the UTF-16 subset
+                // of characters. We should encode upper and lower cross-references into the font blobs or
+                // figure out the formulas for all other languages. Right now only ascii is supported.
                 if ((textConfiguration.m_fontStyleInternal & FontStyles.UpperCase) == FontStyles.UpperCase)
                 {
                     // If this character is lowercase, switch to uppercase.
-                    if (char.IsLower((char)unicode.value))
-                        unicode.value = char.ToUpper((char)unicode.value);
-
+                    unicode = unicode.ToUpper();
                 }
                 else if ((textConfiguration.m_fontStyleInternal & FontStyles.LowerCase) == FontStyles.LowerCase)
                 {
                     // If this character is uppercase, switch to lowercase.
-                    if (char.IsUpper((char)unicode.value))
-                        unicode.value = char.ToLower((char)unicode.value);
+                    unicode = unicode.ToLower();
                 }
                 else if ((textConfiguration.m_fontStyleInternal & FontStyles.SmallCaps) == FontStyles.SmallCaps)
                 {
-                    if (char.IsLower((char)unicode.value))
+                    var oldUnicode = unicode;
+                    unicode        = unicode.ToUpper();
+                    if (unicode != oldUnicode)
                     {
                         smallCapsMultiplier = 0.8f;
-                        unicode.value = char.ToUpper((char)unicode.value);
                     }
                 }
                 #endregion
@@ -117,57 +122,91 @@ namespace Latios.Calligraphics
                     continue;
                 }
 
-                if (font.TryGetGlyphIndex(math.asuint(unicode.value), out var glyphIndex))
+                if (font.TryGetGlyphIndex(unicode, out var glyphIndex))
                 {
                     ref var glyphBlob   = ref font.characters[glyphIndex];
                     var     renderGlyph = new RenderGlyph
                     {
-                        blUVA   = glyphBlob.bottomLeftUV,
-                        trUVA   = glyphBlob.topRightUV,
-                        blUVB   = glyphBlob.bottomLeftUV2,
-                        tlUVB   = glyphBlob.topLeftUV2,
-                        trUVB   = glyphBlob.topRightUV2,
-                        brUVB   = glyphBlob.bottomRightUV2,
+                        unicode = glyphBlob.unicode,
                         blColor = textConfiguration.m_htmlColor,
                         tlColor = textConfiguration.m_htmlColor,
                         trColor = textConfiguration.m_htmlColor,
-                        brColor = textConfiguration.m_htmlColor,
-                        unicode = glyphBlob.unicode,
-                        scale   = textConfiguration.m_currentFontSize,
+                        brColor = textConfiguration.m_htmlColor,                        
                     };
-
+                    
                     // Set Padding based on selected font style
                     #region Handle Style Padding
-                    //not yet implemented
-                    var style_padding = 0;
+                    float boldSpacingAdjustment = 0;
+                    float style_padding = 0;
+                    if ((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold)
+                    {
+                        style_padding = 0;
+                        boldSpacingAdjustment = font.boldStyleSpacing;
+                    }
                     #endregion Handle Style Padding
 
-                    var adjustedScale = textConfiguration.m_currentFontSize * smallCapsMultiplier * font.baseScale;
-                    var currentElementScale = adjustedScale * textConfiguration.m_fontScaleMultiplier * glyphBlob.scale;// * m_cached_TextElement.m_Scale * m_cached_TextElement.m_Glyph.scale;
+                    var adjustedScale = textConfiguration.m_currentFontSize * smallCapsMultiplier / font.pointSize * font.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                    var currentElementScale = adjustedScale * textConfiguration.m_fontScaleMultiplier * glyphBlob.glyphScale; //* m_cached_TextElement.m_Scale
+                    float currentEmScale = baseConfiguration.fontSize * 0.01f * (baseConfiguration.isOrthographic? 1 : 0.1f);
 
-                    var fontWeight = glyphBlob.scale;
-                    if (((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold))
-                    {
-                        fontWeight += font.boldStyleWeight * 0.1f;
-                    }
-
-                    // Determine the position of the vertices of the Character.
+                    // Determine the position of the vertices of the Character
                     #region Calculate Vertices Position
-                    float2 topLeft = glyphBlob.topLeftVertex;
-                    topLeft.x = topLeft.x - topLeft.x * fontWeight;
-                    topLeft *= textConfiguration.m_currentFontSize * smallCapsMultiplier;
+                    var currentGlyphMetrics = glyphBlob.glyphMetrics;
+                    float2 topLeft;
+                    topLeft.x =  (currentGlyphMetrics.horizontalBearingX * textConfiguration.m_FXScale.x - font.materialPadding - style_padding) * currentElementScale;
+                    topLeft.y =  (currentGlyphMetrics.horizontalBearingY + font.materialPadding) * currentElementScale;
 
-                    float2 bottomLeft = glyphBlob.bottomLeftVertex;
-                    bottomLeft.x = bottomLeft.x - bottomLeft.x * fontWeight;
-                    bottomLeft *= textConfiguration.m_currentFontSize * smallCapsMultiplier;
+                    float2 bottomLeft;
+                    bottomLeft.x = topLeft.x;
+                    bottomLeft.y = topLeft.y - ((currentGlyphMetrics.height + font.materialPadding * 2) * currentElementScale);
 
-                    float2 topRight = glyphBlob.topRightVertex;
-                    topRight.x = topRight.x * fontWeight;
-                    topRight *= textConfiguration.m_currentFontSize * smallCapsMultiplier;
+                    float2 topRight;
+                    topRight.x = bottomLeft.x + (currentGlyphMetrics.width * textConfiguration.m_FXScale.x + font.materialPadding * 2 + style_padding * 2) * currentElementScale;
+                    topRight.y = topLeft.y;
 
-                    float2 bottomRight = glyphBlob.bottomLeftVertex;
-                    bottomRight.x = bottomRight.x * fontWeight;
-                    bottomRight *= textConfiguration.m_currentFontSize * smallCapsMultiplier;
+                    float2 bottomRight;
+                    bottomRight.x = topRight.x;
+                    bottomRight.y = bottomLeft.y;
+                    #endregion
+
+                    #region Setup UVA
+                    var glyphRect = glyphBlob.glyphRect;
+                    float2 blUVA, tlUVA, trUVA, brUVA;
+                    blUVA.x = (glyphRect.x - font.materialPadding - style_padding) / font.atlasWidth;
+                    blUVA.y = (glyphRect.y - font.materialPadding - style_padding) / font.atlasHeight;
+
+                    tlUVA.x = blUVA.x;
+                    tlUVA.y = (glyphRect.y + font.materialPadding + style_padding + glyphRect.height) / font.atlasHeight;
+
+                    trUVA.x = (glyphRect.x + font.materialPadding + style_padding + glyphRect.width) / font.atlasWidth;
+                    trUVA.y = tlUVA.y;
+
+                    brUVA.x = trUVA.x;
+                    brUVA.y = blUVA.y;
+
+                    renderGlyph.blUVA = blUVA;
+                    renderGlyph.trUVA = trUVA;
+                    #endregion
+
+                    #region Setup UVB
+                    //Setup UV2 based on Character Mapping Options Selected
+                    //m_horizontalMapping case TextureMappingOptions.Character
+                    float2 blUVC, tlUVC, trUVC, brUVC;
+                    blUVC.x = 0;
+                    tlUVC.x = 0;
+                    trUVC.x = 1;
+                    brUVC.x = 1;
+
+                    //m_verticalMapping case case TextureMappingOptions.Character
+                    blUVC.y = 0;                    
+                    tlUVC.y = 1;                    
+                    trUVC.y = 1;                    
+                    brUVC.y = 0;
+
+                    renderGlyph.blUVB = blUVC;
+                    renderGlyph.tlUVB = tlUVA;
+                    renderGlyph.trUVB = trUVC;
+                    renderGlyph.brUVB = brUVA;
                     #endregion
 
                     // Check if we need to Shear the rectangles for Italic styles
@@ -175,34 +214,57 @@ namespace Latios.Calligraphics
                     if (((textConfiguration.m_fontStyleInternal & FontStyles.Italic) == FontStyles.Italic))
                     {
                         // Shift Top vertices forward by half (Shear Value * height of character) and Bottom vertices back by same amount.
-                        float shear = textConfiguration.m_italicAngle * 0.01f;
-                        float2 topShear = new float2(shear * ((glyphBlob.horizontalBearingY + font.materialPadding + style_padding) * currentElementScale), 0);
-                        float2 bottomShear = new float2(shear * (((glyphBlob.horizontalBearingY - glyphBlob.height - font.materialPadding - style_padding)) * currentElementScale), 0);
+                        float  shear       = textConfiguration.m_italicAngle * 0.01f;
+                        float2 topShear    = new float2(shear * ((currentGlyphMetrics.horizontalBearingY + font.materialPadding + style_padding) * currentElementScale), 0);
+                        float2 bottomShear =
+                            new float2(shear * (((currentGlyphMetrics.horizontalBearingY - currentGlyphMetrics.height - font.materialPadding - style_padding)) * currentElementScale), 0);
                         float2 shearAdjustment = (topShear - bottomShear) * 0.5f;
 
-                        topShear -= shearAdjustment;
+                        topShear    -= shearAdjustment;
                         bottomShear -= shearAdjustment;
 
-                        topLeft += topShear;
-                        bottomLeft += bottomShear;
-                        topRight += topShear;
+                        topLeft     += topShear;
+                        bottomLeft  += bottomShear;
+                        topRight    += topShear;
                         bottomRight += bottomShear;
 
                         renderGlyph.shear = (topLeft.x - bottomLeft.x);
                     }
                     #endregion Handle Italics & Shearing
 
+                    //To-Do: review why this does not work. Roatates around wrong axis?
+                    //// Handle Character FX Rotation
+                    //#region Handle Character FX Rotation
+                    //if (!textConfiguration.m_FXRotation.Equals(quaternion.identity))
+                    //{
+                    //    Matrix4x4 rotationMatrix = Matrix4x4.Rotate(textConfiguration.m_FXRotation);
+                    //    float2 positionOffset = (topRight + bottomLeft) / 2;
+
+                    //    topLeft = math.rotate(rotationMatrix, new float3(topLeft - positionOffset, 0)).xy + positionOffset;
+                    //    bottomLeft = math.rotate(rotationMatrix, new float3(bottomLeft - positionOffset, 0)).xy + positionOffset;
+                    //    topRight = math.rotate(rotationMatrix, new float3(topRight - positionOffset, 0)).xy + positionOffset;
+                    //    bottomRight = math.rotate(rotationMatrix, new float3(bottomRight - positionOffset, 0)).xy + positionOffset;
+                    //}
+                    //#endregion
+
+                    #region handle bold
+                    var xScale = textConfiguration.m_currentFontSize;// * math.abs(lossyScale) * (1 - m_charWidthAdjDelta);
+                    if ((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold) xScale *= -1;
+
+                    renderGlyph.scale = xScale;
+                    #endregion
+
                     #region apply offsets
-                    var offset = adjustmentOffset + cumulativeOffset;
-                    topLeft += offset;
-                    bottomLeft += offset;
-                    topRight += offset;
+                    var offset   = adjustmentOffset + cumulativeOffset;
+                    topLeft     += offset;
+                    bottomLeft  += offset;
+                    topRight    += offset;
                     bottomRight += offset;
                     #endregion
 
                     #region apply baselineoffset to glyph (influenced by <sub>, <sup>, <voffset>
                     bottomLeft.y += textConfiguration.m_baselineOffset;
-                    topRight.y += textConfiguration.m_baselineOffset;
+                    topRight.y   += textConfiguration.m_baselineOffset;
                     #endregion
 
                     renderGlyph.trPosition = topRight;
@@ -218,49 +280,44 @@ namespace Latios.Calligraphics
                     #region Handle Kerning
                     adjustmentOffset = float2.zero;
                     float m_characterSpacing = 0;
-                    GlyphBlob.GlyphAdjustment glyphAdjustments = new();
+                    GlyphAdjustment glyphAdjustments = new();
                     float characterSpacingAdjustment = m_characterSpacing;
                     float m_GlyphHorizontalAdvanceAdjustment = 0;
                     if (baseConfiguration.enableKerning)
                     {
-                        GlyphBlob.AdjustmentPair adjustmentPair;
                         if (characterEnumerator.MoveNext())
                         {
-                            var nextChar = characterEnumerator.Current.value;
+                            var nextChar = characterEnumerator.Current;
 
-                            for (int k = 0; k < glyphBlob.glyphAdjustments.Length; k++)
+                            if (font.TryGetGlyphIndex(nextChar, out var nextGlyphIndex))
                             {
-                                adjustmentPair = glyphBlob.glyphAdjustments[k];
-                                if (adjustmentPair.secondAdjustment.glyphUnicode == math.asuint(nextChar))
+                                if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForGlyphAfter(nextGlyphIndex, out var adjustmentIndex))
                                 {
+                                    var adjustmentPair = font.adjustmentPairs[adjustmentIndex];
                                     glyphAdjustments = adjustmentPair.firstAdjustment;
-                                    characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) == FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
-                                    break;
+                                    characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
+                                                                 FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
                                 }
                             }
-                            characterEnumerator.MovePrevious();//rewind
+                            characterEnumerator.MovePrevious();  //rewind
                         }
 
                         if (textConfiguration.m_characterCount >= 1)
                         {
                             characterEnumerator.MovePrevious();
-                            var prevChar = characterEnumerator.Current.value;
+                            var prevChar = characterEnumerator.Current;
 
-                            uint previousGlyphIndex;
-                            if (font.TryGetGlyphIndex(math.asuint(characterEnumerator.Current.value), out var nextGlyphBlobIndex))
-                                previousGlyphIndex = font.characters[glyphIndex].glyphIndex;
-
-                            for (int k = 0; k < glyphBlob.glyphAdjustments.Length; k++)
+                            if (font.TryGetGlyphIndex(prevChar, out var previousGlyphIndex))
                             {
-                                adjustmentPair = glyphBlob.glyphAdjustments[k];
-                                if (adjustmentPair.secondAdjustment.glyphUnicode == math.asuint(prevChar))
+                                if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForGlyphBefore(previousGlyphIndex, out var adjustmentIndex))
                                 {
+                                    var adjustmentPair = font.adjustmentPairs[adjustmentIndex];
                                     glyphAdjustments += adjustmentPair.secondAdjustment;
-                                    characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) == FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
-                                    break;
+                                    characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
+                                                                  FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
                                 }
                             }
-                            characterEnumerator.MoveNext();//undo rewind
+                            characterEnumerator.MoveNext();  //undo rewind
                         }
                     }
 
@@ -269,13 +326,16 @@ namespace Latios.Calligraphics
                     adjustmentOffset.x = glyphAdjustments.xPlacement * currentElementScale;
                     adjustmentOffset.y = glyphAdjustments.yPlacement * currentElementScale;
 
-                    cumulativeOffset.x += currentElementScale * glyphBlob.horizontalAdvance + glyphAdjustments.xAdvance * currentElementScale;
-                    cumulativeOffset.y += glyphAdjustments.yAdvance * currentElementScale;
+                    cumulativeOffset.x += ((currentGlyphMetrics.horizontalAdvance * textConfiguration.m_FXScale.x + glyphAdjustments.xAdvance) * currentElementScale + (font.regularStyleSpacing + characterSpacingAdjustment + boldSpacingAdjustment) * currentEmScale + textConfiguration.m_cSpacing);// * (1 - m_charWidthAdjDelta);                   
+                    cumulativeOffset.y += glyphAdjustments.yAdvance * currentElementScale + textConfiguration.m_baselineOffset;
                     #endregion
 
+                    #region Word Wrapping
                     // Apply accumulated spaces to non-space character
                     while (unicode.value != 32 && accumulatedSpaces > 0)
                     {
+                        // We add the glyph entry for each proceeding whitespace, so that the justified offset is
+                        // "weighted" by the preceeding number of spaces.
                         characterGlyphIndicesWithPreceedingSpacesInLine.Add(renderGlyphs.Length - 1 - startOfLineGlyphIndex);
                         accumulatedSpaces--;
                     }
@@ -288,6 +348,11 @@ namespace Latios.Calligraphics
                         bool dropSpace = false;
                         if (unicode.value == 32 && !prevWasSpace)
                         {
+                            // What pushed us past the line width was a space character.
+                            // The previous character was not a space, and we don't
+                            // want to render this character at the start of the next line.
+                            // We drop this space character instead and allow the next
+                            // character to line-wrap, space or not.
                             dropSpace = true;
                             accumulatedSpaces--;
                         }
@@ -343,6 +408,7 @@ namespace Latios.Calligraphics
                     {
                         prevWasSpace = false;
                     }
+                    #endregion
                 }
             }
 
