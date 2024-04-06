@@ -3,6 +3,7 @@ using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine.TextCore;
 using UnityEngine.TextCore.LowLevel;
 
 namespace Latios.Calligraphics
@@ -53,38 +54,11 @@ namespace Latios.Calligraphics
     {
         public uint              glyphIndex;
         public uint              unicode;
-        public BlobArray<float2> vertices;
-        public BlobArray<float2> uv;
-        public BlobArray<float2> uv2;
-
-        public int bottomLeftIndex => 0;
-        public int topLeftIndex => 1;
-        public int topRightIndex => 2;
-        public int bottomRightIndex => 3;
-        public float2 bottomLeftVertex => vertices[bottomLeftIndex];
-        public float2 topLeftVertex => vertices[topLeftIndex];
-        public float2 topRightVertex => vertices[topRightIndex];
-        public float2 bottomRightVertex => vertices[bottomRightIndex];
-
-        public float2 bottomLeftUV => uv[bottomLeftIndex];
-        public float2 topLeftUV => uv[topLeftIndex];
-        public float2 topRightUV => uv[topRightIndex];
-        public float2 bottomRightUV => uv[bottomRightIndex];
-
-        public float2 bottomLeftUV2 => uv2[bottomLeftIndex];
-        public float2 topLeftUV2 => uv2[topLeftIndex];
-        public float2 topRightUV2 => uv2[topRightIndex];
-        public float2 bottomRightUV2 => uv2[bottomRightIndex];
-
-        public float horizontalAdvance;
-        public float horizontalBearingX;
-        public float horizontalBearingY;
+        public GlyphMetrics      glyphMetrics;
+        public GlyphRect         glyphRect;
+        public float             glyphScale;
 
         public AdjustmentPairLookupByGlyph glyphAdjustmentsLookup;
-
-        public float scale;
-        public float width;
-        public float height;
     }
 
     public struct GlyphLookup

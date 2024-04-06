@@ -176,3 +176,12 @@ void Layer4_float(float4 alpha, float4 color0, float4 color1, float4 color2, flo
 	outColor = lerp(lerp(lerp(color3, color2, alpha.z), color1, alpha.y), color0, alpha.x);
 	outColor.rgb /= outColor.a;
 }
+
+void GetFontWeight_float(float4 uv, float4 isoPerimeterIN, float weightNormal, float weightBold, out float4 isoPerimeterOut)
+{
+	isoPerimeterOut = isoPerimeterIN;
+	float bold = step(uv.w, 0);
+	float weight = lerp(weightNormal, weightBold, bold) / 4.0;
+	weight = (weight + isoPerimeterIN.x) * 0.5;
+	isoPerimeterOut.x = weight;
+}

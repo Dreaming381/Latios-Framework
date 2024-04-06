@@ -1,5 +1,6 @@
 using Latios.Calligraphics.RichText;
 using Unity.Collections;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 
@@ -63,8 +64,8 @@ namespace Latios.Calligraphics
 
         public bool m_isParsingText;
 
-        public Matrix4x4 m_fxMatrix;
-        public bool      m_isFXMatrixSet;
+        public float m_FXRotationAngle;
+        public float3 m_FXScale;
 
         public FixedStack512Bytes<HighlightState> m_highlightStateStack;
         public int                                m_characterCount;
@@ -128,8 +129,8 @@ namespace Latios.Calligraphics
             m_isNonBreakingSpace = false;
 
             m_isParsingText = false;
-            m_fxMatrix      = Matrix4x4.identity;
-            m_isFXMatrixSet = false;
+            m_FXRotationAngle = 0;
+            m_FXScale = 1;
 
             m_highlightStateStack = new FixedStack512Bytes<HighlightState>();
 
