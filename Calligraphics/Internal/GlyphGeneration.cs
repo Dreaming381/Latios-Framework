@@ -154,7 +154,7 @@ namespace Latios.Calligraphics
                     var currentGlyphMetrics = glyphBlob.glyphMetrics;
                     float2 topLeft;
                     topLeft.x =  (currentGlyphMetrics.horizontalBearingX * textConfiguration.m_FXScale.x - font.materialPadding - style_padding) * currentElementScale;
-                    topLeft.y =  (currentGlyphMetrics.horizontalBearingY + font.materialPadding) * currentElementScale;
+                    topLeft.y =  (currentGlyphMetrics.horizontalBearingY + font.materialPadding) * currentElementScale - textConfiguration.m_lineOffset + textConfiguration.m_baselineOffset;
 
                     float2 bottomLeft;
                     bottomLeft.x = topLeft.x;
@@ -253,11 +253,6 @@ namespace Latios.Calligraphics
                     bottomRight += offset;
                     #endregion
 
-                    #region apply baselineoffset to glyph (influenced by <sub>, <sup>, <voffset>
-                    bottomLeft.y += textConfiguration.m_baselineOffset;
-                    topRight.y   += textConfiguration.m_baselineOffset;
-                    #endregion
-
                     renderGlyph.trPosition = topRight;
                     renderGlyph.blPosition = bottomLeft;
 
@@ -318,7 +313,7 @@ namespace Latios.Calligraphics
                     adjustmentOffset.y = glyphAdjustments.yPlacement * currentElementScale;
 
                     cumulativeOffset.x += ((currentGlyphMetrics.horizontalAdvance * textConfiguration.m_FXScale.x + glyphAdjustments.xAdvance) * currentElementScale + (font.regularStyleSpacing + characterSpacingAdjustment + boldSpacingAdjustment) * currentEmScale + textConfiguration.m_cSpacing);// * (1 - m_charWidthAdjDelta);                   
-                    cumulativeOffset.y += glyphAdjustments.yAdvance * currentElementScale + textConfiguration.m_baselineOffset;
+                    cumulativeOffset.y += glyphAdjustments.yAdvance * currentElementScale;
                     #endregion
 
                     #region Word Wrapping

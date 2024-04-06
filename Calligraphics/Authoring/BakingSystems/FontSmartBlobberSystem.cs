@@ -113,15 +113,20 @@ namespace Latios.Calligraphics.Authoring.Systems
             fontBlobRoot.ascentLine          = font.faceInfo.ascentLine;
             fontBlobRoot.descentLine         = font.faceInfo.descentLine;
             fontBlobRoot.lineHeight          = font.faceInfo.lineHeight;
+            fontBlobRoot.subscriptOffset     = font.faceInfo.subscriptOffset;
+            fontBlobRoot.subscriptSize       = font.faceInfo.subscriptSize;
+            fontBlobRoot.superscriptOffset   = font.faceInfo.superscriptOffset;
+            fontBlobRoot.superscriptSize     = font.faceInfo.superscriptSize;
+            fontBlobRoot.capLine             = font.faceInfo.capLine;
             fontBlobRoot.regularStyleSpacing = font.regularStyleSpacing;
             fontBlobRoot.regularStyleWeight  = font.regularStyleWeight;
             fontBlobRoot.boldStyleSpacing    = font.boldStyleSpacing;
             fontBlobRoot.boldStyleWeight     = font.boldStyleWeight;
-            fontBlobRoot.italicsStyleSlant   = font.italicStyleSlant;
-            fontBlobRoot.capLine             = font.faceInfo.capLine;
+            fontBlobRoot.italicsStyleSlant   = font.italicStyleSlant;            
             fontBlobRoot.atlasWidth          = font.atlasWidth;
             fontBlobRoot.atlasHeight         = font.atlasHeight;
             fontBlobRoot.materialPadding     = materialPadding;
+
 
             var       adjustmentCacheBefore      = new NativeList<int2>(Allocator.TempJob);
             var       adjustmentCacheAfter       = new NativeList<int2>(Allocator.TempJob);
