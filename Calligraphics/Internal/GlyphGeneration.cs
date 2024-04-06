@@ -232,20 +232,11 @@ namespace Latios.Calligraphics
                     }
                     #endregion Handle Italics & Shearing
 
-                    //To-Do: review why this does not work. Roatates around wrong axis?
-                    //// Handle Character FX Rotation
-                    //#region Handle Character FX Rotation
-                    //if (!textConfiguration.m_FXRotation.Equals(quaternion.identity))
-                    //{
-                    //    Matrix4x4 rotationMatrix = Matrix4x4.Rotate(textConfiguration.m_FXRotation);
-                    //    float2 positionOffset = (topRight + bottomLeft) / 2;
 
-                    //    topLeft = math.rotate(rotationMatrix, new float3(topLeft - positionOffset, 0)).xy + positionOffset;
-                    //    bottomLeft = math.rotate(rotationMatrix, new float3(bottomLeft - positionOffset, 0)).xy + positionOffset;
-                    //    topRight = math.rotate(rotationMatrix, new float3(topRight - positionOffset, 0)).xy + positionOffset;
-                    //    bottomRight = math.rotate(rotationMatrix, new float3(bottomRight - positionOffset, 0)).xy + positionOffset;
-                    //}
-                    //#endregion
+                    // Handle Character FX Rotation
+                    #region Handle Character FX Rotation
+                    renderGlyph.rotationCCW = textConfiguration.m_FXRotationAngle;
+                    #endregion
 
                     #region handle bold
                     var xScale = textConfiguration.m_currentFontSize;// * math.abs(lossyScale) * (1 - m_charWidthAdjDelta);

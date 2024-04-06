@@ -64,7 +64,7 @@ namespace Latios.Calligraphics
 
         public bool m_isParsingText;
 
-        public quaternion m_FXRotation;
+        public float m_FXRotationAngle;
         public float3 m_FXScale;
 
         public FixedStack512Bytes<HighlightState> m_highlightStateStack;
@@ -129,7 +129,7 @@ namespace Latios.Calligraphics
             m_isNonBreakingSpace = false;
 
             m_isParsingText = false;
-            m_FXRotation = quaternion.identity;
+            m_FXRotationAngle = 0;
             m_FXScale = 1;
 
             m_highlightStateStack = new FixedStack512Bytes<HighlightState>();
