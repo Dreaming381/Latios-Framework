@@ -4,6 +4,7 @@ using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -50,11 +51,12 @@ namespace Latios.Kinemation
 
             var boundsJob = new BoundsJob
             {
-                RendererBounds         = GetComponentTypeHandle<RenderBounds>(true),
-                WorldTransform         = m_worldTransformHandle,
-                PostProcessMatrix      = GetComponentTypeHandle<PostProcessMatrix>(true),
-                WorldRenderBounds      = GetComponentTypeHandle<WorldRenderBounds>(),
-                ChunkWorldRenderBounds = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
+                RendererBounds                 = GetComponentTypeHandle<RenderBounds>(true),
+                WorldTransform                 = m_worldTransformHandle,
+                PostProcessMatrix              = GetComponentTypeHandle<PostProcessMatrix>(true),
+                WorldRenderBounds              = GetComponentTypeHandle<WorldRenderBounds>(),
+                ChunkWorldRenderBounds         = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
+                shaderEffectRadialBoundsHandle = GetComponentTypeHandle<ShaderEffectRadialBounds>(true),
             };
             state.Dependency = boundsJob.ScheduleParallelByRef(m_WorldRenderBounds, state.Dependency);
         }
@@ -62,11 +64,14 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct BoundsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<RenderBounds>       RendererBounds;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>  PostProcessMatrix;
-            public ComponentTypeHandle<WorldRenderBounds>             WorldRenderBounds;
-            public ComponentTypeHandle<ChunkWorldRenderBounds>        ChunkWorldRenderBounds;
+            [ReadOnly] public ComponentTypeHandle<RenderBounds>             RendererBounds;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle       WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>        PostProcessMatrix;
+            [ReadOnly] public ComponentTypeHandle<ShaderEffectRadialBounds> shaderEffectRadialBoundsHandle;
+            public ComponentTypeHandle<WorldRenderBounds>                   WorldRenderBounds;
+            public ComponentTypeHandle<ChunkWorldRenderBounds>              ChunkWorldRenderBounds;
+
+            [NoAlias, NativeDisableContainerSafetyRestriction] NativeArray<RenderBounds> tempBoundsBuffer;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -76,6 +81,20 @@ namespace Latios.Kinemation
                 var worldBounds     = chunk.GetNativeArray(ref WorldRenderBounds);
                 var localBounds     = chunk.GetNativeArray(ref RendererBounds);
                 var worldTransforms = WorldTransform.Resolve(chunk);
+                var shaderBounds    = chunk.GetNativeArray(ref shaderEffectRadialBoundsHandle);
+
+                if (shaderBounds.Length > 0)
+                {
+                    if (!tempBoundsBuffer.IsCreated)
+                        tempBoundsBuffer = new NativeArray<RenderBounds>(128, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                    for (int i = 0; i < shaderBounds.Length; i++)
+                    {
+                        var bounds            = localBounds[i];
+                        bounds.Value.Extents += shaderBounds[i].radialBounds;
+                        tempBoundsBuffer[i]   = bounds;
+                    }
+                    localBounds = tempBoundsBuffer;
+                }
 
                 var chunkAabb = new Aabb(float.MaxValue, float.MinValue);
 

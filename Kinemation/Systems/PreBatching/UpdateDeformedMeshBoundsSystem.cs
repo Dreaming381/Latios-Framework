@@ -75,18 +75,17 @@ namespace Latios.Kinemation.Systems
 
                 // We only care about didOrderChange if the chunk is missing a component, because that component could have been removed.
                 // This isn't much of an optimization, but is still relatively cheap to compute.
-                bool renderBoundsChanged     = !hasSkeleton && hasLocalBounds && chunk.DidChange(ref localBoundsHandle, lastSystemVersion);
-                bool meshNeedsUpdate         = hasDynamicMesh && chunk.DidChange(ref dynamicMeshMaxVertexDisplacementHandle, lastSystemVersion);
-                meshNeedsUpdate             |= (!hasDynamicMesh && didOrderChange);
-                meshNeedsUpdate             |= renderBoundsChanged;
-                bool blendShapesNeedsUpdate  = hasBlendShapes && chunk.DidChange(ref blendShapeWeightsHandle, lastSystemVersion);
-                blendShapesNeedsUpdate      |= (!hasBlendShapes && didOrderChange);
-                blendShapesNeedsUpdate      |= renderBoundsChanged;
-                bool shaderNeedsUpdate       = hasShaderBounds && chunk.DidChange(ref shaderBoundsHandle, lastSystemVersion);
-                shaderNeedsUpdate           |= (!hasShaderBounds && didOrderChange);
-                shaderNeedsUpdate           |= renderBoundsChanged;
+                bool renderBoundsChanged        = !hasSkeleton && hasLocalBounds && chunk.DidChange(ref localBoundsHandle, lastSystemVersion);
+                bool meshNeedsUpdate            = hasDynamicMesh && chunk.DidChange(ref dynamicMeshMaxVertexDisplacementHandle, lastSystemVersion);
+                meshNeedsUpdate                |= (!hasDynamicMesh && didOrderChange);
+                meshNeedsUpdate                |= renderBoundsChanged;
+                bool blendShapesNeedsUpdate     = hasBlendShapes && chunk.DidChange(ref blendShapeWeightsHandle, lastSystemVersion);
+                blendShapesNeedsUpdate         |= (!hasBlendShapes && didOrderChange);
+                blendShapesNeedsUpdate         |= renderBoundsChanged;
+                bool skeletonShaderNeedsUpdate  = hasSkeleton && hasShaderBounds && chunk.DidChange(ref shaderBoundsHandle, lastSystemVersion);
+                skeletonShaderNeedsUpdate      |= (!hasShaderBounds && didOrderChange && hasSkeleton);
 
-                if (!(meshNeedsUpdate || blendShapesNeedsUpdate || shaderNeedsUpdate))
+                if (!(meshNeedsUpdate || blendShapesNeedsUpdate || skeletonShaderNeedsUpdate))
                     return;
 
                 if (!tempFloatBuffer.IsCreated)
@@ -94,7 +93,7 @@ namespace Latios.Kinemation.Systems
 
                 var localRadialBounds = tempFloatBuffer.GetSubArray(0, chunk.Count);
 
-                if (hasDynamicMesh && hasShaderBounds)
+                if (hasDynamicMesh && hasShaderBounds && hasSkeleton)
                 {
                     var mesh   = chunk.GetNativeArray(ref dynamicMeshMaxVertexDisplacementHandle);
                     var shader = chunk.GetNativeArray(ref shaderBoundsHandle);
@@ -103,9 +102,9 @@ namespace Latios.Kinemation.Systems
                 }
                 else if (hasDynamicMesh)
                     localRadialBounds.CopyFrom(chunk.GetNativeArray(ref dynamicMeshMaxVertexDisplacementHandle).Reinterpret<float>());
-                else if (hasShaderBounds)
+                else if (hasShaderBounds && hasSkeleton)
                     localRadialBounds.CopyFrom(chunk.GetNativeArray(ref shaderBoundsHandle).Reinterpret<float>());
-                else
+                else if (hasSkeleton || hasBlendShapes)
                     UnsafeUtility.MemClear(localRadialBounds.GetUnsafePtr(), sizeof(float) * chunk.Count);
 
                 if (hasBlendShapes)
@@ -130,7 +129,7 @@ namespace Latios.Kinemation.Systems
                     }
                 }
 
-                if (chunk.Has(ref skeletonDependentHandle))
+                if (hasSkeleton)
                 {
                     var skeletonDependents = chunk.GetNativeArray(ref skeletonDependentHandle);
                     for (int i = 0; i < chunk.Count; i++)
@@ -141,7 +140,7 @@ namespace Latios.Kinemation.Systems
                         dependentSkinnedMeshLookup[skeletonDependent.root].ElementAt(skeletonDependent.indexInDependentSkinnedMeshesBuffer).meshRadialOffset = localRadialBounds[i];
                     }
                 }
-                else if (chunk.Has(ref localBoundsHandle))
+                else if (hasLocalBounds)
                 {
                     var bounds = chunk.GetNativeArray(ref localBoundsHandle);
                     var blobs  = chunk.GetNativeArray(ref blobHandle);

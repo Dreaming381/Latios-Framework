@@ -26,6 +26,7 @@ namespace Latios.Kinemation.Systems
     {
         LatiosWorldUnmanaged latiosWorld;
         EntityQuery          m_metaQuery;
+        EntityQueryMask      m_motionVectorDeformQueryMask;
 
         FindChunksWithVisibleJob m_findJob;
         ProfilerMarker           m_profilerEmitChunk;
@@ -35,6 +36,12 @@ namespace Latios.Kinemation.Systems
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkPerCameraCullingMask>(true).With<ChunkPerCameraCullingSplitsMask>(true)
                           .With<ChunkPerFrameCullingMask>(false).With<EntitiesGraphicsChunkInfo>(true).Build();
+            var motionVectorDeformQuery = state.Fluent().WithAnyEnabled<PreviousDeformShaderIndex, TwoAgoDeformShaderIndex, PreviousMatrixVertexSkinningShaderIndex>(true)
+                                          .WithAnyEnabled<TwoAgoMatrixVertexSkinningShaderIndex, PreviousDqsVertexSkinningShaderIndex, TwoAgoDqsVertexSkinningShaderIndex>(true)
+                                          .WithAnyEnabled<ShaderEffectRadialBounds,
+                                                          LegacyDotsDeformParamsShaderIndex>(                                                                              true).
+                                          Build();
+            m_motionVectorDeformQueryMask = motionVectorDeformQuery.GetEntityQueryMask();
 
             m_findJob = new FindChunksWithVisibleJob
             {
@@ -81,10 +88,11 @@ namespace Latios.Kinemation.Systems
 #if UNITY_EDITOR
                 EditorDataComponentHandle = GetSharedComponentTypeHandle<EditorRenderData>(),
 #endif
-                EntitiesGraphicsChunkInfo = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                LastSystemVersion         = state.LastSystemVersion,
-                LightMaps                 = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
-                lodCrossfadeHandle        = GetComponentTypeHandle<LodCrossfade>(true),
+                EntitiesGraphicsChunkInfo   = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                LastSystemVersion           = state.LastSystemVersion,
+                LightMaps                   = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                lodCrossfadeHandle          = GetComponentTypeHandle<LodCrossfade>(true),
+                motionVectorDeformQueryMask = m_motionVectorDeformQueryMask,
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<WorldTransform>(true),
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
@@ -238,6 +246,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
             [ReadOnly] public ComponentTypeHandle<LodCrossfade>                    lodCrossfadeHandle;
+            [ReadOnly] public EntityQueryMask                                      motionVectorDeformQueryMask;
             public bool                                                            splitsAreValid;
 
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
@@ -320,11 +329,8 @@ namespace Latios.Kinemation.Systems
                         bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
                         if (hasPostProcess)
                             transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
-#if ENABLE_DOTS_DEFORMATION_MOTION_VECTORS
-                        bool isDeformed = chunk.Has(ref DeformedMeshIndex);
-#else
-                        bool isDeformed = false;
-#endif
+                        bool isDeformed       = motionVectorDeformQueryMask.MatchesIgnoreFilter(chunk);
+
                         hasMotion = orderChanged || transformChanged || isDeformed;
                     }
 
