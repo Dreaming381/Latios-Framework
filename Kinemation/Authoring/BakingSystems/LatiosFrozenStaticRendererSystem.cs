@@ -1,5 +1,3 @@
-using Latios;
-using Latios.Transforms;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
@@ -7,6 +5,8 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
+
+// Todo: This is a dead system due to the query for RenderMesh. Unity hasn't updated the query either.
 
 namespace Latios.Kinemation.Authoring
 {

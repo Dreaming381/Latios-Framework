@@ -839,36 +839,36 @@ namespace Latios.Calligraphics.RichText
                     //        }
                     //    }
                     //    return true;
-                    case 275917:  // <align=>
-                    case 186285:  // <ALIGN>
-                        switch (firstTagIndentifier.valueHashCode)
-                        {
-                            case 3774683:  // <align=left>
-                                textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Left;
-                                textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
-                                return true;
-                            case 136703040:  // <align=right>
-                                textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Right;
-                                textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
-                                return true;
-                            case -458210101:  // <align=center>
-                                textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Center;
-                                textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
-                                return true;
-                            case -523808257:  // <align=justified>
-                                textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Justified;
-                                textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
-                                return true;
-                            case 122383428:  // <align=flush>
-                                textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Flush;
-                                textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
-                                return true;
-                        }
-                        return false;
-                    case 1065846:  // </align>
-                    case 976214:  // </ALIGN>
-                        textConfiguration.m_lineJustification = textConfiguration.m_lineJustificationStack.RemoveExceptRoot();
-                        return true;
+                    //case 275917:  // <align=>
+                    //case 186285:  // <ALIGN>
+                    //    switch (firstTagIndentifier.valueHashCode)
+                    //    {
+                    //        case 3774683:  // <align=left>
+                    //            textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Left;
+                    //            textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
+                    //            return true;
+                    //        case 136703040:  // <align=right>
+                    //            textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Right;
+                    //            textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
+                    //            return true;
+                    //        case -458210101:  // <align=center>
+                    //            textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Center;
+                    //            textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
+                    //            return true;
+                    //        case -523808257:  // <align=justified>
+                    //            textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Justified;
+                    //            textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
+                    //            return true;
+                    //        case 122383428:  // <align=flush>
+                    //            textConfiguration.m_lineJustification = HorizontalAlignmentOptions.Flush;
+                    //            textConfiguration.m_lineJustificationStack.Add(textConfiguration.m_lineJustification);
+                    //            return true;
+                    //    }
+                    //    return false;
+                    //case 1065846:  // </align>
+                    //case 976214:  // </ALIGN>
+                    //    textConfiguration.m_lineJustification = textConfiguration.m_lineJustificationStack.RemoveExceptRoot();
+                    //    return true;
                     case 327550:  // <width=xx>
                     case 237918:  // <WIDTH>
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
@@ -1526,8 +1526,8 @@ namespace Latios.Calligraphics.RichText
 
                     //    m_actionStack.Remove();
                     //    return true;
-                    case 315682: // <scale=xx.x>
-                    case 226050: // <SCALE=xx.x>
+                    case 315682:  // <scale=xx.x>
+                    case 226050:  // <SCALE=xx.x>
                         calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
                         if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
@@ -1536,8 +1536,8 @@ namespace Latios.Calligraphics.RichText
                         textConfiguration.m_FXScale = new Vector3(value, 1, 1);
 
                         return true;
-                    case 1105611: // </scale>
-                    case 1015979: // </SCALE>
+                    case 1105611:  // </scale>
+                    case 1015979:  // </SCALE>
                         textConfiguration.m_FXScale = 1;
                         return true;
                     case 2227963:  // <rotate=xx.x>

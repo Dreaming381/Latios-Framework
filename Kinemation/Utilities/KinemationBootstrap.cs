@@ -47,7 +47,6 @@ namespace Latios.Kinemation
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationFrameSyncPointSuperSystem>(),              world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosEntitiesGraphicsSystem>(),                     world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationPostRenderSuperSystem>(),                  world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosLODRequirementsUpdateSystem>(),                world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosUpdateEntitiesGraphicsChunkStructureSystem>(), world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosLightProbeUpdateSystem>(),                     world);
 

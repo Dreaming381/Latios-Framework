@@ -22,7 +22,7 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<InitializeAndFilterPerCameraSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullExposedSkeletonsSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullOptimizedSkeletonsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateLODsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<CullLodsSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedEntitiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedPostProcessEntitiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullUnskinnedEntitiesSystem>();
@@ -113,7 +113,6 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateBrgBoundsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<LatiosLODRequirementsUpdateSystem>();
             GetOrCreateAndAddManagedSystem<BeginPerFrameDeformMeshBuffersUploadSystem>();
         }
     }

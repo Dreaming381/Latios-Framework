@@ -12,14 +12,18 @@ Material:
     type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _ALPHATEST_ON
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses:
+  - DepthOnly
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
@@ -54,6 +58,8 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AlphaClip: 1
+    - _AlphaToMask: 0
     - _Ambient: 0.3
     - _BevelAmount: 0
     - _BevelClamp: 0
@@ -61,9 +67,13 @@ Material:
     - _BevelRoundness: 0
     - _BevelType: 0
     - _BevelWidth: 0
+    - _Blend: 0
+    - _CastShadows: 1
     - _ColorMask: 15
+    - _Cull: 0
     - _CullMode: 0
     - _Diffuse: 0.3
+    - _DstBlend: 10
     - _FaceDilate: 0
     - _GradientScale: 10
     - _LightAngle: 0
@@ -87,11 +97,13 @@ Material:
     - _ShaderFlags: 0
     - _Sharpness: 0
     - _SpecularPower: 0
+    - _SrcBlend: 5
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
+    - _Surface: 1
     - _TextureHeight: 1024
     - _TextureWidth: 1024
     - _UnderlayDilate: 0
@@ -102,6 +114,10 @@ Material:
     - _VertexOffsetY: 0
     - _WeightBold: 0.75
     - _WeightNormal: 0
+    - _ZTest: 4
+    - _ZWrite: 0
+    - _ZWriteControl: 0
+    - _latiosTextGlyphMaskBase: 0
     m_Colors:
     - _ClipRect: {r: -32767, g: -32767, b: 32767, a: 32767}
     - _FaceColor: {r: 1, g: 1, b: 1, a: 1}
@@ -137,6 +153,24 @@ MonoBehaviour:
   m_Version: 1.1.0
   m_Material: {fileID: -658778759613031741}
   m_SourceFontFileGUID: e3265ab4bf004d28a9537516768c1c75
+  m_fontAssetCreationEditorSettings:
+    sourceFontFileGUID: e3265ab4bf004d28a9537516768c1c75
+    faceIndex: 0
+    pointSizeSamplingMode: 0
+    pointSize: 84
+    padding: 9
+    paddingMode: 2
+    packingMode: 0
+    atlasWidth: 1024
+    atlasHeight: 1024
+    characterSetSelectionMode: 1
+    characterSequence: 32 - 126, 160 - 255, 8192 - 8303, 8364, 8482, 9633
+    referencedFontAssetGUID: b773c04e36205284fa9d7b06cf720e42
+    referencedTextAssetGUID: 
+    fontStyle: 0
+    fontStyleModifier: 0
+    renderMode: 4165
+    includeFontFeatures: 1
   m_SourceFontFile: {fileID: 0}
   m_SourceFontFilePath: 
   m_AtlasPopulationMode: 0
@@ -8161,24 +8195,6 @@ MonoBehaviour:
     m_MarkToBaseAdjustmentRecords: []
     m_MarkToMarkAdjustmentRecords: []
   m_FallbackFontAssetTable: []
-  m_fontAssetCreationEditorSettings:
-    sourceFontFileGUID: e3265ab4bf004d28a9537516768c1c75
-    faceIndex: 0
-    pointSizeSamplingMode: 0
-    pointSize: 84
-    padding: 9
-    paddingMode: 2
-    packingMode: 0
-    atlasWidth: 1024
-    atlasHeight: 1024
-    characterSetSelectionMode: 1
-    characterSequence: 32 - 126, 160 - 255, 8192 - 8303, 8364, 8482, 9633
-    referencedFontAssetGUID: b773c04e36205284fa9d7b06cf720e42
-    referencedTextAssetGUID: 
-    fontStyle: 0
-    fontStyleModifier: 0
-    renderMode: 4165
-    includeFontFeatures: 1
   m_FontWeightTable:
   - regularTypeface: {fileID: 0}
     italicTypeface: {fileID: 0}

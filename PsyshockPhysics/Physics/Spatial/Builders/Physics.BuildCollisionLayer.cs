@@ -503,7 +503,10 @@ namespace Latios.Psyshock
                 NativeList<float2>                                      xMinMaxs;
                 NativeList<BuildCollisionLayerInternal.ColliderAoSData> aos;
 
-                JobHandle filteredCacheDisposeHandle = default;
+                // A Unity bug causes some platforms to not recognize the != operator for JobHandle.
+                // As a workaround, we use a secondary bool.
+                JobHandle filteredCacheDisposeHandle    = default;
+                bool      hasFilteredCacheDisposeHandle = false;
 
                 if (config.query.HasFilter() || config.query.UsesEnabledFiltering())
                 {
@@ -536,7 +539,8 @@ namespace Latios.Psyshock
                         xMinMaxs           = xMinMaxs.AsDeferredJobArray()
                     }.Schedule(filteredChunkCache, 1, jh);
 
-                    filteredCacheDisposeHandle = filteredChunkCache.Dispose(jh);
+                    filteredCacheDisposeHandle    = filteredChunkCache.Dispose(jh);
+                    hasFilteredCacheDisposeHandle = true;
                 }
                 else
                 {
@@ -567,7 +571,8 @@ namespace Latios.Psyshock
                     layerIndices = layerIndices.AsDeferredJobArray()
                 }.Schedule(jh);
 
-                if (filteredCacheDisposeHandle != default)
+                //if (filteredCacheDisposeHandle != default)
+                if (hasFilteredCacheDisposeHandle)
                     jh = JobHandle.CombineDependencies(filteredCacheDisposeHandle, jh);
 
                 jh = new BuildCollisionLayerInternal.Part3Job

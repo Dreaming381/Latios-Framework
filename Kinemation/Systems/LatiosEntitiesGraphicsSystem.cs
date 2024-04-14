@@ -902,8 +902,6 @@ namespace Latios.Kinemation.Systems
             var entitiesGraphicsRenderedChunkType   = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(false);
             var entitiesGraphicsRenderedChunkTypeRO = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true);
             var chunkHeadersRO                      = GetComponentTypeHandle<ChunkHeader>(true);
-            var lodRangesRO                         = GetComponentTypeHandle<LODRange>(true);
-            var rootLodRangesRO                     = GetComponentTypeHandle<RootLODRange>(true);
             var materialMeshInfosRO                 = GetComponentTypeHandle<MaterialMeshInfo>(true);
             var renderMeshArrays                    = GetSharedComponentTypeHandle<RenderMeshArray>();
 
@@ -991,8 +989,6 @@ namespace Latios.Kinemation.Systems
                 EntitiesGraphicsChunkInfo    = entitiesGraphicsRenderedChunkType,
                 ChunkHeader                  = chunkHeadersRO,
                 WorldTransform               = GetDynamicComponentTypeHandle(QueryExtensions.GetAbstractWorldTransformROComponentType()),
-                LodRange                     = lodRangesRO,
-                RootLodRange                 = rootLodRangesRO,
                 MaterialMeshInfo             = materialMeshInfosRO,
                 EntitiesGraphicsChunkUpdater = entitiesGraphicsChunkUpdater,
             };
@@ -1184,7 +1180,12 @@ namespace Latios.Kinemation.Systems
 
             Assert.IsTrue(newChunks.Length > 0, "Attempted to add new chunks, but list of new chunks was empty");
 
-            var batchCreationTypeHandles = new BatchCreationTypeHandles(this);
+            var batchCreationTypeHandles = new BatchCreationTypeHandles
+            {
+                perInstanceCullingHandle                       = SystemAPI.GetComponentTypeHandle<PerInstanceCullingTag>(true),
+                lodHeightPercentagesHandle                     = SystemAPI.GetComponentTypeHandle<LodHeightPercentages>(true),
+                lodHeightPercentagesWithCrossfadeMarginsHandle = SystemAPI.GetComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins>(true),
+            };
 
             // Sort new chunks by RenderMesh so we can put
             // all compatible chunks inside one batch.
@@ -1405,6 +1406,13 @@ namespace Latios.Kinemation.Systems
             public NativeArray<int>             OverrideStreamBegin;
         }
 
+        internal struct BatchCreationTypeHandles
+        {
+            public ComponentTypeHandle<LodHeightPercentages>                     lodHeightPercentagesHandle;
+            public ComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins> lodHeightPercentagesWithCrossfadeMarginsHandle;
+            public ComponentTypeHandle<PerInstanceCullingTag>                    perInstanceCullingHandle;
+        }
+
         [BurstCompile]
         static void SetBatchChunkData(ref SetBatchChunkDataArgs args, ref UnsafeList<ArchetypePropertyOverride> overrides)
         {
@@ -1456,13 +1464,12 @@ namespace Latios.Kinemation.Systems
 
         static byte ComputeCullingFlags(ArchetypeChunk chunk, BatchCreationTypeHandles typeHandles)
         {
-            bool hasLodData = chunk.Has(ref typeHandles.RootLODRange) &&
-                              chunk.Has(ref typeHandles.LODRange);
+            bool hasLodData = chunk.Has(ref typeHandles.lodHeightPercentagesHandle) || chunk.Has(ref typeHandles.lodHeightPercentagesWithCrossfadeMarginsHandle);
 
             // TODO: Do we need non-per-instance culling anymore? It seems to always be added
             // for converted objects, and doesn't seem to be removed ever, so the only way to
             // not have it is to manually remove it or create entities from scratch.
-            bool hasPerInstanceCulling = !hasLodData || chunk.Has(ref typeHandles.PerInstanceCulling);
+            bool hasPerInstanceCulling = !hasLodData || chunk.Has(ref typeHandles.perInstanceCullingHandle);
 
             byte flags = 0;
 
@@ -1814,8 +1821,6 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<EntitiesGraphicsChunkInfo>   EntitiesGraphicsChunkInfo;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>      ChunkHeader;
             [ReadOnly] public DynamicComponentTypeHandle            WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<LODRange>         LodRange;
-            [ReadOnly] public ComponentTypeHandle<RootLODRange>     RootLodRange;
             [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo> MaterialMeshInfo;
             public EntitiesGraphicsChunkUpdater                     EntitiesGraphicsChunkUpdater;
 
@@ -1845,16 +1850,16 @@ namespace Latios.Kinemation.Systems
                         continue;
 
                     // When LOD ranges change, we must reset the movement grace to avoid using stale data
-                    bool lodRangeChange =
-                        chunkHeader.ArchetypeChunk.DidOrderChange(EntitiesGraphicsChunkUpdater.lastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(ref LodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion) |
-                        chunkHeader.ArchetypeChunk.DidChange(ref RootLodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion);
-
-                    if (lodRangeChange)
-                    {
-                        chunkInfo.CullingData.MovementGraceFixed16 = 0;
-                        entitiesGraphicsChunkInfos[i]              = chunkInfo;
-                    }
+                    //bool lodRangeChange =
+                    //    chunkHeader.ArchetypeChunk.DidOrderChange(EntitiesGraphicsChunkUpdater.lastSystemVersion) |
+                    //    chunkHeader.ArchetypeChunk.DidChange(ref LodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion) |
+                    //    chunkHeader.ArchetypeChunk.DidChange(ref RootLodRange, EntitiesGraphicsChunkUpdater.lastSystemVersion);
+                    //
+                    //if (lodRangeChange)
+                    //{
+                    //    chunkInfo.CullingData.MovementGraceFixed16 = 0;
+                    //    entitiesGraphicsChunkInfos[i]              = chunkInfo;
+                    //}
 
                     EntitiesGraphicsChunkUpdater.ProcessChunk(in chunkInfo, in chunk);
                 }

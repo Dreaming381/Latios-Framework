@@ -174,7 +174,7 @@ namespace Latios.Kinemation.Authoring
             RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, sharedMesh, m_materialsCache);
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
-            RenderingBakingTools.GetLOD(this, authoring, out var lodGroupEntity, out var lodMask);
+            RenderingBakingTools.GetLOD(this, authoring, out var lodSettings);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -185,8 +185,7 @@ namespace Latios.Kinemation.Authoring
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = authoring.lightmapIndex,
                 lightmapScaleOffset         = authoring.lightmapScaleOffset,
-                lodGroupEntity              = lodGroupEntity,
-                lodGroupMask                = lodMask,
+                lodSettings                 = lodSettings,
                 isStatic                    = IsStatic(),
                 localBounds                 = sharedMesh != null ? sharedMesh.bounds : default,
             };

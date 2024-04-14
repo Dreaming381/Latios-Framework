@@ -36,9 +36,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // Todo? Batches not accounted for in hashmap?
-            var crossfadePtrMap = new NativeHashMap<LODCrossfadePtrMap.ChunkIdentifier,
-                                                    LODCrossfadePtrMap.CrossfadePtr>(
+            var crossfadePtrMap = new NativeHashMap<LODCrossfadePtrMap.ChunkIdentifier, LODCrossfadePtrMap.CrossfadePtr>(
                 1,
                 state.WorldUpdateAllocator);
             latiosWorld.worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new LODCrossfadePtrMap { chunkIdentifierToPtrMap = crossfadePtrMap });

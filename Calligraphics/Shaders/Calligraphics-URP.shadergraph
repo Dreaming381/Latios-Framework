@@ -812,7 +812,6 @@
     "m_OutputNode": {
         "m_Id": ""
     },
-    "m_SubDatas": [],
     "m_ActiveTargets": [
         {
             "m_Id": "94300469581b4924ac7dda496811d45d"
@@ -3762,7 +3761,7 @@
     "m_ActiveSubTarget": {
         "m_Id": "0eeb5490760e492f8c9691086fa00929"
     },
-    "m_AllowMaterialOverride": false,
+    "m_AllowMaterialOverride": true,
     "m_SurfaceType": 1,
     "m_ZTestMode": 4,
     "m_ZWriteControl": 0,

@@ -95,17 +95,65 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public float4 lightmapScaleOffset;
         /// <summary>
-        /// The entity that contains the LOD group components
+        /// The LOD settings for this entity, typically extracted from a belonging LOD group
         /// </summary>
-        public Entity lodGroupEntity;
-        /// <summary>
-        /// A bitmask where each bit represents a LOD level in the LOD group this entity belongs to
-        /// </summary>
-        public int lodGroupMask;
+        public LodSettings lodSettings;
         /// <summary>
         /// True if the entity should be treated as if it were marked static
         /// </summary>
         public bool isStatic;
+    }
+
+    /// <summary>
+    /// A struct which describes the membership within a LOD group.
+    /// </summary>
+    public struct LodSettings : IEquatable<LodSettings>
+    {
+        /// <summary>
+        /// The local height as dictated by the LOD Group
+        /// </summary>
+        public float localHeight;
+        /// <summary>
+        /// The smallest percentage of the screen height this entity should consume to be drawn
+        /// </summary>
+        public half minScreenHeightPercent;
+        /// <summary>
+        /// The largest percentage of the screen height this entity should consume to be drawn
+        /// </summary>
+        public half maxScreenHeightPercent;
+        /// <summary>
+        /// The percentage of the screen height at which the entity begins crossfading to the LOD that
+        /// shares the minScreenHeightPercent. (The adjacent LOD is higher indexed and lower-res or complete fade-out.)
+        /// Zero or negative if crossfade is unused for this edge.
+        /// </summary>
+        public half minScreenHeightPercentAtCrossfadeEdge;
+        /// <summary>
+        /// The percentage of the screen height at which the entity begins crossfading to the LOD that
+        /// shares the maxScreenHeightPercent. (The adjacent LOD is lower indexed and higher res.)
+        /// Zero or negative if crossfade is unused for this edge.
+        /// </summary>
+        public half maxScreenHeightPercentAtCrossfadeEdge;
+
+        /// <summary>
+        /// The LOD level used to compare against QualitySettings.maximumLODLevel
+        /// </summary>
+        public byte lowestResLodLevel;
+
+        /// <summary>
+        /// True if the crossfade mode uses speedtree
+        /// </summary>
+        public bool isSpeedTree;
+
+        public bool Equals(LodSettings other)
+        {
+            return localHeight.Equals(other.localHeight) &&
+                   minScreenHeightPercent.Equals(other.minScreenHeightPercent) &&
+                   maxScreenHeightPercent.Equals(other.maxScreenHeightPercent) &&
+                   minScreenHeightPercentAtCrossfadeEdge.Equals(other.minScreenHeightPercentAtCrossfadeEdge) &&
+                   maxScreenHeightPercentAtCrossfadeEdge.Equals(other.maxScreenHeightPercentAtCrossfadeEdge) &&
+                   lowestResLodLevel.Equals(other.lowestResLodLevel) &&
+                   isSpeedTree.Equals(other.isSpeedTree);
+        }
     }
 
     /// <summary>
@@ -186,38 +234,79 @@ namespace Latios.Kinemation.Authoring
         }
 
         /// <summary>
-        /// Acquires the LOD Group entity and mask that the passed in renderer belongs to
+        /// Acquires the LOD Group the renderer belongs to and extracts LOD settings for the renderer.
         /// </summary>
         /// <param name="baker">The baker used to search for the LOD Group in the hierarchy</param>
         /// <param name="renderer">The renderer to find within the LOD Group</param>
-        /// <param name="lodGroupEntity">The entity which represents the LOD Group</param>
-        /// <param name="lodMask">The bitmask that represents the levels in the LOD Group the renderer belongs to</param>
-        public static void GetLOD(IBaker baker, Renderer renderer, out Entity lodGroupEntity, out int lodMask)
+        /// <param name="lodSettings">The LOD settings for this renderer inside the LOD Group</param>
+        public static void GetLOD(IBaker baker, Renderer renderer, out LodSettings lodSettings)
         {
-            var group      = baker.GetComponentInParent<LODGroup>();
-            lodGroupEntity = baker.GetEntity(group, TransformUsageFlags.Renderable);
+            var group   = baker.GetComponentInParent<LODGroup>();
+            lodSettings = default;
             if (group != null)
             {
-                lodMask          = 0;
-                var lodGroupLODs = group.GetLODs();
+                lodSettings.localHeight = group.size;
+                lodSettings.isSpeedTree = group.fadeMode == LODFadeMode.SpeedTree;
+                var lodGroupLODs        = group.GetLODs();
 
-                int lodGroupMask = 0;
+                float previousMargin     = -1f;
+                float previousTransition = 1f;
+                bool  foundFirst         = false;
 
                 // Find the renderer inside the LODGroup
                 for (int i = 0; i < lodGroupLODs.Length; ++i)
                 {
+                    float currentMargin = group.fadeMode != LODFadeMode.None ? math.lerp(lodGroupLODs[i].screenRelativeTransitionHeight,
+                                                                                         previousTransition,
+                                                                                         lodGroupLODs[i].fadeTransitionWidth) : -1f;
                     foreach (var candidate in lodGroupLODs[i].renderers)
                     {
                         if (renderer == candidate)
                         {
-                            lodGroupMask |= (1 << i);
+                            if (!foundFirst)
+                            {
+                                if (previousMargin > 0f)
+                                {
+                                    // For non-animated cross-fade, the fade starts before the transition and ends at the transition.
+                                    lodSettings.maxScreenHeightPercent                = (half)previousMargin;
+                                    lodSettings.maxScreenHeightPercentAtCrossfadeEdge = (half)previousTransition;
+                                }
+                                else
+                                {
+                                    lodSettings.maxScreenHeightPercent                = (half)previousTransition;
+                                    lodSettings.maxScreenHeightPercentAtCrossfadeEdge = new half(-1f);
+                                }
+                                foundFirst = true;
+                            }
+                            if (currentMargin > 0f)
+                            {
+                                lodSettings.minScreenHeightPercentAtCrossfadeEdge = (half)currentMargin;
+                            }
+                            lodSettings.minScreenHeightPercent = (half)lodGroupLODs[i].screenRelativeTransitionHeight;
+                            lodSettings.lowestResLodLevel      = (byte)i;
+                            break;
                         }
                     }
+                    previousMargin     = currentMargin;
+                    previousTransition = lodGroupLODs[i].screenRelativeTransitionHeight;
                 }
-                lodMask = lodGroupMask > 0 ? lodGroupMask : -1;
+                if (lodSettings.maxScreenHeightPercent <= 0f)
+                {
+                    lodSettings = default;
+                    return;
+                }
+
+                // We have found valid LODs. But we should validate that the screenHeight is useful or if an offset would be required.
+                var rendererTransform = baker.GetComponent<Transform>(renderer);
+                var groupTransform    = baker.GetComponent<Transform>(group);
+                var relativeTransform = Transforms.Authoring.Abstract.AbstractBakingUtilities.ExtractTransformRelativeTo(rendererTransform, groupTransform);
+                if (math.lengthsq(relativeTransform.position) > math.EPSILON)
+                {
+                    Debug.LogWarning(
+                        $"LOD renderer {renderer.gameObject.name} has a different world position than the LOD Group {group.gameObject.name} it belongs to. This is currently not supported and artifacts may occur. If you are seeing this message, please report it to the Latios Framework developers so that we can better understand your use case.");
+                }
+                lodSettings.localHeight /= math.cmax(relativeTransform.scale * relativeTransform.stretch);
             }
-            else
-                lodMask = -1;
         }
     }
 
@@ -254,7 +343,7 @@ namespace Latios.Kinemation.Authoring
             RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, mesh, m_materialsCache);
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
-            RenderingBakingTools.GetLOD(this, authoring, out var lodGroupEntity, out var lodMask);
+            RenderingBakingTools.GetLOD(this, authoring, out var lodSettings);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -265,8 +354,7 @@ namespace Latios.Kinemation.Authoring
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = authoring.lightmapIndex,
                 lightmapScaleOffset         = authoring.lightmapScaleOffset,
-                lodGroupEntity              = lodGroupEntity,
-                lodGroupMask                = lodMask,
+                lodSettings                 = lodSettings,
                 isStatic                    = IsStatic(),
                 localBounds                 = mesh != null ? mesh.bounds : default,
             };

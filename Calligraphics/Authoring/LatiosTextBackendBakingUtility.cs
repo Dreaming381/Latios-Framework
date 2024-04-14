@@ -19,7 +19,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
         {
             var mesh = Resources.Load<Mesh>(kTextBackendMeshResource);
 
-            RenderingBakingTools.GetLOD(baker, renderer, out var lodGroupEntity, out var lodMask);
+            RenderingBakingTools.GetLOD(baker, renderer, out var lodSettings);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -30,8 +30,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = renderer.lightmapIndex,
                 lightmapScaleOffset         = renderer.lightmapScaleOffset,
-                lodGroupEntity              = lodGroupEntity,
-                lodGroupMask                = lodMask,
+                lodSettings                 = lodSettings,
                 isStatic                    = baker.IsStatic(),
                 localBounds                 = default,
             };

@@ -100,13 +100,11 @@ namespace Latios.Kinemation.Systems
 
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var ptr = metaChunk.GetComponentDataPtrRW(ref maskHandle);
-                UnsafeUtility.MemClear(ptr, sizeof(ChunkPerCameraCullingMask) * metaChunk.Count);
+                var chunkPerCameraMasks = metaChunk.GetComponentDataPtrRW(ref maskHandle);
+                UnsafeUtility.MemClear(chunkPerCameraMasks, sizeof(ChunkPerCameraCullingMask) * metaChunk.Count);
 
-                var chunkPerCameraMasks = (ChunkPerCameraCullingMask*)ptr;
-
-                var chunkHeaders = (ChunkHeader*)metaChunk.GetComponentDataPtrRO(ref headerHandle);
-                var chunkInfos   = (EntitiesGraphicsChunkInfo*)metaChunk.GetComponentDataPtrRO(ref chunkInfoHandle);
+                var chunkHeaders = metaChunk.GetComponentDataPtrRO(ref headerHandle);
+                var chunkInfos   = metaChunk.GetComponentDataPtrRO(ref chunkInfoHandle);
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
                     chunkPerCameraMasks[i] = default;
@@ -156,8 +154,8 @@ namespace Latios.Kinemation.Systems
 
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var chunkPerCameraMasks = (ChunkPerCameraCullingMask*)metaChunk.GetComponentDataPtrRW(ref maskHandle);
-                var chunkHeaders        = (ChunkHeader*)metaChunk.GetComponentDataPtrRO(ref headerHandle);
+                var chunkPerCameraMasks = metaChunk.GetComponentDataPtrRW(ref maskHandle);
+                var chunkHeaders        = metaChunk.GetComponentDataPtrRO(ref headerHandle);
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
                     if (chunkPerCameraMasks[i].lower.Value == 0)

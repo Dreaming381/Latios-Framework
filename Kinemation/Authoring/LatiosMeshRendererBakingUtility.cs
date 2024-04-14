@@ -128,10 +128,45 @@ namespace Latios.Kinemation.Authoring
                     if (renderer.isDeforming)
                         requiredPropertiesForReference |= classification;
 
-                    if (renderer.lodGroupEntity != Entity.Null && renderer.lodGroupMask != -1)
+                    if (!renderer.lodSettings.Equals(default(LodSettings)))
                     {
-                        var lodComponent = new MeshLODComponent { Group = renderer.lodGroupEntity, LODMask = renderer.lodGroupMask };
-                        baker.AddComponent(renderer.targetEntity, lodComponent);
+                        bool negHeight = (renderer.lodSettings.lowestResLodLevel & 0x1) == 1;
+                        bool negMin    = (renderer.lodSettings.lowestResLodLevel & 0x2) == 2;
+                        bool negMax    = (renderer.lodSettings.lowestResLodLevel & 0x4) == 4;
+                        if (negHeight)
+                            renderer.lodSettings.localHeight *= -1;
+                        if (negMin)
+                            renderer.lodSettings.minScreenHeightPercent *= new half(-1f);
+                        if (negMax)
+                            renderer.lodSettings.maxScreenHeightPercent *= new half(-1f);
+
+                        if (renderer.lodSettings.minScreenHeightPercentAtCrossfadeEdge > 0f || renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge > 0f)
+                        {
+                            if (renderer.lodSettings.isSpeedTree)
+                                baker.AddComponent<SpeedTreeCrossfadeTag>(renderer.targetEntity);
+
+                            if (renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge < 0f)
+                                renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge = half.MaxValueAsHalf;
+
+                            baker.AddComponent<LodCrossfade>(renderer.targetEntity);
+                            baker.AddComponent(              renderer.targetEntity, new LodHeightPercentagesWithCrossfadeMargins
+                            {
+                                localSpaceHeight = renderer.lodSettings.localHeight,
+                                maxCrossFadeEdge = renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge,
+                                maxPercent       = renderer.lodSettings.maxScreenHeightPercent,
+                                minCrossFadeEdge = renderer.lodSettings.minScreenHeightPercentAtCrossfadeEdge,
+                                minPercent       = renderer.lodSettings.minScreenHeightPercent
+                            });
+                        }
+                        else
+                        {
+                            baker.AddComponent(renderer.targetEntity, new LodHeightPercentages
+                            {
+                                localSpaceHeight = renderer.lodSettings.localHeight,
+                                maxPercent       = renderer.lodSettings.maxScreenHeightPercent,
+                                minPercent       = renderer.lodSettings.minScreenHeightPercent
+                            });
+                        }
                     }
 
                     if (renderer.useLightmapsIfPossible)

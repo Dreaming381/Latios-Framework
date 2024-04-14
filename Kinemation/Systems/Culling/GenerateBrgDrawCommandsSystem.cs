@@ -98,13 +98,14 @@ namespace Latios.Kinemation.Systems
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<Unity.Transforms.LocalToWorld>(true),
 #endif
-                PostProcessMatrix    = GetComponentTypeHandle<PostProcessMatrix>(true),
-                MaterialMeshInfo     = GetComponentTypeHandle<MaterialMeshInfo>(true),
-                ProfilerEmitChunk    = m_profilerEmitChunk,
-                RenderFilterSettings = GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                RenderMeshArray      = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
-                SceneCullingMask     = cullingContext.sceneCullingMask,
-                splitsAreValid       = cullingContext.viewType == BatchCullingViewType.Light,
+                PostProcessMatrix           = GetComponentTypeHandle<PostProcessMatrix>(true),
+                MaterialMeshInfo            = GetComponentTypeHandle<MaterialMeshInfo>(true),
+                ProfilerEmitChunk           = m_profilerEmitChunk,
+                RenderFilterSettings        = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                RenderMeshArray             = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
+                SceneCullingMask            = cullingContext.sceneCullingMask,
+                speedTreeCrossfadeTagHandle = GetComponentTypeHandle<SpeedTreeCrossfadeTag>(true),
+                splitsAreValid              = cullingContext.viewType == BatchCullingViewType.Light,
             };
 
             var allocateWorkItemsJob = new AllocateWorkItemsJob
@@ -246,6 +247,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraCullingMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
             [ReadOnly] public ComponentTypeHandle<LodCrossfade>                    lodCrossfadeHandle;
+            [ReadOnly] public ComponentTypeHandle<SpeedTreeCrossfadeTag>           speedTreeCrossfadeTagHandle;
             [ReadOnly] public EntityQueryMask                                      motionVectorDeformQueryMask;
             public bool                                                            splitsAreValid;
 
@@ -336,8 +338,10 @@ namespace Latios.Kinemation.Systems
 
                     int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
 
-                    var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
-                    var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
+                    var mask              = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
+                    var splitsMask        = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
+                    var crossFadeEnableds = hasLodCrossfade ? chunk.GetEnabledMask(ref lodCrossfadeHandle) : default;
+                    var isSpeedTree       = hasLodCrossfade && chunk.Has(ref speedTreeCrossfadeTagHandle);
 
                     TransformQvvs* depthSortingTransformsPtr = null;
                     if (isDepthSorted && hasPostProcess)
@@ -384,8 +388,14 @@ namespace Latios.Kinemation.Systems
                             if (isLightMapped)
                                 drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
 
-                            if (hasLodCrossfade)
+                            if (hasLodCrossfade && crossFadeEnableds[entityIndex])
+                            {
+                                // Todo: Remove the LODCrossFade line and replace with the commented out lines in Unity 6.
                                 drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
+                                //drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
+                                //if (!isSpeedTree)
+                                //    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+                            }
 
                             // Depth sorted draws are emitted with access to entity transforms,
                             // so they can also be written out for sorting
