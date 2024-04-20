@@ -13,7 +13,7 @@ using static Unity.Entities.SystemAPI;
 
 // Todo: Currently we don't pad the per-thread AABBs because we only touch them once per chunk.
 // But maybe we should?
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]

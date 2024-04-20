@@ -7,7 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     // Todo: What is this below TODO talking about? Regardless, this always needs to update to check the RecreateAllBatchesFlag.
     //@TODO: Updating always necessary due to empty component group. When Component group and archetype chunks are unified, [RequireMatchingQueriesForUpdate] can be added.

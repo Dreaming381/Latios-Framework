@@ -28,13 +28,16 @@ namespace Latios.Calligraphics.Authoring
         public HorizontalAlignmentOptions horizontalAlignment = HorizontalAlignmentOptions.Left;
         public VerticalAlignmentOptions   verticalAlignment   = VerticalAlignmentOptions.Top;
         public bool                       isOrthographic;
-        public bool                       enableKerning       = true;
+        public bool                       enableKerning = true;
         public FontStyles                 fontStyle;
         public FontWeight                 fontWeight;
 
         public Color32 color = UnityEngine.Color.white;
 
         public List<FontMaterialPair> fontsAndMaterials;
+
+        [Tooltip("If enabled, text is stored perpetually in GPU memory and always uploaded on change, regardless of visibility.")]
+        public bool gpuResident;
     }
 
     [Serializable]
@@ -56,8 +59,11 @@ namespace Latios.Calligraphics.Authoring
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
 
-            //Fonts
+            // Fonts and rendering
             AddFontRendering(entity, authoring.fontsAndMaterials[0]);
+            if (authoring.gpuResident)
+                AddComponent<GpuResidentTextTag>(entity);
+
             if (authoring.fontsAndMaterials.Count > 1)
             {
                 AddComponent<TextMaterialMaskShaderIndex>(entity);
@@ -70,10 +76,12 @@ namespace Latios.Calligraphics.Authoring
                     AddComponent<TextMaterialMaskShaderIndex>(newEntity);
                     AddBuffer<RenderGlyphMask>(newEntity);
                     additionalEntities.Add(newEntity);
+                    if (authoring.gpuResident)
+                        AddComponent<GpuResidentTextTag>(newEntity);
                 }
             }
 
-            //Text Content
+            // Text Content
             var calliString = new CalliString(AddBuffer<CalliByte>(entity));
             calliString.Append(authoring.text);
             AddComponent(entity, new TextBaseConfiguration

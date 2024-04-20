@@ -169,7 +169,7 @@ namespace Latios
         /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
         public InstantiateCommandBuffer(AllocatorManager.AllocatorHandle allocator)
         {
-            FixedList64Bytes<ComponentType> types = new FixedList64Bytes<ComponentType>();
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
             types.Add(ComponentType.ReadWrite<T0>());
             m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types);
         }
@@ -301,7 +301,7 @@ namespace Latios
         /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
         public InstantiateCommandBuffer(AllocatorManager.AllocatorHandle allocator)
         {
-            FixedList64Bytes<ComponentType> types = new FixedList64Bytes<ComponentType>();
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
             types.Add(ComponentType.ReadWrite<T0>());
             types.Add(ComponentType.ReadWrite<T1>());
             m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types);
@@ -437,7 +437,7 @@ namespace Latios
         /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
         public InstantiateCommandBuffer(AllocatorManager.AllocatorHandle allocator)
         {
-            FixedList64Bytes<ComponentType> types = new FixedList64Bytes<ComponentType>();
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
             types.Add(ComponentType.ReadWrite<T0>());
             types.Add(ComponentType.ReadWrite<T1>());
             types.Add(ComponentType.ReadWrite<T2>());
@@ -576,7 +576,7 @@ namespace Latios
         /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
         public InstantiateCommandBuffer(AllocatorManager.AllocatorHandle allocator)
         {
-            FixedList64Bytes<ComponentType> types = new FixedList64Bytes<ComponentType>();
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
             types.Add(ComponentType.ReadWrite<T0>());
             types.Add(ComponentType.ReadWrite<T1>());
             types.Add(ComponentType.ReadWrite<T2>());
@@ -718,7 +718,7 @@ namespace Latios
         /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
         public InstantiateCommandBuffer(AllocatorManager.AllocatorHandle allocator)
         {
-            FixedList64Bytes<ComponentType> types = new FixedList64Bytes<ComponentType>();
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
             types.Add(ComponentType.ReadWrite<T0>());
             types.Add(ComponentType.ReadWrite<T1>());
             types.Add(ComponentType.ReadWrite<T2>());

@@ -11,6 +11,7 @@ namespace Latios.Calligraphics
     //TODO: Underlay, Bold, Smallcaps
     public struct FontBlob
     {
+        public FixedString128Bytes                name;
         public BlobArray<GlyphBlob>               characters;
         public BlobArray<BlobArray<GlyphLookup> > glyphLookupMap;
         public BlobArray<AdjustmentPair>          adjustmentPairs;
@@ -52,11 +53,11 @@ namespace Latios.Calligraphics
 
     public struct GlyphBlob
     {
-        public uint              glyphIndex;
-        public uint              unicode;
-        public GlyphMetrics      glyphMetrics;
-        public GlyphRect         glyphRect;
-        public float             glyphScale;
+        public uint         glyphIndex;
+        public uint         unicode;
+        public GlyphMetrics glyphMetrics;
+        public GlyphRect    glyphRect;
+        public float        glyphScale;
 
         public AdjustmentPairLookupByGlyph glyphAdjustmentsLookup;
     }

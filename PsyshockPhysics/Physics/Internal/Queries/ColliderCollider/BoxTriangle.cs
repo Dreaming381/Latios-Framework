@@ -12,6 +12,16 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
+            // Do a quick SAT test against the box faces to rule out misses.
+            var aInBTransform          = math.mul(math.inverse(boxTransform), triangleTransform);
+            var triangleInBoxSpaceAabb = Physics.AabbFrom(triangle, aInBTransform);
+            var localBoxAabb           = new Aabb(box.center - (box.halfSize + maxDistance), box.center + (box.halfSize + maxDistance));
+            if (math.any(triangleInBoxSpaceAabb.max < localBoxAabb.min) || math.any(localBoxAabb.max < triangleInBoxSpaceAabb.min))
+            {
+                result = default;
+                return false;
+            }
+
             // Todo: SAT algorithm similar to box vs box.
             var bInATransform = math.mul(math.inverse(triangleTransform), boxTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(triangle, box, in bInATransform);

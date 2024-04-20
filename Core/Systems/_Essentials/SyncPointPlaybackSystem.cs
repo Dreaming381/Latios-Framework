@@ -64,7 +64,8 @@ namespace Latios.Systems
             Disable,
             Destroy,
             InstantiateNoData,
-            InstantiateUntyped
+            InstantiateUntyped,
+            AddComponentsUntyped,
         }
 
         struct PlaybackInstance
@@ -73,12 +74,13 @@ namespace Latios.Systems
             public SystemHandle requestingSystem;
         }
 
-        NativeList<EntityCommandBuffer>             m_entityCommandBuffers;
-        NativeList<EnableCommandBuffer>             m_enableCommandBuffers;
-        NativeList<DisableCommandBuffer>            m_disableCommandBuffers;
-        NativeList<DestroyCommandBuffer>            m_destroyCommandBuffers;
-        NativeList<InstantiateCommandBuffer>        m_instantiateCommandBuffersWithoutData;
-        NativeList<InstantiateCommandBufferUntyped> m_instantiateCommandBuffersUntyped;
+        NativeList<EntityCommandBuffer>               m_entityCommandBuffers;
+        NativeList<EnableCommandBuffer>               m_enableCommandBuffers;
+        NativeList<DisableCommandBuffer>              m_disableCommandBuffers;
+        NativeList<DestroyCommandBuffer>              m_destroyCommandBuffers;
+        NativeList<InstantiateCommandBuffer>          m_instantiateCommandBuffersWithoutData;
+        NativeList<InstantiateCommandBufferUntyped>   m_instantiateCommandBuffersUntyped;
+        NativeList<AddComponentsCommandBufferUntyped> m_addComponentsCommandBuffersUntyped;
 
         NativeList<JobHandle>                m_jobHandles;
         NativeList<PlaybackInstance>         m_playbackInstances;
@@ -98,6 +100,7 @@ namespace Latios.Systems
         int m_destroyIndex;
         int m_instantiateNoDataIndex;
         int m_instantiateUntypedIndex;
+        int m_addComponentsUntypedIndex;
 
         internal NativeText.ReadOnly m_requestSystemNameForCurrentBuffer;
         internal FixedString64Bytes  m_currentBufferTypeName;
@@ -124,6 +127,7 @@ namespace Latios.Systems
             m_destroyCommandBuffers                = new NativeList<DestroyCommandBuffer>(Allocator.Persistent);
             m_instantiateCommandBuffersWithoutData = new NativeList<InstantiateCommandBuffer>(Allocator.Persistent);
             m_instantiateCommandBuffersUntyped     = new NativeList<InstantiateCommandBufferUntyped>(Allocator.Persistent);
+            m_addComponentsCommandBuffersUntyped   = new NativeList<AddComponentsCommandBufferUntyped>(Allocator.Persistent);
 
             m_jobHandles = new NativeList<JobHandle>(Allocator.Persistent);
 
@@ -148,6 +152,7 @@ namespace Latios.Systems
             m_destroyCommandBuffers.Dispose();
             m_instantiateCommandBuffersWithoutData.Dispose();
             m_instantiateCommandBuffersUntyped.Dispose();
+            m_addComponentsCommandBuffersUntyped.Dispose();
 
             m_externalSourceText.Dispose();
         }
@@ -177,12 +182,13 @@ namespace Latios.Systems
                 m_currentBufferTypeName = default;
                 switch (instance.type)
                 {
-                    case PlaybackType.Entity: m_currentBufferTypeName             = "EntityCommandBuffer"; break;
-                    case PlaybackType.Enable: m_currentBufferTypeName             = "EnableCommandBuffer"; break;
-                    case PlaybackType.Disable: m_currentBufferTypeName            = "DisableCommandBuffer"; break;
-                    case PlaybackType.Destroy: m_currentBufferTypeName            = "DestroyCommandBuffer"; break;
-                    case PlaybackType.InstantiateNoData: m_currentBufferTypeName  = "InstantiateCommandBuffer"; break;
-                    case PlaybackType.InstantiateUntyped: m_currentBufferTypeName = "InstantiateCommandBuffer"; break;
+                    case PlaybackType.Entity: m_currentBufferTypeName               = "EntityCommandBuffer"; break;
+                    case PlaybackType.Enable: m_currentBufferTypeName               = "EnableCommandBuffer"; break;
+                    case PlaybackType.Disable: m_currentBufferTypeName              = "DisableCommandBuffer"; break;
+                    case PlaybackType.Destroy: m_currentBufferTypeName              = "DestroyCommandBuffer"; break;
+                    case PlaybackType.InstantiateNoData: m_currentBufferTypeName    = "InstantiateCommandBuffer"; break;
+                    case PlaybackType.InstantiateUntyped: m_currentBufferTypeName   = "InstantiateCommandBuffer"; break;
+                    case PlaybackType.AddComponentsUntyped: m_currentBufferTypeName = "AddComponentsCommandBuffer"; break;
                 }
                 if (state.WorldUnmanaged.IsSystemValid(instance.requestingSystem))
                     m_requestSystemNameForCurrentBuffer = state.WorldUnmanaged.ResolveSystemStateRef(instance.requestingSystem).DebugName;
@@ -239,6 +245,13 @@ namespace Latios.Systems
                         icb.Playback(state.EntityManager);
                         break;
                     }
+                    case PlaybackType.AddComponentsUntyped:
+                    {
+                        var accb = m_addComponentsCommandBuffersUntyped[m_addComponentsUntypedIndex];
+                        m_addComponentsUntypedIndex++;
+                        accb.Playback(state.EntityManager);
+                        break;
+                    }
                 }
 #if ENABLE_PROFILER
                 m_currentMarker.End();
@@ -261,13 +274,15 @@ namespace Latios.Systems
             m_destroyCommandBuffers.Clear();
             m_instantiateCommandBuffersWithoutData.Clear();
             m_instantiateCommandBuffersUntyped.Clear();
+            m_addComponentsCommandBuffersUntyped.Clear();
 
-            m_entityIndex             = 0;
-            m_enableIndex             = 0;
-            m_disableIndex            = 0;
-            m_destroyIndex            = 0;
-            m_instantiateNoDataIndex  = 0;
-            m_instantiateUntypedIndex = 0;
+            m_entityIndex               = 0;
+            m_enableIndex               = 0;
+            m_disableIndex              = 0;
+            m_destroyIndex              = 0;
+            m_instantiateNoDataIndex    = 0;
+            m_instantiateUntypedIndex   = 0;
+            m_addComponentsUntypedIndex = 0;
 
             m_commandBufferAllocator.Allocator.Rewind();
         }
@@ -446,6 +461,102 @@ namespace Latios.Systems
             m_playbackInstances.Add(instance);
             m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
             return icb;
+        }
+
+        /// <summary>
+        /// Creates a new AddComponentsCommandBuffer that will be played back by this system.
+        /// </summary>
+        public AddComponentsCommandBuffer<T0> CreateAddComponentsCommandBuffer<T0>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 : unmanaged,
+        IComponentData
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var accb                        = new AddComponentsCommandBuffer<T0>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            return accb;
+        }
+
+        /// <summary>
+        /// Creates a new AddComponentsCommandBuffer that will be played back by this system.
+        /// </summary>
+        public AddComponentsCommandBuffer<T0, T1> CreateAddComponentsCommandBuffer<T0, T1>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged, IComponentData
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var accb                        = new AddComponentsCommandBuffer<T0, T1>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            return accb;
+        }
+
+        /// <summary>
+        /// Creates a new AddComponentsCommandBuffer that will be played back by this system.
+        /// </summary>
+        public AddComponentsCommandBuffer<T0, T1, T2> CreateAddComponentsCommandBuffer<T0, T1,
+                                                                                       T2>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            return accb;
+        }
+
+        /// <summary>
+        /// Creates a new AddComponentsCommandBuffer that will be played back by this system.
+        /// </summary>
+        public AddComponentsCommandBuffer<T0, T1, T2, T3> CreateAddComponentsCommandBuffer<T0, T1, T2,
+                                                                                           T3>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 :
+        unmanaged, IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2, T3>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            return accb;
+        }
+
+        /// <summary>
+        /// Creates a new AddComponentsCommandBuffer that will be played back by this system.
+        /// </summary>
+        public AddComponentsCommandBuffer<T0, T1, T2, T3, T4> CreateAddComponentsCommandBuffer<T0, T1, T2, T3,
+                                                                                               T4>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 :
+        unmanaged, IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2, T3, T4>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            return accb;
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Latios;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;

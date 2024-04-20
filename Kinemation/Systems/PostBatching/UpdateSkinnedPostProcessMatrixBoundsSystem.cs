@@ -9,7 +9,7 @@ using Unity.Rendering;
 
 using static Unity.Entities.SystemAPI;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]

@@ -256,7 +256,7 @@ namespace Latios.Kinemation
                     m_copyShader.SetBuffer(0, "_dst", m_currentBuffer);
                     m_copyShader.SetBuffer(0, "_src", prevBuffer);
                     uint copySize = m_currentSize;
-                    for (uint dispatchesRemaining = copySize / threadGroupSize, start = 0; dispatchesRemaining > 0;)
+                    for (uint dispatchesRemaining = (copySize + threadGroupSize - 1) / threadGroupSize, start = 0; dispatchesRemaining > 0;)
                     {
                         uint dispatchCount = math.min(dispatchesRemaining, 65535);
                         m_copyShader.SetInt("_start", (int)(start * threadGroupSize));

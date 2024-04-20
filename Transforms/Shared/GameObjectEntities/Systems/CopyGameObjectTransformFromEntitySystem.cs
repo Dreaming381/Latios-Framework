@@ -5,7 +5,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using UnityEngine.Jobs;
 
-namespace Latios.Transforms
+namespace Latios.Transforms.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]

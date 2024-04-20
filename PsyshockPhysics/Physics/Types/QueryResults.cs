@@ -191,13 +191,20 @@ namespace Latios.Psyshock
     public struct DistanceBetweenAllCache : IDistanceBetweenAllProcessor
     {
         UnsafeList<ColliderDistanceResult> results;
+        int                                requiredSize;
 
-        public void Begin(in DistanceBetweenAllContext context) => results.Length = 0;
+        public void Begin(in DistanceBetweenAllContext context)
+        {
+            results.Length = 0;
+            requiredSize   = math.ceilpow2(math.max(results.Capacity, context.numSubcollidersA + context.numSubcollidersB));
+        }
 
         public void Execute(in ColliderDistanceResult result)
         {
             if (!results.IsCreated)
                 results = new UnsafeList<ColliderDistanceResult>(8, Allocator.Temp);
+            if (results.Length == results.Capacity && results.Length * 2 < requiredSize)
+                results.SetCapacity(requiredSize);
             results.Add(result);
         }
 

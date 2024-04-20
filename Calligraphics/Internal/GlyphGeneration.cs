@@ -1,6 +1,6 @@
+using System.Runtime.CompilerServices;
 using Latios.Calligraphics.Rendering;
 using Latios.Calligraphics.RichText;
-using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -36,7 +36,6 @@ namespace Latios.Calligraphics
             bool                   prevWasSpace                                    = false;
             int                    lineCount                                       = 0;
             bool                   isLineStart                                     = true;
-            ref FontBlob           font                                            = ref fontMaterialSet[0];
 
             var calliString         = new CalliString(calliBytes);
             var characterEnumerator = calliString.GetEnumerator();
@@ -51,7 +50,8 @@ namespace Latios.Calligraphics
                 {
                     textConfiguration.m_isParsingText = true;
                     // Check if Tag is valid. If valid, skip to the end of the validated tag.
-                    if (RichTextParser.ValidateHtmlTag(in calliString, ref characterEnumerator, ref font, in baseConfiguration, ref textConfiguration, ref richTextTagIdentifiers))
+                    if (RichTextParser.ValidateHtmlTag(in calliString, ref characterEnumerator, ref fontMaterialSet, in baseConfiguration, ref textConfiguration,
+                                                       ref richTextTagIdentifiers))
                     {
                         // Continue to next character
                         continue;
@@ -59,6 +59,7 @@ namespace Latios.Calligraphics
                 }
                 #endregion
 
+                ref FontBlob font                 = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
                 textConfiguration.m_isParsingText = false;
 
                 // Handle Font Styles like LowerCase, UpperCase and SmallCaps.
@@ -131,30 +132,32 @@ namespace Latios.Calligraphics
                         blColor = textConfiguration.m_htmlColor,
                         tlColor = textConfiguration.m_htmlColor,
                         trColor = textConfiguration.m_htmlColor,
-                        brColor = textConfiguration.m_htmlColor,                        
+                        brColor = textConfiguration.m_htmlColor,
                     };
-                    
+
                     // Set Padding based on selected font style
                     #region Handle Style Padding
                     float boldSpacingAdjustment = 0;
-                    float style_padding = 0;
+                    float style_padding         = 0;
                     if ((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold)
                     {
-                        style_padding = 0;
+                        style_padding         = 0;
                         boldSpacingAdjustment = font.boldStyleSpacing;
                     }
                     #endregion Handle Style Padding
 
-                    var adjustedScale = textConfiguration.m_currentFontSize * smallCapsMultiplier / font.pointSize * font.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f);
-                    var currentElementScale = adjustedScale * textConfiguration.m_fontScaleMultiplier * glyphBlob.glyphScale; //* m_cached_TextElement.m_Scale
-                    float currentEmScale = baseConfiguration.fontSize * 0.01f * (baseConfiguration.isOrthographic? 1 : 0.1f);
+                    var adjustedScale = textConfiguration.m_currentFontSize * smallCapsMultiplier / font.pointSize * font.scale *
+                                        (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                    var   currentElementScale = adjustedScale * textConfiguration.m_fontScaleMultiplier * glyphBlob.glyphScale;  //* m_cached_TextElement.m_Scale
+                    float currentEmScale      = baseConfiguration.fontSize * 0.01f * (baseConfiguration.isOrthographic ? 1 : 0.1f);
 
                     // Determine the position of the vertices of the Character
                     #region Calculate Vertices Position
-                    var currentGlyphMetrics = glyphBlob.glyphMetrics;
+                    var    currentGlyphMetrics = glyphBlob.glyphMetrics;
                     float2 topLeft;
-                    topLeft.x =  (currentGlyphMetrics.horizontalBearingX * textConfiguration.m_FXScale.x - font.materialPadding - style_padding) * currentElementScale;
-                    topLeft.y =  (currentGlyphMetrics.horizontalBearingY + font.materialPadding) * currentElementScale - textConfiguration.m_lineOffset + textConfiguration.m_baselineOffset;
+                    topLeft.x = (currentGlyphMetrics.horizontalBearingX * textConfiguration.m_FXScale.x - font.materialPadding - style_padding) * currentElementScale;
+                    topLeft.y = (currentGlyphMetrics.horizontalBearingY + font.materialPadding) * currentElementScale - textConfiguration.m_lineOffset +
+                                textConfiguration.m_baselineOffset;
 
                     float2 bottomLeft;
                     bottomLeft.x = topLeft.x;
@@ -170,7 +173,7 @@ namespace Latios.Calligraphics
                     #endregion
 
                     #region Setup UVA
-                    var glyphRect = glyphBlob.glyphRect;
+                    var    glyphRect = glyphBlob.glyphRect;
                     float2 blUVA, tlUVA, trUVA, brUVA;
                     blUVA.x = (glyphRect.x - font.materialPadding - style_padding) / font.atlasWidth;
                     blUVA.y = (glyphRect.y - font.materialPadding - style_padding) / font.atlasHeight;
@@ -198,9 +201,9 @@ namespace Latios.Calligraphics
                     brUVC.x = 1;
 
                     //m_verticalMapping case case TextureMappingOptions.Character
-                    blUVC.y = 0;                    
-                    tlUVC.y = 1;                    
-                    trUVC.y = 1;                    
+                    blUVC.y = 0;
+                    tlUVC.y = 1;
+                    trUVC.y = 1;
                     brUVC.y = 0;
 
                     renderGlyph.blUVB = blUVC;
@@ -217,7 +220,9 @@ namespace Latios.Calligraphics
                         float  shear       = textConfiguration.m_italicAngle * 0.01f;
                         float2 topShear    = new float2(shear * ((currentGlyphMetrics.horizontalBearingY + font.materialPadding + style_padding) * currentElementScale), 0);
                         float2 bottomShear =
-                            new float2(shear * (((currentGlyphMetrics.horizontalBearingY - currentGlyphMetrics.height - font.materialPadding - style_padding)) * currentElementScale), 0);
+                            new float2(
+                                shear * (((currentGlyphMetrics.horizontalBearingY - currentGlyphMetrics.height - font.materialPadding - style_padding)) * currentElementScale),
+                                0);
                         float2 shearAdjustment = (topShear - bottomShear) * 0.5f;
 
                         topShear    -= shearAdjustment;
@@ -232,15 +237,15 @@ namespace Latios.Calligraphics
                     }
                     #endregion Handle Italics & Shearing
 
-
                     // Handle Character FX Rotation
                     #region Handle Character FX Rotation
                     renderGlyph.rotationCCW = textConfiguration.m_FXRotationAngle;
                     #endregion
 
                     #region handle bold
-                    var xScale = textConfiguration.m_currentFontSize;// * math.abs(lossyScale) * (1 - m_charWidthAdjDelta);
-                    if ((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold) xScale *= -1;
+                    var xScale = textConfiguration.m_currentFontSize;  // * math.abs(lossyScale) * (1 - m_charWidthAdjDelta);
+                    if ((textConfiguration.m_fontStyleInternal & FontStyles.Bold) == FontStyles.Bold)
+                        xScale *= -1;
 
                     renderGlyph.scale = xScale;
                     #endregion
@@ -312,7 +317,9 @@ namespace Latios.Calligraphics
                     adjustmentOffset.x = glyphAdjustments.xPlacement * currentElementScale;
                     adjustmentOffset.y = glyphAdjustments.yPlacement * currentElementScale;
 
-                    cumulativeOffset.x += ((currentGlyphMetrics.horizontalAdvance * textConfiguration.m_FXScale.x + glyphAdjustments.xAdvance) * currentElementScale + (font.regularStyleSpacing + characterSpacingAdjustment + boldSpacingAdjustment) * currentEmScale + textConfiguration.m_cSpacing);// * (1 - m_charWidthAdjDelta);                   
+                    cumulativeOffset.x +=
+                        ((currentGlyphMetrics.horizontalAdvance * textConfiguration.m_FXScale.x + glyphAdjustments.xAdvance) * currentElementScale +
+                         (font.regularStyleSpacing + characterSpacingAdjustment + boldSpacingAdjustment) * currentEmScale + textConfiguration.m_cSpacing);  // * (1 - m_charWidthAdjDelta);
                     cumulativeOffset.y += glyphAdjustments.yAdvance * currentElementScale;
                     #endregion
 
@@ -409,7 +416,7 @@ namespace Latios.Calligraphics
                 ApplyHorizontalAlignmentToGlyphs(ref finalGlyphsLine, ref characterGlyphIndicesWithPreceedingSpacesInLine, baseConfiguration.maxLineWidth, overrideMode);
             }
             lineCount++;
-            ApplyVerticalAlignmentToGlyphs(ref renderGlyphs, lineCount, baseConfiguration.verticalAlignment, ref font, baseConfiguration.fontSize);
+            ApplyVerticalAlignmentToGlyphs(ref renderGlyphs, lineCount, baseConfiguration.verticalAlignment, ref fontMaterialSet[0], baseConfiguration.fontSize);
         }
 
         static unsafe void ApplyHorizontalAlignmentToGlyphs(ref NativeArray<RenderGlyph> glyphs,

@@ -1,4 +1,3 @@
-using Latios;
 using Latios.Psyshock;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
@@ -12,7 +11,7 @@ using Unity.Rendering;
 
 using static Unity.Entities.SystemAPI;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     /// <summary>
     /// A system that updates the WorldRenderBounds for entities that have both a WorldTransform and RenderBounds component.

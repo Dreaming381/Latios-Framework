@@ -10,7 +10,7 @@ int _start;
 [numthreads(64, 1, 1)]
 void CopyBytes(uint3 id : SV_DispatchThreadID)
 {
-    int index = _start + id.x;
+    int index = 4 * (_start + id.x);
     uint data = _src.Load(index);
     _dst.Store(index, data);
 }

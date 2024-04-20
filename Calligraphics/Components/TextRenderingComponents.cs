@@ -172,12 +172,42 @@ namespace Latios.Calligraphics.Rendering
         public uint lowerOffsetUpperMask16;
     }
 
+    /// <summary>
+    /// When this tag is present, the text is treated as GPU-resident. Such text always
+    /// consumes GPU memory, even when not visible, and that memory can be prone to fragmentation.
+    /// It is recommended to only use this for static text which will appear for steady durations
+    /// of time or when the number known to exist is suitably small. An example of an appropriate
+    /// use case would be player names in a game session that had a max capacity of players of
+    /// 1024 or less.
+    /// </summary>
+    public struct GpuResidentTextTag : IComponentData { }
+
     internal struct GlyphCountThisFrame : IComponentData
     {
         public uint glyphCount;
     }
 
     internal struct MaskCountThisFrame : IComponentData
+    {
+        public uint maskCount;
+    }
+
+    internal struct GpuResidentUpdateFlag : IComponentData, IEnableableComponent { }
+
+    internal struct GpuResidentAllocation : ICleanupComponentData
+    {
+        public uint glyphStart;
+        public uint glyphCount;
+        public uint maskStart;
+        public uint maskCount;
+    }
+
+    internal struct GpuResidentGlyphCount : IComponentData
+    {
+        public uint glyphCount;
+    }
+
+    internal struct GpuResidentMaskCount : IComponentData
     {
         public uint maskCount;
     }

@@ -1,4 +1,3 @@
-using Latios;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Collections;
@@ -7,7 +6,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [UpdateInGroup(typeof(StructuralChangePresentationSystemGroup))]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.EntitySceneOptimizations | WorldSystemFilterFlags.Editor)]

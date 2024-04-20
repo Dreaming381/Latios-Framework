@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
-// Todo: Design public APIs for masked sampling and parameter blending.
+// Todo: Design public APIs for parameter blending.
 
 namespace AclUnity
 {

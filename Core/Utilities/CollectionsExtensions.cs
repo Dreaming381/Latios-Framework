@@ -1,5 +1,9 @@
-﻿using Unity.Collections;
+﻿using System;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Jobs;
+using Unity.Jobs.LowLevel.Unsafe;
 
 namespace Latios
 {
@@ -16,6 +20,11 @@ namespace Latios
             var result = new NativeList<T>(list.Length, allocator);
             result.AddRangeNoResize(list);
             return result;
+        }
+
+        public static unsafe JobHandle CombineDependencies(Span<JobHandle> jobHandles)
+        {
+            return JobHandleUnsafeUtility.CombineDependencies((JobHandle*)UnsafeUtility.AddressOf(ref jobHandles[0]), jobHandles.Length);
         }
     }
 }

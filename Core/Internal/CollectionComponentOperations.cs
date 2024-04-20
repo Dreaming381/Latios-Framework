@@ -9,6 +9,10 @@ namespace Latios.InternalSourceGen
 {
     internal static unsafe class CollectionComponentOperations
     {
+        static StaticAPI.ContextPtr Wrap(void* ptr) => new StaticAPI.ContextPtr {
+            ptr = ptr
+        };
+
         public static void CreateQueries(FunctionPointer<StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
                                          ref SystemState state,
                                          out EntityQuery addQuery,
@@ -23,7 +27,7 @@ namespace Latios.InternalSourceGen
                     state       = ptr
                 };
 
-                functionPtr.Invoke(UnsafeUtility.AddressOf(ref context), (int)OperationType.CreateQueries);
+                functionPtr.Invoke(Wrap(UnsafeUtility.AddressOf(ref context)), (int)OperationType.CreateQueries);
 
                 addQuery    = context.addQuery;
                 removeQuery = context.removeQuery;
@@ -45,7 +49,7 @@ namespace Latios.InternalSourceGen
                 entityHandle = entityHandle
             };
 
-            functionPtr.Invoke(UnsafeUtility.AddressOf(ref context), (int)OperationType.SyncQueries);
+            functionPtr.Invoke(Wrap(UnsafeUtility.AddressOf(ref context)), (int)OperationType.SyncQueries);
         }
 
         public static void DisposeCollectionStorage(FunctionPointer<StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
@@ -58,7 +62,7 @@ namespace Latios.InternalSourceGen
                 storageIndex = storageIndex
             };
 
-            functionPtr.Invoke(UnsafeUtility.AddressOf(ref context), (int)OperationType.DisposeCollectionStorage);
+            functionPtr.Invoke(Wrap(UnsafeUtility.AddressOf(ref context)), (int)OperationType.DisposeCollectionStorage);
         }
 
         enum OperationType : int

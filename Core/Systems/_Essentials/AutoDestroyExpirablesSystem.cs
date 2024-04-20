@@ -1,4 +1,3 @@
-using Latios.Systems;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
@@ -17,7 +16,7 @@ using static Unity.Entities.SystemAPI;
 // Note: If we had the ability to get all chunks from a query without filtering,
 // we could replace the hash map with an array, which would be a lot faster.
 
-namespace Latios
+namespace Latios.Systems
 {
     [DisableAutoCreation]
     [UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]

@@ -1,5 +1,6 @@
 using Latios.Authoring;
 using Latios.Kinemation.Authoring.Systems;
+using Latios.Kinemation.Systems;
 using Unity.Entities;
 
 namespace Latios.Kinemation.Authoring

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using Latios.Kinemation;
 using Latios.Kinemation.Systems;
 using Unity.Burst;
@@ -40,22 +39,23 @@ namespace Latios.Calligraphics.Rendering.Systems
         int _latiosTextBuffer;
         int _latiosTextMaskBuffer;
 
-        static GraphicsBufferBroker.StaticID kGlyphsBufferID     = GraphicsBufferBroker.ReservePersistentBuffer();
-        static GraphicsBufferBroker.StaticID kGlyphsUploadID     = GraphicsBufferBroker.ReserveUploadPool();
-        static GraphicsBufferBroker.StaticID kGlyphMasksBufferID = GraphicsBufferBroker.ReservePersistentBuffer();
-        static GraphicsBufferBroker.StaticID kGlyphMasksUploadID = GraphicsBufferBroker.ReserveUploadPool();
+        internal static GraphicsBufferBroker.StaticID kGlyphsBufferID     = GraphicsBufferBroker.ReservePersistentBuffer();
+        internal static GraphicsBufferBroker.StaticID kGlyphMasksBufferID = GraphicsBufferBroker.ReservePersistentBuffer();
+        static GraphicsBufferBroker.StaticID          kGlyphsUploadID     = GraphicsBufferBroker.ReserveUploadPool();
+        static GraphicsBufferBroker.StaticID          kGlyphMasksUploadID = GraphicsBufferBroker.ReserveUploadPool();
 
         protected override void OnCreate()
         {
             m_glyphsQuery = Fluent.With<RenderGlyph, TextRenderControl, RenderBounds>(true).With<TextShaderIndex>(false)
-                            .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(          true,  true).Build();
+                            .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(true,  true).Without<GpuResidentTextTag>().Build();
             m_masksQuery = Fluent.With<TextMaterialMaskShaderIndex>(false).With<RenderBounds, RenderGlyphMask>(true)
-                           .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(          true,  true).Build();
+                           .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(true,  true).Without<GpuResidentTextTag>().Build();
             m_allQuery = Fluent.WithAnyEnabled<TextShaderIndex, TextMaterialMaskShaderIndex>(true).With<RenderBounds>(true)
-                         .With<ChunkPerCameraCullingMask>(                                    false, true).With<ChunkPerFrameCullingMask>(true, true).Build();
+                         .With<ChunkPerCameraCullingMask>(                          false, true).With<ChunkPerFrameCullingMask>(true, true)
+                         .Without<GpuResidentTextTag>().Build();
             m_glyphsAndMasksQuery = Fluent.With<RenderGlyph, TextRenderControl, RenderBounds>(true)
                                     .With<TextShaderIndex, TextMaterialMaskShaderIndex, RenderGlyphMask>(true)
-                                    .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(          true,  true).Build();
+                                    .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(          true, true).Without<GpuResidentTextTag>().Build();
 
             var copyByteAddressShader = Resources.Load<ComputeShader>("CopyBytes");
             m_uploadGlyphsShader      = Resources.Load<ComputeShader>("UploadGlyphs");
@@ -129,18 +129,19 @@ namespace Latios.Calligraphics.Rendering.Systems
                 var glyphStreamConstructJh = NativeStream.ScheduleConstruct(out var glyphStream, glyphStreamCount, default, WorldUpdateAllocator);
                 var collectGlyphsJh        = new GatherGlyphUploadOperationsJob
                 {
-                    additonalEntitiesHandle   = SystemAPI.GetBufferTypeHandle<AdditionalFontMaterialEntity>(true),
-                    glyphCountThisFrameLookup = SystemAPI.GetComponentLookup<GlyphCountThisFrame>(false),
-                    glyphCountThisPass        = 0,
-                    glyphsHandle              = SystemAPI.GetBufferTypeHandle<RenderGlyph>(true),
-                    glyphMaskHandle           = SystemAPI.GetBufferTypeHandle<RenderGlyphMask>(true),
-                    map                       = map,
-                    perCameraMaskHandle       = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                    perFrameMaskHandle        = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
-                    streamWriter              = glyphStream.AsWriter(),
-                    textShaderIndexHandle     = SystemAPI.GetComponentTypeHandle<TextShaderIndex>(false),
-                    trcHandle                 = SystemAPI.GetComponentTypeHandle<TextRenderControl>(true),
-                    worldBlackboardEntity     = worldBlackboardEntity
+                    additonalEntitiesHandle     = SystemAPI.GetBufferTypeHandle<AdditionalFontMaterialEntity>(true),
+                    glyphCountThisFrameLookup   = SystemAPI.GetComponentLookup<GlyphCountThisFrame>(false),
+                    glyphCountThisPass          = 0,
+                    glyphsHandle                = SystemAPI.GetBufferTypeHandle<RenderGlyph>(true),
+                    glyphMaskHandle             = SystemAPI.GetBufferTypeHandle<RenderGlyphMask>(true),
+                    gpuResidentGlyphCountLookup = SystemAPI.GetComponentLookup<GpuResidentGlyphCount>(true),
+                    map                         = map,
+                    perCameraMaskHandle         = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                    perFrameMaskHandle          = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                    streamWriter                = glyphStream.AsWriter(),
+                    textShaderIndexHandle       = SystemAPI.GetComponentTypeHandle<TextShaderIndex>(false),
+                    trcHandle                   = SystemAPI.GetComponentTypeHandle<TextRenderControl>(true),
+                    worldBlackboardEntity       = worldBlackboardEntity
                 }.Schedule(m_glyphsQuery, JobHandle.CombineDependencies(glyphStreamConstructJh, foundChildrenDependenciesJh));
 
                 var glyphPayloads                 = new NativeList<UploadPayload>(1, WorldUpdateAllocator);
@@ -163,14 +164,15 @@ namespace Latios.Calligraphics.Rendering.Systems
 
                     var collectMasksJh = new GatherMaskUploadOperationsJob
                     {
-                        glyphMasksHandle         = SystemAPI.GetBufferTypeHandle<RenderGlyphMask>(true),
-                        maskCountThisFrameLookup = SystemAPI.GetComponentLookup<MaskCountThisFrame>(false),
-                        maskCountThisPass        = 0,
-                        maskShaderIndexHandle    = SystemAPI.GetComponentTypeHandle<TextMaterialMaskShaderIndex>(false),
-                        perCameraMaskHandle      = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                        perFrameMaskHandle       = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
-                        streamWriter             = maskStream.AsWriter(),
-                        worldBlackboardEntity    = worldBlackboardEntity
+                        glyphMasksHandle           = SystemAPI.GetBufferTypeHandle<RenderGlyphMask>(true),
+                        gpuResidentMaskCountLookup = SystemAPI.GetComponentLookup<GpuResidentMaskCount>(true),
+                        maskCountThisFrameLookup   = SystemAPI.GetComponentLookup<MaskCountThisFrame>(false),
+                        maskCountThisPass          = 0,
+                        maskShaderIndexHandle      = SystemAPI.GetComponentTypeHandle<TextMaterialMaskShaderIndex>(false),
+                        perCameraMaskHandle        = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
+                        perFrameMaskHandle         = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                        streamWriter               = maskStream.AsWriter(),
+                        worldBlackboardEntity      = worldBlackboardEntity
                     }.Schedule(m_masksQuery, JobHandle.CombineDependencies(maskStreamConstructJh, materialMasksJh));
 
                     var batchMasksJh = new MapPayloadsToUploadBufferJob
@@ -245,6 +247,7 @@ namespace Latios.Calligraphics.Rendering.Systems
 
                     finalSecondPhaseJh = JobHandle.CombineDependencies(finalSecondPhaseJh, maskJh);
                 }
+                Dependency = finalSecondPhaseJh;
 
                 yield return true;
 
@@ -263,8 +266,9 @@ namespace Latios.Calligraphics.Rendering.Systems
                 if (terminate)
                     break;
 
-                var persistentGlyphBuffer = graphicsBroker.GetPersistentBuffer(kGlyphsBufferID,
-                                                                               math.max(worldBlackboardEntity.GetComponentData<GlyphCountThisFrame>().glyphCount, 128) * 24);
+                var frameGlyphCount       = worldBlackboardEntity.GetComponentData<GlyphCountThisFrame>().glyphCount;
+                var gpuResidentGlyphCount = worldBlackboardEntity.GetComponentData<GpuResidentGlyphCount>().glyphCount;
+                var persistentGlyphBuffer = graphicsBroker.GetPersistentBuffer(kGlyphsBufferID, math.max(frameGlyphCount + gpuResidentGlyphCount, 128) * 24);
                 m_uploadGlyphsShader.SetBuffer(0, _dst,  persistentGlyphBuffer);
                 m_uploadGlyphsShader.SetBuffer(0, _src,  glyphUploadBuffer);
                 m_uploadGlyphsShader.SetBuffer(0, _meta, glyphMetaBuffer);
@@ -280,8 +284,9 @@ namespace Latios.Calligraphics.Rendering.Systems
 
                 Shader.SetGlobalBuffer(_latiosTextBuffer, persistentGlyphBuffer);
 
-                var persistentMaskBuffer = graphicsBroker.GetPersistentBuffer(kGlyphMasksBufferID,
-                                                                              math.max(worldBlackboardEntity.GetComponentData<MaskCountThisFrame>().maskCount, 128));
+                var frameMaskCount       = worldBlackboardEntity.GetComponentData<MaskCountThisFrame>().maskCount;
+                var gpuResidentMaskCount = worldBlackboardEntity.GetComponentData<GpuResidentMaskCount>().maskCount;
+                var persistentMaskBuffer = graphicsBroker.GetPersistentBuffer(kGlyphMasksBufferID, math.max(frameMaskCount + gpuResidentMaskCount, 128));
 
                 if (glyphsWithChildrenCount > 0)
                 {
@@ -297,9 +302,8 @@ namespace Latios.Calligraphics.Rendering.Systems
                         offset              += dispatchCount;
                         dispatchesRemaining -= dispatchCount;
                     }
-
-                    Shader.SetGlobalBuffer(_latiosTextMaskBuffer, persistentMaskBuffer);
                 }
+                Shader.SetGlobalBuffer(_latiosTextMaskBuffer, persistentMaskBuffer);
 
                 yield return true;
             }
@@ -466,6 +470,7 @@ namespace Latios.Calligraphics.Rendering.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraMaskHandle;
             [ReadOnly] public BufferTypeHandle<AdditionalFontMaterialEntity> additonalEntitiesHandle;
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, v128>    map;
+            [ReadOnly] public ComponentLookup<GpuResidentGlyphCount>         gpuResidentGlyphCountLookup;
             public ComponentTypeHandle<TextShaderIndex>                      textShaderIndexHandle;
             public ComponentLookup<GlyphCountThisFrame>                      glyphCountThisFrameLookup;
             public Entity                                                    worldBlackboardEntity;
@@ -493,7 +498,8 @@ namespace Latios.Calligraphics.Rendering.Systems
                 if ((upper | lower) == 0)
                     return;
 
-                ref var glyphCountThisFrame = ref glyphCountThisFrameLookup.GetRefRW(worldBlackboardEntity).ValueRW.glyphCount;
+                ref var glyphCountThisFrame   = ref glyphCountThisFrameLookup.GetRefRW(worldBlackboardEntity).ValueRW.glyphCount;
+                var     gpuResidentGlyphCount = gpuResidentGlyphCountLookup[worldBlackboardEntity].glyphCount;
 
                 streamWriter.BeginForEachIndex(unfilteredChunkIndex);
                 var trcs          = chunk.GetNativeArray(ref trcHandle);
@@ -513,7 +519,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     }
                     shaderIndices[i] = new TextShaderIndex
                     {
-                        firstGlyphIndex = glyphCountThisFrame,
+                        firstGlyphIndex = glyphCountThisFrame + gpuResidentGlyphCount,
                         glyphCount      = (uint)glyphCount
                     };
 
@@ -522,7 +528,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                         ptr                   = buffer.GetUnsafeReadOnlyPtr(),
                         length                = (uint)buffer.Length,
                         uploadBufferStart     = glyphCountThisPass,
-                        persistentBufferStart = glyphCountThisFrame,
+                        persistentBufferStart = glyphCountThisFrame + gpuResidentGlyphCount,
                         controls              = (uint)trc
                     });
                     glyphCountThisPass  += (uint)buffer.Length;
@@ -540,6 +546,7 @@ namespace Latios.Calligraphics.Rendering.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>  perFrameMaskHandle;
             [ReadOnly] public BufferTypeHandle<RenderGlyphMask>              glyphMasksHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraMaskHandle;
+            [ReadOnly] public ComponentLookup<GpuResidentMaskCount>          gpuResidentMaskCountLookup;
             public ComponentTypeHandle<TextMaterialMaskShaderIndex>          maskShaderIndexHandle;
             public ComponentLookup<MaskCountThisFrame>                       maskCountThisFrameLookup;
             public Entity                                                    worldBlackboardEntity;
@@ -557,7 +564,8 @@ namespace Latios.Calligraphics.Rendering.Systems
                 if ((upper | lower) == 0)
                     return;
 
-                ref var maskCountThisFrame = ref maskCountThisFrameLookup.GetRefRW(worldBlackboardEntity).ValueRW.maskCount;
+                ref var maskCountThisFrame   = ref maskCountThisFrameLookup.GetRefRW(worldBlackboardEntity).ValueRW.maskCount;
+                var     gpuResidentMaskCount = gpuResidentMaskCountLookup[worldBlackboardEntity].maskCount;
 
                 streamWriter.BeginForEachIndex(unfilteredChunkIndex);
                 var glyphMasksBuffers = chunk.GetBufferAccessor(ref glyphMasksHandle);
@@ -569,7 +577,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     var buffer       = glyphMasksBuffers[i];
                     shaderIndices[i] = new TextMaterialMaskShaderIndex
                     {
-                        firstMaskIndex = maskCountThisFrame
+                        firstMaskIndex = maskCountThisFrame + gpuResidentMaskCount
                     };
 
                     streamWriter.Write(new UploadPayload
@@ -577,7 +585,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                         ptr                   = buffer.GetUnsafeReadOnlyPtr(),
                         length                = (uint)buffer.Length,
                         uploadBufferStart     = maskCountThisPass,
-                        persistentBufferStart = maskCountThisFrame,
+                        persistentBufferStart = maskCountThisFrame + gpuResidentMaskCount,
                         controls              = 0
                     });
                     maskCountThisPass  += (uint)buffer.Length;

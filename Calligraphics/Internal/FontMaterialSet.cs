@@ -15,6 +15,8 @@ namespace Latios.Calligraphics
 
         public ref FontBlob this[int index] => ref m_fontMaterialArray[index].font;
 
+        public int length => m_fontMaterialArray.Length;
+
         public void WriteFontMaterialIndexForGlyph(int index)
         {
             if (!m_hasMultipleFonts)

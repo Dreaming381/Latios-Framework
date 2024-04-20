@@ -102,11 +102,12 @@ namespace Latios.Calligraphics.Authoring.Systems
         public static unsafe BlobAssetReference<FontBlob> BakeFont(FontAsset font, Material material)
         {
             material.SetFloat("_WeightNormal", font.regularStyleWeight);
-            material.SetFloat("_WeightBold", font.boldStyleWeight);
+            material.SetFloat("_WeightBold",   font.boldStyleWeight);
             float materialPadding = material.GetPaddingForText(false, false);
 
             var          builder             = new BlobBuilder(Allocator.Temp);
             ref FontBlob fontBlobRoot        = ref builder.ConstructRoot<FontBlob>();
+            fontBlobRoot.name                = font.name;
             fontBlobRoot.scale               = font.faceInfo.scale;
             fontBlobRoot.pointSize           = font.faceInfo.pointSize;
             fontBlobRoot.baseLine            = font.faceInfo.baseline;
@@ -122,11 +123,10 @@ namespace Latios.Calligraphics.Authoring.Systems
             fontBlobRoot.regularStyleWeight  = font.regularStyleWeight;
             fontBlobRoot.boldStyleSpacing    = font.boldStyleSpacing;
             fontBlobRoot.boldStyleWeight     = font.boldStyleWeight;
-            fontBlobRoot.italicsStyleSlant   = font.italicStyleSlant;            
+            fontBlobRoot.italicsStyleSlant   = font.italicStyleSlant;
             fontBlobRoot.atlasWidth          = font.atlasWidth;
             fontBlobRoot.atlasHeight         = font.atlasHeight;
             fontBlobRoot.materialPadding     = materialPadding;
-
 
             var       adjustmentCacheBefore      = new NativeList<int2>(Allocator.TempJob);
             var       adjustmentCacheAfter       = new NativeList<int2>(Allocator.TempJob);
@@ -179,10 +179,10 @@ namespace Latios.Calligraphics.Authoring.Systems
                 {
                     ref GlyphBlob glyphBlob = ref glyphBuilder[i];
 
-                    glyphBlob.unicode            = character.unicode;
-                    glyphBlob.glyphScale         = character.glyph.scale;
-                    glyphBlob.glyphMetrics       = character.glyph.metrics;
-                    glyphBlob.glyphRect          = character.glyph.glyphRect;
+                    glyphBlob.unicode      = character.unicode;
+                    glyphBlob.glyphScale   = character.glyph.scale;
+                    glyphBlob.glyphMetrics = character.glyph.metrics;
+                    glyphBlob.glyphRect    = character.glyph.glyphRect;
 
                     //Add kerning adjustments
                     adjustmentCacheBefore.Clear();

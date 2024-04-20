@@ -20,7 +20,7 @@ using static Unity.Entities.SystemAPI;
 // and Bursted!
 // This system seems like a good candidate to move to PostBatching. So that's where it is now.
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     //[UpdateInGroup(typeof(UpdatePresentationSystemGroup))]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]

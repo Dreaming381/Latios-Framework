@@ -20,9 +20,10 @@ namespace Latios.Calligraphics
             if (world.Flags.HasFlag(WorldFlags.Conversion))
                 throw new System.InvalidOperationException("Cannot install Calligraphics runtime in a conversion world.");
 
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.GenerateGlyphsSystem>(),                  world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingUpdateSystem>(),   world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingDispatchSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.GenerateGlyphsSystem>(),                    world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingUpdateSystem>(),     world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingDispatchSystem>(),   world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.GpuResidentTextDispatchSystem>(), world);
         }
 
         /// <summary>

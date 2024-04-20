@@ -17,7 +17,7 @@ namespace Latios.Calligraphics.RichText
         internal static bool ValidateHtmlTag(
             in CalliString calliString,
             ref CalliString.Enumerator enumerator,
-            ref FontBlob currenFont,  //will need to be replaced with List of FontAssets to allow switching
+            ref FontMaterialSet fontMaterialSet,
             in TextBaseConfiguration baseConfiguration,
             ref TextConfiguration textConfiguration,
             ref FixedList512Bytes<RichTextTagIdentifier> richTextTagIndentifiers)  //this is just a cache to avoid allocation
@@ -218,6 +218,8 @@ namespace Latios.Calligraphics.RichText
                 float value = 0;
                 float fontScale;
 
+                ref var currentFont = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
+
                 switch (firstTagIndentifier.nameHashCode)
                 {
                     case 98:  // <b>
@@ -257,7 +259,7 @@ namespace Latios.Calligraphics.RichText
                                 return false;
                         }
                         else
-                            textConfiguration.m_italicAngle = currenFont.italicsStyleSlant;
+                            textConfiguration.m_italicAngle = currentFont.italicsStyleSlant;
 
                         textConfiguration.m_italicAngleStack.Add(textConfiguration.m_italicAngle);
 
@@ -398,11 +400,11 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 6552:  // <sub>
                     case 4728:  // <SUB>
-                        textConfiguration.m_fontScaleMultiplier *= currenFont.subscriptSize > 0 ? currenFont.subscriptSize : 1;
+                        textConfiguration.m_fontScaleMultiplier *= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
                         textConfiguration.m_baselineOffsetStack.Add(textConfiguration.m_baselineOffset);
                         fontScale =
-                            (textConfiguration.m_currentFontSize / currenFont.pointSize * currenFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
-                        textConfiguration.m_baselineOffset += currenFont.subscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
+                            (textConfiguration.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
+                        textConfiguration.m_baselineOffset += currentFont.subscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
 
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Subscript);
                         textConfiguration.m_fontStyleInternal |= FontStyles.Subscript;
@@ -414,7 +416,7 @@ namespace Latios.Calligraphics.RichText
                             if (textConfiguration.m_fontScaleMultiplier < 1)
                             {
                                 textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.Pop();
-                                textConfiguration.m_fontScaleMultiplier /= currenFont.subscriptSize > 0 ? currenFont.subscriptSize : 1;
+                                textConfiguration.m_fontScaleMultiplier /= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
                             }
 
                             if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Subscript) == 0)
@@ -423,11 +425,11 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 6566:  // <sup>
                     case 4742:  // <SUP>
-                        textConfiguration.m_fontScaleMultiplier *= currenFont.superscriptSize > 0 ? currenFont.superscriptSize : 1;
+                        textConfiguration.m_fontScaleMultiplier *= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
                         textConfiguration.m_baselineOffsetStack.Add(textConfiguration.m_baselineOffset);
                         fontScale =
-                            (textConfiguration.m_currentFontSize / currenFont.pointSize * currenFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
-                        textConfiguration.m_baselineOffset += currenFont.superscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
+                            (textConfiguration.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
+                        textConfiguration.m_baselineOffset += currentFont.superscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
 
                         textConfiguration.m_fontStyleStack.Add(FontStyles.Superscript);
                         textConfiguration.m_fontStyleInternal |= FontStyles.Superscript;
@@ -439,7 +441,7 @@ namespace Latios.Calligraphics.RichText
                             if (textConfiguration.m_fontScaleMultiplier < 1)
                             {
                                 textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.Pop();
-                                textConfiguration.m_fontScaleMultiplier /= currenFont.superscriptSize > 0 ? currenFont.superscriptSize : 1;
+                                textConfiguration.m_fontScaleMultiplier /= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
                             }
 
                             if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Superscript) == 0)
@@ -610,108 +612,48 @@ namespace Latios.Calligraphics.RichText
                     case 145592:  // </SIZE>
                         textConfiguration.m_currentFontSize = textConfiguration.m_sizeStack.RemoveExceptRoot();
                         return true;
-                    //case 41311: // <font=xx>
-                    //case 28511: // <FONT>
-                    //    int fontHashCode = firstTagIndentifier.valueHashCode;
-                    //    int materialTagIndentifierHashCode = richTextTagIndentifiers[1].nameHashCode;
-                    //    int materialHashCode = richTextTagIndentifiers[1].valueHashCode;
+                    case 41311:  // <font=xx>
+                    case 28511:  // <FONT>
+                        int fontHashCode                   = firstTagIndentifier.valueHashCode;
+                        int materialTagIndentifierHashCode = richTextTagIndentifiers[1].nameHashCode;
+                        int materialHashCode               = richTextTagIndentifiers[1].valueHashCode;
 
-                    //    // Special handling for <font=default> or <font=Default>
-                    //    if (fontHashCode == 764638571 || fontHashCode == 523367755)
-                    //    {
-                    //        m_currentFontAsset = m_materialReferences[0].fontAsset;
-                    //        m_currentMaterial = m_materialReferences[0].material;
-                    //        m_currentMaterialIndex = 0;
-                    //        //Debug.Log("<font=Default> assigning Font Asset [" + m_currentFontAsset.name + "] with Material [" + m_currentMaterial.name + "].");
+                        // Special handling for <font=default> or <font=Default>
+                        if (fontHashCode == 764638571 || fontHashCode == 523367755)
+                        {
+                            textConfiguration.m_currentFontMaterialIndex = 0;
+                            textConfiguration.m_fontMaterialIndexStack.Add(0);
+                            return true;
+                        }
 
-                    //        m_materialReferenceStack.Add(m_materialReferences[0]);
+                        var fontNameGrabber = enumerator;
+                        fontNameGrabber.GotoByteIndex(firstTagIndentifier.valueStartIndex);
+                        FixedString128Bytes fontNameToSearch = default;
+                        while (fontNameGrabber.CurrentByteIndex < firstTagIndentifier.valueStartIndex + firstTagIndentifier.valueLength)
+                        {
+                            fontNameToSearch.Append(fontNameGrabber.Current);
+                            fontNameGrabber.MoveNext();
+                        }
 
-                    //        return true;
-                    //    }
+                        for (int i = 0; i < fontMaterialSet.length; i++)
+                        {
+                            ref var candidateFont = ref fontMaterialSet[i];
+                            if (fontNameToSearch.Equals(candidateFont.name))
+                            {
+                                textConfiguration.m_currentFontMaterialIndex = i;
+                                textConfiguration.m_fontMaterialIndexStack.Add(i);
+                                return true;
+                            }
+                        }
+                        return false;
+                    case 154158:  // </font>
+                    case 141358:  // </FONT>
+                    {
+                        textConfiguration.m_fontMaterialIndexStack.Pop();
+                        textConfiguration.m_currentFontMaterialIndex = textConfiguration.m_fontMaterialIndexStack.Peek();
 
-                    //    TMP_FontAsset tempFont;
-                    //    Material tempMaterial;
-
-                    //    // HANDLE NEW FONT ASSET
-                    //    //TMP_ResourceManager.TryGetFontAsset(fontHashCode, out tempFont);
-
-                    //    // Check if we already have a reference to this font asset.
-                    //    MaterialReferenceManager.TryGetFontAsset(fontHashCode, out tempFont);
-
-                    //    // Try loading font asset from potential delegate or resources.
-                    //    if (tempFont == null)
-                    //    {
-                    //        // Check for anyone registered to this callback
-                    //        tempFont = OnFontAssetRequest?.Invoke(fontHashCode, new string(calliString, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength));
-
-                    //        if (tempFont == null)
-                    //        {
-                    //            // Load Font Asset
-                    //            tempFont = Resources.Load<TMP_FontAsset>(TMP_Settings.defaultFontAssetPath + new string(calliString, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength));
-                    //        }
-
-                    //        if (tempFont == null)
-                    //            return false;
-
-                    //        // Add new reference to the font asset as well as default material to the MaterialReferenceManager
-                    //        MaterialReferenceManager.AddFontAsset(tempFont);
-                    //    }
-
-                    //    // HANDLE NEW MATERIAL
-                    //    if (materialTagIndentifierHashCode == 0 && materialHashCode == 0)
-                    //    {
-                    //        // No material specified then use default font asset material.
-                    //        m_currentMaterial = tempFont.material;
-
-                    //        m_currentMaterialIndex = MaterialReference.AddMaterialReference(m_currentMaterial, tempFont, ref m_materialReferences, m_materialReferenceIndexLookup);
-
-                    //        m_materialReferenceStack.Add(m_materialReferences[m_currentMaterialIndex]);
-                    //    }
-                    //    else if (materialTagIndentifierHashCode == 103415287 || materialTagIndentifierHashCode == 72669687) // using material tagIndentifier
-                    //    {
-                    //        if (MaterialReferenceManager.TryGetMaterial(materialHashCode, out tempMaterial))
-                    //        {
-                    //            m_currentMaterial = tempMaterial;
-
-                    //            m_currentMaterialIndex = MaterialReference.AddMaterialReference(m_currentMaterial, tempFont, ref m_materialReferences, m_materialReferenceIndexLookup);
-
-                    //            m_materialReferenceStack.Add(m_materialReferences[m_currentMaterialIndex]);
-                    //        }
-                    //        else
-                    //        {
-                    //            // Load new material
-                    //            tempMaterial = Resources.Load<Material>(TMP_Settings.defaultFontAssetPath + new string(calliString, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength));
-
-                    //            if (tempMaterial == null)
-                    //                return false;
-
-                    //            // Add new reference to this material in the MaterialReferenceManager
-                    //            MaterialReferenceManager.AddFontMaterial(materialHashCode, tempMaterial);
-
-                    //            m_currentMaterial = tempMaterial;
-
-                    //            m_currentMaterialIndex = MaterialReference.AddMaterialReference(m_currentMaterial, tempFont, ref m_materialReferences, m_materialReferenceIndexLookup);
-
-                    //            m_materialReferenceStack.Add(m_materialReferences[m_currentMaterialIndex]);
-                    //        }
-                    //    }
-                    //    else
-                    //        return false;
-
-                    //    m_currentFontAsset = tempFont;
-
-                    //    return true;
-                    //case 154158: // </font>
-                    //case 141358: // </FONT>
-                    //    {
-                    //        MaterialReference materialReference = m_materialReferenceStack.Remove();
-
-                    //        m_currentFontAsset = materialReference.fontAsset;
-                    //        m_currentMaterial = materialReference.material;
-                    //        m_currentMaterialIndex = materialReference.index;
-
-                    //        return true;
-                    //    }
+                        return true;
+                    }
                     //case 103415287: // <material="material name">
                     //case 72669687: // <MATERIAL>
                     //    materialHashCode = firstTagIndentifier.valueHashCode;

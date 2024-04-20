@@ -10,7 +10,7 @@ using Unity.Mathematics;
 
 using static Unity.Entities.SystemAPI;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
