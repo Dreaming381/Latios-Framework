@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
@@ -39,7 +40,6 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         /// <param name="animator">An animator that was imported with "Optimize Game Objects" enabled</param>
         /// <param name="rootName">The name to use for the root bone in the hiearchy</param>
-        /// <returns></returns>
         public static SmartBlobberHandle<SkeletonBindingPathsBlob> RequestCreateBlobAsset(this IBaker baker, UnityEngine.Animator animator, FixedString64Bytes rootName)
         {
             return baker.RequestCreateBlobAsset<SkeletonBindingPathsBlob, SkeletonBindingPathsFromOptimizedAnimatorBakeData>(new SkeletonBindingPathsFromOptimizedAnimatorBakeData
@@ -47,6 +47,39 @@ namespace Latios.Kinemation.Authoring
                 animator = animator,
                 rootName = rootName
             });
+        }
+
+        /// <summary>
+        /// Requests the creation of a temporary baking entity with a DynamicBuffer<SkeletonBoneNameInHierarchy> allowing for generation of bone index
+        /// references at bake time inside an ISmartPostProcessItem.
+        /// </summary>
+        /// <param name="animator">An animator that was imported with "Optimize Game Objects" enabled</param>
+        /// <param name="rootName">The name to use for the root bone in the hiearchy</param>
+        /// <returns>A handle which can be resolved in ISmartPostProcessItem.PostProcessBlobRequests() to read bone names and parent indices</returns>
+        public static BoneNamesRequestHandle RequestBoneNames(this IBaker baker, UnityEngine.Animator animator, FixedString64Bytes rootName)
+        {
+            var entity                                                                                          = baker.CreateAdditionalEntity(TransformUsageFlags.None, true);
+            baker.AddComponent(entity, new ShadowHierarchyRequest { animatorToBuildShadowFor                    = animator });
+            baker.AddBuffer<SkeletonBoneNameInHierarchy>(entity).Add(new SkeletonBoneNameInHierarchy { boneName = rootName, parentIndex = -1 });
+            baker.DependsOn(animator.avatar);
+            return new BoneNamesRequestHandle { boneNamesTempEntity = entity };
+        }
+    }
+
+    /// <summary>
+    /// A handle to a temporary entity used to bake bone names which can be resolved in an ISmartPostProcessItem.
+    /// This is typically used to bake indices into optimized skeletons.
+    /// </summary>
+    public struct BoneNamesRequestHandle
+    {
+        internal EntityWithBuffer<SkeletonBoneNameInHierarchy> boneNamesTempEntity;
+
+        /// <summary>
+        /// Retrieves the optimized skeleton's bone names. Call this in ISmartPostProcessItem.PostProcessBlobRequests().
+        /// </summary>
+        public ReadOnlySpan<SkeletonBoneNameInHierarchy> Resolve(EntityManager entityManager)
+        {
+            return entityManager.GetBuffer<SkeletonBoneNameInHierarchy>(boneNamesTempEntity, true).AsNativeArray().AsReadOnlySpan();
         }
     }
 

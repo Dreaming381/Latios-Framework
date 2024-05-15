@@ -1,8 +1,7 @@
 using Latios.Calligraphics.Rendering;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Mathematics;
+
 
 namespace Latios.Calligraphics
 {
@@ -42,6 +41,7 @@ namespace Latios.Calligraphics
             m_selectorBuffer.Clear();
             m_hasMultipleFonts = true;
             m_fontToEntityIndexArray.Clear();
+            m_fontToEntityIndexArray.Add(0);// Index 0 is this entity. Index 1 is the first entity in AdditionalFontMaterialEntity buffer.
             for (int i = 0; i < entities.Length; i++)
             {
                 if (blobLookup.TryGetComponent(entities[i].entity, out var blobRef))
@@ -49,7 +49,7 @@ namespace Latios.Calligraphics
                     if (blobRef.blob.IsCreated)
                     {
                         m_fontMaterialArray.Add(new FontMaterial(blobRef.blob));
-                        m_fontToEntityIndexArray.Add((byte)i);
+                        m_fontToEntityIndexArray.Add((byte)(i + 1));
                     }
                 }
             }

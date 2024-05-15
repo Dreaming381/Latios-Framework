@@ -280,8 +280,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     m_uploadGlyphsShader.Dispatch(0, (int)dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
-                }
-
+                }                
                 Shader.SetGlobalBuffer(_latiosTextBuffer, persistentGlyphBuffer);
 
                 var frameMaskCount       = worldBlackboardEntity.GetComponentData<MaskCountThisFrame>().maskCount;
@@ -557,7 +556,7 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                ref var cameraMask = ref chunk.GetChunkComponentRefRW(ref perCameraMaskHandle);
+                var cameraMask =  chunk.GetChunkComponentData(ref perCameraMaskHandle);
                 var     frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var     lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
                 var     upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
@@ -608,7 +607,7 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                ref var cameraMask = ref chunk.GetChunkComponentRefRW(ref perCameraMaskHandle);
+                var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
                 var     frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var     lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
                 var     upper      = cameraMask.upper.Value & (~frameMask.upper.Value);

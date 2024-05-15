@@ -46,8 +46,47 @@ namespace Latios.Psyshock
         /// <returns></returns>
         public Span<T> AsSpan() => new Span<T>(m_ptr, length);
 
+        /// <summary>
+        /// Implicitly converts this StreamSpan into a DynamicStreamSpan.
+        /// </summary>
+        public static implicit operator DynamicStreamSpan(StreamSpan<T> streamSpan)
+        {
+            return new DynamicStreamSpan
+            {
+                m_ptr      = streamSpan.m_ptr,
+                m_length   = streamSpan.m_length,
+                m_typeHash = BurstRuntime.GetHashCode32<T>()
+            };
+        }
+
         internal T*  m_ptr;
         internal int m_length;
+    }
+
+    /// <summary>
+    /// A type-punned version of StreamSpan whic stores the type hash for safety referencing.
+    /// </summary>
+    public unsafe struct DynamicStreamSpan
+    {
+        /// <summary>
+        /// Try to retrieve the StreamSpan of the specified type. Throws if the type hash doesn't match.
+        /// </summary>
+        public StreamSpan<T> GetSpan<T>() where T : unmanaged
+        {
+            CheckTypeHash<T>();
+            return new StreamSpan<T> { m_ptr = (T*)m_ptr, m_length = m_length };
+        }
+
+        internal void* m_ptr;
+        internal int   m_length;
+        internal int   m_typeHash;
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckTypeHash<T>() where T : unmanaged
+        {
+            if (m_typeHash != BurstRuntime.GetHashCode32<T>())
+                throw new InvalidOperationException($"Attempted to access a StreamSpan from a DynamicStreamSpan using the wrong type.");
+        }
     }
 
     /// <summary>
@@ -170,16 +209,23 @@ namespace Latios.Psyshock
 
         #region Public API
         /// <summary>
+        /// The number of buckets in the multibox excluding NaN. This value is the same as CollisionLayer.bucketCount.
+        /// </summary>
+        public int bucketCount => data.expectedBucketCount;
+
+        /// <summary>
         /// Adds a Pair and allocates memory in the stream for a single instance of type T. Returns a ref to T.
         /// The pair will save the reference to T for later lookup.
         /// </summary>
         /// <typeparam name="T">Any unmanaged type that contains data that should be associated with the pair.
         /// This type may contain StreamSpan instances.</typeparam>
         /// <param name="entityA">The first entity in the pair</param>
-        /// <param name="bucketA">The bucket index from the multi-box the first entity belongs to</param>
+        /// <param name="bucketA">The bucket index from the multi-box the first entity belongs to.
+        /// If aIsRW is false, this can be any value [0, bucketCount - 1]</param>
         /// <param name="aIsRW">If true, the first entity is given read-write access in a parallel ForEachPair operation</param>
         /// <param name="entityB">The second entity in the pair</param>
-        /// <param name="bucketB">The bucket index from the multi-box the second entity belongs to</param>
+        /// <param name="bucketB">The bucket index from the multi-box the second entity belongs to.
+        /// If bIsRW is false, this can be any value [0, bucketCount - 1]</param>
         /// <param name="bIsRW">If true, the second entity is given read-write access in a parallel ForEachPair operation</param>
         /// <param name="pair">The pair instance, which can store additional settings and perform additional allocations</param>
         /// <returns>The reference to the allocated instance of type T</returns>
@@ -207,10 +253,12 @@ namespace Latios.Psyshock
         /// The pair will save the pointer for later lookup.
         /// </summary>
         /// <param name="entityA">The first entity in the pair</param>
-        /// <param name="bucketA">The bucket index from the multi-box the first entity belongs to</param>
+        /// <param name="bucketA">The bucket index from the multi-box the first entity belongs to.
+        /// If aIsRW is false, this can be any value [0, bucketCount - 1]</param>
         /// <param name="aIsRW">If true, the first entity is given read-write access in a parallel ForEachPair operation</param>
         /// <param name="entityB">The second entity in the pair</param>
-        /// <param name="bucketB">The bucket index from the multi-box the second entity belongs to</param>
+        /// <param name="bucketB">The bucket index from the multi-box the second entity belongs to.
+        /// If bIsRW is false, this can be any value [0, bucketCount - 1]</param>
         /// <param name="bIsRW">If true, the second entity is given read-write access in a parallel ForEachPair operation</param>
         /// <param name="sizeInBytes">Specifies the size in bytes to allocate</param>
         /// <param name="alignInBytes">Specifies the required alignment of the allocation</param>

@@ -28,7 +28,7 @@ namespace Latios.Psyshock
             Index = math.select(e.m_entity.Index, math.abs(e.m_entity.Index + 1), e.m_entity.Index < 0), Version = e.m_entity.Version
         };
 #else
-        public static implicit operator Entity(SafeEntity e) => e.entity;
+        public static implicit operator Entity(SafeEntity e) => e.m_entity;
 #endif
     }
 

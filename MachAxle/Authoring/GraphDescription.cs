@@ -5,23 +5,24 @@ using Unity.Mathematics;
 
 namespace Latios.MachAxle.Authoring
 {
-    public struct CellHandle
+    // Make all these public once ready
+    internal struct CellHandle
     {
         internal int index;
     }
 
-    public enum CellAggregationMode
+    internal enum CellAggregationMode
     {
         Multiply,
         Add
     }
 
-    public interface ICurveDescription
+    internal interface ICurveDescription
     {
         public void AddCurveToDescription(ref GraphDescription graphDescription);
     }
 
-    public struct GraphDescription : IDisposable
+    internal struct GraphDescription : IDisposable
     {
         public GraphDescription(AllocatorManager.AllocatorHandle allocator)
         {

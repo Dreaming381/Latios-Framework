@@ -70,7 +70,7 @@ namespace Latios.Calligraphics.Rendering
         public PackedColor trColor;
         public PackedColor brColor;
 
-        public uint  unicode;
+        public int  unicode; //not needed anywhere-->remove from struct?
         public float shear;  // Should be equal to topLeft.x - bottomLeft.x
         public float scale;
         public float rotationCCW;  // Radians

@@ -1,17 +1,15 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.10.0-alpha.5]
+# Latios Framework for Unity ECS – [0.10.0-beta.1]
 
 **This is a prerelease version of the Latios Framework version 0.10 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, have not been updated to reflect the new features and changes in
-0.10. Git hashes may not be preserved on transition to beta or official
-release.**
+still under development. Changelogs and Documentation are currently being
+updated to reflect the new features and changes in 0.9.**
 
 **You are still welcome to submit bug reports and PRs for this and future
 prerelease versions!**
 
-**This version of the alpha uses Unity 2022.3.13 with Entities 1.1.0-pre.3.**
+**This version of the beta uses Unity 2022.3.13 with Entities 1.1.0-pre.3.**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -110,8 +108,8 @@ amounts of sources at once. Playing audio is as simple as instantiating prefabs.
 Animation and Rendering provides authored animation, simulated animation, and
 everything in between. It includes an overhauled Entities Graphics for
 significantly improved performance of both skinned and non-skinned entities
-including true frustum culling and LOD support. It also provides a comprehensive
-API for injecting custom effects into ECS rendering.
+including true frustum culling and LOD crossfade support. It also provides a
+comprehensive API for injecting custom effects into ECS rendering.
 
 On the animation side, Kinemation supports bone entity and optimized bone buffer
 configurations. It includes utilities for inertial blending. And for animation
@@ -124,9 +122,10 @@ used in AAA titles such as Rise of the Tomb Raider, Fortnite, and Valorant.
 is a world-space text rendering module. It uses TextCore fonts and formats text
 to be rendered via the Kinemation rendering pipeline, complete with custom ECS
 material property support. The text can be animated with the built-in tweening
-engine, or you can make your own animations with the glyph mapping API. A subset
-of rich text tags is also supported. Use Calligraphics for world-space dialog,
-player names, and damage numbers.
+engine, or you can make your own animations with the glyph mapping API. Rich
+text tags are supported, with much of the implementation being ported from
+TextMeshPro and made Burst-compatible. Use Calligraphics for world-space labels,
+dialog, player names, and damage numbers.
 
 ### Mimic
 
@@ -211,10 +210,10 @@ Getting Started pages and documentation are provided with each module.
 
 ## Proud Users of Latios Framework
 
-### Tools
+### Forks and Extensions
 
--   [DMotion](https://github.com/gamedev-pro/dmotion) – Alternative open source
-    animation state machine powered by Kinemation
+-   [TextMeshDots](https://github.com/Fribur/TextMeshDOTS) – A standalone fork
+    of Calligraphics
 
 ### Open Projects
 
@@ -308,7 +307,7 @@ for how to get started.
 -   Sovogal – Primary author of Mimic’s Mecanim addon and made significant
     contributions to the Calligraphics module (including the name)
 -   canmom – Android support, Kinemation baking fixes, and build fixes
--   Fribur – Calligraphics text processing and shader improvements
+-   Fribur – Calligraphics rich text overhaul and shader improvements
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support

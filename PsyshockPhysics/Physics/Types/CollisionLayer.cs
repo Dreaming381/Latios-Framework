@@ -37,6 +37,58 @@ namespace Latios.Psyshock
     }
 
     /// <summary>
+    /// A utility struct which can calculate the bucket index an AABB would fall within for a
+    /// specific CollisionLayer. These indices can be used to insert elements into a PairStream.
+    /// </summary>
+    public struct CollisionLayerBucketIndexCalculator
+    {
+        float3 worldMin;
+        float3 worldAxisStride;
+        int3   worldSubdivisionsPerAxis;
+        int    bucketCountExcludingNan;
+
+        /// <summary>
+        /// Create a new calculator from specified CollisionLayerSettings
+        /// </summary>
+        public CollisionLayerBucketIndexCalculator(in CollisionLayerSettings settings)
+        {
+            worldMin                 = settings.worldAabb.min;
+            worldAxisStride          = (settings.worldAabb.max - worldMin) / settings.worldSubdivisionsPerAxis;
+            worldSubdivisionsPerAxis = settings.worldSubdivisionsPerAxis;
+            bucketCountExcludingNan  = settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 1;
+        }
+
+        /// <summary>
+        /// Create a new claculator extracting the settings from a CollisionLayer.
+        /// It is safe to pass in a CollisionLayer currently being used in a job.
+        /// </summary>
+        public CollisionLayerBucketIndexCalculator(in CollisionLayer layer)
+        {
+            worldMin                 = layer.worldMin;
+            worldAxisStride          = layer.worldAxisStride;
+            worldSubdivisionsPerAxis = layer.worldSubdivisionsPerAxis;
+            bucketCountExcludingNan  = layer.bucketCountExcludingNan;
+        }
+
+        /// <summary>
+        /// Returns the bucket index inside the CollisionLayer this Aabb would be stored within
+        /// </summary>
+        public int BucketIndexFrom(in Aabb aabb)
+        {
+            int3 minBucket = math.int3(math.floor((aabb.min - worldMin) / worldAxisStride));
+            int3 maxBucket = math.int3(math.floor((aabb.max - worldMin) / worldAxisStride));
+            minBucket      = math.clamp(minBucket, 0, worldSubdivisionsPerAxis - 1);
+            maxBucket      = math.clamp(maxBucket, 0, worldSubdivisionsPerAxis - 1);
+
+            if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
+                return bucketCountExcludingNan;
+            if (math.all(minBucket == maxBucket))
+                return (minBucket.x * worldSubdivisionsPerAxis.y + minBucket.y) * worldSubdivisionsPerAxis.z + minBucket.z;
+            return bucketCountExcludingNan - 1;
+        }
+    }
+
+    /// <summary>
     /// A spatial query acceleration structure composed of native containers
     /// </summary>
     /// <remarks>

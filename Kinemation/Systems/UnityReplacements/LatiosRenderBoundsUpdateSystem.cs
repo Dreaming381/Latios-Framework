@@ -57,7 +57,7 @@ namespace Latios.Kinemation.Systems
                 ChunkWorldRenderBounds         = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
                 shaderEffectRadialBoundsHandle = GetComponentTypeHandle<ShaderEffectRadialBounds>(true),
             };
-            state.Dependency = boundsJob.ScheduleParallelByRef(m_WorldRenderBounds, state.Dependency);
+            state.Dependency = boundsJob.ScheduleParallel(m_WorldRenderBounds, state.Dependency);
         }
 
         [BurstCompile]

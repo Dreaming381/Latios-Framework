@@ -7,7 +7,8 @@ using Unity.Mathematics;
 
 namespace Latios.MachAxle
 {
-    public struct AxleGraph
+    // Make these public once ready
+    internal struct AxleGraph
     {
         internal BlobPtr<Graph> m_graph;
 
@@ -19,7 +20,7 @@ namespace Latios.MachAxle
     }
 
     // Note: This is Disposable
-    public unsafe ref struct AxleGraphEvaluator
+    internal unsafe ref struct AxleGraphEvaluator
     {
         #region Create and Destroy
         public AxleGraphEvaluator(ref AxleGraph graph)

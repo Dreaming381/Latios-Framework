@@ -415,7 +415,7 @@ namespace Latios.Calligraphics.RichText
                         {
                             if (textConfiguration.m_fontScaleMultiplier < 1)
                             {
-                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.Pop();
+                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.RemoveExceptRoot();
                                 textConfiguration.m_fontScaleMultiplier /= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
                             }
 
@@ -440,7 +440,7 @@ namespace Latios.Calligraphics.RichText
                         {
                             if (textConfiguration.m_fontScaleMultiplier < 1)
                             {
-                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.Pop();
+                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.RemoveExceptRoot();
                                 textConfiguration.m_fontScaleMultiplier /= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
                             }
 
@@ -615,30 +615,20 @@ namespace Latios.Calligraphics.RichText
                     case 41311:  // <font=xx>
                     case 28511:  // <FONT>
                         int fontHashCode                   = firstTagIndentifier.valueHashCode;
-                        int materialTagIndentifierHashCode = richTextTagIndentifiers[1].nameHashCode;
-                        int materialHashCode               = richTextTagIndentifiers[1].valueHashCode;
 
                         // Special handling for <font=default> or <font=Default>
                         if (fontHashCode == 764638571 || fontHashCode == 523367755)
                         {
                             textConfiguration.m_currentFontMaterialIndex = 0;
                             textConfiguration.m_fontMaterialIndexStack.Add(0);
-                            return true;
-                        }
+                            return true;                        }
 
-                        var fontNameGrabber = enumerator;
-                        fontNameGrabber.GotoByteIndex(firstTagIndentifier.valueStartIndex);
-                        FixedString128Bytes fontNameToSearch = default;
-                        while (fontNameGrabber.CurrentByteIndex < firstTagIndentifier.valueStartIndex + firstTagIndentifier.valueLength)
-                        {
-                            fontNameToSearch.Append(fontNameGrabber.Current);
-                            fontNameGrabber.MoveNext();
-                        }
+                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
 
                         for (int i = 0; i < fontMaterialSet.length; i++)
                         {
                             ref var candidateFont = ref fontMaterialSet[i];
-                            if (fontNameToSearch.Equals(candidateFont.name))
+                            if (textConfiguration.m_htmlTag.Equals(candidateFont.name))
                             {
                                 textConfiguration.m_currentFontMaterialIndex = i;
                                 textConfiguration.m_fontMaterialIndexStack.Add(i);
@@ -648,10 +638,8 @@ namespace Latios.Calligraphics.RichText
                         return false;
                     case 154158:  // </font>
                     case 141358:  // </FONT>
-                    {
-                        textConfiguration.m_fontMaterialIndexStack.Pop();
-                        textConfiguration.m_currentFontMaterialIndex = textConfiguration.m_fontMaterialIndexStack.Peek();
-
+                    {                        
+                        textConfiguration.m_currentFontMaterialIndex = textConfiguration.m_fontMaterialIndexStack.RemoveExceptRoot();
                         return true;
                     }
                     //case 103415287: // <material="material name">

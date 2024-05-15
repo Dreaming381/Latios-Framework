@@ -5,7 +5,8 @@ using Unity.Mathematics;
 
 namespace Latios.MachAxle
 {
-    public struct GraphBuilder : IDisposable
+    // Make public once ready
+    internal struct GraphBuilder : IDisposable
     {
         public void WriteGraphEssentials(ref BlobBuilder blobBuilder, ref AxleGraph graph)
         {

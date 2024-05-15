@@ -67,6 +67,7 @@ namespace Latios.Calligraphics.Authoring
             if (authoring.fontsAndMaterials.Count > 1)
             {
                 AddComponent<TextMaterialMaskShaderIndex>(entity);
+                AddBuffer<FontMaterialSelectorForGlyph>(entity);
                 AddBuffer<RenderGlyphMask>(entity);
                 var additionalEntities = AddBuffer<Rendering.AdditionalFontMaterialEntity>(entity).Reinterpret<Entity>();
                 for (int i = 1; i < authoring.fontsAndMaterials.Count; i++)

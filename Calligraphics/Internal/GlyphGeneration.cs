@@ -36,17 +36,17 @@ namespace Latios.Calligraphics
             bool                   prevWasSpace                                    = false;
             int                    lineCount                                       = 0;
             bool                   isLineStart                                     = true;
-
+            ref FontBlob font       = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
             var calliString         = new CalliString(calliBytes);
             var characterEnumerator = calliString.GetEnumerator();
             while (characterEnumerator.MoveNext())
             {
-                var unicode = characterEnumerator.Current;
+                var currentRune = characterEnumerator.Current;
                 textConfiguration.m_characterCount++;
 
                 // Parse Rich Text Tag
                 #region Parse Rich Text Tag
-                if (unicode == '<')  // '<'
+                if (currentRune == '<')  // '<'
                 {
                     textConfiguration.m_isParsingText = true;
                     // Check if Tag is valid. If valid, skip to the end of the validated tag.
@@ -59,7 +59,7 @@ namespace Latios.Calligraphics
                 }
                 #endregion
 
-                ref FontBlob font                 = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
+                font                 = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
                 textConfiguration.m_isParsingText = false;
 
                 // Handle Font Styles like LowerCase, UpperCase and SmallCaps.
@@ -73,18 +73,18 @@ namespace Latios.Calligraphics
                 if ((textConfiguration.m_fontStyleInternal & FontStyles.UpperCase) == FontStyles.UpperCase)
                 {
                     // If this character is lowercase, switch to uppercase.
-                    unicode = unicode.ToUpper();
+                    currentRune = currentRune.ToUpper();
                 }
                 else if ((textConfiguration.m_fontStyleInternal & FontStyles.LowerCase) == FontStyles.LowerCase)
                 {
                     // If this character is uppercase, switch to lowercase.
-                    unicode = unicode.ToLower();
+                    currentRune = currentRune.ToLower();
                 }
                 else if ((textConfiguration.m_fontStyleInternal & FontStyles.SmallCaps) == FontStyles.SmallCaps)
                 {
-                    var oldUnicode = unicode;
-                    unicode        = unicode.ToUpper();
-                    if (unicode != oldUnicode)
+                    var oldUnicode = currentRune;
+                    currentRune        = currentRune.ToUpper();
+                    if (currentRune != oldUnicode)
                     {
                         smallCapsMultiplier = 0.8f;
                     }
@@ -102,7 +102,7 @@ namespace Latios.Calligraphics
                 }
 
                 //Handle line break
-                if (unicode.value == 10)  //Line feed
+                if (currentRune.value == 10)  //Line feed
                 {
                     var glyphsLine   = renderGlyphs.AsNativeArray().GetSubArray(startOfLineGlyphIndex, renderGlyphs.Length - startOfLineGlyphIndex);
                     var overrideMode = textConfiguration.m_lineJustification;
@@ -123,9 +123,9 @@ namespace Latios.Calligraphics
                     continue;
                 }
 
-                if (font.TryGetGlyphIndex(unicode, out var glyphIndex))
+                if (font.TryGetCharacterIndex(currentRune, out var currentCharIndex))
                 {
-                    ref var glyphBlob   = ref font.characters[glyphIndex];
+                    ref var glyphBlob   = ref font.characters[currentCharIndex];
                     var     renderGlyph = new RenderGlyph
                     {
                         unicode = glyphBlob.unicode,
@@ -262,10 +262,10 @@ namespace Latios.Calligraphics
                     renderGlyph.blPosition = bottomLeft;
 
                     renderGlyphs.Add(renderGlyph);
-                    fontMaterialSet.WriteFontMaterialIndexForGlyph(0);
+                    fontMaterialSet.WriteFontMaterialIndexForGlyph(textConfiguration.m_currentFontMaterialIndex);
                     mappingWriter.AddCharNoTags(textConfiguration.m_characterCount - 1, true);
                     mappingWriter.AddCharWithTags(characterEnumerator.CurrentCharIndex, true);
-                    mappingWriter.AddBytes(characterEnumerator.CurrentByteIndex, unicode.LengthInUtf8Bytes(), true);
+                    mappingWriter.AddBytes(characterEnumerator.CurrentByteIndex, currentRune.LengthInUtf8Bytes(), true);
 
                     // Handle Kerning if Enabled.
                     #region Handle Kerning
@@ -278,17 +278,13 @@ namespace Latios.Calligraphics
                     {
                         if (characterEnumerator.MoveNext())
                         {
-                            var nextChar = characterEnumerator.Current;
-
-                            if (font.TryGetGlyphIndex(nextChar, out var nextGlyphIndex))
+                            var nextUnicodeRune = characterEnumerator.Current;
+                            if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForUnicodeAfter(nextUnicodeRune.value, out var adjustmentIndex))
                             {
-                                if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForGlyphAfter(nextGlyphIndex, out var adjustmentIndex))
-                                {
-                                    var adjustmentPair         = font.adjustmentPairs[adjustmentIndex];
-                                    glyphAdjustments           = adjustmentPair.firstAdjustment;
-                                    characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
-                                                                 FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
-                                }
+                                var adjustmentPair         = font.adjustmentPairs[adjustmentIndex];
+                                glyphAdjustments           = adjustmentPair.firstAdjustment;
+                                characterSpacingAdjustment = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
+                                                                FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
                             }
                             characterEnumerator.MovePrevious();  //rewind
                         }
@@ -296,17 +292,13 @@ namespace Latios.Calligraphics
                         if (textConfiguration.m_characterCount >= 1)
                         {
                             characterEnumerator.MovePrevious();
-                            var prevChar = characterEnumerator.Current;
-
-                            if (font.TryGetGlyphIndex(prevChar, out var previousGlyphIndex))
+                            var prevUnicodeRune = characterEnumerator.Current;
+                            if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForUnicodeBefore(prevUnicodeRune.value, out var adjustmentIndex))
                             {
-                                if (glyphBlob.glyphAdjustmentsLookup.TryGetAdjustmentPairIndexForGlyphBefore(previousGlyphIndex, out var adjustmentIndex))
-                                {
-                                    var adjustmentPair          = font.adjustmentPairs[adjustmentIndex];
-                                    glyphAdjustments           += adjustmentPair.secondAdjustment;
-                                    characterSpacingAdjustment  = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
-                                                                  FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
-                                }
+                                var adjustmentPair          = font.adjustmentPairs[adjustmentIndex];
+                                glyphAdjustments           += adjustmentPair.secondAdjustment;
+                                characterSpacingAdjustment  = (adjustmentPair.fontFeatureLookupFlags & FontFeatureLookupFlags.IgnoreSpacingAdjustments) ==
+                                                                FontFeatureLookupFlags.IgnoreSpacingAdjustments ? 0 : characterSpacingAdjustment;
                             }
                             characterEnumerator.MoveNext();  //undo rewind
                         }
@@ -325,7 +317,7 @@ namespace Latios.Calligraphics
 
                     #region Word Wrapping
                     // Apply accumulated spaces to non-space character
-                    while (unicode.value != 32 && accumulatedSpaces > 0)
+                    while (currentRune.value != 32 && accumulatedSpaces > 0)
                     {
                         // We add the glyph entry for each proceeding whitespace, so that the justified offset is
                         // "weighted" by the preceeding number of spaces.
@@ -339,7 +331,7 @@ namespace Latios.Calligraphics
                         cumulativeOffset.x > baseConfiguration.maxLineWidth)
                     {
                         bool dropSpace = false;
-                        if (unicode.value == 32 && !prevWasSpace)
+                        if (currentRune.value == 32 && !prevWasSpace)
                         {
                             // What pushed us past the line width was a space character.
                             // The previous character was not a space, and we don't
@@ -380,19 +372,19 @@ namespace Latios.Calligraphics
                     }
 
                     //Detect start of word
-                    if (unicode.value == 32 ||  //Space
-                        unicode.value == 9 ||  //Tab
-                        unicode.value == 45 ||  //Hyphen Minus
-                        unicode.value == 173 ||  //Soft hyphen
-                        unicode.value == 8203 ||  //Zero width space
-                        unicode.value == 8204 ||  //Zero width non-joiner
-                        unicode.value == 8205)  //Zero width joiner
+                    if (currentRune.value == 32 ||  //Space
+                        currentRune.value == 9 ||  //Tab
+                        currentRune.value == 45 ||  //Hyphen Minus
+                        currentRune.value == 173 ||  //Soft hyphen
+                        currentRune.value == 8203 ||  //Zero width space
+                        currentRune.value == 8204 ||  //Zero width non-joiner
+                        currentRune.value == 8205)  //Zero width joiner
                     {
                         lastWordStartCharacterGlyphIndex = renderGlyphs.Length;
                         mappingWriter.AddWordStart(renderGlyphs.Length);
                     }
 
-                    if (unicode.value == 32)
+                    if (currentRune.value == 32)
                     {
                         accumulatedSpaces++;
                         prevWasSpace = true;
@@ -416,7 +408,7 @@ namespace Latios.Calligraphics
                 ApplyHorizontalAlignmentToGlyphs(ref finalGlyphsLine, ref characterGlyphIndicesWithPreceedingSpacesInLine, baseConfiguration.maxLineWidth, overrideMode);
             }
             lineCount++;
-            ApplyVerticalAlignmentToGlyphs(ref renderGlyphs, lineCount, baseConfiguration.verticalAlignment, ref fontMaterialSet[0], baseConfiguration.fontSize);
+            ApplyVerticalAlignmentToGlyphs(ref renderGlyphs, lineCount, baseConfiguration.verticalAlignment, ref font, baseConfiguration.fontSize);
         }
 
         static unsafe void ApplyHorizontalAlignmentToGlyphs(ref NativeArray<RenderGlyph> glyphs,

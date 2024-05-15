@@ -53,25 +53,24 @@ namespace Latios.Calligraphics
 
     public struct GlyphBlob
     {
-        public uint         glyphIndex;
-        public uint         unicode;
+        public int          unicode;
         public GlyphMetrics glyphMetrics;
         public GlyphRect    glyphRect;
         public float        glyphScale;
 
-        public AdjustmentPairLookupByGlyph glyphAdjustmentsLookup;
+        public AdjustmentPairLookupByUnicode glyphAdjustmentsLookup;
     }
 
     public struct GlyphLookup
     {
-        public uint unicode;
+        public int unicode;
         public int  index;
     }
 
     public struct AdjustmentPair
     {
-        public int                    firstGlyphIndex;
-        public int                    secondGlyphIndex;
+        public int                   firstUnicode;
+        public int                   secondUnicode;
         public FontFeatureLookupFlags fontFeatureLookupFlags;
         public GlyphAdjustment        firstAdjustment;
         public GlyphAdjustment        secondAdjustment;
@@ -93,21 +92,21 @@ namespace Latios.Calligraphics
         };
     }
 
-    public struct AdjustmentPairLookupByGlyph
+    public struct AdjustmentPairLookupByUnicode
     {
-        public BlobArray<int> beforeKeys;
+        public BlobArray<int> beforeKeys;//unicode
         public BlobArray<int> beforeIndices;
-        public BlobArray<int> afterKeys;
+        public BlobArray<int> afterKeys;//unicode
         public BlobArray<int> afterIndices;
 
-        public unsafe bool TryGetAdjustmentPairIndexForGlyphBefore(int otherGlyphBefore, out int index)
+        public unsafe bool TryGetAdjustmentPairIndexForUnicodeBefore(int otherUnicodeBefore, out int index)
         {
             index = -1;
             if (beforeKeys.Length == 0)
                 return false;
 
-            var found = BinarySearchFirstGreaterOrEqual((int*)beforeKeys.GetUnsafePtr(), beforeKeys.Length, otherGlyphBefore);
-            if (found < beforeKeys.Length && beforeKeys[found] == otherGlyphBefore)
+            var found = BinarySearchFirstGreaterOrEqual((int*)beforeKeys.GetUnsafePtr(), beforeKeys.Length, otherUnicodeBefore);
+            if (found < beforeKeys.Length && beforeKeys[found] == otherUnicodeBefore)
             {
                 index = beforeIndices[found];
                 return true;
@@ -115,14 +114,14 @@ namespace Latios.Calligraphics
             return false;
         }
 
-        public unsafe bool TryGetAdjustmentPairIndexForGlyphAfter(int otherGlyphAfter, out int index)
+        public unsafe bool TryGetAdjustmentPairIndexForUnicodeAfter(int otherUnicodeAfter, out int index)
         {
             index = -1;
             if (afterKeys.Length == 0)
                 return false;
 
-            var found = BinarySearchFirstGreaterOrEqual((int*)afterKeys.GetUnsafePtr(), afterKeys.Length, otherGlyphAfter);
-            if (found < afterKeys.Length && afterKeys[found] == otherGlyphAfter)
+            var found = BinarySearchFirstGreaterOrEqual((int*)afterKeys.GetUnsafePtr(), afterKeys.Length, otherUnicodeAfter);
+            if (found < afterKeys.Length && afterKeys[found] == otherUnicodeAfter)
             {
                 index = afterIndices[found];
                 return true;
@@ -174,19 +173,19 @@ namespace Latios.Calligraphics
 
     public static class BlobTextMeshGlyphExtensions
     {
-        public static bool TryGetGlyphIndex(ref this FontBlob font, Unicode.Rune character, out int index)
+        public static bool TryGetCharacterIndex(ref this FontBlob font, Unicode.Rune character, out int index)
         {
-            return TryGetGlyphIndex(ref font, math.asuint(character.value), out index);
+            return TryGetCharacterIndex(ref font, character.value, out index);
         }
 
-        public static bool TryGetGlyphIndex(ref this FontBlob font, uint character, out int index)
+        public static bool TryGetCharacterIndex(ref this FontBlob font, int unicode, out int index)
         {
-            ref var hashArray = ref font.glyphLookupMap[GetGlyphHash(character)];
+            ref var hashArray = ref font.glyphLookupMap[GetGlyphHash(unicode)];
             index             = -1;
 
             for (int i = 0; i < hashArray.Length; i++)
             {
-                if (hashArray[i].unicode == character)
+                if (hashArray[i].unicode == unicode)
                 {
                     index = hashArray[i].index;
                     return true;
@@ -196,9 +195,9 @@ namespace Latios.Calligraphics
             return false;
         }
 
-        public static int GetGlyphHash(uint unicode)
+        public static int GetGlyphHash(int unicode)
         {
-            return (int)(unicode & 0x3f);
+            return unicode & 0x3f;
         }
     }
 }

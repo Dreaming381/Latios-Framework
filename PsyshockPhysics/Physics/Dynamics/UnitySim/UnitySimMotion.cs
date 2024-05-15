@@ -113,6 +113,22 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Computes a new world transform of an object using its velocity and the specified time step
+        /// </summary>
+        /// <param name="inertialPoseWorldTransform">The original world transform of the center of mass and inertia tensor diagonal before the time step</param>
+        /// <param name="velocity">The linear and angular velocity to apply to the world transform</param>
+        /// <param name="deltaTime">The time step over which the velocity should be applied</param>
+        /// <returns>A new inertialPoseWorldTransform propagated by the Velocity across the time span of deltaTime</returns>
+        public static RigidTransform IntegrateWithoutDamping(RigidTransform inertialPoseWorldTransform, in Velocity velocity, float deltaTime)
+        {
+            inertialPoseWorldTransform.pos += velocity.linear * deltaTime;
+            var halfDeltaAngle              = velocity.angular * 0.5f * deltaTime;
+            var dq                          = new quaternion(new float4(halfDeltaAngle, 1f));
+            inertialPoseWorldTransform.rot  = math.normalize(math.mul(inertialPoseWorldTransform.rot, dq));
+            return inertialPoseWorldTransform;
+        }
+
+        /// <summary>
         /// Applies the transform delta relative to the center of mass and inertia tensor diagonal to a TransformQvvs
         /// </summary>
         /// <param name="oldWorldTransform">The previous world transform for an entity</param>

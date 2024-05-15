@@ -16,8 +16,19 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_breadthQueue == null)
                 m_breadthQueue = new Queue<(UnityEngine.Transform, int)>();
 
-            Entities.ForEach((ref DynamicBuffer<SkeletonBoneNameInHierarchy> boneNames, in ShadowHierarchyReference shadowRef) =>
+            var previousHierarchyCopyMap = new NativeHashMap<UnityObjectRef<UnityEngine.GameObject>, Entity>(128, Allocator.TempJob);
+
+            CompleteDependency();
+            foreach ((var boneNames, var shadowRef, var entity) in SystemAPI.Query<DynamicBuffer<SkeletonBoneNameInHierarchy>, ShadowHierarchyReference>()
+                     .WithEntityAccess().WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab))
             {
+                if (previousHierarchyCopyMap.TryGetValue(shadowRef.shadowHierarchyRoot, out var otherEntity))
+                {
+                    boneNames.Clear();
+                    boneNames.AddRange(SystemAPI.GetBuffer<SkeletonBoneNameInHierarchy>(otherEntity).AsNativeArray());
+                    continue;
+                }
+
                 m_breadthQueue.Clear();
 
                 m_breadthQueue.Enqueue((shadowRef.shadowHierarchyRoot.Value.transform, -1));
@@ -38,8 +49,11 @@ namespace Latios.Kinemation.Authoring.Systems
                     }
                     currentIndex++;
                 }
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab).WithoutBurst().Run();
+                previousHierarchyCopyMap.Add(shadowRef.shadowHierarchyRoot, entity);
+            }
             m_breadthQueue.Clear();
+
+            previousHierarchyCopyMap.Dispose();
         }
     }
 }
