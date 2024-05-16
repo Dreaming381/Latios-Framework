@@ -25,6 +25,7 @@ namespace Latios.Calligraphics
                 Pop();
             return Peek();
         }
+        public void Clear() => m_buffer.Clear();
     }
 }
 

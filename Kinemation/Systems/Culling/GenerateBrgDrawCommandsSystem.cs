@@ -494,6 +494,260 @@ namespace Latios.Kinemation.Systems
             }
         }
 
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+        [BurstCompile]
+        unsafe struct EmitDrawCommandsJob : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<LodCrossfade> lodCrossfadeHandle;
+            [ReadOnly] public ComponentTypeHandle<SpeedTreeCrossfadeTag> speedTreeCrossfadeTagHandle;
+            [ReadOnly] public EntityQueryMask motionVectorDeformQueryMask;
+            public bool splitsAreValid;
+
+            //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo> MaterialMeshInfo;
+            [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> WorldTransform;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix> PostProcessMatrix;
+            [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag> DepthSorted;
+            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray> RenderMeshArray;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
+            [ReadOnly] public SharedComponentTypeHandle<LightMaps> LightMaps;
+            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray> BRGRenderMeshArrays;
+
+            public ChunkDrawCommandOutput DrawCommandOutput;
+
+            public ulong SceneCullingMask;
+            public float3 CameraPosition;
+            public uint LastSystemVersion;
+            public uint CullingLayerMask;
+
+            public ProfilerMarker ProfilerEmitChunk;
+
+#if UNITY_EDITOR
+            [ReadOnly] public SharedComponentTypeHandle<EditorRenderData> EditorDataComponentHandle;
+#endif
+
+            public void Execute(int i)
+            {
+                Execute(chunksToProcess[i]);
+            }
+
+            void Execute(in ArchetypeChunk chunk)
+            {
+                //var visibilityItem = VisibilityItems.ElementAt(index);
+
+                //var chunkVisibility = visibilityItem.Visibility;
+
+                int filterIndex = chunk.GetSharedComponentIndex(RenderFilterSettings);
+
+                DrawCommandOutput.InitializeForEmitThread();
+
+                {
+                    var entitiesGraphicsChunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
+
+                    if (!entitiesGraphicsChunkInfo.Valid)
+                        return;
+
+                    // If the chunk has a RenderMeshArray, get access to the corresponding registered
+                    // Material and Mesh IDs
+                    BRGRenderMeshArray brgRenderMeshArray = default;
+                    if (!BRGRenderMeshArrays.IsEmpty)
+                    {
+                        int renderMeshArrayIndex = chunk.GetSharedComponentIndex(RenderMeshArray);
+                        bool hasRenderMeshArray   = renderMeshArrayIndex >= 0;
+                        if (hasRenderMeshArray)
+                            BRGRenderMeshArrays.TryGetValue(renderMeshArrayIndex, out brgRenderMeshArray);
+                    }
+
+                    ref var chunkCullingData = ref entitiesGraphicsChunkInfo.CullingData;
+
+                    int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
+
+                    var materialMeshInfos   = chunk.GetNativeArray(ref MaterialMeshInfo);
+                    var worldTransforms     = chunk.GetNativeArray(ref WorldTransform);
+                    var postProcessMatrices = chunk.GetNativeArray(ref PostProcessMatrix);
+                    bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
+                    bool isDepthSorted       = chunk.Has(ref DepthSorted);
+                    bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+                    bool hasLodCrossfade     = chunk.Has(ref lodCrossfadeHandle);
+
+                    // Check if the chunk has statically disabled motion (i.e. never in motion pass)
+                    // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
+                    // We make sure to never set the motion flag if motion is statically disabled to improve batching
+                    // in cases where the transform is changed.
+                    bool hasMotion = (chunkCullingData.Flags & EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion) != 0;
+
+                    if (hasMotion)
+                    {
+                        bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
+                        bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
+                        if (hasPostProcess)
+                            transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
+                        bool isDeformed = motionVectorDeformQueryMask.MatchesIgnoreFilter(chunk);
+                        hasMotion = orderChanged || transformChanged || isDeformed;
+                    }
+
+                    int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
+
+                    var mask              = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
+                    var splitsMask        = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
+                    var crossFadeEnableds = hasLodCrossfade ? chunk.GetEnabledMask(ref lodCrossfadeHandle) : default;
+                    var isSpeedTree       = hasLodCrossfade && chunk.Has(ref speedTreeCrossfadeTagHandle);
+
+                    float4x4* depthSortingTransformsPtr = null;
+                    if (isDepthSorted && hasPostProcess)
+                    {
+                        // In this case, we don't actually have a component that represents the rendered position.
+                        // So we allocate a new array and compute the world positions. We store them in TransformQvvs
+                        // so that the read pointer looks the same as our WorldTransforms.
+                        // We compute them in the inner loop since only the visible instances are read from later,
+                        // and it is a lot cheaper to only compute the visible instances.
+                        var allocator = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
+                        depthSortingTransformsPtr = AllocatorManager.Allocate<float4x4>(allocator, chunk.Count);
+                    }
+                    else if (isDepthSorted)
+                    {
+                        depthSortingTransformsPtr = (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr();
+                    }
+
+                    for (int j = 0; j < 2; j++)
+                    {
+                        ulong visibleWord = mask.ValueRO.GetUlongFromIndex(j);
+
+                        while (visibleWord != 0)
+                        {
+                            int bitIndex    = math.tzcnt(visibleWord);
+                            int entityIndex = (j << 6) + bitIndex;
+                            ulong entityMask  = 1ul << bitIndex;
+
+                            // Clear the bit first in case we early out from the loop
+                            visibleWord ^= entityMask;
+
+                            MaterialMeshInfo materialMeshInfo = materialMeshInfos[entityIndex];
+                            BatchID batchID          = new BatchID { value = (uint)batchIndex };
+                            ushort splitMask        = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0;  // Todo: Should the default be 1 instead of 0?
+                            bool flipWinding      = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
+
+                            BatchDrawCommandFlags drawCommandFlags = 0;
+
+                            if (flipWinding)
+                                drawCommandFlags |= BatchDrawCommandFlags.FlipWinding;
+
+                            if (hasMotion)
+                                drawCommandFlags |= BatchDrawCommandFlags.HasMotion;
+
+                            if (isLightMapped)
+                                drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
+
+                            if (hasLodCrossfade && crossFadeEnableds[entityIndex])
+                            {
+                                // Todo: Remove the LODCrossFade line and replace with the commented out lines in Unity 6.
+                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
+                                //drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
+                                //if (!isSpeedTree)
+                                //    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+                            }
+
+                            // Depth sorted draws are emitted with access to entity transforms,
+                            // so they can also be written out for sorting
+                            if (isDepthSorted)
+                            {
+                                drawCommandFlags |= BatchDrawCommandFlags.HasSortingPosition;
+                                // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
+                                // We also customize the code where this pointer is read.
+                                if (hasPostProcess)
+                                {
+                                    var index = j * 64 + bitIndex;
+                                    var f4x4  = new float4x4(new float4(postProcessMatrices[index].postProcessMatrix.c0, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
+                                                             new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
+                                    depthSortingTransformsPtr[index].c3.xyz = math.transform(f4x4, worldTransforms[index].Position);
+                                }
+                            }
+
+                            if (materialMeshInfo.HasMaterialMeshIndexRange)
+                            {
+                                RangeInt matMeshIndexRange = materialMeshInfo.MaterialMeshIndexRange;
+
+                                for (int i = 0; i < matMeshIndexRange.length; i++)
+                                {
+                                    int matMeshSubMeshIndex = matMeshIndexRange.start + i;
+
+                                    // Drop the draw command if OOB. Errors should have been reported already so no need to log anything
+                                    if (matMeshSubMeshIndex >= brgRenderMeshArray.MaterialMeshSubMeshes.Length)
+                                        continue;
+
+                                    BatchMaterialMeshSubMesh matMeshSubMesh = brgRenderMeshArray.MaterialMeshSubMeshes[matMeshSubMeshIndex];
+
+                                    DrawCommandSettings settings = new DrawCommandSettings
+                                    {
+                                        FilterIndex  = filterIndex,
+                                        BatchID      = batchID,
+                                        MaterialID   = matMeshSubMesh.Material,
+                                        MeshID       = matMeshSubMesh.Mesh,
+                                        SplitMask    = splitMask,
+                                        SubMeshIndex = (ushort)matMeshSubMesh.SubMeshIndex,
+                                        Flags        = drawCommandFlags
+                                    };
+
+                                    EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
+                                }
+                            }
+                            else
+                            {
+                                BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
+                                                     materialMeshInfo.MeshID :
+                                                     brgRenderMeshArray.GetMeshID(materialMeshInfo);
+
+                                // Invalid meshes at this point will be skipped.
+                                if (meshID == BatchMeshID.Null)
+                                    continue;
+
+                                // Null materials are handled internally by Unity using the error material if available.
+                                BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
+                                                             materialMeshInfo.MaterialID :
+                                                             brgRenderMeshArray.GetMaterialID(materialMeshInfo);
+
+                                if (materialID == BatchMaterialID.Null)
+                                    continue;
+
+                                var settings = new DrawCommandSettings
+                                {
+                                    FilterIndex  = filterIndex,
+                                    BatchID      = batchID,
+                                    MaterialID   = materialID,
+                                    MeshID       = meshID,
+                                    SplitMask    = splitMask,
+                                    SubMeshIndex = (ushort)materialMeshInfo.SubMesh,
+                                    Flags        = drawCommandFlags
+                                };
+
+                                EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
+                            }
+                        }
+                    }
+                }
+            }
+
+            private void EmitDrawCommand(in DrawCommandSettings settings, int entityQword, int entityBit, int chunkStartIndex, void* depthSortingPtr)
+            {
+                // Depth sorted draws are emitted with access to entity transforms,
+                // so they can also be written out for sorting
+                if (settings.HasSortingPosition)
+                {
+                    DrawCommandOutput.EmitDepthSorted(settings, entityQword, entityBit, chunkStartIndex, (float4x4*)depthSortingPtr);
+                }
+                else
+                {
+                    DrawCommandOutput.Emit(settings, entityQword, entityBit, chunkStartIndex);
+                }
+            }
+        }
+#endif
         [BurstCompile]
         internal unsafe struct ExpandVisibleInstancesJob : IJobParallelForDefer
         {
@@ -744,256 +998,6 @@ namespace Latios.Kinemation.Systems
                 return numInstances;
             }
         }
-#endif
-
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-        [BurstCompile]
-        unsafe struct EmitDrawCommandsJob : IJobParallelForDefer
-        {
-            [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<LodCrossfade> lodCrossfadeHandle;
-            public bool splitsAreValid;
-
-            //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
-            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
-            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo> MaterialMeshInfo;
-            [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix> PostProcessMatrix;
-            [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag> DepthSorted;
-            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray> RenderMeshArray;
-            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
-            [ReadOnly] public SharedComponentTypeHandle<LightMaps> LightMaps;
-            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray> BRGRenderMeshArrays;
-
-            public ChunkDrawCommandOutput DrawCommandOutput;
-
-            public ulong SceneCullingMask;
-            public float3 CameraPosition;
-            public uint LastSystemVersion;
-            public uint CullingLayerMask;
-
-            public ProfilerMarker ProfilerEmitChunk;
-
-#if UNITY_EDITOR
-            [ReadOnly] public SharedComponentTypeHandle<EditorRenderData> EditorDataComponentHandle;
-#endif
-
-            public void Execute(int i)
-            {
-                Execute(chunksToProcess[i]);
-            }
-
-            void Execute(in ArchetypeChunk chunk)
-            {
-                //var visibilityItem = VisibilityItems.ElementAt(index);
-
-                //var chunkVisibility = visibilityItem.Visibility;
-
-                int filterIndex = chunk.GetSharedComponentIndex(RenderFilterSettings);
-
-                DrawCommandOutput.InitializeForEmitThread();
-
-                {
-                    var entitiesGraphicsChunkInfo = chunk.GetChunkComponentData(ref EntitiesGraphicsChunkInfo);
-
-                    if (!entitiesGraphicsChunkInfo.Valid)
-                        return;
-
-                    // If the chunk has a RenderMeshArray, get access to the corresponding registered
-                    // Material and Mesh IDs
-                    BRGRenderMeshArray brgRenderMeshArray = default;
-                    if (!BRGRenderMeshArrays.IsEmpty)
-                    {
-                        int renderMeshArrayIndex = chunk.GetSharedComponentIndex(RenderMeshArray);
-                        bool hasRenderMeshArray   = renderMeshArrayIndex >= 0;
-                        if (hasRenderMeshArray)
-                            BRGRenderMeshArrays.TryGetValue(renderMeshArrayIndex, out brgRenderMeshArray);
-                    }
-
-                    ref var chunkCullingData = ref entitiesGraphicsChunkInfo.CullingData;
-
-                    int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
-
-                    var materialMeshInfos   = chunk.GetNativeArray(ref MaterialMeshInfo);
-                    var worldTransforms     = chunk.GetNativeArray(ref WorldTransform);
-                    var postProcessMatrices = chunk.GetNativeArray(ref PostProcessMatrix);
-                    bool hasPostProcess      = chunk.Has(ref PostProcessMatrix);
-                    bool isDepthSorted       = chunk.Has(ref DepthSorted);
-                    bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
-                    bool hasLodCrossfade     = chunk.Has(ref lodCrossfadeHandle);
-
-                    // Check if the chunk has statically disabled motion (i.e. never in motion pass)
-                    // or enabled motion (i.e. in motion pass if there was actual motion or force-to-zero).
-                    // We make sure to never set the motion flag if motion is statically disabled to improve batching
-                    // in cases where the transform is changed.
-                    bool hasMotion = (chunkCullingData.Flags & EntitiesGraphicsChunkCullingData.kFlagPerObjectMotion) != 0;
-
-                    if (hasMotion)
-                    {
-                        bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
-                        bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
-                        if (hasPostProcess)
-                            transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
-#if ENABLE_DOTS_DEFORMATION_MOTION_VECTORS
-                        bool isDeformed = chunk.Has(ref DeformedMeshIndex);
-#else
-                        bool isDeformed = false;
-#endif
-                        hasMotion = orderChanged || transformChanged || isDeformed;
-                    }
-
-                    int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
-
-                    var mask       = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle);
-                    var splitsMask = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
-
-                    float4x4* depthSortingTransformsPtr = null;
-                    if (isDepthSorted && hasPostProcess)
-                    {
-                        // In this case, we don't actually have a component that represents the rendered position.
-                        // So we allocate a new array and compute the world positions. We store them in TransformQvvs
-                        // so that the read pointer looks the same as our WorldTransforms.
-                        // We compute them in the inner loop since only the visible instances are read from later,
-                        // and it is a lot cheaper to only compute the visible instances.
-                        var allocator = DrawCommandOutput.ThreadLocalAllocator.ThreadAllocator(DrawCommandOutput.ThreadIndex)->Handle;
-                        depthSortingTransformsPtr = AllocatorManager.Allocate<float4x4>(allocator, chunk.Count);
-                    }
-                    else if (isDepthSorted)
-                    {
-                        depthSortingTransformsPtr = (float4x4*)worldTransforms.GetUnsafeReadOnlyPtr();
-                    }
-
-                    for (int j = 0; j < 2; j++)
-                    {
-                        ulong visibleWord = mask.ValueRO.GetUlongFromIndex(j);
-
-                        while (visibleWord != 0)
-                        {
-                            int bitIndex    = math.tzcnt(visibleWord);
-                            int entityIndex = (j << 6) + bitIndex;
-                            ulong entityMask  = 1ul << bitIndex;
-
-                            // Clear the bit first in case we early out from the loop
-                            visibleWord ^= entityMask;
-
-                            MaterialMeshInfo materialMeshInfo = materialMeshInfos[entityIndex];
-                            BatchID batchID          = new BatchID { value = (uint)batchIndex };
-                            ushort splitMask        = splitsAreValid ? splitsMask.ValueRO.splitMasks[entityIndex] : (ushort)0;  // Todo: Should the default be 1 instead of 0?
-                            bool flipWinding      = (chunkCullingData.FlippedWinding[j] & entityMask) != 0;
-
-                            BatchDrawCommandFlags drawCommandFlags = 0;
-
-                            if (flipWinding)
-                                drawCommandFlags |= BatchDrawCommandFlags.FlipWinding;
-
-                            if (hasMotion)
-                                drawCommandFlags |= BatchDrawCommandFlags.HasMotion;
-
-                            if (isLightMapped)
-                                drawCommandFlags |= BatchDrawCommandFlags.IsLightMapped;
-
-                            if (hasLodCrossfade)
-                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
-
-                            // Depth sorted draws are emitted with access to entity transforms,
-                            // so they can also be written out for sorting
-                            if (isDepthSorted)
-                            {
-                                drawCommandFlags |= BatchDrawCommandFlags.HasSortingPosition;
-                                // To maintain compatibility with most of the data structures, we pretend we have a LocalToWorld matrix pointer.
-                                // We also customize the code where this pointer is read.
-                                if (hasPostProcess)
-                                {
-                                    var index = j * 64 + bitIndex;
-                                    var f4x4  = new float4x4(new float4(postProcessMatrices[index].postProcessMatrix.c0, 0f),
-                                                             new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
-                                                             new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
-                                                             new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
-                                    depthSortingTransformsPtr[index].c3.xyz = math.transform(f4x4, worldTransforms[index].Position);
-                                }
-                            }
-
-                            if (materialMeshInfo.HasMaterialMeshIndexRange)
-                            {
-                                RangeInt matMeshIndexRange = materialMeshInfo.MaterialMeshIndexRange;
-
-                                for (int i = 0; i < matMeshIndexRange.length; i++)
-                                {
-                                    int matMeshSubMeshIndex = matMeshIndexRange.start + i;
-
-                                    // Drop the draw command if OOB. Errors should have been reported already so no need to log anything
-                                    if (matMeshSubMeshIndex >= brgRenderMeshArray.MaterialMeshSubMeshes.Length)
-                                        continue;
-
-                                    BatchMaterialMeshSubMesh matMeshSubMesh = brgRenderMeshArray.MaterialMeshSubMeshes[matMeshSubMeshIndex];
-
-                                    DrawCommandSettings settings = new DrawCommandSettings
-                                    {
-                                        FilterIndex  = filterIndex,
-                                        BatchID      = batchID,
-                                        MaterialID   = matMeshSubMesh.Material,
-                                        MeshID       = matMeshSubMesh.Mesh,
-                                        SplitMask    = splitMask,
-                                        SubMeshIndex = (ushort)matMeshSubMesh.SubMeshIndex,
-                                        Flags        = drawCommandFlags
-                                    };
-
-                                    EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
-                                }
-                            }
-                            else
-                            {
-                                BatchMeshID meshID = materialMeshInfo.IsRuntimeMesh ?
-                                                     materialMeshInfo.MeshID :
-                                                     brgRenderMeshArray.GetMeshID(materialMeshInfo);
-
-                                // Invalid meshes at this point will be skipped.
-                                if (meshID == BatchMeshID.Null)
-                                    continue;
-
-                                // Null materials are handled internally by Unity using the error material if available.
-                                BatchMaterialID materialID = materialMeshInfo.IsRuntimeMaterial ?
-                                                             materialMeshInfo.MaterialID :
-                                                             brgRenderMeshArray.GetMaterialID(materialMeshInfo);
-
-                                if (materialID == BatchMaterialID.Null)
-                                    continue;
-
-                                var settings = new DrawCommandSettings
-                                {
-                                    FilterIndex  = filterIndex,
-                                    BatchID      = batchID,
-                                    MaterialID   = materialID,
-                                    MeshID       = meshID,
-                                    SplitMask    = splitMask,
-                                    SubMeshIndex = (ushort)materialMeshInfo.SubMesh,
-                                    Flags        = drawCommandFlags
-                                };
-
-                                EmitDrawCommand(settings, j, bitIndex, chunkStartIndex, depthSortingTransformsPtr);
-                            }
-                        }
-                    }
-                }
-            }
-
-            private void EmitDrawCommand(in DrawCommandSettings settings, int entityQword, int entityBit, int chunkStartIndex, void* depthSortingPtr)
-            {
-                // Depth sorted draws are emitted with access to entity transforms,
-                // so they can also be written out for sorting
-                if (settings.HasSortingPosition)
-                {
-                    DrawCommandOutput.EmitDepthSorted(settings, entityQword, entityBit, chunkStartIndex, (float4x4*)depthSortingPtr);
-                }
-                else
-                {
-                    DrawCommandOutput.Emit(settings, entityQword, entityBit, chunkStartIndex);
-                }
-            }
-        }
-#endif
 
         [BurstCompile]
         unsafe struct GenerateDrawCommandsJob : IJobParallelForDefer

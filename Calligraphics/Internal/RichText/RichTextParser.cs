@@ -19,9 +19,11 @@ namespace Latios.Calligraphics.RichText
             ref CalliString.Enumerator enumerator,
             ref FontMaterialSet fontMaterialSet,
             in TextBaseConfiguration baseConfiguration,
-            ref TextConfiguration textConfiguration,
-            ref FixedList512Bytes<RichTextTagIdentifier> richTextTagIndentifiers)  //this is just a cache to avoid allocation
+            ref TextConfigurationStack textConfigurationStack,
+            ref TextGenerationStateCommands textGenerationStateCommands,
+            int characterCount)  // CharacterCount is a temporary argument until we replace the enumerator.
         {
+            ref var richTextTagIndentifiers = ref textConfigurationStack.richTextTagIndentifiers;
             richTextTagIndentifiers.Clear();
             int         tagCharCount       = 0;
             int         tagByteCount       = 0;
@@ -186,21 +188,21 @@ namespace Latios.Calligraphics.RichText
             }
 
             ref var firstTagIndentifier = ref richTextTagIndentifiers.ElementAt(0);
-            calliString.GetSubString(ref textConfiguration.m_htmlTag, startByteIndex, tagByteCount);
+            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, startByteIndex, tagByteCount);
 
             //#region Rich Text Tag Processing
             //#if !RICH_TEXT_ENABLED
             // Special handling of the no parsing tag </noparse> </NOPARSE> tag
-            if (textConfiguration.tag_NoParsing && (firstTagIndentifier.nameHashCode != 53822163 && firstTagIndentifier.nameHashCode != 49429939))
+            if (textConfigurationStack.m_tagNoParsing && (firstTagIndentifier.nameHashCode != 53822163 && firstTagIndentifier.nameHashCode != 49429939))
                 return false;
             else if (firstTagIndentifier.nameHashCode == 53822163 || firstTagIndentifier.nameHashCode == 49429939)
             {
-                textConfiguration.tag_NoParsing = false;
+                textConfigurationStack.m_tagNoParsing = false;
                 return true;
             }
 
             // Color tag just starting with hex (no assignment)
-            if (textConfiguration.m_htmlTag[0] == 35)
+            if (textConfigurationStack.m_htmlTag[0] == 35)
             {
                 // tagCharCount == 4: Color <#FFF> 3 Hex values (short form)
                 // tagCharCount == 5: Color <#FFF7> 4 Hex values with alpha (short form)
@@ -208,8 +210,8 @@ namespace Latios.Calligraphics.RichText
                 // tagCharCount == 9: Color <#FF00FF00> with alpha
                 if (tagCharCount == 4 || tagCharCount == 5 || tagCharCount == 7 || tagCharCount == 9)
                 {
-                    textConfiguration.m_htmlColor = HexCharsToColor(textConfiguration.m_htmlTag, tagCharCount);
-                    textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                    textConfigurationStack.m_htmlColor = HexCharsToColor(textConfigurationStack.m_htmlTag, tagCharCount);
+                    textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                     return true;
                 }
             }
@@ -218,129 +220,132 @@ namespace Latios.Calligraphics.RichText
                 float value = 0;
                 float fontScale;
 
-                ref var currentFont = ref fontMaterialSet[textConfiguration.m_currentFontMaterialIndex];
+                ref var currentFont = ref fontMaterialSet[textConfigurationStack.m_currentFontMaterialIndex];
 
                 switch (firstTagIndentifier.nameHashCode)
                 {
                     case 98:  // <b>
                     case 66:  // <B>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Bold;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Bold);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Bold;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Bold);
 
-                        textConfiguration.m_fontWeightInternal = FontWeight.Bold;
+                        textConfigurationStack.m_fontWeightInternal = FontWeight.Bold;
                         return true;
                     case 427:  // </b>
                     case 395:  // </B>
                         if ((baseConfiguration.fontStyle & FontStyles.Bold) != FontStyles.Bold)
                         {
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Bold) == 0)
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Bold) == 0)
                             {
-                                textConfiguration.m_fontStyleInternal  &= ~FontStyles.Bold;
-                                textConfiguration.m_fontWeightInternal  = textConfiguration.m_fontWeightStack.Peek();
+                                textConfigurationStack.m_fontStyleInternal  &= ~FontStyles.Bold;
+                                textConfigurationStack.m_fontWeightInternal  = textConfigurationStack.m_fontWeightStack.Peek();
                             }
                         }
                         return true;
                     case 105:  // <i>
                     case 73:  // <I>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Italic;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Italic);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Italic;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Italic);
 
                         if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 276531 || richTextTagIndentifiers[1].nameHashCode == 186899))
                         {
                             // Reject tag if value is invalid.
-                            calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
+                            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
 
-                            if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                            if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                                 return false;
-                            textConfiguration.m_italicAngle = (short)value;
+                            textConfigurationStack.m_italicAngle = (short)value;
 
                             // Make sure angle is within valid range.
-                            if (textConfiguration.m_italicAngle < -180 || textConfiguration.m_italicAngle > 180)
+                            if (textConfigurationStack.m_italicAngle < -180 || textConfigurationStack.m_italicAngle > 180)
                                 return false;
                         }
                         else
-                            textConfiguration.m_italicAngle = currentFont.italicsStyleSlant;
+                            textConfigurationStack.m_italicAngle = currentFont.italicsStyleSlant;
 
-                        textConfiguration.m_italicAngleStack.Add(textConfiguration.m_italicAngle);
+                        textConfigurationStack.m_italicAngleStack.Add(textConfigurationStack.m_italicAngle);
 
                         return true;
                     case 434:  // </i>
                     case 402:  // </I>
                         if ((baseConfiguration.fontStyle & FontStyles.Italic) != FontStyles.Italic)
                         {
-                            textConfiguration.m_italicAngle = textConfiguration.m_italicAngleStack.RemoveExceptRoot();
+                            textConfigurationStack.m_italicAngle = textConfigurationStack.m_italicAngleStack.RemoveExceptRoot();
 
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Italic) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Italic;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Italic) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Italic;
                         }
                         return true;
                     case 115:  // <s>
                     case 83:  // <S>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Strikethrough;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Strikethrough);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Strikethrough;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Strikethrough);
 
                         if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323))
                         {
-                            calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
-                            charCount                                = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
-                            textConfiguration.m_strikethroughColor   = HexCharsToColor(textConfiguration.m_htmlTag, charCount);
-                            textConfiguration.m_strikethroughColor.a = textConfiguration.m_htmlColor.a <
-                                                                       textConfiguration.m_strikethroughColor.a ? (byte)(textConfiguration.m_htmlColor.a) : (byte)(textConfiguration
-                                                                                                                                                                   .
-                                                                                                                                                                   m_strikethroughColor
-                                                                                                                                                                   .a);
+                            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
+                            charCount                                     = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
+                            textConfigurationStack.m_strikethroughColor   = HexCharsToColor(textConfigurationStack.m_htmlTag, charCount);
+                            textConfigurationStack.m_strikethroughColor.a = textConfigurationStack.m_htmlColor.a <
+                                                                            textConfigurationStack.m_strikethroughColor.a ? (byte)(textConfigurationStack.m_htmlColor.a) : (byte)(
+                                textConfigurationStack
+                                .
+                                m_strikethroughColor
+                                .a);
                         }
                         else
-                            textConfiguration.m_strikethroughColor = textConfiguration.m_htmlColor;
+                            textConfigurationStack.m_strikethroughColor = textConfigurationStack.m_htmlColor;
 
-                        textConfiguration.m_strikethroughColorStack.Add(textConfiguration.m_strikethroughColor);
+                        textConfigurationStack.m_strikethroughColorStack.Add(textConfigurationStack.m_strikethroughColor);
 
                         return true;
                     case 444:  // </s>
                     case 412:  // </S>
                         if ((baseConfiguration.fontStyle & FontStyles.Strikethrough) != FontStyles.Strikethrough)
                         {
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Strikethrough) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Strikethrough;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Strikethrough) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Strikethrough;
                         }
 
-                        textConfiguration.m_strikethroughColor = textConfiguration.m_strikethroughColorStack.RemoveExceptRoot();
+                        textConfigurationStack.m_strikethroughColor = textConfigurationStack.m_strikethroughColorStack.RemoveExceptRoot();
                         return true;
                     case 117:  // <u>
                     case 85:  // <U>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Underline;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Underline);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Underline;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Underline);
                         if (richTextTagIndentifiers.Length > 1 && (richTextTagIndentifiers[1].nameHashCode == 281955 || richTextTagIndentifiers[1].nameHashCode == 192323))
                         {
-                            calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
-                            charCount                            = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
-                            textConfiguration.m_underlineColor   = HexCharsToColor(textConfiguration.m_htmlTag, charCount);
-                            textConfiguration.m_underlineColor.a = textConfiguration.m_htmlColor.a <
-                                                                   textConfiguration.m_underlineColor.a ? (byte)(textConfiguration.m_htmlColor.a) : (byte)(textConfiguration.
-                                                                                                                                                           m_underlineColor.a);
+                            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, richTextTagIndentifiers[1].valueStartIndex, richTextTagIndentifiers[1].valueLength);
+                            charCount                                 = richTextTagIndentifiers[1].valueLength - richTextTagIndentifiers[1].valueStartIndex;
+                            textConfigurationStack.m_underlineColor   = HexCharsToColor(textConfigurationStack.m_htmlTag, charCount);
+                            textConfigurationStack.m_underlineColor.a = textConfigurationStack.m_htmlColor.a <
+                                                                        textConfigurationStack.m_underlineColor.a ? (byte)(textConfigurationStack.m_htmlColor.a) : (byte)(
+                                textConfigurationStack.
+                                m_underlineColor
+                                .a);
                         }
                         else
-                            textConfiguration.m_underlineColor = textConfiguration.m_htmlColor;
+                            textConfigurationStack.m_underlineColor = textConfigurationStack.m_htmlColor;
 
-                        textConfiguration.m_underlineColorStack.Add(textConfiguration.m_underlineColor);
+                        textConfigurationStack.m_underlineColorStack.Add(textConfigurationStack.m_underlineColor);
 
                         return true;
                     case 446:  // </u>
                     case 414:  // </U>
                         if ((baseConfiguration.fontStyle & FontStyles.Underline) != FontStyles.Underline)
                         {
-                            textConfiguration.m_underlineColor = textConfiguration.m_underlineColorStack.RemoveExceptRoot();
+                            textConfigurationStack.m_underlineColor = textConfigurationStack.m_underlineColorStack.RemoveExceptRoot();
 
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Underline) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Underline;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Underline) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Underline;
                         }
 
-                        textConfiguration.m_underlineColor = textConfiguration.m_underlineColorStack.RemoveExceptRoot();
+                        textConfigurationStack.m_underlineColor = textConfigurationStack.m_underlineColorStack.RemoveExceptRoot();
                         return true;
                     case 43045:  // <mark=#FF00FF80>
                     case 30245:  // <MARK>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Highlight;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Highlight);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Highlight;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Highlight);
 
                         Color32     highlightColor   = new Color32(255, 255, 0, 64);
                         RectOffsets highlightPadding = RectOffsets.zero;
@@ -358,17 +363,19 @@ namespace Latios.Calligraphics.RichText
                                     if (richTextTagIndentifiers[i].valueType == TagValueType.ColorValue)
                                     {
                                         //is this a bug in TMP Pro? -->should be richTextTagIndentifiers[i] and not firstTagIndentifier
-                                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                                         charCount      = firstTagIndentifier.valueLength - firstTagIndentifier.valueStartIndex;
-                                        highlightColor = HexCharsToColor(textConfiguration.m_htmlTag, charCount);
+                                        highlightColor = HexCharsToColor(textConfigurationStack.m_htmlTag, charCount);
                                     }
                                     break;
 
                                 // Color tagIndentifier
                                 case 281955:
-                                    calliString.GetSubString(ref textConfiguration.m_htmlTag, richTextTagIndentifiers[i].valueStartIndex, richTextTagIndentifiers[i].valueLength);
+                                    calliString.GetSubString(ref textConfigurationStack.m_htmlTag,
+                                                             richTextTagIndentifiers[i].valueStartIndex,
+                                                             richTextTagIndentifiers[i].valueLength);
                                     charCount      = richTextTagIndentifiers[i].valueLength - richTextTagIndentifiers[i].valueStartIndex;
-                                    highlightColor = HexCharsToColor(textConfiguration.m_htmlTag, charCount);
+                                    highlightColor = HexCharsToColor(textConfigurationStack.m_htmlTag, charCount);
                                     break;
 
                                 // Padding tagIndentifier
@@ -382,140 +389,144 @@ namespace Latios.Calligraphics.RichText
                             }
                         }
 
-                        highlightColor.a = textConfiguration.m_htmlColor.a < highlightColor.a ? (byte)(textConfiguration.m_htmlColor.a) : (byte)(highlightColor.a);
+                        highlightColor.a = textConfigurationStack.m_htmlColor.a < highlightColor.a ? (byte)(textConfigurationStack.m_htmlColor.a) : (byte)(highlightColor.a);
 
                         HighlightState state = new HighlightState(highlightColor, highlightPadding);
-                        textConfiguration.m_highlightStateStack.Add(state);
+                        textConfigurationStack.m_highlightStateStack.Add(state);
 
                         return true;
                     case 155892:  // </mark>
                     case 143092:  // </MARK>
                         if ((baseConfiguration.fontStyle & FontStyles.Highlight) != FontStyles.Highlight)
                         {
-                            textConfiguration.m_highlightStateStack.RemoveExceptRoot();
+                            textConfigurationStack.m_highlightStateStack.RemoveExceptRoot();
 
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Highlight) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Highlight;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Highlight) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Highlight;
                         }
                         return true;
                     case 6552:  // <sub>
                     case 4728:  // <SUB>
-                        textConfiguration.m_fontScaleMultiplier *= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
-                        textConfiguration.m_baselineOffsetStack.Add(textConfiguration.m_baselineOffset);
+                        textConfigurationStack.m_fontScaleMultiplier *= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
+                        textConfigurationStack.m_baselineOffsetStack.Add(textConfigurationStack.m_baselineOffset);
                         fontScale =
-                            (textConfiguration.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
-                        textConfiguration.m_baselineOffset += currentFont.subscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
+                            (textConfigurationStack.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
+                        textConfigurationStack.m_baselineOffset += currentFont.subscriptOffset * fontScale * textConfigurationStack.m_fontScaleMultiplier;
 
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Subscript);
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Subscript;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Subscript);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Subscript;
                         return true;
                     case 22673:  // </sub>
                     case 20849:  // </SUB>
-                        if ((textConfiguration.m_fontStyleInternal & FontStyles.Subscript) == FontStyles.Subscript)
+                        if ((textConfigurationStack.m_fontStyleInternal & FontStyles.Subscript) == FontStyles.Subscript)
                         {
-                            if (textConfiguration.m_fontScaleMultiplier < 1)
+                            if (textConfigurationStack.m_fontScaleMultiplier < 1)
                             {
-                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.RemoveExceptRoot();
-                                textConfiguration.m_fontScaleMultiplier /= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
+                                textConfigurationStack.m_baselineOffset       = textConfigurationStack.m_baselineOffsetStack.RemoveExceptRoot();
+                                textConfigurationStack.m_fontScaleMultiplier /= currentFont.subscriptSize > 0 ? currentFont.subscriptSize : 1;
                             }
 
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Subscript) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Subscript;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Subscript) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Subscript;
                         }
                         return true;
                     case 6566:  // <sup>
                     case 4742:  // <SUP>
-                        textConfiguration.m_fontScaleMultiplier *= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
-                        textConfiguration.m_baselineOffsetStack.Add(textConfiguration.m_baselineOffset);
+                        textConfigurationStack.m_fontScaleMultiplier *= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
+                        textConfigurationStack.m_baselineOffsetStack.Add(textConfigurationStack.m_baselineOffset);
                         fontScale =
-                            (textConfiguration.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
-                        textConfiguration.m_baselineOffset += currentFont.superscriptOffset * fontScale * textConfiguration.m_fontScaleMultiplier;
+                            (textConfigurationStack.m_currentFontSize / currentFont.pointSize * currentFont.scale * (baseConfiguration.isOrthographic ? 1 : 0.1f));
+                        textConfigurationStack.m_baselineOffset += currentFont.superscriptOffset * fontScale * textConfigurationStack.m_fontScaleMultiplier;
 
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.Superscript);
-                        textConfiguration.m_fontStyleInternal |= FontStyles.Superscript;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.Superscript);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.Superscript;
                         return true;
                     case 22687:  // </sup>
                     case 20863:  // </SUP>
-                        if ((textConfiguration.m_fontStyleInternal & FontStyles.Superscript) == FontStyles.Superscript)
+                        if ((textConfigurationStack.m_fontStyleInternal & FontStyles.Superscript) == FontStyles.Superscript)
                         {
-                            if (textConfiguration.m_fontScaleMultiplier < 1)
+                            if (textConfigurationStack.m_fontScaleMultiplier < 1)
                             {
-                                textConfiguration.m_baselineOffset       = textConfiguration.m_baselineOffsetStack.RemoveExceptRoot();
-                                textConfiguration.m_fontScaleMultiplier /= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
+                                textConfigurationStack.m_baselineOffset       = textConfigurationStack.m_baselineOffsetStack.RemoveExceptRoot();
+                                textConfigurationStack.m_fontScaleMultiplier /= currentFont.superscriptSize > 0 ? currentFont.superscriptSize : 1;
                             }
 
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.Superscript) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.Superscript;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.Superscript) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.Superscript;
                         }
                         return true;
                     case -330774850:  // <font-weight>
                     case 2012149182:  // <FONT-WEIGHT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch ((int)value)
                         {
                             case 100:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Thin;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Thin;
                                 break;
                             case 200:
-                                textConfiguration.m_fontWeightInternal = FontWeight.ExtraLight;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.ExtraLight;
                                 break;
                             case 300:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Light;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Light;
                                 break;
                             case 400:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Regular;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Regular;
                                 break;
                             case 500:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Medium;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Medium;
                                 break;
                             case 600:
-                                textConfiguration.m_fontWeightInternal = FontWeight.SemiBold;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.SemiBold;
                                 break;
                             case 700:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Bold;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Bold;
                                 break;
                             case 800:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Heavy;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Heavy;
                                 break;
                             case 900:
-                                textConfiguration.m_fontWeightInternal = FontWeight.Black;
+                                textConfigurationStack.m_fontWeightInternal = FontWeight.Black;
                                 break;
                         }
 
-                        textConfiguration.m_fontWeightStack.Add(textConfiguration.m_fontWeightInternal);
+                        textConfigurationStack.m_fontWeightStack.Add(textConfigurationStack.m_fontWeightInternal);
 
                         return true;
                     case -1885698441:  // </font-weight>
                     case 457225591:  // </FONT-WEIGHT>
-                        textConfiguration.m_fontWeightStack.RemoveExceptRoot();
+                        textConfigurationStack.m_fontWeightStack.RemoveExceptRoot();
 
-                        if (textConfiguration.m_fontStyleInternal == FontStyles.Bold)
-                            textConfiguration.m_fontWeightInternal = FontWeight.Bold;
+                        if (textConfigurationStack.m_fontStyleInternal == FontStyles.Bold)
+                            textConfigurationStack.m_fontWeightInternal = FontWeight.Bold;
                         else
-                            textConfiguration.m_fontWeightInternal = textConfiguration.m_fontWeightStack.Peek();
+                            textConfigurationStack.m_fontWeightInternal = textConfigurationStack.m_fontWeightStack.Peek();
 
                         return true;
                     case 6380:  // <pos=000.00px> <pos=0em> <pos=50%>
                     case 4556:  // <POS>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_xAdvance = value * (baseConfiguration.isOrthographic ? 1.0f : 0.1f);
+                                textGenerationStateCommands.xAdvanceChange      = value * (baseConfiguration.isOrthographic ? 1.0f : 0.1f);
+                                textGenerationStateCommands.xAdvanceIsOverwrite = true;
                                 return true;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_xAdvance = value * textConfiguration.m_currentFontSize * (baseConfiguration.isOrthographic ? 1.0f : 0.1f);
+                                textGenerationStateCommands.xAdvanceChange = value * textConfigurationStack.m_currentFontSize *
+                                                                             (baseConfiguration.isOrthographic ? 1.0f : 0.1f);
+                                textGenerationStateCommands.xAdvanceIsOverwrite = true;
                                 return true;
                             case TagUnitType.Percentage:
-                                textConfiguration.m_xAdvance = textConfiguration.m_marginWidth * value / 100;
+                                textGenerationStateCommands.xAdvanceChange      = textConfigurationStack.m_marginWidth * value / 100;
+                                textGenerationStateCommands.xAdvanceIsOverwrite = true;
                                 return true;
                         }
                         return false;
@@ -525,17 +536,17 @@ namespace Latios.Calligraphics.RichText
                     case 16034505:  // <voffset>
                     case 11642281:  // <VOFFSET>
                         // Reject tag if value is invalid.
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_baselineOffset = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_baselineOffset = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 return true;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_baselineOffset = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_baselineOffset = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 return true;
                             case TagUnitType.Percentage:
                                 //m_baselineOffset = m_marginHeight * val / 100;
@@ -544,7 +555,7 @@ namespace Latios.Calligraphics.RichText
                         return false;
                     case 54741026:  // </voffset>
                     case 50348802:  // </VOFFSET>
-                        textConfiguration.m_baselineOffset = 0;
+                        textConfigurationStack.m_baselineOffset = 0;
                         return true;
                     //case 43991: // <page>
                     //case 31191: // <PAGE>
@@ -564,17 +575,17 @@ namespace Latios.Calligraphics.RichText
                     ////    return true;
                     case 43969:  // <nobr>
                     case 31169:  // <NOBR>
-                        textConfiguration.m_isNonBreakingSpace = true;
+                        textConfigurationStack.m_isNonBreakingSpace = true;
                         return true;
                     case 156816:  // </nobr>
                     case 144016:  // </NOBR>
-                        textConfiguration.m_isNonBreakingSpace = false;
+                        textConfigurationStack.m_isNonBreakingSpace = false;
                         return true;
                     case 45545:  // <size=>
                     case 32745:  // <SIZE>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
@@ -582,64 +593,65 @@ namespace Latios.Calligraphics.RichText
                             case TagUnitType.Pixels:
                                 if (calliString[5] == 43)  // <size=+00>
                                 {
-                                    textConfiguration.m_currentFontSize = baseConfiguration.fontSize + value;
-                                    textConfiguration.m_sizeStack.Add(textConfiguration.m_currentFontSize);
+                                    textConfigurationStack.m_currentFontSize = baseConfiguration.fontSize + value;
+                                    textConfigurationStack.m_sizeStack.Add(textConfigurationStack.m_currentFontSize);
                                     return true;
                                 }
                                 else if (calliString[5] == 45)  // <size=-00>
                                 {
-                                    textConfiguration.m_currentFontSize = baseConfiguration.fontSize + value;
-                                    textConfiguration.m_sizeStack.Add(textConfiguration.m_currentFontSize);
+                                    textConfigurationStack.m_currentFontSize = baseConfiguration.fontSize + value;
+                                    textConfigurationStack.m_sizeStack.Add(textConfigurationStack.m_currentFontSize);
                                     return true;
                                 }
                                 else  // <size=00.0>
                                 {
-                                    textConfiguration.m_currentFontSize = value;
-                                    textConfiguration.m_sizeStack.Add(textConfiguration.m_currentFontSize);
+                                    textConfigurationStack.m_currentFontSize = value;
+                                    textConfigurationStack.m_sizeStack.Add(textConfigurationStack.m_currentFontSize);
                                     return true;
                                 }
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_currentFontSize = baseConfiguration.fontSize * value;
-                                textConfiguration.m_sizeStack.Add(textConfiguration.m_currentFontSize);
+                                textConfigurationStack.m_currentFontSize = baseConfiguration.fontSize * value;
+                                textConfigurationStack.m_sizeStack.Add(textConfigurationStack.m_currentFontSize);
                                 return true;
                             case TagUnitType.Percentage:
-                                textConfiguration.m_currentFontSize = baseConfiguration.fontSize * value / 100;
-                                textConfiguration.m_sizeStack.Add(textConfiguration.m_currentFontSize);
+                                textConfigurationStack.m_currentFontSize = baseConfiguration.fontSize * value / 100;
+                                textConfigurationStack.m_sizeStack.Add(textConfigurationStack.m_currentFontSize);
                                 return true;
                         }
                         return false;
                     case 158392:  // </size>
                     case 145592:  // </SIZE>
-                        textConfiguration.m_currentFontSize = textConfiguration.m_sizeStack.RemoveExceptRoot();
+                        textConfigurationStack.m_currentFontSize = textConfigurationStack.m_sizeStack.RemoveExceptRoot();
                         return true;
                     case 41311:  // <font=xx>
                     case 28511:  // <FONT>
-                        int fontHashCode                   = firstTagIndentifier.valueHashCode;
+                        int fontHashCode = firstTagIndentifier.valueHashCode;
 
                         // Special handling for <font=default> or <font=Default>
                         if (fontHashCode == 764638571 || fontHashCode == 523367755)
                         {
-                            textConfiguration.m_currentFontMaterialIndex = 0;
-                            textConfiguration.m_fontMaterialIndexStack.Add(0);
-                            return true;                        }
+                            textConfigurationStack.m_currentFontMaterialIndex = 0;
+                            textConfigurationStack.m_fontMaterialIndexStack.Add(0);
+                            return true;
+                        }
 
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
 
                         for (int i = 0; i < fontMaterialSet.length; i++)
                         {
                             ref var candidateFont = ref fontMaterialSet[i];
-                            if (textConfiguration.m_htmlTag.Equals(candidateFont.name))
+                            if (textConfigurationStack.m_htmlTag.Equals(candidateFont.name))
                             {
-                                textConfiguration.m_currentFontMaterialIndex = i;
-                                textConfiguration.m_fontMaterialIndexStack.Add(i);
+                                textConfigurationStack.m_currentFontMaterialIndex = i;
+                                textConfigurationStack.m_fontMaterialIndexStack.Add(i);
                                 return true;
                             }
                         }
                         return false;
                     case 154158:  // </font>
                     case 141358:  // </FONT>
-                    {                        
-                        textConfiguration.m_currentFontMaterialIndex = textConfiguration.m_fontMaterialIndexStack.RemoveExceptRoot();
+                    {
+                        textConfigurationStack.m_currentFontMaterialIndex = textConfigurationStack.m_fontMaterialIndexStack.RemoveExceptRoot();
                         return true;
                     }
                     //case 103415287: // <material="material name">
@@ -708,18 +720,18 @@ namespace Latios.Calligraphics.RichText
                     //    }
                     case 320078:  // <space=000.00>
                     case 230446:  // <SPACE>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_xAdvance += value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textGenerationStateCommands.xAdvanceChange += value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 return true;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_xAdvance += value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textGenerationStateCommands.xAdvanceChange += value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 return true;
                             case TagUnitType.Percentage:
                                 // Not applicable
@@ -731,8 +743,9 @@ namespace Latios.Calligraphics.RichText
                         if (firstTagIndentifier.valueLength != 3)
                             return false;
 
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
-                        textConfiguration.m_htmlColor.a = (byte)(HexToInt((char)textConfiguration.m_htmlTag[1]) * 16 + HexToInt((char)textConfiguration.m_htmlTag[2]));
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        textConfigurationStack.m_htmlColor.a =
+                            (byte)(HexToInt((char)textConfigurationStack.m_htmlTag[1]) * 16 + HexToInt((char)textConfigurationStack.m_htmlTag[2]));
                         return true;
 
                     //case 1750458: // <a name=" ">
@@ -801,58 +814,58 @@ namespace Latios.Calligraphics.RichText
                     //    return true;
                     case 327550:  // <width=xx>
                     case 237918:  // <WIDTH>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_width = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_width = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
                                 return false;
                             //break;
                             case TagUnitType.Percentage:
-                                textConfiguration.m_width = textConfiguration.m_marginWidth * value / 100;
+                                textConfigurationStack.m_width = textConfigurationStack.m_marginWidth * value / 100;
                                 break;
                         }
                         return true;
                     case 1117479:  // </width>
                     case 1027847:  // </WIDTH>
-                        textConfiguration.m_width = -1;
+                        textConfigurationStack.m_width = -1;
                         return true;
                     case 281955:  // <color> <color=#FF00FF> or <color=#FF00FF00>
                     case 192323:  // <COLOR=#FF00FF>
                                   // <color=#FFF> 3 Hex (short hand)
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         tagCharCount -= 6;  //remove "color=" from char count
-                        if (textConfiguration.m_htmlTag[0] == 35 && tagCharCount == 4)
+                        if (textConfigurationStack.m_htmlTag[0] == 35 && tagCharCount == 4)
                         {
-                            textConfiguration.m_htmlColor = HexCharsToColor(textConfiguration.m_htmlTag, tagCharCount);
-                            textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                            textConfigurationStack.m_htmlColor = HexCharsToColor(textConfigurationStack.m_htmlTag, tagCharCount);
+                            textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                             return true;
                         }
                         // <color=#FFF7> 4 Hex (short hand)
-                        else if (textConfiguration.m_htmlTag[0] == 35 && tagCharCount == 5)
+                        else if (textConfigurationStack.m_htmlTag[0] == 35 && tagCharCount == 5)
                         {
-                            textConfiguration.m_htmlColor = HexCharsToColor(textConfiguration.m_htmlTag, tagCharCount);
-                            textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                            textConfigurationStack.m_htmlColor = HexCharsToColor(textConfigurationStack.m_htmlTag, tagCharCount);
+                            textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                             return true;
                         }
                         // <color=#FF00FF> 3 Hex pairs
-                        if (textConfiguration.m_htmlTag[0] == 35 && tagCharCount == 7)
+                        if (textConfigurationStack.m_htmlTag[0] == 35 && tagCharCount == 7)
                         {
-                            textConfiguration.m_htmlColor = HexCharsToColor(textConfiguration.m_htmlTag, tagCharCount);
-                            textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                            textConfigurationStack.m_htmlColor = HexCharsToColor(textConfigurationStack.m_htmlTag, tagCharCount);
+                            textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                             return true;
                         }
                         // <color=#FF00FF00> 4 Hex pairs
-                        else if (textConfiguration.m_htmlTag[0] == 35 && tagCharCount == 9)
+                        else if (textConfigurationStack.m_htmlTag[0] == 35 && tagCharCount == 9)
                         {
-                            textConfiguration.m_htmlColor = HexCharsToColor(textConfiguration.m_htmlTag, tagCharCount);
-                            textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                            textConfigurationStack.m_htmlColor = HexCharsToColor(textConfigurationStack.m_htmlTag, tagCharCount);
+                            textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                             return true;
                         }
 
@@ -860,44 +873,44 @@ namespace Latios.Calligraphics.RichText
                         switch (firstTagIndentifier.valueHashCode)
                         {
                             case 125395:  // <color=red>
-                                textConfiguration.m_htmlColor = Color.red;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.red;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case -992792864:  // <color=lightblue>
-                                textConfiguration.m_htmlColor = new Color32(173, 216, 230, 255);
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = new Color32(173, 216, 230, 255);
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 3573310:  // <color=blue>
-                                textConfiguration.m_htmlColor = Color.blue;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.blue;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 3680713:  // <color=grey>
-                                textConfiguration.m_htmlColor = new Color32(128, 128, 128, 255);
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = new Color32(128, 128, 128, 255);
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 117905991:  // <color=black>
-                                textConfiguration.m_htmlColor = Color.black;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.black;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 121463835:  // <color=green>
-                                textConfiguration.m_htmlColor = Color.green;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.green;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 140357351:  // <color=white>
-                                textConfiguration.m_htmlColor = Color.white;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.white;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 26556144:  // <color=orange>
-                                textConfiguration.m_htmlColor = new Color32(255, 128, 0, 255);
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = new Color32(255, 128, 0, 255);
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case -36881330:  // <color=purple>
-                                textConfiguration.m_htmlColor = new Color32(160, 32, 240, 255);
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = new Color32(160, 32, 240, 255);
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                             case 554054276:  // <color=yellow>
-                                textConfiguration.m_htmlColor = Color.yellow;
-                                textConfiguration.m_colorStack.Add(textConfiguration.m_htmlColor);
+                                textConfigurationStack.m_htmlColor = Color.yellow;
+                                textConfigurationStack.m_colorStack.Add(textConfigurationStack.m_htmlColor);
                                 return true;
                         }
                         return false;
@@ -960,18 +973,18 @@ namespace Latios.Calligraphics.RichText
 
                     case 1983971:  // <cspace=xx.x>
                     case 1356515:  // <CSPACE>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_cSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_cSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_cSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_cSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
                                 return false;
@@ -979,31 +992,31 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 7513474:  // </cspace>
                     case 6886018:  // </CSPACE>
-                        if (!textConfiguration.m_isParsingText)
+                        if (!textConfigurationStack.m_isParsingText)
                             return true;
 
                         // Adjust xAdvance to remove extra space from last character.
-                        if (textConfiguration.m_characterCount > 0)
+                        if (characterCount > 0)
                         {
-                            textConfiguration.m_xAdvance -= textConfiguration.m_cSpacing;
+                            textGenerationStateCommands.xAdvanceChange -= textConfigurationStack.m_cSpacing;
                             //m_textInfo.characterInfo[m_characterCount - 1].xAdvance = m_xAdvance;
                         }
-                        textConfiguration.m_cSpacing = 0;
+                        textConfigurationStack.m_cSpacing = 0;
                         return true;
                     case 2152041:  // <mspace=xx.x>
                     case 1524585:  // <MSPACE>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_monoSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_monoSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_monoSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_monoSpacing = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
                                 return false;
@@ -1011,68 +1024,69 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case 7681544:  // </mspace>
                     case 7054088:  // </MSPACE>
-                        textConfiguration.m_monoSpacing = 0;
+                        textConfigurationStack.m_monoSpacing = 0;
                         return true;
                     case 280416:  // <class="name">
                         return false;
                     case 1071884:  // </color>
                     case 982252:  // </COLOR>
-                        textConfiguration.m_htmlColor = textConfiguration.m_colorStack.RemoveExceptRoot();
+                        textConfigurationStack.m_htmlColor = textConfigurationStack.m_colorStack.RemoveExceptRoot();
                         return true;
                     case 2068980:  // <indent=10px> <indent=10em> <indent=50%>
                     case 1441524:  // <INDENT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
-                                    textConfiguration.tag_Indent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
+                                    textConfigurationStack.m_tagIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.tag_Indent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_tagIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
-                                textConfiguration.tag_Indent = textConfiguration.m_marginWidth * value / 100;
+                                textConfigurationStack.m_tagIndent = textConfigurationStack.m_marginWidth * value / 100;
                                 break;
                         }
-                        textConfiguration.m_indentStack.Add(textConfiguration.tag_Indent);
+                        textConfigurationStack.m_indentStack.Add(textConfigurationStack.m_tagIndent);
 
-                        textConfiguration.m_xAdvance = textConfiguration.tag_Indent;
+                        textGenerationStateCommands.xAdvanceChange      = textConfigurationStack.m_tagIndent;
+                        textGenerationStateCommands.xAdvanceIsOverwrite = true;
                         return true;
                     case 7598483:  // </indent>
                     case 6971027:  // </INDENT>
-                        textConfiguration.tag_Indent = textConfiguration.m_indentStack.RemoveExceptRoot();
+                        textConfigurationStack.m_tagIndent = textConfigurationStack.m_indentStack.RemoveExceptRoot();
                         //m_xAdvance = tag_Indent;
                         return true;
                     case 1109386397:  // <line-indent>
                     case -842656867:  // <LINE-INDENT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.tag_LineIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_tagLineIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.tag_LineIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_tagLineIndent = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
-                                textConfiguration.tag_LineIndent = textConfiguration.m_marginWidth * value / 100;
+                                textConfigurationStack.m_tagLineIndent = textConfigurationStack.m_marginWidth * value / 100;
                                 break;
                         }
 
-                        textConfiguration.m_xAdvance += textConfiguration.tag_LineIndent;
+                        textGenerationStateCommands.xAdvanceChange += textConfigurationStack.m_tagLineIndent;
                         return true;
                     case -445537194:  // </line-indent>
                     case 1897386838:  // </LINE-INDENT>
-                        textConfiguration.tag_LineIndent = 0;
+                        textConfigurationStack.m_tagLineIndent = 0;
                         return true;
                     //case 2246877: // <sprite=x>
                     //case 1619421: // <SPRITE>
@@ -1225,23 +1239,23 @@ namespace Latios.Calligraphics.RichText
                     //    return true;
                     case 730022849:  // <lowercase>
                     case 514803617:  // <LOWERCASE>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.LowerCase;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.LowerCase);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.LowerCase;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.LowerCase);
                         return true;
                     case -1668324918:  // </lowercase>
                     case -1883544150:  // </LOWERCASE>
                         if ((baseConfiguration.fontStyle & FontStyles.LowerCase) != FontStyles.LowerCase)
                         {
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.LowerCase) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.LowerCase;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.LowerCase) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.LowerCase;
                         }
                         return true;
                     case 13526026:  // <allcaps>
                     case 9133802:  // <ALLCAPS>
                     case 781906058:  // <uppercase>
                     case 566686826:  // <UPPERCASE>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.UpperCase;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.UpperCase);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.UpperCase;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.UpperCase);
                         return true;
                     case 52232547:  // </allcaps>
                     case 47840323:  // </ALLCAPS>
@@ -1249,21 +1263,21 @@ namespace Latios.Calligraphics.RichText
                     case -1831660941:  // </UPPERCASE>
                         if ((baseConfiguration.fontStyle & FontStyles.UpperCase) != FontStyles.UpperCase)
                         {
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.UpperCase) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.UpperCase;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.UpperCase) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.UpperCase;
                         }
                         return true;
                     case 766244328:  // <smallcaps>
                     case 551025096:  // <SMALLCAPS>
-                        textConfiguration.m_fontStyleInternal |= FontStyles.SmallCaps;
-                        textConfiguration.m_fontStyleStack.Add(FontStyles.SmallCaps);
+                        textConfigurationStack.m_fontStyleInternal |= FontStyles.SmallCaps;
+                        textConfigurationStack.m_fontStyleStack.Add(FontStyles.SmallCaps);
                         return true;
                     case -1632103439:  // </smallcaps>
                     case -1847322671:  // </SMALLCAPS>
                         if ((baseConfiguration.fontStyle & FontStyles.SmallCaps) != FontStyles.SmallCaps)
                         {
-                            if (textConfiguration.m_fontStyleStack.Remove(FontStyles.SmallCaps) == 0)
-                                textConfiguration.m_fontStyleInternal &= ~FontStyles.SmallCaps;
+                            if (textConfigurationStack.m_fontStyleStack.Remove(FontStyles.SmallCaps) == 0)
+                                textConfigurationStack.m_fontStyleInternal &= ~FontStyles.SmallCaps;
                         }
                         return true;
                     case 2109854:  // <margin=00.0> <margin=00em> <margin=50%>
@@ -1272,27 +1286,27 @@ namespace Latios.Calligraphics.RichText
                         switch (firstTagIndentifier.valueType)
                         {
                             case TagValueType.NumericalValue:
-                                calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                                calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                                 // Reject tag if value is invalid.
-                                if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                                if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                                     return false;
 
                                 // Determine tag unit type
                                 switch (tagUnitType)
                                 {
                                     case TagUnitType.Pixels:
-                                        textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                        textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                         break;
                                     case TagUnitType.FontUnits:
-                                        textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                        textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                         break;
                                     case TagUnitType.Percentage:
-                                        textConfiguration.m_marginLeft =
-                                            (textConfiguration.m_marginWidth - (textConfiguration.m_width != -1 ? textConfiguration.m_width : 0)) * value / 100;
+                                        textConfigurationStack.m_marginLeft =
+                                            (textConfigurationStack.m_marginWidth - (textConfigurationStack.m_width != -1 ? textConfigurationStack.m_width : 0)) * value / 100;
                                         break;
                                 }
-                                textConfiguration.m_marginLeft  = textConfiguration.m_marginLeft >= 0 ? textConfiguration.m_marginLeft : 0;
-                                textConfiguration.m_marginRight = textConfiguration.m_marginLeft;
+                                textConfigurationStack.m_marginLeft  = textConfigurationStack.m_marginLeft >= 0 ? textConfigurationStack.m_marginLeft : 0;
+                                textConfigurationStack.m_marginRight = textConfigurationStack.m_marginLeft;
                                 return true;
 
                             case TagValueType.None:
@@ -1305,47 +1319,53 @@ namespace Latios.Calligraphics.RichText
                                     switch (nameHashCode)
                                     {
                                         case 42823:  // <margin left=value>
-                                            calliString.GetSubString(ref textConfiguration.m_htmlTag, currentTagIndentifier.valueStartIndex, currentTagIndentifier.valueLength);
+                                            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, currentTagIndentifier.valueStartIndex,
+                                                                     currentTagIndentifier.valueLength);
                                             // Reject tag if value is invalid.
-                                            if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                                            if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                                                 return false;
 
                                             switch (richTextTagIndentifiers[i].unitType)
                                             {
                                                 case TagUnitType.Pixels:
-                                                    textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                                    textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                                     break;
                                                 case TagUnitType.FontUnits:
-                                                    textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                                    textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) *
+                                                                                          textConfigurationStack.m_currentFontSize;
                                                     break;
                                                 case TagUnitType.Percentage:
-                                                    textConfiguration.m_marginLeft =
-                                                        (textConfiguration.m_marginWidth - (textConfiguration.m_width != -1 ? textConfiguration.m_width : 0)) * value / 100;
+                                                    textConfigurationStack.m_marginLeft =
+                                                        (textConfigurationStack.m_marginWidth -
+                                                         (textConfigurationStack.m_width != -1 ? textConfigurationStack.m_width : 0)) * value / 100;
                                                     break;
                                             }
-                                            textConfiguration.m_marginLeft = textConfiguration.m_marginLeft >= 0 ? textConfiguration.m_marginLeft : 0;
+                                            textConfigurationStack.m_marginLeft = textConfigurationStack.m_marginLeft >= 0 ? textConfigurationStack.m_marginLeft : 0;
                                             break;
 
                                         case 315620:  // <margin right=value>
-                                            calliString.GetSubString(ref textConfiguration.m_htmlTag, currentTagIndentifier.valueStartIndex, currentTagIndentifier.valueLength);
+                                            calliString.GetSubString(ref textConfigurationStack.m_htmlTag, currentTagIndentifier.valueStartIndex,
+                                                                     currentTagIndentifier.valueLength);
                                             // Reject tag if value is invalid.
-                                            if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                                            if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                                                 return false;
 
                                             switch (richTextTagIndentifiers[i].unitType)
                                             {
                                                 case TagUnitType.Pixels:
-                                                    textConfiguration.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                                    textConfigurationStack.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                                     break;
                                                 case TagUnitType.FontUnits:
-                                                    textConfiguration.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                                    textConfigurationStack.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) *
+                                                                                           textConfigurationStack.m_currentFontSize;
                                                     break;
                                                 case TagUnitType.Percentage:
-                                                    textConfiguration.m_marginRight =
-                                                        (textConfiguration.m_marginWidth - (textConfiguration.m_width != -1 ? textConfiguration.m_width : 0)) * value / 100;
+                                                    textConfigurationStack.m_marginRight =
+                                                        (textConfigurationStack.m_marginWidth -
+                                                         (textConfigurationStack.m_width != -1 ? textConfigurationStack.m_width : 0)) * value / 100;
                                                     break;
                                             }
-                                            textConfiguration.m_marginRight = textConfiguration.m_marginRight >= 0 ? textConfiguration.m_marginRight : 0;
+                                            textConfigurationStack.m_marginRight = textConfigurationStack.m_marginRight >= 0 ? textConfigurationStack.m_marginRight : 0;
                                             break;
                                     }
                                 }
@@ -1355,67 +1375,67 @@ namespace Latios.Calligraphics.RichText
                         return false;
                     case 7639357:  // </margin>
                     case 7011901:  // </MARGIN>
-                        textConfiguration.m_marginLeft  = 0;
-                        textConfiguration.m_marginRight = 0;
+                        textConfigurationStack.m_marginLeft  = 0;
+                        textConfigurationStack.m_marginRight = 0;
                         return true;
                     case 1100728678:  // <margin-left=xx.x>
                     case -855002522:  // <MARGIN-LEFT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_marginLeft = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
-                                textConfiguration.m_marginLeft =
-                                    (textConfiguration.m_marginWidth - (textConfiguration.m_width != -1 ? textConfiguration.m_width : 0)) * value / 100;
+                                textConfigurationStack.m_marginLeft =
+                                    (textConfigurationStack.m_marginWidth - (textConfigurationStack.m_width != -1 ? textConfigurationStack.m_width : 0)) * value / 100;
                                 break;
                         }
-                        textConfiguration.m_marginLeft = textConfiguration.m_marginLeft >= 0 ? textConfiguration.m_marginLeft : 0;
+                        textConfigurationStack.m_marginLeft = textConfigurationStack.m_marginLeft >= 0 ? textConfigurationStack.m_marginLeft : 0;
                         return true;
                     case -884817987:  // <margin-right=xx.x>
                     case -1690034531:  // <MARGIN-RIGHT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_marginRight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
-                                textConfiguration.m_marginRight =
-                                    (textConfiguration.m_marginWidth - (textConfiguration.m_width != -1 ? textConfiguration.m_width : 0)) * value / 100;
+                                textConfigurationStack.m_marginRight =
+                                    (textConfigurationStack.m_marginWidth - (textConfigurationStack.m_width != -1 ? textConfigurationStack.m_width : 0)) * value / 100;
                                 break;
                         }
-                        textConfiguration.m_marginRight = textConfiguration.m_marginRight >= 0 ? textConfiguration.m_marginRight : 0;
+                        textConfigurationStack.m_marginRight = textConfigurationStack.m_marginRight >= 0 ? textConfigurationStack.m_marginRight : 0;
                         return true;
                     case 1109349752:  // <line-height=xx.x>
                     case -842693512:  // <LINE-HEIGHT>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
                         switch (tagUnitType)
                         {
                             case TagUnitType.Pixels:
-                                textConfiguration.m_lineHeight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
+                                textConfigurationStack.m_lineHeight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f);
                                 break;
                             case TagUnitType.FontUnits:
-                                textConfiguration.m_lineHeight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfiguration.m_currentFontSize;
+                                textConfigurationStack.m_lineHeight = value * (baseConfiguration.isOrthographic ? 1 : 0.1f) * textConfigurationStack.m_currentFontSize;
                                 break;
                             case TagUnitType.Percentage:
                                 //fontScale = (richtextAdjustments.m_currentFontSize / m_currentFontAsset.faceInfo.pointSize * m_currentFontAsset.faceInfo.scale * (richtextAdjustments.m_isOrthographic ? 1 : 0.1f));
@@ -1425,11 +1445,11 @@ namespace Latios.Calligraphics.RichText
                         return true;
                     case -445573839:  // </line-height>
                     case 1897350193:  // </LINE-HEIGHT>
-                        textConfiguration.m_lineHeight = float.MinValue;  //TMP_Math.FLOAT_UNSET -->is there a better way to do this?
+                        textConfigurationStack.m_lineHeight = float.MinValue;  //TMP_Math.FLOAT_UNSET -->is there a better way to do this?
                         return true;
                     case 15115642:  // <noparse>
                     case 10723418:  // <NOPARSE>
-                        textConfiguration.tag_NoParsing = true;
+                        textConfigurationStack.m_tagNoParsing = true;
                         return true;
                     //case 1913798: // <action>
                     //case 1286342: // <ACTION>
@@ -1458,32 +1478,32 @@ namespace Latios.Calligraphics.RichText
                     //    return true;
                     case 315682:  // <scale=xx.x>
                     case 226050:  // <SCALE=xx.x>
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
-                        textConfiguration.m_FXScale = new Vector3(value, 1, 1);
+                        textConfigurationStack.m_fxScale = new Vector3(value, 1, 1);
 
                         return true;
                     case 1105611:  // </scale>
                     case 1015979:  // </SCALE>
-                        textConfiguration.m_FXScale = 1;
+                        textConfigurationStack.m_fxScale = 1;
                         return true;
                     case 2227963:  // <rotate=xx.x>
                     case 1600507:  // <ROTATE=xx.x>
                                    // TODO: Add ability to use Random Rotation
-                        calliString.GetSubString(ref textConfiguration.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
+                        calliString.GetSubString(ref textConfigurationStack.m_htmlTag, firstTagIndentifier.valueStartIndex, firstTagIndentifier.valueLength);
                         // Reject tag if value is invalid.
-                        if (ConvertToFloat(ref textConfiguration.m_htmlTag, out value) != ParseError.None)
+                        if (ConvertToFloat(ref textConfigurationStack.m_htmlTag, out value) != ParseError.None)
                             return false;
 
-                        textConfiguration.m_FXRotationAngle = math.radians(value);
+                        textConfigurationStack.m_fxRotationAngleCCW = -math.radians(value);
 
                         return true;
                     case 7757466:  // </rotate>
                     case 7130010:  // </ROTATE>
-                        textConfiguration.m_FXRotationAngle = 0;
+                        textConfigurationStack.m_fxRotationAngleCCW = 0;
                         return true;
                     case 317446:  // <table>
                     case 227814:  // <TABLE>

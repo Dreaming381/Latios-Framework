@@ -35,6 +35,7 @@ namespace Latios.Calligraphics.Rendering.Systems
         int _dst;
         int _startOffset;
         int _meta;
+        int _elementSizeInBytes;
 
         int _latiosTextBuffer;
         int _latiosTextMaskBuffer;
@@ -55,6 +56,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                          .Without<GpuResidentTextTag>().Build();
             m_glyphsAndMasksQuery = Fluent.With<RenderGlyph, TextRenderControl, RenderBounds>(true)
                                     .With<TextShaderIndex, TextMaterialMaskShaderIndex, RenderGlyphMask>(true)
+                                    .With<AdditionalFontMaterialEntity>(                                 true)
                                     .With<ChunkPerCameraCullingMask, ChunkPerFrameCullingMask>(          true, true).Without<GpuResidentTextTag>().Build();
 
             var copyByteAddressShader = Resources.Load<ComputeShader>("CopyBytes");
@@ -64,6 +66,7 @@ namespace Latios.Calligraphics.Rendering.Systems
             _dst                      = Shader.PropertyToID("_dst");
             _startOffset              = Shader.PropertyToID("_startOffset");
             _meta                     = Shader.PropertyToID("_meta");
+            _elementSizeInBytes       = Shader.PropertyToID("_elementSizeInBytes");
             _latiosTextBuffer         = Shader.PropertyToID("_latiosTextBuffer");
             _latiosTextMaskBuffer     = Shader.PropertyToID("_latiosTextMaskBuffer");
 
@@ -188,6 +191,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                         perCameraMaskHandle      = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
                         perFrameMaskHandle       = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
                         shaderIndexHandle        = SystemAPI.GetComponentTypeHandle<TextShaderIndex>(true),
+                        renderGlyphMaskLookup    = SystemAPI.GetBufferLookup<RenderGlyphMask>(true),
                         shaderIndexLookup        = SystemAPI.GetComponentLookup<TextShaderIndex>(false)
                     }.ScheduleParallel(m_glyphsAndMasksQuery, collectGlyphsJh);
 
@@ -280,7 +284,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     m_uploadGlyphsShader.Dispatch(0, (int)dispatchCount, 1, 1);
                     offset              += dispatchCount;
                     dispatchesRemaining -= dispatchCount;
-                }                
+                }
                 Shader.SetGlobalBuffer(_latiosTextBuffer, persistentGlyphBuffer);
 
                 var frameMaskCount       = worldBlackboardEntity.GetComponentData<MaskCountThisFrame>().maskCount;
@@ -292,6 +296,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     m_uploadMasksShader.SetBuffer(0, _dst,  persistentMaskBuffer);
                     m_uploadMasksShader.SetBuffer(0, _src,  maskUploadBuffer);
                     m_uploadMasksShader.SetBuffer(0, _meta, maskMetaBuffer);
+                    m_uploadMasksShader.SetInt(_elementSizeInBytes, 4);
 
                     for (uint dispatchesRemaining = (uint)maskPayloads.Length, offset = 0; dispatchesRemaining > 0;)
                     {
@@ -556,10 +561,10 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var cameraMask =  chunk.GetChunkComponentData(ref perCameraMaskHandle);
-                var     frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
-                var     lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
-                var     upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
+                var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
+                var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
+                var lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
+                var upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
                 if ((upper | lower) == 0)
                     return;
 
@@ -603,14 +608,15 @@ namespace Latios.Calligraphics.Rendering.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>                  perCameraMaskHandle;
             [ReadOnly] public ComponentTypeHandle<TextShaderIndex>                            shaderIndexHandle;
             [ReadOnly] public BufferTypeHandle<AdditionalFontMaterialEntity>                  additionalEntitiesHandle;
+            [ReadOnly] public BufferLookup<RenderGlyphMask>                                   renderGlyphMaskLookup;
             [NativeDisableContainerSafetyRestriction] public ComponentLookup<TextShaderIndex> shaderIndexLookup;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
-                var     frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
-                var     lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
-                var     upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
+                var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
+                var lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
+                var upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
                 if ((upper | lower) == 0)
                     return;
 
@@ -620,9 +626,12 @@ namespace Latios.Calligraphics.Rendering.Systems
                 var enumerator = new ChunkEntityEnumerator(true, new v128(lower, upper), chunk.Count);
                 while (enumerator.NextEntityIndex(out int i))
                 {
+                    var indices = shaderIndices[i];
                     foreach (var entity in additionalEntitiesBuffers[i])
                     {
-                        shaderIndexLookup[entity.entity] = shaderIndices[i];
+                        var maskBuffer                   = renderGlyphMaskLookup[entity.entity];
+                        indices.glyphCount               = (uint)(16 * maskBuffer.Length);
+                        shaderIndexLookup[entity.entity] = indices;
                     }
                 }
             }

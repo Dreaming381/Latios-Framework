@@ -15,13 +15,15 @@ namespace Latios.Calligraphics
         public BlobArray<GlyphBlob>               characters;
         public BlobArray<BlobArray<GlyphLookup> > glyphLookupMap;
         public BlobArray<AdjustmentPair>          adjustmentPairs;
+        public float                              baseLine;
         public float                              ascentLine;
         public float                              descentLine;
+        public float                              capLine;
+        public float                              meanLine;
         public float                              lineHeight;
         public float                              pointSize;
         public float                              scale;
 
-        public float baseLine;
         public float atlasWidth;
         public float atlasHeight;
 
@@ -31,12 +33,13 @@ namespace Latios.Calligraphics
         public float boldStyleWeight;
         public byte  italicsStyleSlant;
 
-        public float capLine;
-
         public float subscriptOffset;
         public float subscriptSize;
         public float superscriptOffset;
         public float superscriptSize;
+
+        public float tabWidth;
+        public float tabMultiple;
 
         //public float underlineOffset;
 
@@ -44,11 +47,6 @@ namespace Latios.Calligraphics
         /// Padding that is read from material properties
         /// </summary>
         public float materialPadding;
-
-        public float baseScale => 1f / pointSize * scale * .1f;
-
-        public const float smallCapsScaleMultiplier    = .8f;
-        public const float orthographicScaleMultiplier = 10f;
     }
 
     public struct GlyphBlob
@@ -64,13 +62,13 @@ namespace Latios.Calligraphics
     public struct GlyphLookup
     {
         public int unicode;
-        public int  index;
+        public int index;
     }
 
     public struct AdjustmentPair
     {
-        public int                   firstUnicode;
-        public int                   secondUnicode;
+        public int                    firstUnicode;
+        public int                    secondUnicode;
         public FontFeatureLookupFlags fontFeatureLookupFlags;
         public GlyphAdjustment        firstAdjustment;
         public GlyphAdjustment        secondAdjustment;
@@ -94,9 +92,9 @@ namespace Latios.Calligraphics
 
     public struct AdjustmentPairLookupByUnicode
     {
-        public BlobArray<int> beforeKeys;//unicode
+        public BlobArray<int> beforeKeys;  //unicode
         public BlobArray<int> beforeIndices;
-        public BlobArray<int> afterKeys;//unicode
+        public BlobArray<int> afterKeys;  //unicode
         public BlobArray<int> afterIndices;
 
         public unsafe bool TryGetAdjustmentPairIndexForUnicodeBefore(int otherUnicodeBefore, out int index)

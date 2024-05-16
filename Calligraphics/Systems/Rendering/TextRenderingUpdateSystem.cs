@@ -198,14 +198,17 @@ namespace Latios.Calligraphics.Rendering.Systems
                 for (int entityIndex = 0; entityIndex < chunk.Count; entityIndex++)
                 {
                     var entity = entities[entityIndex];
+                    instances.Clear();
 
                     var ctrl = controlLookup[entity];
                     if ((ctrl.flags & TextRenderControl.Flags.Dirty) != TextRenderControl.Flags.Dirty)
                         continue;
                     ctrl.flags &= ~TextRenderControl.Flags.Dirty;
-                    var gpuBit  = gpuResidentAllocationLookup.GetComponentEnabledRefRWOptional<GpuResidentUpdateFlag>(entity);
-                    if (gpuBit.IsValid)
-                        gpuBit.ValueRW = true;
+                    {
+                        var gpuBit = gpuResidentAllocationLookup.GetComponentEnabledRefRWOptional<GpuResidentUpdateFlag>(entity);
+                        if (gpuBit.IsValid)
+                            gpuBit.ValueRW = true;
+                    }
 
                     var glyphBuffer    = glyphBuffers[entityIndex].AsNativeArray();
                     var selectorBuffer = selectorBuffers[entityIndex].AsNativeArray().Reinterpret<byte>();
@@ -226,6 +229,10 @@ namespace Latios.Calligraphics.Rendering.Systems
                             aabb   = new Aabb(float.MaxValue, float.MinValue),
                             entity = entityBuffer[i]
                         });
+                    }
+                    foreach (var instance in instances)
+                    {
+                        instance.masks.Clear();
                     }
 
                     var glyphCount = math.min(glyphBuffer.Length, selectorBuffer.Length);
@@ -258,6 +265,10 @@ namespace Latios.Calligraphics.Rendering.Systems
                     for (int i = 0; i < instances.Length; i++)
                     {
                         ref var instance = ref instances.ElementAt(i);
+
+                        var gpuBit = gpuResidentAllocationLookup.GetComponentEnabledRefRWOptional<GpuResidentUpdateFlag>(instance.entity);
+                        if (gpuBit.IsValid)
+                            gpuBit.ValueRW = true;
 
                         Physics.GetCenterExtents(instance.aabb, out var center, out var extents);
                         if (glyphBuffer.Length == 0)

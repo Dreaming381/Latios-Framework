@@ -137,11 +137,11 @@ namespace Latios.Calligraphics.Systems
                                     endIndex = -1;
                                 break;
                             case TransitionTextUnitScope.Word:
-                                startIndex = glyphMapper.GetGlyphStartIndexAndCountForWord(transition.startIndex).x;
-                                if (transition.endIndex >= glyphMapper.wordCount - 1)
-                                {
+                                startIndex = glyphMapper.GetGlyphStartIndexAndCountForWord(math.min(transition.startIndex, glyphMapper.wordCount - 1)).x;
+                                if (transition.endIndex >= glyphMapper.wordCount)
+                                    endIndex = -1;
+                                else if (transition.endIndex == glyphMapper.wordCount - 1)
                                     endIndex = renderGlyphs.Length - 1;
-                                }
                                 else if (transition.endIndex == transition.startIndex)
                                     endIndex = glyphMapper.GetGlyphStartIndexAndCountForWord(transition.endIndex + 1).x - 1;
                                 else
@@ -149,11 +149,11 @@ namespace Latios.Calligraphics.Systems
 
                                 break;
                             case TransitionTextUnitScope.Line:
-                                startIndex = glyphMapper.GetGlyphStartIndexAndCountForLine(transition.startIndex).x;
-                                if (transition.endIndex >= glyphMapper.lineCount - 1)
-                                {
+                                startIndex = glyphMapper.GetGlyphStartIndexAndCountForLine(math.min(transition.startIndex, glyphMapper.lineCount - 1)).x;
+                                if (transition.endIndex >= glyphMapper.lineCount)
+                                    endIndex = -1;
+                                else if (transition.endIndex == glyphMapper.lineCount - 1)
                                     endIndex = renderGlyphs.Length - 1;
-                                }
                                 else if (transition.endIndex == transition.startIndex)
                                     endIndex = glyphMapper.GetGlyphStartIndexAndCountForLine(transition.endIndex + 1).x - 1;
                                 else

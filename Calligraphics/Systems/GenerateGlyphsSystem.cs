@@ -92,7 +92,8 @@ namespace Latios.Calligraphics.Systems
                 var  additionalEntitiesBuffers = chunk.GetBufferAccessor(ref additionalEntitiesHandle);
                 bool hasMultipleFonts          = selectorBuffers.Length > 0 && additionalEntitiesBuffers.Length > 0;
 
-                FontMaterialSet fontMaterialSet = default;
+                FontMaterialSet        fontMaterialSet        = default;
+                TextConfigurationStack textConfigurationStack = default;
 
                 for (int indexInChunk = 0; indexInChunk < chunk.Count; indexInChunk++)
                 {
@@ -115,6 +116,7 @@ namespace Latios.Calligraphics.Systems
                     GlyphGeneration.CreateRenderGlyphs(ref renderGlyphs,
                                                        ref m_glyphMappingWriter,
                                                        ref fontMaterialSet,
+                                                       ref textConfigurationStack,
                                                        in calliBytes,
                                                        in textBaseConfiguration);
 

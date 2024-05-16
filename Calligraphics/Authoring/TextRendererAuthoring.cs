@@ -26,11 +26,17 @@ namespace Latios.Calligraphics.Authoring
         public bool                       wordWrap            = true;
         public float                      maxLineWidth        = float.MaxValue;
         public HorizontalAlignmentOptions horizontalAlignment = HorizontalAlignmentOptions.Left;
-        public VerticalAlignmentOptions   verticalAlignment   = VerticalAlignmentOptions.Top;
-        public bool                       isOrthographic;
-        public bool                       enableKerning = true;
-        public FontStyles                 fontStyle;
-        public FontWeight                 fontWeight;
+        public VerticalAlignmentOptions   verticalAlignment   = VerticalAlignmentOptions.TopAscent;
+        public bool                       isOrthographic      = false;
+        public bool                       enableKerning       = true;
+        public FontStyles                 fontStyle           = FontStyles.Normal;
+        public FontWeight                 fontWeight          = FontWeight.Regular;
+        [Tooltip("Additional word spacing in font units where a value of 1 equals 1/100em.")]
+        public float wordSpacing = 0;
+        [Tooltip("Additional line spacing in font units where a value of 1 equals 1/100em.")]
+        public float lineSpacing = 0;
+        [Tooltip("Paragraph spacing in font units where a value of 1 equals 1/100em.")]
+        public float paragraphSpacing = 0;
 
         public Color32 color = UnityEngine.Color.white;
 
@@ -61,6 +67,7 @@ namespace Latios.Calligraphics.Authoring
 
             // Fonts and rendering
             AddFontRendering(entity, authoring.fontsAndMaterials[0]);
+            AddBuffer<RenderGlyph>(entity);
             if (authoring.gpuResident)
                 AddComponent<GpuResidentTextTag>(entity);
 
@@ -68,10 +75,12 @@ namespace Latios.Calligraphics.Authoring
             {
                 AddComponent<TextMaterialMaskShaderIndex>(entity);
                 AddBuffer<FontMaterialSelectorForGlyph>(entity);
-                AddBuffer<RenderGlyphMask>(entity);
+                AddBuffer<RenderGlyphMask>(             entity);
                 var additionalEntities = AddBuffer<Rendering.AdditionalFontMaterialEntity>(entity).Reinterpret<Entity>();
                 for (int i = 1; i < authoring.fontsAndMaterials.Count; i++)
                 {
+                    if (authoring.fontsAndMaterials[i].font == null)
+                        continue;
                     var newEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable);
                     AddFontRendering(newEntity, authoring.fontsAndMaterials[i]);
                     AddComponent<TextMaterialMaskShaderIndex>(newEntity);
@@ -96,6 +105,9 @@ namespace Latios.Calligraphics.Authoring
                 enableKerning     = authoring.enableKerning,
                 fontStyle         = authoring.fontStyle,
                 fontWeight        = authoring.fontWeight,
+                wordSpacing = authoring.wordSpacing,
+                lineSpacing = authoring.lineSpacing,
+                paragraphSpacing = authoring.paragraphSpacing,
             });
         }
 

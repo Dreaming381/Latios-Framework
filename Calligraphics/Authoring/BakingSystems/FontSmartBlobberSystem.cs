@@ -113,12 +113,15 @@ namespace Latios.Calligraphics.Authoring.Systems
             fontBlobRoot.baseLine            = font.faceInfo.baseline;
             fontBlobRoot.ascentLine          = font.faceInfo.ascentLine;
             fontBlobRoot.descentLine         = font.faceInfo.descentLine;
+            fontBlobRoot.capLine             = font.faceInfo.capLine;
+            fontBlobRoot.meanLine            = font.faceInfo.meanLine;
             fontBlobRoot.lineHeight          = font.faceInfo.lineHeight;
             fontBlobRoot.subscriptOffset     = font.faceInfo.subscriptOffset;
             fontBlobRoot.subscriptSize       = font.faceInfo.subscriptSize;
             fontBlobRoot.superscriptOffset   = font.faceInfo.superscriptOffset;
             fontBlobRoot.superscriptSize     = font.faceInfo.superscriptSize;
-            fontBlobRoot.capLine             = font.faceInfo.capLine;
+            fontBlobRoot.tabWidth            = font.faceInfo.tabWidth;
+            fontBlobRoot.tabMultiple         = font.tabMultiple;
             fontBlobRoot.regularStyleSpacing = font.regularStyleSpacing;
             fontBlobRoot.regularStyleWeight  = font.regularStyleWeight;
             fontBlobRoot.boldStyleSpacing    = font.boldStyleSpacing;
@@ -135,16 +138,15 @@ namespace Latios.Calligraphics.Authoring.Systems
             hashCounts.Clear();
             // Todo: Currently, we allocate a glyph per character and leave characters with null glyphs uninitialized.
             // We should rework that to only allocate glyphs to save memory.
-            BlobBuilderArray<GlyphBlob>      glyphBuilder    = builder.Allocate(ref fontBlobRoot.characters, font.characterTable.Count);
+            var characterLookupTable = font.characterLookupTable;
+            BlobBuilderArray<GlyphBlob>      glyphBuilder    = builder.Allocate(ref fontBlobRoot.characters, characterLookupTable.Count);
             BlobBuilderArray<AdjustmentPair> adjustmentPairs = builder.Allocate(ref fontBlobRoot.adjustmentPairs, glyphPairAdjustmentsSource.Count);
-
-            var characterTable = font.characterTable;
-
+      
             for (int i = 0; i < glyphPairAdjustmentsSource.Count; i++)
             {
-                var kerningPair            = glyphPairAdjustmentsSource[i];
-                if (GlyphIndexToUnicode(kerningPair.firstAdjustmentRecord.glyphIndex, characterTable, out int firstUnicode) &&
-                    GlyphIndexToUnicode(kerningPair.secondAdjustmentRecord.glyphIndex, characterTable, out int secondUnicode))
+                var kerningPair = glyphPairAdjustmentsSource[i];
+                if (GlyphIndexToUnicode(kerningPair.firstAdjustmentRecord.glyphIndex, characterLookupTable, out int firstUnicode) &&
+                    GlyphIndexToUnicode(kerningPair.secondAdjustmentRecord.glyphIndex, characterLookupTable, out int secondUnicode))                    
                 {
                     adjustmentPairs[i] = new AdjustmentPair
                     {
@@ -152,32 +154,32 @@ namespace Latios.Calligraphics.Authoring.Systems
                         {
                             xPlacement = kerningPair.firstAdjustmentRecord.glyphValueRecord.xPlacement,
                             yPlacement = kerningPair.firstAdjustmentRecord.glyphValueRecord.yPlacement,
-                            xAdvance = kerningPair.firstAdjustmentRecord.glyphValueRecord.xAdvance,
-                            yAdvance = kerningPair.firstAdjustmentRecord.glyphValueRecord.yAdvance,
+                            xAdvance   = kerningPair.firstAdjustmentRecord.glyphValueRecord.xAdvance,
+                            yAdvance   = kerningPair.firstAdjustmentRecord.glyphValueRecord.yAdvance,
                         },
                         secondAdjustment = new GlyphAdjustment
                         {
                             xPlacement = kerningPair.secondAdjustmentRecord.glyphValueRecord.xPlacement,
                             yPlacement = kerningPair.secondAdjustmentRecord.glyphValueRecord.yPlacement,
-                            xAdvance = kerningPair.secondAdjustmentRecord.glyphValueRecord.xAdvance,
-                            yAdvance = kerningPair.secondAdjustmentRecord.glyphValueRecord.yAdvance,
+                            xAdvance   = kerningPair.secondAdjustmentRecord.glyphValueRecord.xAdvance,
+                            yAdvance   = kerningPair.secondAdjustmentRecord.glyphValueRecord.yAdvance,
                         },
                         fontFeatureLookupFlags = kerningPair.featureLookupFlags,
-                        firstUnicode = firstUnicode,
-                        secondUnicode = secondUnicode
+                        firstUnicode           = firstUnicode,
+                        secondUnicode          = secondUnicode
                     };
                 }
             }
 
-            for (int i = 0; i < font.characterTable.Count; i++)
-            {
-                var character = font.characterTable[i];
-                var glyph = character.glyph;
+            int characterCount = 0;
+            foreach (var character in characterLookupTable.Values)
+            { 
+                var glyph 	  = character.glyph;
                 if (glyph == null)
                     continue;
                 var unicode = math.asint(character.unicode);
 
-                ref GlyphBlob glyphBlob = ref glyphBuilder[i];
+                ref GlyphBlob glyphBlob = ref glyphBuilder[characterCount++];
 
                 glyphBlob.unicode      = unicode;
                 glyphBlob.glyphScale   = glyph.scale;
@@ -201,7 +203,7 @@ namespace Latios.Calligraphics.Authoring.Systems
                 for (int j = 0; j < bk.Length; j++)
                 {
                     var d = adjustmentCacheBefore[j];
-                    bk[j] = d.x;//unicode
+                    bk[j] = d.x;  //unicode
                     bv[j] = d.y;
                 }
                 adjustmentCacheAfter.Sort(new XSorter());
@@ -210,7 +212,7 @@ namespace Latios.Calligraphics.Authoring.Systems
                 for (int j = 0; j < ak.Length; j++)
                 {
                     var d = adjustmentCacheAfter[j];
-                    ak[j] = d.x;//unicode
+                    ak[j] = d.x;  //unicode
                     av[j] = d.y;
                 }
 
@@ -246,15 +248,14 @@ namespace Latios.Calligraphics.Authoring.Systems
 
             return result;
         }
-        static bool GlyphIndexToUnicode(uint glyphIndex, List<Character> characterTable, out int unicode)
+        static bool GlyphIndexToUnicode(uint glyphIndex, Dictionary<uint, Character> characterLookupTable, out int unicode)
         {
             unicode = default;
-            for (int i = 0, end = characterTable.Count; i < end; i++)
+            foreach (var character in characterLookupTable.Values)
             {
-                var currentGlyphIndex = characterTable[i].glyphIndex;
-                if (currentGlyphIndex == glyphIndex)
+                if (character.glyphIndex == glyphIndex)
                 {
-                    unicode = math.asint(characterTable[i].unicode);
+                    unicode = math.asint(character.unicode);
                     return true;
                 }
             }

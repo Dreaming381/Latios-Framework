@@ -39,8 +39,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
 
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
 
-            baker.AddComponent(entity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
-            baker.AddBuffer<RenderGlyph>(entity);
+            baker.AddComponent(                 entity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
             baker.AddComponent<TextShaderIndex>(entity);
         }
 
@@ -50,8 +49,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
 
             baker.BakeMeshAndMaterial(rendererSettings, mesh, material);
 
-            baker.AddComponent(rendererSettings.targetEntity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
-            baker.AddBuffer<RenderGlyph>(rendererSettings.targetEntity);
+            baker.AddComponent(                 rendererSettings.targetEntity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
             baker.AddComponent<TextShaderIndex>(rendererSettings.targetEntity);
         }
 
