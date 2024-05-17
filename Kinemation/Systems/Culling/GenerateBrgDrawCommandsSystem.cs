@@ -390,11 +390,13 @@ namespace Latios.Kinemation.Systems
 
                             if (hasLodCrossfade && crossFadeEnableds[entityIndex])
                             {
-                                // Todo: Remove the LODCrossFade line and replace with the commented out lines in Unity 6.
+#if UNITY_6000_0_OR_NEWER
+                                if (!isSpeedTree)
+                                    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
+#else
                                 drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
-                                //drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
-                                //if (!isSpeedTree)
-                                //    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+#endif
                             }
 
                             // Depth sorted draws are emitted with access to entity transforms,
@@ -644,11 +646,13 @@ namespace Latios.Kinemation.Systems
 
                             if (hasLodCrossfade && crossFadeEnableds[entityIndex])
                             {
-                                // Todo: Remove the LODCrossFade line and replace with the commented out lines in Unity 6.
+#if UNITY_6000_0_OR_NEWER
+                                if (!isSpeedTree)
+                                    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+                                drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
+#else
                                 drawCommandFlags |= BatchDrawCommandFlags.LODCrossFade;
-                                //drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeValuePacked;
-                                //if (!isSpeedTree)
-                                //    drawCommandFlags |= BatchDrawCommandFlags.LODCrossFadeKeyword;
+#endif
                             }
 
                             // Depth sorted draws are emitted with access to entity transforms,

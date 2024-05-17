@@ -19,7 +19,7 @@ namespace Latios.Kinemation.Authoring
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().With<SceneSection>(true).With<RenderMesh>(true).With<Unity.Transforms.Static>().WithWorldTransformReadOnly()
+            m_query = state.Fluent().With<SceneSection>(true).With<MaterialMeshInfo>(true).With<Unity.Transforms.Static>().WithWorldTransformReadOnly()
                       .Without<FrozenRenderSceneTag>().Build();
         }
 

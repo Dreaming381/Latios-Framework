@@ -183,11 +183,12 @@ namespace Latios.Kinemation.Systems
                     var  crossfadeEnableds = chunk.GetEnabledMask(ref crossfadeHandle);
                     bool isSpeedTree       = chunk.Has(ref speedTreeTagHandle);
 
+                    chunk.SetComponentEnabledForAll(ref crossfadeHandle, false);
+
                     for (int i = 0; i < chunk.Count; i++)
                     {
-                        crossfadeEnableds[i] = false;
-                        var lodValues        = percentsWithMargins[i];
-                        var transform        = transforms[i].worldTransformQvvs;
+                        var lodValues = percentsWithMargins[i];
+                        var transform = transforms[i].worldTransformQvvs;
                         if (!TestInRange(lodValues.localSpaceHeight, lodValues.minPercent, lodValues.maxPercent, in transform, out var computedParams))
                             continue;
 

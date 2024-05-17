@@ -167,14 +167,7 @@ namespace Latios.Kinemation.Authoring.Systems
         RenderMeshArray CreateRenderMeshArrayFromRefArrays(NativeArray<UnityObjectRef<Mesh> > meshes, NativeArray<UnityObjectRef<Material> > materials,
                                                            NativeArray<MaterialMeshIndex> indices)
         {
-            var rmaMeshes = new Mesh[meshes.Length];
-            for (int i = 0; i < meshes.Length; i++)
-                rmaMeshes[i] = meshes[i];
-            var rmaMats      = new Material[materials.Length];
-            for (int i = 0; i < materials.Length; i++)
-                rmaMats[i] = materials[i];
-            var rmaIndices = indices.ToArray();
-            return new RenderMeshArray(rmaMats, rmaMeshes, rmaIndices);
+            return new RenderMeshArray(materials.AsReadOnlySpan(), meshes.AsReadOnlySpan(), indices.AsReadOnlySpan());
         }
 
         [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
@@ -280,7 +273,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     var meshIndex     = meshMap[element.mesh];
                     var materialIndex = materialMap[element.material];
 
-                    mmi = MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, meshIndex, (sbyte)element.submesh);
+                    mmi = MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, meshIndex, (ushort)element.submesh);
                 }
                 else
                 {
@@ -342,9 +335,9 @@ namespace Latios.Kinemation.Authoring.Systems
 
         struct MaterialLookupKey
         {
-            public Material          baseMaterial;
-            public LightMaps         lightmaps;
-            public LightMappingFlags flags;
+            public UnityObjectRef<Material> baseMaterial;
+            public LightMaps                lightmaps;
+            public LightMappingFlags        flags;
         }
 
         struct LightMapKey : IEquatable<LightMapKey>
@@ -404,9 +397,9 @@ namespace Latios.Kinemation.Authoring.Systems
         private int m_numLightMappedMaterialCacheHits;
         private int m_numLightMappedMaterialCacheMisses;
 
-        private Dictionary<LightMapKey, LightMapReference> m_lightMapArrayCache       = new Dictionary<LightMapKey, LightMapReference>();
-        private Dictionary<MaterialLookupKey, Material>    m_lightMappedMaterialCache = new Dictionary<MaterialLookupKey, Material>();
-        private Dictionary<int, LightMapReference>         m_lightMapReferences       = new Dictionary<int, LightMapReference>();
+        private Dictionary<LightMapKey, LightMapReference>               m_lightMapArrayCache       = new Dictionary<LightMapKey, LightMapReference>();
+        private Dictionary<MaterialLookupKey, UnityObjectRef<Material> > m_lightMappedMaterialCache = new ();
+        private Dictionary<int, LightMapReference>                       m_lightMapReferences       = new Dictionary<int, LightMapReference>();
 
         public LightMapBakingContext()
         {
@@ -510,7 +503,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 return null;
         }
 
-        public Material GetLightMappedMaterial(Material baseMaterial, LightMapReference lightMapRef)
+        public Material GetLightMappedMaterial(UnityObjectRef<Material> baseMaterial, LightMapReference lightMapRef)
         {
             var flags = LightMappingFlags.Lightmapped;
             if (lightMapRef.lightMaps.hasDirections)
@@ -539,7 +532,7 @@ namespace Latios.Kinemation.Authoring.Systems
             }
         }
 
-        private static Material CreateLightMappedMaterial(Material material, LightMaps lightMaps)
+        private static UnityObjectRef<Material> CreateLightMappedMaterial(UnityObjectRef<Material> material, LightMaps lightMaps)
         {
             var lightMappedMaterial  = new Material(material);
             lightMappedMaterial.name = $"{lightMappedMaterial.name}_Lightmapped_";

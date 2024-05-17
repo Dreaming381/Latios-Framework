@@ -67,7 +67,7 @@ namespace Latios.Transforms.Systems
             EnableSystemSorting = true;
 
             GetOrCreateAndAddManagedSystem<GameObjectEntityBindingSystem>();
-            GetOrCreateAndAddManagedSystem<CompanionGameObjectUpdateSystem>();
+            //GetOrCreateAndAddManagedSystem<CompanionGameObjectUpdateSystem>();
         }
     }
 

@@ -3,6 +3,7 @@
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
@@ -17,9 +18,12 @@ namespace Latios.Transforms.Systems
     [BurstCompile]
     public partial struct CompanionGameObjectUpdateTransformSystem : ISystem
     {
-        static readonly ProfilerMarker s_profilerMarkerAddNew = new("AddNew");
-        static readonly ProfilerMarker s_profilerMarkerRemove = new("Remove");
-        static readonly ProfilerMarker s_profilerMarkerUpdate = new("Update");
+        static readonly string         s_ProfilerMarkerAddNewString = "AddNew";
+        static readonly string         s_ProfilerMarkerRemoveString = "Remove";
+        static readonly string         s_ProfilerMarkerUpdateString = "Update";
+        static readonly ProfilerMarker s_ProfilerMarkerAddNew       = new(s_ProfilerMarkerAddNewString);
+        static readonly ProfilerMarker s_ProfilerMarkerRemove       = new(s_ProfilerMarkerRemoveString);
+        static readonly ProfilerMarker s_ProfilerMarkerUpdate       = new(s_ProfilerMarkerUpdateString);
 
         struct CompanionGameObjectUpdateTransformCleanup : ICleanupComponentData
         {
@@ -37,38 +41,20 @@ namespace Latios.Transforms.Systems
 
         EntityQuery m_createdQuery;
         EntityQuery m_destroyedQuery;
-        EntityQuery m_modifiedQuery;
         EntityQuery m_existQuery;
 
+        [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             m_transformAccessArray = new TransformAccessArray(0);
             m_entities             = new NativeList<Entity>(64, Allocator.Persistent);
             m_entitiesMap          = new NativeHashMap<Entity, IndexAndInstance>(64, Allocator.Persistent);
-            m_createdQuery         = state.GetEntityQuery(
-                new EntityQueryDesc
-            {
-                All  = new[] { ComponentType.ReadOnly<CompanionLink>() },
-                None = new[] { ComponentType.ReadOnly<CompanionGameObjectUpdateTransformCleanup>() }
-            }
-                );
-            m_destroyedQuery = state.GetEntityQuery(
-                new EntityQueryDesc
-            {
-                All  = new[] { ComponentType.ReadOnly<CompanionGameObjectUpdateTransformCleanup>() },
-                None = new[] { ComponentType.ReadOnly<CompanionLink>() }
-            }
-                );
-            m_modifiedQuery = state.GetEntityQuery(
-                new EntityQueryDesc
-            {
-                All = new[] { ComponentType.ReadOnly<CompanionLink>() },
-            }
-                );
-            m_modifiedQuery.SetChangedVersionFilter(typeof(CompanionLink));
-            m_existQuery = state.GetEntityQuery(ComponentType.ReadOnly<CompanionLink>(), ComponentType.ReadOnly<WorldTransform>());
+            m_createdQuery         = state.Fluent().With<CompanionLink, CompanionLinkTransform, WorldTransform>(true).Without<CompanionGameObjectUpdateTransformCleanup>().Build();
+            m_destroyedQuery       = state.Fluent().With<CompanionGameObjectUpdateTransformCleanup>(true).Without<CompanionLink>().Build();
+            m_existQuery           = state.Fluent().With<CompanionLink, CompanionLinkTransform, WorldTransform>(true).Build();
         }
 
+        [BurstCompile]
         public void OnDestroy(ref SystemState state)
         {
             m_transformAccessArray.Dispose();
@@ -76,9 +62,10 @@ namespace Latios.Transforms.Systems
             m_entitiesMap.Dispose();
         }
 
+        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            using (s_profilerMarkerAddNew.Auto())
+            using (s_ProfilerMarkerAddNew.Auto())
             {
                 if (!m_createdQuery.IsEmpty)
                 {
@@ -86,16 +73,16 @@ namespace Latios.Transforms.Systems
                     for (int i = 0; i < entities.Length; i++)
                     {
                         var entity = entities[i];
-                        var link   = state.EntityManager.GetComponentData<CompanionLink>(entity);
+                        var link   = state.EntityManager.GetComponentData<CompanionLinkTransform>(entity);
 
                         // It is possible that an object is created and immediately destroyed, and then this shouldn't run.
-                        if (link.Companion != null)
+                        if (link.CompanionTransform.IsValid())
                         {
                             IndexAndInstance indexAndInstance          = default;
                             indexAndInstance.transformAccessArrayIndex = m_entities.Length;
-                            indexAndInstance.instanceID                = link.Companion.GetInstanceID();
+                            indexAndInstance.instanceID                = link.CompanionTransform.InstanceID();
                             m_entitiesMap.Add(entity, indexAndInstance);
-                            m_transformAccessArray.Add(link.Companion.transform);
+                            m_transformAccessArray.Add(link.CompanionTransform.InstanceID());
                             m_entities.Add(entity);
                         }
                     }
@@ -104,7 +91,7 @@ namespace Latios.Transforms.Systems
                 }
             }
 
-            using (s_profilerMarkerRemove.Auto())
+            using (s_ProfilerMarkerRemove.Auto())
             {
                 if (!m_destroyedQuery.IsEmpty)
                 {
@@ -120,12 +107,12 @@ namespace Latios.Transforms.Systems
                 }
             }
 
-            using (s_profilerMarkerUpdate.Auto())
+            using (s_ProfilerMarkerUpdate.Auto())
             {
-                foreach (var (link, entity) in Query<CompanionLink>().WithChangeFilter<CompanionLink>().WithEntityAccess())
+                foreach (var (link, entity) in Query<CompanionLinkTransform>().WithChangeFilter<CompanionLink>().WithEntityAccess())
                 {
                     var cached    = m_entitiesMap[entity];
-                    var currentID = link.Companion.GetInstanceID();
+                    var currentID = link.CompanionTransform.InstanceID();
                     if (cached.instanceID != currentID)
                     {
                         // We avoid the need to update the indices and reorder the entities array by adding
@@ -134,7 +121,7 @@ namespace Latios.Transforms.Systems
                         // 1. ABCD + X = ABCDX
                         // 2. ABCDX - B = AXCD
                         // -> the transform is updated, but the index remains unchanged
-                        m_transformAccessArray.Add(link.Companion.transform);
+                        m_transformAccessArray.Add(link.CompanionTransform.InstanceID());
                         m_transformAccessArray.RemoveAtSwapBack(cached.transformAccessArrayIndex);
                         cached.instanceID     = currentID;
                         m_entitiesMap[entity] = cached;

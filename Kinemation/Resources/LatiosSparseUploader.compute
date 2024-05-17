@@ -1,7 +1,7 @@
 #pragma kernel CopyKernel
 #pragma kernel ReplaceKernel
 
-static const float kEpsilon = 0.000001f;
+static const float kEpsilon = 0.0000000001f;
 
 static const uint kOperationType_Upload = 0;
 static const uint kOperationType_Matrix_4x4 = 1;

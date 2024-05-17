@@ -963,6 +963,7 @@ namespace Latios.Kinemation.Systems
 
                     EnabledMask needs = default;
 
+                    // Todo: This should be flipped in 0.10.0-beta.4
                     if (!hasNeedsBindings)
                         needs = chunk.GetEnabledMask(ref needsBindingHandle);
 
@@ -1002,9 +1003,6 @@ namespace Latios.Kinemation.Systems
                                 oldBoundMeshState = boundMeshes[i]
                             }, m_nativeThreadIndex);
 
-                            // Todo: We can't set the whole enabled bit array in batch?
-                            if (hasNeedsBindings)
-                                needs[i] = false;
                             if (reinit)
                             {
                                 if (i < 64)
@@ -1014,6 +1012,8 @@ namespace Latios.Kinemation.Systems
                             }
                         }
                     }
+                    if (hasNeedsBindings)
+                        chunk.SetComponentEnabledForAll(ref needsBindingHandle, false);
                 }
 
                 if (hasNeedsBindings)
@@ -1950,10 +1950,9 @@ namespace Latios.Kinemation.Systems
                         if (index < indicesToClear.Value.Length)
                             indicesToClear.Value.Set(index, true);
                         operations.Add(new ExposedSkeletonCullingIndexOperation { index = index, skeletonEntity = entities[i] });
-                        // Todo: Batch clear?
-                        dirtyFlags[i] = false;
                     }
                 }
+                chunk.SetComponentEnabledForAll(ref dirtyFlagHandle, false);
             }
         }
 

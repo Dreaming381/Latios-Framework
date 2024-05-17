@@ -10,18 +10,13 @@ namespace Latios.Transforms
     {
         public static void InstallTransforms(LatiosWorld world, ComponentSystemGroup defaultComponentSystemGroup, bool extreme = false)
         {
-            foreach (var system in world.Systems)
-            {
-                var type = system.GetType();
-                if (type.Namespace != null && type.Namespace.StartsWith("Unity.Transforms"))
-                {
-                    system.Enabled = false;
-                }
-                if (type.Name.StartsWith("Companion") && type.Namespace != null && type.Namespace.StartsWith("Unity.Entities"))
-                {
-                    system.Enabled = false;
-                }
-            }
+            var transformGroup = world.GetExistingSystemManaged<Unity.Transforms.TransformSystemGroup>();
+            if (transformGroup != null)
+                transformGroup.Enabled = false;
+
+            var companionTransformSystem = world.Unmanaged.GetExistingUnmanagedSystem<Unity.Entities.CompanionGameObjectUpdateTransformSystem>();
+            if (world.Unmanaged.IsSystemValid(companionTransformSystem))
+                world.Unmanaged.ResolveSystemStateRef(companionTransformSystem).Enabled = false;
 
             if (extreme)
                 world.worldBlackboardEntity.AddComponentData(new RuntimeFeatureFlags { flags = RuntimeFeatureFlags.Flags.ExtremeTransforms });

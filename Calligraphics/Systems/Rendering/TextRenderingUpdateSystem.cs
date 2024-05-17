@@ -82,11 +82,7 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var enabled = chunk.GetEnabledMask(ref gpuResidentHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    enabled[i] = false;
-                }
+                chunk.SetComponentEnabledForAll(ref gpuResidentHandle, false);
             }
         }
 

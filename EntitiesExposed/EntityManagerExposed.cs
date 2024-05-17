@@ -33,6 +33,9 @@ namespace Unity.Entities.Exposed
             if (!type.IsSharedComponent)
                 throw new ArgumentException($"Attempted to call EntityManager.CopySharedComponent on {type} which is not an ISharedComponentData");
         }
+
+        // Todo: Find a better home
+        public static int InstanceID<T>(this UnityObjectRef<T> unityObjectRef) where T : UnityEngine.Object => unityObjectRef.Id.instanceId;
     }
 }
 

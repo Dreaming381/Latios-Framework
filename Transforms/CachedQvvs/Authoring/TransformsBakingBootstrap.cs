@@ -14,7 +14,7 @@ namespace Latios.Transforms.Authoring
             var systems = TypeManager.GetSystemTypeIndices(WorldSystemFilterFlags.BakingSystem);
             foreach (var system in systems)
             {
-                if (!system.IsManaged)
+                if (system.IsManaged)
                     continue;
                 var name = TypeManager.GetSystemName(system);
                 if (!name.Contains(new FixedString64Bytes("TransformBakingSystem")))

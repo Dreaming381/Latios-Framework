@@ -1,11 +1,8 @@
-using System.Collections.Generic;
 using System.Reflection;
-using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
-using UnityEngine;
 
 namespace Latios.Kinemation
 {
@@ -37,11 +34,16 @@ namespace Latios.Kinemation
 
             s_initialized = true;
 
+            // Todo: We should optimize this to improve iteration time.
+            for (int i = 0; i < (int)RenderMeshUtility.EntitiesGraphicsComponentFlags.PermutationCount; i++)
+                RenderMeshUtility.ComputeComponentTypes((RenderMeshUtility.EntitiesGraphicsComponentFlags)i);
+
             try
             {
-                var egct  = RenderMeshUtility.s_EntitiesGraphicsComponentTypes;
-                var field = egct.GetType().GetField("m_ComponentTypePermutations", BindingFlags.Instance | BindingFlags.NonPublic);
-                var array = field.GetValue(egct) as ComponentTypeSet[];
+                var egctField = typeof(RenderMeshUtility).GetField("s_EntitiesGraphicsComponentTypes", BindingFlags.Static | BindingFlags.NonPublic);  //RenderMeshUtility.s_EntitiesGraphicsComponentTypes;
+                var egct      = egctField.GetValue(null);
+                var ctpField  = egctField.FieldType.GetField("m_ComponentTypePermutations", BindingFlags.Instance | BindingFlags.NonPublic);
+                var array     = ctpField.GetValue(egct) as ComponentTypeSet[];
 
                 for (int i = 0; i < array.Length; i++)
                 {

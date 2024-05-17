@@ -43,27 +43,27 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 
-    [RequireMatchingQueriesForUpdate]
-    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    [UpdateAfter(typeof(RenderMeshPostProcessSystem))]
-    [DisableAutoCreation]
-    public partial class ValidateRenderMeshArraySystem : SystemBase
-    {
-        protected override void OnUpdate()
-        {
-            foreach ((var renderMeshArray, var renderMesh, var entity) in Query<RenderMeshArray, RenderMesh>().WithEntityAccess())
-            {
-                UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
-            }
-
-            //Entities.ForEach((Entity entity, in RenderMeshArray renderMeshArray, in RenderMesh renderMesh) =>
-            //{
-            //    if (renderMeshArray.Meshes == null)
-            //    {
-            //        UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
-            //    }
-            //}).WithoutBurst().Run();
-        }
-    }
+    //[RequireMatchingQueriesForUpdate]
+    //[WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
+    //[UpdateAfter(typeof(RenderMeshPostProcessSystem))]
+    //[DisableAutoCreation]
+    //public partial class ValidateRenderMeshArraySystem : SystemBase
+    //{
+    //    protected override void OnUpdate()
+    //    {
+    //        foreach ((var renderMeshArray, var renderMesh, var entity) in Query<RenderMeshArray>().WithEntityAccess())
+    //        {
+    //            UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
+    //        }
+    //
+    //        //Entities.ForEach((Entity entity, in RenderMeshArray renderMeshArray, in RenderMesh renderMesh) =>
+    //        //{
+    //        //    if (renderMeshArray.Meshes == null)
+    //        //    {
+    //        //        UnityEngine.Debug.Log($"RenderMeshArray was null: {entity}, {renderMesh.mesh.name}, {renderMesh.material.name}");
+    //        //    }
+    //        //}).WithoutBurst().Run();
+    //    }
+    //}
 }
 

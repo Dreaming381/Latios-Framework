@@ -197,7 +197,16 @@ namespace Latios.Kinemation.Authoring
         /// <summary>
         /// Returns true if the material requires depth sorting due to alpha transparency
         /// </summary>
-        public static bool RequiresDepthSorting(Material material) => RenderMeshUtility.DepthSortedFlags(material) == RenderMeshUtility.EntitiesGraphicsComponentFlags.DepthSorted;
+        public static bool RequiresDepthSorting(Material material)
+        {
+            var span                                               = s_materialSpanCache.AsSpan();
+            span[0]                                                = material;
+            RenderMeshUtility.EntitiesGraphicsComponentFlags flags = default;
+            flags.AppendDepthSortedFlag(span);
+            return flags == RenderMeshUtility.EntitiesGraphicsComponentFlags.DepthSorted;
+        }
+
+        static Material[] s_materialSpanCache = new Material[1];
 
         /// <summary>
         /// Rearranges the MeshMaterialSubmeshSettings such that the elements that do not require depth sorting are at the beginning

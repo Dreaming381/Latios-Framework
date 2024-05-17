@@ -18,7 +18,8 @@ namespace Latios.Kinemation.Authoring
 
         [BakingType] struct RequestPreviousTag : IRequestPreviousTransform { }
 
-        static List<int> s_validIndexCache = new List<int>();
+        static List<int>  s_validIndexCache   = new List<int>();
+        static Material[] s_materialSpanCache = new Material[1];
 
         internal static void Convert(IBaker baker,
                                      ReadOnlySpan<MeshRendererBakeSettings>    rendererSettings,
@@ -49,6 +50,7 @@ namespace Latios.Kinemation.Authoring
                 return;
             }
 
+            var                  materialSpan                   = s_materialSpanCache.AsSpan();
             DeformClassification requiredPropertiesForReference = DeformClassification.None;
             int                  primaryRendererIndex           = -1;
             for (int rangeStart = 0, rendererIndex = 0; rendererIndex < rendererSettings.Length; rendererIndex++)
@@ -103,7 +105,8 @@ namespace Latios.Kinemation.Authoring
                     }
                     classification |= mmsClassification;
 
-                    flags |= RenderMeshUtility.DepthSortedFlags(material);
+                    materialSpan[0] = material;
+                    flags.AppendDepthSortedFlag(materialSpan);
 
                     s_validIndexCache.Add(mmsIndex);
                 }
@@ -260,9 +263,12 @@ namespace Latios.Kinemation.Authoring
         private static void AddRendererComponents(Entity entity, IBaker baker, in MeshRendererBakeSettings settings, RenderMeshUtility.EntitiesGraphicsComponentFlags baseFlags)
         {
             // Add all components up front using as few calls as possible.
-            baseFlags        |= RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking;
-            var componentSet  = RenderMeshUtility.ComputeComponentTypes(baseFlags, settings.renderMeshDescription, baker.IsStatic(), null);
-            baker.AddComponent(entity, componentSet);
+            baseFlags |= RenderMeshUtility.EntitiesGraphicsComponentFlags.Baking;
+            baseFlags.AppendMotionAndProbeFlags(settings.renderMeshDescription, baker.IsStatic());
+            var componentSet = RenderMeshUtility.ComputeComponentTypes(baseFlags);
+            baker.AddComponent(                 entity, componentSet);
+            // Todo: For some dumb reason, Unity refuses to add RenderMeshArray during baking.
+            baker.AddComponent<RenderMeshArray>(entity);
             for (int i = 0; i < componentSet.Length; i++)
             {
                 // Todo: What to do for Unity Transforms?

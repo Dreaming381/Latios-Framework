@@ -1,13 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using Debug = UnityEngine.Debug;
-using Unity.Collections;
-using Unity.Entities;
-using Unity.Entities.Exposed;
-using Unity.Jobs;
-
 using System.Runtime.InteropServices;
 using Latios.Systems;
+using Unity.Collections;
+using Unity.Entities;
+
+#if !ENTITY_STORE_V1
+#error The Latios Framework requires the scripting define ENTITY_STORE_V1 for your safety and wellbeing.
+#endif
 
 namespace Latios
 {
@@ -167,7 +166,7 @@ namespace Latios
                     catch (Exception e)
                     {
                         hadError = true;
-                        Debug.LogException(e);
+                        UnityEngine.Debug.LogException(e);
                     }
                     finally
                     {
@@ -193,7 +192,7 @@ namespace Latios
                     catch (Exception e)
                     {
                         hadError = true;
-                        Debug.LogException(e);
+                        UnityEngine.Debug.LogException(e);
                     }
                     finally
                     {

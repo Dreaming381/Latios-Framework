@@ -32,6 +32,7 @@ namespace Latios.Kinemation.Systems
             {
                 All = new[]
                 {
+                    ComponentType.ChunkComponentReadOnly<EntitiesGraphicsChunkInfo>(),
                     ComponentType.ReadOnly<DisableRendering>(),
                 },
             });
