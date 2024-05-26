@@ -49,6 +49,7 @@ public class LatiosBootstrap : ICustomBootstrap
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default);
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
+        //Latios.Transforms.TransformsBootstrap.InstallGameObjectEntitySynchronization(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);

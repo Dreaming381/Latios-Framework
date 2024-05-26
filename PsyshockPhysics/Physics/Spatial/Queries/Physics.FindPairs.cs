@@ -98,6 +98,14 @@ namespace Latios.Psyshock
         /// </summary>
         public int sourceIndexB => m_layerB.srcIndices[bodyIndexB];
         /// <summary>
+        /// The bucket index of the first collider in the pair, used for populating a PairStream in an immediate context
+        /// </summary>
+        public int bucketIndexA => m_bucketIndexA;
+        /// <summary>
+        /// The bucket index of the second collider in the pair, used for populating a PairStream in an immediate context
+        /// </summary>
+        public int bucketIndexB => m_bucketIndexB;
+        /// <summary>
         /// An index that is guaranteed to be deterministic and unique between threads for a given FindPairs operation,
         /// and can be used as the sortKey for command buffers
         /// </summary>
@@ -138,6 +146,7 @@ namespace Latios.Psyshock
         {
             get
             {
+                CheckCanGenerateParallelPairKey();
                 int factor = 1;
                 if (jobIndex >= layerA.bucketCount)
                     factor++;
@@ -296,6 +305,14 @@ namespace Latios.Psyshock
         /// The number of colliders in layerB that is processed with this jobIndex.
         /// </summary>
         public int bucketCountB => m_bucketCountB;
+        /// <summary>
+        /// The bucket index of the colliders in layerA, used for populating a PairStream in an immediate context.
+        /// </summary>
+        public int bucketIndexA => m_bucketIndexA;
+        /// <summary>
+        /// The bucket index of the colliders in layerB, used for populating a PairStream in an immediate context.
+        /// </summary>
+        public int bucketIndexB => m_bucketIndexB;
         /// <summary>
         /// An index that is guaranteed to be deterministic and unique between threads for a given FindPairs operation,
         /// and can be used as the sortKey for command buffers or as an index in a NativeStream.

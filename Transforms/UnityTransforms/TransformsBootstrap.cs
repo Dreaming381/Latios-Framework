@@ -8,7 +8,7 @@ namespace Latios.Transforms
 {
     public static class TransformsBootstrap
     {
-        public static void InstallGameObjectEntitySynchronization(LatiosWorld world, ComponentSystemGroup defaultComponentSystemGroup, bool extreme = false)
+        public static void InstallGameObjectEntitySynchronization(LatiosWorld world)
         {
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.GameObjectEntityBindingSystem>(),           world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.CopyGameObjectTransformToEntitySystem>(),   world);

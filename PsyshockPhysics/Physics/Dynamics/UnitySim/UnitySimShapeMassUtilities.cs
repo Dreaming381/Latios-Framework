@@ -8,7 +8,7 @@ namespace Latios.Psyshock
     public static partial class UnitySim
     {
         /// <summary>
-        /// A local-space inertia tensor diagonal matrix and orientation.
+        /// A local-space normalized inertia tensor diagonal and orientation.
         /// The diagonal should have any stretch already applied to the collider
         /// it was derived from. The diagonal is used to compute the inverse inertia
         /// in a Mass instance while the orientation is transformed into the

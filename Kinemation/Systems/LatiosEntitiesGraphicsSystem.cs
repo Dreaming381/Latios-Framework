@@ -151,7 +151,7 @@ namespace Latios.Kinemation.Systems
         private NativeParallelHashSet<int> m_ExistingBatchIndices;
         private ComponentTypeCache         m_ComponentTypeCache;
 
-        private SortedSet<int> m_SortedBatchIds;
+        private SortedSetUnmanaged m_SortedBatchIds;
 
         private NativeList<ValueBlitDescriptor> m_ValueBlits;
 
@@ -720,7 +720,9 @@ namespace Latios.Kinemation.Systems
 
         private void ResetIds()
         {
-            m_SortedBatchIds = new SortedSet<int>();
+            if (m_SortedBatchIds.isCreated)
+                m_SortedBatchIds.Dispose();
+            m_SortedBatchIds = new SortedSetUnmanaged(1024);
             m_ExistingBatchIndices.Clear();
         }
 
@@ -784,7 +786,7 @@ namespace Latios.Kinemation.Systems
             m_ValueBlits.Dispose();
             m_ComponentTypeCache.Dispose();
 
-            m_SortedBatchIds = null;
+            m_SortedBatchIds.Dispose();
 
             m_GraphicsArchetypes.Dispose();
 
@@ -1149,7 +1151,7 @@ namespace Latios.Kinemation.Systems
                 m_ChunkMetadataAllocator.Release(metadataAllocation);
             }
 
-            m_ThreadedBatchContext.RemoveBatch(new BatchID { value = (uint) batchIndex });
+            m_ThreadedBatchContext.RemoveBatch(new BatchID { value = (uint)batchIndex });
         }
 
         static int NumInstancesInChunk(ArchetypeChunk chunk) => chunk.Capacity;
@@ -1174,6 +1176,7 @@ namespace Latios.Kinemation.Systems
             }
             sortedNewChunks.Sort();
         }
+
         private int AddNewChunks(NativeArray<ArchetypeChunk> newChunks)
         {
             int numValidNewChunks = 0;
@@ -2047,6 +2050,50 @@ namespace Latios.Kinemation.Systems
             }
         }
 #endif
+
+        struct SortedSetUnmanaged
+        {
+            UnsafeHashSet<int> m_set;
+            int                m_cachedMax;
+
+            public SortedSetUnmanaged(int initialCapacity)
+            {
+                m_set       = new UnsafeHashSet<int>(initialCapacity, Allocator.Persistent);
+                m_cachedMax = -1;
+            }
+
+            public bool isCreated => m_set.IsCreated;
+
+            public void Dispose() => m_set.Dispose();
+
+            public void Add(int index)
+            {
+                m_cachedMax = math.max(index, m_cachedMax);
+                m_set.Add(index);
+            }
+
+            public void Remove(int index)
+            {
+                m_set.Remove(index);
+                if (m_cachedMax == index)
+                    m_cachedMax = -1;
+            }
+
+            public bool Contains(int index) => m_set.Contains(index);
+
+            public int Max
+            {
+                get
+                {
+                    if (m_cachedMax < 0)
+                    {
+                        foreach (var i in m_set)
+                            m_cachedMax = math.max(m_cachedMax, i);
+                    }
+                    return math.max(0, m_cachedMax);
+                }
+            }
+        }
     }
 }
 
