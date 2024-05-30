@@ -10,7 +10,7 @@ using Unity.Mathematics;
 
 namespace Latios.Kinemation
 {
-    public partial struct OptimizedSkeletonAspect
+    public readonly partial struct OptimizedSkeletonAspect
     {
         internal bool BeginSampleTrueIfAdditive(out NativeArray<AclUnity.Qvvs> targetLocalTransforms)
         {
