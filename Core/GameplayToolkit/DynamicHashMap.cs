@@ -445,9 +445,9 @@ namespace Latios
 
                             // Start over
                             return TryAdd(in key, in value);
-                        }
-                        last.nextIndex              = 0;
+                        }                        
                         candidate.nextIndex         = m_buffer.Length;
+                        last.nextIndex              = 0;
                         m_buffer.Add(new Pair { key = key, value = value, meta = (uint)m_count | 0x10000000 });
                         IncrementCount();
                         return true;
