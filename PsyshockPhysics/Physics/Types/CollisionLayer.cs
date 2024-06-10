@@ -34,6 +34,16 @@ namespace Latios.Psyshock
         /// How many "cells" to divide the worldAabb into.
         /// </summary>
         public int3 worldSubdivisionsPerAxis;
+
+        /// <summary>
+        /// The default CollisionLayerSettings used when none is specified.
+        /// These settings divide the world into 8 cells associated with the 8 octants of world space
+        /// </summary>
+        public static readonly CollisionLayerSettings kDefault = new CollisionLayerSettings
+        {
+            worldAabb                = new Aabb(new float3(-1f), new float3(1f)),
+            worldSubdivisionsPerAxis = new int3(2, 2, 2)
+        };
     }
 
     /// <summary>
@@ -45,7 +55,7 @@ namespace Latios.Psyshock
         float3 worldMin;
         float3 worldAxisStride;
         int3   worldSubdivisionsPerAxis;
-        int    bucketCountExcludingNan;
+        int    cellCount;
 
         /// <summary>
         /// Create a new calculator from specified CollisionLayerSettings
@@ -55,7 +65,7 @@ namespace Latios.Psyshock
             worldMin                 = settings.worldAabb.min;
             worldAxisStride          = (settings.worldAabb.max - worldMin) / settings.worldSubdivisionsPerAxis;
             worldSubdivisionsPerAxis = settings.worldSubdivisionsPerAxis;
-            bucketCountExcludingNan  = settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 1;
+            cellCount                = IndexStrategies.CellCountFromSubdivisionsPerAxis(settings.worldSubdivisionsPerAxis);
         }
 
         /// <summary>
@@ -67,7 +77,7 @@ namespace Latios.Psyshock
             worldMin                 = layer.worldMin;
             worldAxisStride          = layer.worldAxisStride;
             worldSubdivisionsPerAxis = layer.worldSubdivisionsPerAxis;
-            bucketCountExcludingNan  = layer.bucketCountExcludingNan;
+            cellCount                = layer.cellCount;
         }
 
         /// <summary>
@@ -81,10 +91,10 @@ namespace Latios.Psyshock
             maxBucket      = math.clamp(maxBucket, 0, worldSubdivisionsPerAxis - 1);
 
             if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
-                return bucketCountExcludingNan;
+                return IndexStrategies.NanBucketIndex(cellCount);
             if (math.all(minBucket == maxBucket))
-                return (minBucket.x * worldSubdivisionsPerAxis.y + minBucket.y) * worldSubdivisionsPerAxis.z + minBucket.z;
-            return bucketCountExcludingNan - 1;
+                return IndexStrategies.CellIndexFromSubdivisionIndices(minBucket, worldSubdivisionsPerAxis);
+            return IndexStrategies.CrossBucketIndex(cellCount);
         }
     }
 
@@ -114,7 +124,7 @@ namespace Latios.Psyshock
         internal float3                       worldMin;
         internal float3                       worldAxisStride;
         internal int3                         worldSubdivisionsPerAxis;
-        internal int                          bucketCountExcludingNan;
+        internal int                          cellCount;
 
         internal CollisionLayer(CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
@@ -122,16 +132,16 @@ namespace Latios.Psyshock
             worldAxisStride          = (settings.worldAabb.max - worldMin) / settings.worldSubdivisionsPerAxis;
             worldSubdivisionsPerAxis = settings.worldSubdivisionsPerAxis;
 
-            var buckets           = settings.worldSubdivisionsPerAxis.x * settings.worldSubdivisionsPerAxis.y * settings.worldSubdivisionsPerAxis.z + 2;
+            cellCount             = IndexStrategies.CellCountFromSubdivisionsPerAxis(settings.worldSubdivisionsPerAxis);
+            var buckets           = IndexStrategies.BucketCountWithNaN(cellCount);
             bucketStartsAndCounts = new NativeList<int2>(buckets, allocator);
             bucketStartsAndCounts.Resize(buckets, NativeArrayOptions.ClearMemory);
-            xmins                   = new NativeList<float>(allocator);
-            xmaxs                   = new NativeList<float>(allocator);
-            yzminmaxs               = new NativeList<float4>(allocator);
-            intervalTrees           = new NativeList<IntervalTreeNode>(allocator);
-            bodies                  = new NativeList<ColliderBody>(allocator);
-            srcIndices              = new NativeList<int>(allocator);
-            bucketCountExcludingNan = buckets - 1;
+            xmins         = new NativeList<float>(allocator);
+            xmaxs         = new NativeList<float>(allocator);
+            yzminmaxs     = new NativeList<float4>(allocator);
+            intervalTrees = new NativeList<IntervalTreeNode>(allocator);
+            bodies        = new NativeList<ColliderBody>(allocator);
+            srcIndices    = new NativeList<int>(allocator);
         }
 
         /// <summary>
@@ -144,7 +154,7 @@ namespace Latios.Psyshock
             worldMin                 = sourceLayer.worldMin;
             worldAxisStride          = sourceLayer.worldAxisStride;
             worldSubdivisionsPerAxis = sourceLayer.worldSubdivisionsPerAxis;
-            bucketCountExcludingNan  = sourceLayer.bucketCountExcludingNan;
+            cellCount                = sourceLayer.cellCount;
 
             bucketStartsAndCounts = sourceLayer.bucketStartsAndCounts.Clone(allocator);
             xmins                 = sourceLayer.xmins.Clone(allocator);
@@ -167,7 +177,6 @@ namespace Latios.Psyshock
             var layer = new CollisionLayer(settings, allocator);
             for (int i = 0; i < layer.bucketStartsAndCounts.Length; i++)
                 layer.bucketStartsAndCounts[i] = 0;
-            layer.worldSubdivisionsPerAxis.x   = math.max(1, layer.worldSubdivisionsPerAxis.x);  // Ensure IsCreated is true.
             return layer;
         }
 
@@ -214,7 +223,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// The number of cells in the layer, including the "catch-all" cell but ignoring the NaN cell
         /// </summary>
-        public int bucketCount => bucketCountExcludingNan;  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
+        public int bucketCount => IndexStrategies.BucketCountWithoutNaN(cellCount);  // For algorithmic purposes, we pretend the nan bucket doesn't exist.
         /// <summary>
         /// True if the CollisionLayer has been created
         /// </summary>

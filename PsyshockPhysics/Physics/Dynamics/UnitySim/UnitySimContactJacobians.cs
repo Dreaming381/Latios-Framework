@@ -321,6 +321,8 @@ namespace Latios.Psyshock
                                          bool enableFrictionVelocitiesHeuristic, float invNumSolverIterations,
                                          out ContactJacobianImpulses outputImpulses)
         {
+            CheckContactAndImpulseSpanLengthsEqual(perContactParameters.Length, perContactImpulses.Length);
+
             // Copy velocity data
             Velocity tempVelocityA = velocityA;
             Velocity tempVelocityB = velocityB;
@@ -529,6 +531,13 @@ namespace Latios.Psyshock
         {
             if (parametersLength != contactsLength)
                 throw new ArgumentException($"Span<ContactJacobianContactParameters> length of {parametersLength} does not match the number of contacts {contactsLength}");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void CheckContactAndImpulseSpanLengthsEqual(int parametersLength, int impulseLength)
+        {
+            if (impulseLength != parametersLength)
+                throw new ArgumentException($"Span<ContactJacobianContactParameters> length of {parametersLength} does not match impulses Span<float> length of {impulseLength}");
         }
     }
 }

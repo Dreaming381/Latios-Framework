@@ -16,28 +16,26 @@ namespace Latios.Psyshock
         {
             var bInATransform = math.mul(math.inverse(aTransform), bTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(convexA, convexB, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
-            SphereConvex.DistanceBetween(in convexA,
-                                         in RigidTransform.identity,
-                                         new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
-                                         RigidTransform.identity,
-                                         float.MaxValue,
-                                         out var closestOnA);
-            SphereConvex.DistanceBetween(in convexB,
-                                         in bInATransform,
-                                         new SphereCollider(gjkResult.hitpointOnBInASpace - epsilon, 0f),
-                                         RigidTransform.identity,
-                                         float.MaxValue,
-                                         out var closestOnB);
+            var featureCodeA  = PointRayConvex.FeatureCodeFromGjk(gjkResult.simplexAVertexCount,
+                                                                  gjkResult.simplexAVertexA,
+                                                                  gjkResult.simplexAVertexB,
+                                                                  gjkResult.simplexAVertexC,
+                                                                  in convexA);
+            var featureCodeB = PointRayConvex.FeatureCodeFromGjk(gjkResult.simplexBVertexCount,
+                                                                 gjkResult.simplexBVertexA,
+                                                                 gjkResult.simplexBVertexB,
+                                                                 gjkResult.simplexBVertexC,
+                                                                 in convexB);
             result = InternalQueryTypeUtilities.BinAResultToWorld(new ColliderDistanceResultInternal
             {
-                distance     = gjkResult.distance,
-                hitpointA    = gjkResult.hitpointOnAInASpace,
-                hitpointB    = gjkResult.hitpointOnBInASpace,
-                normalA      = closestOnA.normalA,
-                normalB      = closestOnB.normalA,
-                featureCodeA = closestOnA.featureCodeA,
-                featureCodeB = closestOnB.featureCodeA
+                distance  = gjkResult.distance,
+                hitpointA = gjkResult.hitpointOnAInASpace,
+                hitpointB = gjkResult.hitpointOnBInASpace,
+                normalA   = PointRayConvex.ConvexNormalFromFeatureCode(featureCodeA, in convexA, -gjkResult.normalizedOriginToClosestCsoPoint),
+                normalB   = math.rotate(bInATransform.rot, PointRayConvex.ConvexNormalFromFeatureCode(featureCodeB, in convexB,
+                                                                                                      gjkResult.normalizedOriginToClosestCsoPoint)),
+                featureCodeA = featureCodeA,
+                featureCodeB = featureCodeB
             }, aTransform);
             return result.distance <= maxDistance;
         }

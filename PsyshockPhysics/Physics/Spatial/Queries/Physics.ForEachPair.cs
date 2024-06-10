@@ -84,7 +84,7 @@ namespace Latios.Psyshock
         /// </summary>
         public void RunImmediate()
         {
-            ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, 0, pairStream.mixedIslandAggregateStream, false, false, includeDisabled);
+            ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, 0, pairStream.data.pairHeaders.indexCount, false, false, includeDisabled);
         }
 
         /// <summary>
@@ -107,11 +107,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the ForEachPair operation using multiple worker threads in multiple phases.
+        /// If the PairStream was constructed from only a single cell (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies from any previous operation that touches the PairStream</param>
         /// <returns>The final JobHandle for the scheduled jobs</returns>
         public JobHandle ScheduleParallel(JobHandle inputDeps)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(pairStream.data.cellCount))
+                return ScheduleSingle(inputDeps);
+
             var jh = new ForEachPairInternal.ForEachPairJob(in pairStream, in processor, includeDisabled).ScheduleParallel(inputDeps, ScheduleMode.ParallelPart1);
             ForEachPairMethods.ScheduleBumpVersions(ref pairStream, ref jh);
             return new ForEachPairInternal.ForEachPairJob(in pairStream, in processor, includeDisabled).ScheduleParallel(jh, ScheduleMode.ParallelPart2);
@@ -119,11 +123,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the ForEachPair operation using multiple worker threads all at once without entity thread-safety.
+        /// If the PairStream was constructed from only a single cell (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies from any previous operation that touches the PairStream</param>
         /// <returns>A JobHandle for the scheduled job</returns>
         public JobHandle ScheduleParallelUnsafe(JobHandle inputDeps)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(pairStream.data.cellCount))
+                return ScheduleSingle(inputDeps);
+
             return new ForEachPairInternal.ForEachPairJob(in pairStream, in processor, includeDisabled).ScheduleParallel(inputDeps, ScheduleMode.ParallelUnsafe);
         }
     }

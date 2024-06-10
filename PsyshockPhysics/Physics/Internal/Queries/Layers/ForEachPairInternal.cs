@@ -55,14 +55,14 @@ namespace Latios.Psyshock
                     SetScheduleMode(scheduleMode);
                     if (scheduleMode == ScheduleMode.ParallelPart1)
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                        return this.ScheduleParallel(pairStream.data.expectedBucketCount + 2, 1, inputDeps);
+                        return this.ScheduleParallel(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 2, 1, inputDeps);
 #else
-                        return this.ScheduleParallel(pairStream.data.expectedBucketCount + 1, 1, inputDeps);
+                        return this.ScheduleParallel(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 1, 1, inputDeps);
 #endif
                     if (scheduleMode == ScheduleMode.ParallelPart2)
-                        return this.ScheduleParallel(2 * pairStream.data.expectedBucketCount - 2, 1, inputDeps);
+                        return this.ScheduleParallel(IndexStrategies.MixedStreamCount(pairStream.data.cellCount), 1, inputDeps);
                     if (scheduleMode == ScheduleMode.ParallelUnsafe)
-                        return this.ScheduleParallel(pairStream.mixedIslandAggregateStream, 1, inputDeps);
+                        return this.ScheduleParallel(pairStream.data.pairHeaders.indexCount, 1, inputDeps);
                     return inputDeps;
                 }
 
@@ -110,24 +110,23 @@ namespace Latios.Psyshock
                     using var jobName = modeAndTMarker.Auto();
                     if (mode == ScheduleMode.Single)
                     {
-                        ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, 0, pairStream.mixedIslandAggregateStream, true, true, includeDisabled);
+                        ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, 0, pairStream.data.pairHeaders.indexCount, true, true, includeDisabled);
                     }
                     else if (mode == ScheduleMode.ParallelPart1)
                     {
-                        if (jobIndex < pairStream.data.expectedBucketCount)
+                        var bucketCount = IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount);
+                        if (jobIndex < bucketCount)
                         {
-                            ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, jobIndex * 3, 3, true, true, includeDisabled);
+                            var start = IndexStrategies.FirstStreamIndexFromBucketIndex(jobIndex, pairStream.data.cellCount);
+                            var count = IndexStrategies.StreamCountFromBucketIndex(jobIndex, pairStream.data.cellCount);
+                            ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, start, count, true, true, includeDisabled);
                         }
-                        else if (jobIndex == pairStream.data.expectedBucketCount)
-                        {
-                            ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, pairStream.nanBucketStream, 1, true, true, includeDisabled);
-                        }
-                        else if (jobIndex == pairStream.data.expectedBucketCount + 1)
+                        else if (jobIndex == bucketCount)
                         {
                             if (pairStream.data.state->needsIslanding)
                                 ForEachPairMethods.CreateIslands(ref pairStream);
                         }
-                        else if (jobIndex == pairStream.data.expectedBucketCount + 2)
+                        else if (jobIndex == bucketCount + 1)
                         {
                             if (pairStream.data.state->needsAliasChecks)
                                 ForEachPairMethods.CheckAliasing(pairStream);
@@ -135,7 +134,13 @@ namespace Latios.Psyshock
                     }
                     else if (mode == ScheduleMode.ParallelPart2)
                     {
-                        ForEachPairMethods.ExecuteBatch(ref pairStream, ref processor, jobIndex + pairStream.firstMixedBucketStream, 1, true, true, includeDisabled);
+                        ForEachPairMethods.ExecuteBatch(ref pairStream,
+                                                        ref processor,
+                                                        jobIndex + IndexStrategies.FirstMixedStreamIndex(pairStream.data.cellCount),
+                                                        1,
+                                                        true,
+                                                        true,
+                                                        includeDisabled);
                     }
                     else if (mode == ScheduleMode.ParallelUnsafe)
                     {
@@ -181,9 +186,11 @@ namespace Latios.Psyshock
         {
             pairStream.CheckWriteAccess();
 
-            var aggregateStream = pairStream.mixedIslandAggregateStream;
+            var aggregateStream        = IndexStrategies.IslandAggregateStreamIndex(pairStream.data.cellCount);
+            var firstMixedBucketStream = IndexStrategies.FirstMixedStreamIndex(pairStream.data.cellCount);
+            var mixedStreamCount       = IndexStrategies.MixedStreamCount(pairStream.data.cellCount);
             pairStream.data.pairHeaders.ClearIndex(aggregateStream);
-            for (int i = pairStream.firstMixedBucketStream; i < pairStream.nanBucketStream; i++)
+            for (int i = firstMixedBucketStream; i < firstMixedBucketStream + mixedStreamCount; i++)
             {
                 pairStream.data.pairHeaders.MoveIndexToOtherIndexUnordered(i, aggregateStream);
             }
@@ -271,7 +278,7 @@ namespace Latios.Psyshock
             }
 
             // If we have more islands than streams, we need to distribute them.
-            if (uniqueIslandIndices.Length > pairStream.nanBucketStream - pairStream.firstMixedBucketStream)
+            if (uniqueIslandIndices.Length > mixedStreamCount)
             {
                 // Count elements in each island and sort
                 var islandIndicesAndCounts = new NativeArray<int2>(uniqueIslandIndices.Length, Allocator.Temp);
@@ -287,7 +294,7 @@ namespace Latios.Psyshock
                 islandIndicesAndCounts.Sort(new GreatestToLeastComparer());
 
                 // Distribute largest islands
-                var streamIndicesAndCounts = new NativeArray<int2>(pairStream.nanBucketStream - pairStream.firstMixedBucketStream, Allocator.Temp);
+                var streamIndicesAndCounts = new NativeArray<int2>(mixedStreamCount, Allocator.Temp);
                 for (int i = 0; i < streamIndicesAndCounts.Length; i++)
                 {
                     var island                    = islandIndicesAndCounts[i];
@@ -360,7 +367,7 @@ namespace Latios.Psyshock
 
             // At this point, ranks contain stream indices offset from the first mixed bucket stream.
             // We can now redistribute the pair headers.
-            var baseStream = pairStream.firstMixedBucketStream;
+            var baseStream = firstMixedBucketStream;
             enumerator     = pairStream.data.pairHeaders.GetEnumerator(aggregateStream);
             while (enumerator.MoveNext())
             {
@@ -375,63 +382,51 @@ namespace Latios.Psyshock
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         public static void CheckAliasing(PairStream pairStream)
         {
+            // Note: It is allowed to have an entity with write access in bucket 0 and read access in bucket 1.
+            // This is because the entity cannot index a PhysicsComponentLookup in bucket, so only read-only components
+            // are accessed. That container should be marked read-only, which makes it safe to read in both bucket 0
+            // and bucket 1 in parallel.
+
             // Todo: If we ever make a readonly mode, this should be checking read access and not update the state flag at the end.
             pairStream.CheckWriteAccess();
 
             int pairsToCheck = 0;
-            for (int i = 0; i < pairStream.firstMixedBucketStream; i++)
+            for (int i = 0; i < IndexStrategies.BucketStreamCount(pairStream.data.cellCount); i++)
             {
                 pairsToCheck += pairStream.data.pairHeaders.CountForIndex(i);
             }
 
             var map = new NativeHashMap<Entity, int>(pairsToCheck, Allocator.Temp);
 
-            for (int i = 0; i < pairStream.firstMixedBucketStream; i++)
+            for (int bucketIndex = 0; bucketIndex < IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount); bucketIndex++)
             {
-                var bucketIndex = i / 3;
-                var enumerator  = pairStream.data.pairHeaders.GetEnumerator(i);
-                while (enumerator.MoveNext())
+                var firstIndex  = IndexStrategies.FirstStreamIndexFromBucketIndex(bucketIndex, pairStream.data.cellCount);
+                var streamCount = IndexStrategies.StreamCountFromBucketIndex(bucketIndex, pairStream.data.cellCount);
+                for (int i = firstIndex; i < firstIndex + streamCount; i++)
                 {
-                    ref var header = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
-                    bool    aIsRW  = (header.flags & PairStream.PairHeader.kWritableA) == PairStream.PairHeader.kWritableA;
-                    if (aIsRW && map.TryGetValue(header.entityA, out var oldIndex))
+                    var enumerator = pairStream.data.pairHeaders.GetEnumerator(i);
+                    while (enumerator.MoveNext())
                     {
-                        if (oldIndex != i)
-                            throw new System.InvalidOperationException(
-                                $"Entity {header.entityA.ToFixedString()} is contained in both buckets {oldIndex} and {bucketIndex} within the PairStream. This is not allowed.");
-                    }
-                    else if (aIsRW)
-                        map.Add(header.entityA, bucketIndex);
+                        ref var header = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
+                        bool    aIsRW  = (header.flags & PairStream.PairHeader.kWritableA) == PairStream.PairHeader.kWritableA;
+                        if (aIsRW && map.TryGetValue(header.entityA, out var oldIndex))
+                        {
+                            if (oldIndex != bucketIndex)
+                                throw new System.InvalidOperationException(
+                                    $"Entity {header.entityA.ToFixedString()} is contained in both buckets {oldIndex} and {bucketIndex} within the PairStream with write access for both. This is not allowed.");
+                        }
+                        else if (aIsRW)
+                            map.Add(header.entityA, bucketIndex);
 
-                    bool bIsRW = (header.flags & PairStream.PairHeader.kWritableB) == PairStream.PairHeader.kWritableB;
-                    if (bIsRW && map.TryGetValue(header.entityB, out oldIndex))
-                    {
-                        if (oldIndex != i)
-                            throw new System.InvalidOperationException(
-                                $"Entity {header.entityB.ToFixedString()} is contained in both buckets {oldIndex} and {bucketIndex} within the PairStream. This is not allowed.");
-                    }
-                    else if (bIsRW)
-                        map.Add(header.entityB, bucketIndex);
-                }
-            }
-
-            {
-                var enumerator = pairStream.data.pairHeaders.GetEnumerator(pairStream.nanBucketStream);
-                while (enumerator.MoveNext())
-                {
-                    ref var header = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
-                    bool    aIsRW  = (header.flags & PairStream.PairHeader.kWritableA) == PairStream.PairHeader.kWritableA;
-                    if (aIsRW && map.TryGetValue(header.entityA, out var oldIndex))
-                    {
-                        throw new System.InvalidOperationException(
-                            $"Entity {header.entityA.ToFixedString()} is contained in both buckets {oldIndex} and the NaN bucket within the PairStream. This is not allowed.");
-                    }
-
-                    bool bIsRW = (header.flags & PairStream.PairHeader.kWritableB) == PairStream.PairHeader.kWritableB;
-                    if (bIsRW && map.TryGetValue(header.entityB, out oldIndex))
-                    {
-                        throw new System.InvalidOperationException(
-                            $"Entity {header.entityB.ToFixedString()} is contained in both buckets {oldIndex} and the NaN bucket within the PairStream. This is not allowed.");
+                        bool bIsRW = (header.flags & PairStream.PairHeader.kWritableB) == PairStream.PairHeader.kWritableB;
+                        if (bIsRW && map.TryGetValue(header.entityB, out oldIndex))
+                        {
+                            if (oldIndex != bucketIndex)
+                                throw new System.InvalidOperationException(
+                                    $"Entity {header.entityB.ToFixedString()} is contained in both buckets {oldIndex} and {bucketIndex} within the PairStream with write access for both. This is not allowed.");
+                        }
+                        else if (bIsRW)
+                            map.Add(header.entityB, bucketIndex);
                     }
                 }
             }

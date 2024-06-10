@@ -137,25 +137,21 @@ namespace Latios
 
         public static float AsFloat(uint u, float minInclusive, float maxExclusive)
         {
-            CheckFloatMinMax(minInclusive, maxExclusive);
             return AsFloat(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
         public static float2 AsFloat2(uint2 u, float2 minInclusive, float2 maxExclusive)
         {
-            CheckFloatMinMax(minInclusive.xyxy, maxExclusive.xyxy);
             return AsFloat2(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
         public static float3 AsFloat3(uint3 u, float3 minInclusive, float3 maxExclusive)
         {
-            CheckFloatMinMax(minInclusive.xyzx, maxExclusive.xyzx);
             return AsFloat3(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
         public static float4 AsFloat4(uint4 u, float4 minInclusive, float4 maxExclusive)
         {
-            CheckFloatMinMax(minInclusive, maxExclusive);
             return AsFloat4(u) * (maxExclusive - minInclusive) + minInclusive;
         }
 
@@ -205,15 +201,6 @@ namespace Latios
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         private static void CheckUIntMinMax(uint4 minInclusive, uint4 maxExclusive)
-        {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (math.any(minInclusive > maxExclusive))
-                throw new System.ArgumentException("minInclusive must be less than or equal to maxExclusive");
-#endif
-        }
-
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        private static void CheckFloatMinMax(float4 minInclusive, float4 maxExclusive)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (math.any(minInclusive > maxExclusive))

@@ -72,15 +72,15 @@ namespace Latios.Psyshock
 
                     if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
                     {
-                        layerIndices[dst] = layer.bucketStartsAndCounts.Length - 1;
+                        layerIndices[dst] = IndexStrategies.NanBucketIndex(layer.cellCount);
                     }
                     else if (math.all(minBucket == maxBucket))
                     {
-                        layerIndices[dst] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                        layerIndices[dst] = IndexStrategies.CellIndexFromSubdivisionIndices(minBucket, layer.worldSubdivisionsPerAxis);
                     }
                     else
                     {
-                        layerIndices[dst] = layer.bucketStartsAndCounts.Length - 2;
+                        layerIndices[dst] = IndexStrategies.CrossBucketIndex(layer.cellCount);
                     }
                 }
             }
@@ -182,15 +182,15 @@ namespace Latios.Psyshock
 
                     if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
                     {
-                        layerIndices[index] = layer.bucketStartsAndCounts.Length - 1;
+                        layerIndices[index] = IndexStrategies.NanBucketIndex(layer.cellCount);
                     }
                     else if (math.all(minBucket == maxBucket))
                     {
-                        layerIndices[index] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                        layerIndices[index] = IndexStrategies.CellIndexFromSubdivisionIndices(minBucket, layer.worldSubdivisionsPerAxis);
                     }
                     else
                     {
-                        layerIndices[index] = layer.bucketStartsAndCounts.Length - 2;
+                        layerIndices[index] = IndexStrategies.CrossBucketIndex(layer.cellCount);
                     }
                 }
             }
@@ -255,15 +255,15 @@ namespace Latios.Psyshock
 
                 if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
                 {
-                    layerIndices[i] = layer.bucketStartsAndCounts.Length - 1;
+                    layerIndices[i] = IndexStrategies.NanBucketIndex(layer.cellCount);
                 }
                 else if (math.all(minBucket == maxBucket))
                 {
-                    layerIndices[i] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                    layerIndices[i] = IndexStrategies.CellIndexFromSubdivisionIndices(minBucket, layer.worldSubdivisionsPerAxis);
                 }
                 else
                 {
-                    layerIndices[i] = layer.bucketStartsAndCounts.Length - 2;
+                    layerIndices[i] = IndexStrategies.CrossBucketIndex(layer.cellCount);
                 }
             }
         }
@@ -298,15 +298,15 @@ namespace Latios.Psyshock
 
                 if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
                 {
-                    layerIndices[i] = layer.bucketStartsAndCounts.Length - 1;
+                    layerIndices[i] = IndexStrategies.NanBucketIndex(layer.cellCount);
                 }
                 else if (math.all(minBucket == maxBucket))
                 {
-                    layerIndices[i] = (minBucket.x * layer.worldSubdivisionsPerAxis.y + minBucket.y) * layer.worldSubdivisionsPerAxis.z + minBucket.z;
+                    layerIndices[i] = IndexStrategies.CellIndexFromSubdivisionIndices(minBucket, layer.worldSubdivisionsPerAxis);
                 }
                 else
                 {
-                    layerIndices[i] = layer.bucketStartsAndCounts.Length - 2;
+                    layerIndices[i] = IndexStrategies.CrossBucketIndex(layer.cellCount);
                 }
             }
         }
@@ -378,7 +378,7 @@ namespace Latios.Psyshock
 
             public void Execute()
             {
-                for (int i = 0; i < bucketStartAndCounts.Length - 1; i++)
+                for (int i = 0; i < IndexStrategies.BucketCountWithoutNaNFromBucketCountWithNaN(bucketStartAndCounts.Length); i++)
                     Execute(i);
             }
 
@@ -392,24 +392,6 @@ namespace Latios.Psyshock
                 BuildEytzingerIntervalTree(tree, intSlice, xMinMaxs);
             }
         }
-
-        //Parallel
-        //Sort buckets using Unity's sort (may be better for smaller counts, needs more analysis)
-        /*[BurstCompile]
-           public struct Part4UnityJob : IJobFor
-           {
-            [NativeDisableParallelForRestriction] public NativeArray<int>   unsortedSrcIndices;
-            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<float> xmins;
-            [ReadOnly] public NativeArray<int2>                             bucketStartAndCounts;
-
-            public void Execute(int i)
-            {
-                var startAndCount = bucketStartAndCounts[i];
-
-                var intSlice = unsortedSrcIndices.Slice(startAndCount.x, startAndCount.y);
-                UnitySortBucket(intSlice, xmins);
-            }
-           }*/
 
         // Parallel
         // Copy AoS data to SoA layer
@@ -685,43 +667,6 @@ namespace Latios.Psyshock
             for (int i = 0; i < layer.count; i++)
             {
                 p5.Execute(i);
-            }
-        }
-        #endregion
-
-        #region UnitySortBucket
-        private struct Ranker : System.IComparable<Ranker>
-        {
-            public float key;
-            public int   index;
-
-            public int CompareTo(Ranker other)
-            {
-                return key.CompareTo(other.key);
-            }
-        }
-
-        private static void UnitySortBucket(NativeSlice<int> unsortedSrcIndices, NativeArray<float> xmins)
-        {
-            var count = unsortedSrcIndices.Length;
-            if (count <= 1)
-                return;
-
-            var ranks = new NativeArray<Ranker>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            for (int i = 0; i < count; i++)
-            {
-                ranks[i] = new Ranker
-                {
-                    index = unsortedSrcIndices[i],
-                    key   = xmins[unsortedSrcIndices[i]]
-                };
-            }
-
-            ranks.Sort();
-
-            for (int i = 0; i < count; i++)
-            {
-                unsortedSrcIndices[i] = ranks[i].index;
             }
         }
         #endregion

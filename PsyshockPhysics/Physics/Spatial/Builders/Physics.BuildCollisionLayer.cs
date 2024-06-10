@@ -82,8 +82,7 @@ namespace Latios.Psyshock
         internal bool usesLists;
 
         /// <summary>
-        /// The default CollisionLayerSettings used when none is specified.
-        /// These settings divide the world into 8 cells associated with the 8 octants of world space
+        /// See CollisionLayerSettings.kDefault. This will be removed in a future release.
         /// </summary>
         public static readonly CollisionLayerSettings defaultSettings = new CollisionLayerSettings
         {
@@ -116,7 +115,7 @@ namespace Latios.Psyshock
                 query        = query,
                 typeGroup    = new BuildCollisionLayerTypeHandles(system),
                 hasQueryData = true,
-                settings     = BuildCollisionLayerConfig.defaultSettings,
+                settings     = CollisionLayerSettings.kDefault,
             };
             return config;
         }
@@ -134,7 +133,7 @@ namespace Latios.Psyshock
                 query        = query,
                 typeGroup    = new BuildCollisionLayerTypeHandles(ref system),
                 hasQueryData = true,
-                settings     = BuildCollisionLayerConfig.defaultSettings,
+                settings     = CollisionLayerSettings.kDefault,
             };
             return config;
         }
@@ -152,7 +151,7 @@ namespace Latios.Psyshock
                 query        = query,
                 typeGroup    = requiredTypeHandles,
                 hasQueryData = true,
-                settings     = BuildCollisionLayerConfig.defaultSettings,
+                settings     = CollisionLayerSettings.kDefault,
             };
             return config;
         }
@@ -167,7 +166,7 @@ namespace Latios.Psyshock
             {
                 bodiesArray    = bodies,
                 hasBodiesArray = true,
-                settings       = BuildCollisionLayerConfig.defaultSettings,
+                settings       = CollisionLayerSettings.kDefault,
             };
             return config;
         }
@@ -186,7 +185,7 @@ namespace Latios.Psyshock
                 bodiesArray    = bodies,
                 hasAabbsArray  = true,
                 hasBodiesArray = true,
-                settings       = BuildCollisionLayerConfig.defaultSettings
+                settings       = CollisionLayerSettings.kDefault
             };
             return config;
         }
@@ -203,7 +202,7 @@ namespace Latios.Psyshock
                 bodiesList     = bodies,
                 hasBodiesArray = true,
                 usesLists      = true,
-                settings       = BuildCollisionLayerConfig.defaultSettings,
+                settings       = CollisionLayerSettings.kDefault,
             };
             return config;
         }
@@ -226,7 +225,7 @@ namespace Latios.Psyshock
                 hasAabbsArray  = true,
                 hasBodiesArray = true,
                 usesLists      = true,
-                settings       = BuildCollisionLayerConfig.defaultSettings
+                settings       = CollisionLayerSettings.kDefault
             };
             return config;
         }

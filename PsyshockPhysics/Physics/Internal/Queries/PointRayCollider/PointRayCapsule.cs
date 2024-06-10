@@ -192,6 +192,25 @@ namespace Latios.Psyshock
                 return DistanceBetween(point, sphere, maxDistance, out result);
             }
            }*/
+
+        internal static float3 CapsuleNormalFromFeatureCode(ushort featureCode, in CapsuleCollider capsule, float3 csoOutwardDir)
+        {
+            if (featureCode < 0x4000)
+                return math.normalize(csoOutwardDir);
+
+            var axis = capsule.pointB - capsule.pointA;
+            return math.mul(quaternion.LookRotationSafe(axis, csoOutwardDir), math.up());
+        }
+
+        internal static ushort FeatureCodeFromGjk(byte count, byte a)
+        {
+            return count switch
+                   {
+                       1 => a,
+                       2 => 0x4000,
+                       _ => a
+                   };
+        }
     }
 }
 

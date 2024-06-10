@@ -107,9 +107,7 @@ namespace Latios.Kinemation
     {
         public static void NormalizeBone(ref this TransformQvvs localTransform)
         {
-            var w = math.asfloat(localTransform.worldIndex);
-            if (w == 1f)
-                return;
+            var w           = math.asfloat(localTransform.worldIndex);
             w               = 1 / w;
             ref var t       = ref UnsafeUtility.As<TransformQvvs, AclUnity.Qvvs>(ref localTransform);
             t.rotation      = math.normalize(t.rotation);

@@ -27,13 +27,14 @@ namespace Latios.Psyshock
                 {
                     for (int k = minBucket.z; k <= maxBucket.z; k++)
                     {
-                        var bucketIndex = (i * layer.worldSubdivisionsPerAxis.y + j) * layer.worldSubdivisionsPerAxis.z + k;
+                        var bucketIndex = IndexStrategies.CellIndexFromSubdivisionIndices(new int3(i, j, k), layer.worldSubdivisionsPerAxis);
                         AabbSweepBucket(in aabb, in layer, layer.GetBucketSlices(bucketIndex), ref processor);
                     }
                 }
             }
 
-            AabbSweepBucket(in aabb, in layer, layer.GetBucketSlices(layer.bucketCount - 1), ref processor);
+            var crossBucketIndex = IndexStrategies.CrossBucketIndex(layer.cellCount);
+            AabbSweepBucket(in aabb, in layer, layer.GetBucketSlices(crossBucketIndex), ref processor);
         }
 
         private static void AabbSweepBucket<T>(in Aabb aabb, in CollisionLayer layer, in BucketSlices bucket, ref T processor) where T : struct, IFindObjectsProcessor
@@ -316,7 +317,7 @@ namespace Latios.Psyshock
                     }
                 }
 
-                var bucketIndex = (m_bucketIjk.x * m_result.layer.worldSubdivisionsPerAxis.y + m_bucketIjk.y) * m_result.layer.worldSubdivisionsPerAxis.z + m_bucketIjk.z;
+                var bucketIndex = IndexStrategies.CellIndexFromSubdivisionIndices(m_bucketIjk, m_result.layer.worldSubdivisionsPerAxis);
                 m_bucket        = m_result.layer.GetBucketSlices(bucketIndex);
                 m_result        = new FindObjectsResult(in m_result.layer, in m_bucket, bucketIndex, false);
 

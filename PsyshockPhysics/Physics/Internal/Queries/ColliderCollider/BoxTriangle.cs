@@ -25,28 +25,17 @@ namespace Latios.Psyshock
             // Todo: SAT algorithm similar to box vs box.
             var bInATransform = math.mul(math.inverse(triangleTransform), boxTransform);
             var gjkResult     = GjkEpa.DoGjkEpa(triangle, box, in bInATransform);
-            var epsilon       = gjkResult.normalizedOriginToClosestCsoPoint * math.select(-1e-4f, 1e-4f, gjkResult.distance < 0f);
-            SphereTriangle.DistanceBetween(in triangle,
-                                           in RigidTransform.identity,
-                                           new SphereCollider(gjkResult.hitpointOnAInASpace + epsilon, 0f),
-                                           RigidTransform.identity,
-                                           float.MaxValue,
-                                           out var closestOnA);
-            SphereBox.DistanceBetween(in box,
-                                      in bInATransform,
-                                      new SphereCollider(gjkResult.hitpointOnBInASpace - epsilon, 0f),
-                                      RigidTransform.identity,
-                                      float.MaxValue,
-                                      out var closestOnB);
-            result = InternalQueryTypeUtilities.BinAResultToWorld(new ColliderDistanceResultInternal
+            var featureCodeA  = PointRayTriangle.FeatureCodeFromGjk(gjkResult.simplexAVertexCount, gjkResult.simplexAVertexA, gjkResult.simplexAVertexB);
+            var featureCodeB  = PointRayBox.FeatureCodeFromGjk(gjkResult.simplexBVertexCount, gjkResult.simplexBVertexA, gjkResult.simplexBVertexB, gjkResult.simplexBVertexC);
+            result            = InternalQueryTypeUtilities.BinAResultToWorld(new ColliderDistanceResultInternal
             {
                 distance     = gjkResult.distance,
                 hitpointA    = gjkResult.hitpointOnAInASpace,
                 hitpointB    = gjkResult.hitpointOnBInASpace,
-                normalA      = closestOnA.normalA,
-                normalB      = closestOnB.normalA,
-                featureCodeA = closestOnA.featureCodeA,
-                featureCodeB = closestOnB.featureCodeA
+                normalA      = PointRayTriangle.TriangleNormalFromFeatureCode(featureCodeA, in triangle, -gjkResult.normalizedOriginToClosestCsoPoint),
+                normalB      = math.rotate(bInATransform.rot, PointRayBox.BoxNormalFromFeatureCode(featureCodeB)),
+                featureCodeA = featureCodeA,
+                featureCodeB = featureCodeB
             }, triangleTransform);
             return result.distance <= maxDistance;
         }
@@ -201,7 +190,9 @@ namespace Latios.Psyshock
                     };
                     edgeDirectionA      = math.rotate(aInBTransform.rot, edgeDirectionA);
                     aLocalContactNormal = math.normalize(math.cross(edgeDirectionA, edgeDirectionB));
-                    aLocalContactNormal = math.select(aLocalContactNormal, -aLocalContactNormal, math.dot(aLocalContactNormal, distanceResult.normalB) > 0f);
+                    aLocalContactNormal = math.select(aLocalContactNormal,
+                                                      -aLocalContactNormal,
+                                                      math.dot(math.rotate(boxTransform.rot, aLocalContactNormal), distanceResult.normalB) > 0f);
                     break;
                 }
                 case 2:  // A point and B face
@@ -230,7 +221,9 @@ namespace Latios.Psyshock
                     // For B edge, this can only happen due to some bizarre precision issues.
                     // But we'll handle it anyways by just using the face normal of A.
                     aLocalContactNormal = math.normalize(math.cross(triangleInB.pointB - triangleInB.pointA, triangleInB.pointC - triangleInB.pointA));
-                    aLocalContactNormal = math.select(aLocalContactNormal, -aLocalContactNormal, math.dot(aLocalContactNormal, distanceResult.normalA) < 0f);
+                    aLocalContactNormal = math.select(aLocalContactNormal,
+                                                      -aLocalContactNormal,
+                                                      math.dot(math.rotate(boxTransform.rot, aLocalContactNormal), distanceResult.normalA) < 0f);
                     break;
                 }
                 default:

@@ -1,4 +1,6 @@
+using System;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -567,6 +569,233 @@ namespace Latios.Psyshock
             }
             fraction = 2f;
             return false;
+        }
+
+        internal static float3 ConvexNormalFromFeatureCode(ushort featureCode, in ConvexCollider convex, float3 csoOutwardDir)
+        {
+            var nonzeroScales  = new bool4(convex.scale != 0f, false);
+            var nonzeroBitmask = math.bitmask(nonzeroScales);
+            var dimensions     = math.countbits(nonzeroBitmask);
+            if (Hint.Likely(dimensions == 3))
+            {
+                ref var blob  = ref convex.convexColliderBlob.Value;
+                var     index = featureCode & 0x3fff;
+                if (featureCode >= 0x8000)
+                    return new float3(blob.facePlaneX[index], blob.facePlaneY[index], blob.facePlaneZ[index]);
+                if (featureCode >= 0x4000)
+                    return blob.edgeNormals[index];
+                var result = math.normalizesafe(blob.vertexNormals[index] / convex.scale);
+                if (Hint.Likely(!result.Equals(float3.zero)))
+                    return result;
+
+                nonzeroScales.xyz = math.isfinite(1f / convex.scale);
+                if (math.all(nonzeroScales.xyz))
+                    nonzeroScales.xyz = math.cmin(math.abs(convex.scale)) != math.abs(convex.scale);
+                nonzeroBitmask        = math.bitmask(nonzeroScales);
+                dimensions            = math.countbits(nonzeroBitmask);
+            }
+            if (dimensions == 0)
+                return math.normalizesafe(csoOutwardDir, math.up());
+            if (dimensions == 1)
+            {
+                if (featureCode >= 0x4000)
+                    return math.normalize(csoOutwardDir * math.select(1f, 0f, nonzeroScales.xyz));
+                var positiveNormal = math.select(0f, 1f, nonzeroScales).xyz;
+                return math.select(-positiveNormal, positiveNormal, (featureCode == 1) ^ math.any(nonzeroScales.xyz & (convex.scale < 0f)));
+            }
+            // if (dimensions == 2)
+            {
+                var positiveNormal = math.select(1f, 0f, nonzeroScales).xyz;
+                if (featureCode >= 0x8000)
+                    return math.select(positiveNormal, -positiveNormal, math.dot(positiveNormal, csoOutwardDir) < 0f);
+
+                ref var blob          = ref convex.convexColliderBlob.Value;
+                ref var vertexIndices = ref blob.xy2DVertexIndices;
+                if (!nonzeroScales.y)
+                    vertexIndices = ref blob.xz2DVertexIndices;
+                if (!nonzeroScales.z)
+                    vertexIndices = ref blob.yz2DVertexIndices;
+
+                var featureIndex  = featureCode & 0x3fff;
+                var currentIndex  = vertexIndices[featureIndex];
+                var currentVertex = convex.scale * new float3(blob.verticesX[currentIndex], blob.verticesY[currentIndex], blob.verticesZ[currentIndex]);
+                var previousIndex = featureIndex - 1;
+                if (previousIndex < 0)
+                    previousIndex  += vertexIndices.Length;
+                previousIndex       = vertexIndices[previousIndex];
+                var previousVertex  = convex.scale * new float3(blob.verticesX[previousIndex], blob.verticesY[currentIndex], blob.verticesZ[currentIndex]);
+                var nextIndex       = featureIndex + 1;
+                if (nextIndex >= vertexIndices.Length)
+                    nextIndex  = 0;
+                nextIndex      = vertexIndices[nextIndex];
+                var nextVertex = convex.scale * new float3(blob.verticesX[nextIndex], blob.verticesY[nextIndex], blob.verticesZ[nextIndex]);
+
+                if (featureCode < 0x4000)
+                {
+                    var result = math.normalizesafe(currentVertex - previousVertex + currentVertex - nextVertex);
+                    if (!result.Equals(float3.zero))
+                        return result;
+
+                    var normalScaleFactor = math.select(0f, 1f, nonzeroScales.xyz) / math.select(1f, convex.scale, nonzeroScales.xyz);
+                    return math.normalize(normalScaleFactor * blob.vertexNormals[currentIndex]);
+                }
+
+                {
+                    var result = math.normalize(math.cross(nextVertex - currentVertex, positiveNormal));
+                    return math.select(result, -result, math.dot(result, currentVertex - previousVertex) < 0f);
+                }
+            }
+        }
+
+        internal static ushort FeatureCodeFromGjk(byte count, byte a, byte b, byte c, in ConvexCollider convex)
+        {
+            var nonzeroScales  = new bool4(convex.scale != 0f, false);
+            var nonzeroBitmask = math.bitmask(nonzeroScales);
+            var dimensions     = math.countbits(nonzeroBitmask);
+            if (Hint.Likely(dimensions == 3))
+            {
+                ref var blob = ref convex.convexColliderBlob.Value;
+                switch (count)
+                {
+                    case 1:
+                    {
+                        return a;
+                    }
+                    case 2:
+                    {
+                        var faceStartAndCount = blob.faceIndicesByVertexStartsAndCounts[a];
+                        for (int faceWithVertex = 0; faceWithVertex < faceStartAndCount.count; faceWithVertex++)
+                        {
+                            var  faceIndex         = blob.faceIndicesByVertex[faceWithVertex + faceStartAndCount.start];
+                            bool foundA            = false;
+                            bool foundB            = false;
+                            var  edgeStartAndCount = blob.edgeIndicesInFacesStartsAndCounts[faceIndex];
+                            for (int edgeInFace = 0; edgeInFace < edgeStartAndCount.count; edgeInFace++)
+                            {
+                                var  edgeIndex = blob.edgeIndicesInFaces[edgeInFace + edgeStartAndCount.start];
+                                var  edge      = blob.vertexIndicesInEdges[edgeIndex.index];
+                                bool isA       = a == edge.x || a == edge.y;
+                                bool isB       = a == edge.x || a == edge.y;
+                                if (isA && isB)
+                                {
+                                    // This is our edge.
+                                    return (ushort)(0x4000 + edgeIndex.index);
+                                }
+                                foundA |= isA;
+                                foundB |= isB;
+                            }
+                            if (foundA && foundB)
+                            {
+                                // We managed to hit an interior edge of the face.
+                                return (ushort)(0x8000 + faceIndex);
+                            }
+                        }
+                        // We must have hit some interior edge. This should never happen.
+                        return a;
+                    }
+                    case 3:
+                    {
+                        var         aStartAndCount = blob.faceIndicesByVertexStartsAndCounts[a];
+                        var         bStartAndCount = blob.faceIndicesByVertexStartsAndCounts[b];
+                        var         cStartAndCount = blob.faceIndicesByVertexStartsAndCounts[c];
+                        Span<ulong> bits           = stackalloc ulong[8];
+                        bits.Clear();
+                        for (int aWithVertex = 0; aWithVertex < aStartAndCount.count; aWithVertex++)
+                        {
+                            var faceIndex  = blob.faceIndicesByVertex[aWithVertex + aStartAndCount.start];
+                            var index      = faceIndex >> 6;
+                            var bit        = faceIndex & 0x3f;
+                            bits[index]   |= 1ul << bit;
+                        }
+                        var bitsLatter = bits.Slice(4, 4);
+                        for (int bWithVertex = 0; bWithVertex < bStartAndCount.count; bWithVertex++)
+                        {
+                            var faceIndex      = blob.faceIndicesByVertex[bWithVertex + bStartAndCount.start];
+                            var index          = faceIndex >> 6;
+                            var bit            = faceIndex & 0x3f;
+                            bitsLatter[index] |= 1ul << bit;
+                        }
+                        for (int i = 0; i < 4; i++)
+                            bits[i] &= bitsLatter[i];
+                        bitsLatter.Clear();
+                        for (int cWithVertex = 0; cWithVertex < cStartAndCount.count; cWithVertex++)
+                        {
+                            var faceIndex      = blob.faceIndicesByVertex[cWithVertex + cStartAndCount.start];
+                            var index          = faceIndex >> 6;
+                            var bit            = faceIndex & 0x3f;
+                            bitsLatter[index] |= 1ul << bit;
+                        }
+                        for (int i = 0; i < 4; i++)
+                        {
+                            bits[i] &= bitsLatter[i];
+                            if (bits[i] != 0)
+                            {
+                                return (ushort)(0x8000 + (i << 6) + math.tzcnt(bits[i]));
+                            }
+                        }
+                        // We must have hit some interior face. This should never happen.
+                        return a;
+                    }
+                    default: return a;  // Max is 3.
+                }
+            }
+            if (dimensions == 0)
+            {
+                return 0;
+            }
+            if (dimensions == 1)
+            {
+                if (count == 2)
+                    return (ushort)(0x4000 + math.tzcnt(nonzeroBitmask));
+                ref var vertexOrdinates = ref convex.convexColliderBlob.Value.verticesX;
+                if (nonzeroScales.y)
+                    vertexOrdinates = ref convex.convexColliderBlob.Value.verticesY;
+                if (nonzeroScales.z)
+                    vertexOrdinates = ref convex.convexColliderBlob.Value.verticesZ;
+                for (int i = 0; i < vertexOrdinates.Length; i++)
+                    if (vertexOrdinates[i] > vertexOrdinates[a])
+                        return 1;
+                return 0;
+            }
+            // if (dimensions == 2)
+            {
+                ref var blob          = ref convex.convexColliderBlob.Value;
+                ref var vertexIndices = ref blob.xy2DVertexIndices;
+                if (!nonzeroScales.y)
+                    vertexIndices = ref blob.xz2DVertexIndices;
+                if (!nonzeroScales.z)
+                    vertexIndices = ref blob.yz2DVertexIndices;
+
+                int foundIndex = -1;
+                for (int i = 0; i < vertexIndices.Length; i++)
+                {
+                    if (vertexIndices[i] == a)
+                    {
+                        foundIndex = i;
+                        break;
+                    }
+                }
+
+                if (foundIndex < 0)
+                    return 0x8000; // We hit an interior point, which is the face
+                if (count == 1)
+                    return (ushort)foundIndex;
+
+                var beforeIndex = foundIndex - 1;
+                if (beforeIndex < 0)
+                    beforeIndex += vertexIndices.Length;
+                if (vertexIndices[beforeIndex] == b)
+                    return (ushort)(0x4000 + beforeIndex);
+
+                var afterIndex = foundIndex + 1;
+                if (afterIndex == vertexIndices.Length)
+                    afterIndex -= vertexIndices.Length;
+                if (vertexIndices[afterIndex] == b)
+                    return (ushort)(0x4000 + foundIndex);
+
+                // We hit a diagonal, which is the face
+                return 0x8000;
+            }
         }
 
         internal static void BestFacePlane(ref ConvexColliderBlob blob, float3 localDirectionToAlign, ushort featureCode, out Plane facePlane, out int faceIndex, out int edgeCount)

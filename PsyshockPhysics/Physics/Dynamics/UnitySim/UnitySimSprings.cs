@@ -6,8 +6,8 @@ namespace Latios.Psyshock
 {
     public static partial class UnitySim
     {
-        public static float kStiffSpringFrequency = 74341.31f;
-        public static float kStiffDampingRatio    = 2530.126f;
+        public const float kStiffSpringFrequency = 74341.31f;
+        public const float kStiffDampingRatio    = 2530.126f;
 
         public static float SpringFrequencyFrom(float springConstant, float inverseMass)
         {

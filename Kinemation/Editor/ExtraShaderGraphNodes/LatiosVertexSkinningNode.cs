@@ -281,7 +281,7 @@ namespace Latios.Kinemation.Editor.ShaderGraphNodes
             string algo = algorithm switch
             {
                 Algorithm.Matrix => "Matrix",
-                //Algorithm.DualQuaternion => "Dqs",
+                Algorithm.DualQuaternion => "Dqs",
                 _ => "What???",
             };
 

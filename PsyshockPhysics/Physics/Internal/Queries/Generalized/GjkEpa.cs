@@ -12,16 +12,20 @@ namespace Latios.Psyshock
 {
     internal static class GjkEpa
     {
-        // Todo: It would be nice if we could get the real normals out of Gjk,
-        // but due to precision issues, we could slide off a key feature during barycentric sampling.
-        // Fortunately, with the hit points, we can use point queries to extract the normals.
-        // But this means we can't use Gjk for point vs convex mesh distance queries
         public struct GjkResult
         {
             public float  distance;
             public float3 hitpointOnAInASpace;
             public float3 hitpointOnBInASpace;
-            public float3 normalizedOriginToClosestCsoPoint;
+            public float3 normalizedOriginToClosestCsoPoint;  // Points from B to A
+            public byte   simplexAVertexCount;
+            public byte   simplexAVertexA;
+            public byte   simplexAVertexB;
+            public byte   simplexAVertexC;
+            public byte   simplexBVertexCount;
+            public byte   simplexBVertexA;
+            public byte   simplexBVertexB;
+            public byte   simplexBVertexC;
         }
 
         // From Unity.Physics ConvexConvexDistance.cs
@@ -347,11 +351,62 @@ namespace Latios.Psyshock
             // Patch distance with radius
             float radialA                             = MinkowskiSupports.GetRadialPadding(colliderA);
             float radialB                             = MinkowskiSupports.GetRadialPadding(colliderB);
-            result.hitpointOnAInASpace               += normalizedOriginToClosestCsoPoint * radialA;
+            result.hitpointOnAInASpace               -= normalizedOriginToClosestCsoPoint * radialA;
             result.distance                          -= radialA;
             result.distance                          -= radialB;
             result.hitpointOnBInASpace                = result.hitpointOnAInASpace - normalizedOriginToClosestCsoPoint * result.distance;
             result.normalizedOriginToClosestCsoPoint  = normalizedOriginToClosestCsoPoint;
+
+            // Extract simplex vertices
+            var   ids           = new uint4(simplex.a.id, simplex.b.id, simplex.c.id, simplex.d.id);
+            uint4 compressedIDs = default;
+            math.compress(&compressedIDs.x, 0, ids, coordinates != math.cmin(coordinates));
+            uint4 aIds = compressedIDs >> 16;
+            uint4 bIds = compressedIDs & 0xff;
+
+            result.simplexAVertexA = (byte)aIds.x;
+            if (aIds.x != aIds.y)
+            {
+                result.simplexAVertexB = (byte)aIds.y;
+                if (aIds.x != aIds.z && aIds.y != aIds.z)
+                {
+                    result.simplexAVertexC     = (byte)aIds.z;
+                    result.simplexAVertexCount = 3;
+                }
+                else
+                    result.simplexAVertexCount = 2;
+            }
+            else if (aIds.x != aIds.z)
+            {
+                result.simplexAVertexB     = (byte)aIds.z;
+                result.simplexAVertexCount = 2;
+            }
+            else
+                result.simplexBVertexCount = 1;
+
+            result.simplexBVertexA = (byte)bIds.x;
+            if (bIds.x != bIds.y)
+            {
+                result.simplexBVertexB = (byte)bIds.y;
+                if (bIds.x != bIds.z && bIds.y != bIds.z)
+                {
+                    result.simplexBVertexC     = (byte)bIds.z;
+                    result.simplexBVertexCount = 3;
+                }
+                else
+                    result.simplexBVertexCount = 2;
+            }
+            else if (bIds.x != bIds.z)
+            {
+                result.simplexBVertexB     = (byte)bIds.z;
+                result.simplexBVertexCount = 2;
+            }
+            else
+                result.simplexBVertexCount = 1;
+
+            result.simplexAVertexCount = (byte)math.min(result.simplexAVertexCount, simplex.numVertices);
+            result.simplexBVertexCount = (byte)math.min(result.simplexBVertexCount, simplex.numVertices);
+
             return result;
         }
 

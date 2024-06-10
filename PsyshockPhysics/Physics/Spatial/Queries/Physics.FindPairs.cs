@@ -147,19 +147,14 @@ namespace Latios.Psyshock
             get
             {
                 CheckCanGenerateParallelPairKey();
-                int factor = 1;
-                if (jobIndex >= layerA.bucketCount)
-                    factor++;
-                if (jobIndex >= 2 * layerA.bucketCount - 1)
-                    factor++;
                 return new PairStream.ParallelWriteKey
                 {
                     entityA             = bodyA.entity,
                     entityB             = bodyB.entity,
-                    streamIndexA        = m_bucketIndexA * factor,
-                    streamIndexB        = m_bucketIndexB * factor,
-                    streamIndexCombined = 2 * layerA.bucketCount + jobIndex,
-                    expectedBucketCount = layerA.bucketCount
+                    streamIndexA        = IndexStrategies.BucketStreamIndexFromFindPairsJobIndex(m_bucketIndexA, m_jobIndex, layerA.cellCount),
+                    streamIndexB        = IndexStrategies.BucketStreamIndexFromFindPairsJobIndex(m_bucketIndexB, m_jobIndex, layerA.cellCount),
+                    streamIndexCombined = IndexStrategies.MixedStreamIndexFromFindPairsJobIndex(jobIndex, layerA.cellCount),
+                    cellCount           = layerA.cellCount
                 };
             }
         }
@@ -328,19 +323,14 @@ namespace Latios.Psyshock
             CheckSafeEntityInRange(bIndex, bucketStartB, bucketCountB);
             CheckCanGenerateParallelPairKey();
 
-            int factor = 1;
-            if (jobIndex >= layerA.bucketCount)
-                factor++;
-            if (jobIndex >= 2 * layerA.bucketCount - 1)
-                factor++;
             return new PairStream.ParallelWriteKey
             {
                 entityA             = layerA.bodies[aIndex].entity,
                 entityB             = layerB.bodies[bIndex].entity,
-                streamIndexA        = m_bucketIndexA * factor,
-                streamIndexB        = m_bucketIndexB * factor,
-                streamIndexCombined = 2 * layerA.bucketCount + jobIndex,
-                expectedBucketCount = layerA.bucketCount
+                streamIndexA        = IndexStrategies.BucketStreamIndexFromFindPairsJobIndex(m_bucketIndexA, m_jobIndex, layerA.cellCount),
+                streamIndexB        = IndexStrategies.BucketStreamIndexFromFindPairsJobIndex(m_bucketIndexB, m_jobIndex, layerA.cellCount),
+                streamIndexCombined = IndexStrategies.MixedStreamIndexFromFindPairsJobIndex(jobIndex, layerA.cellCount),
+                cellCount           = layerA.cellCount
             };
         }
 
@@ -494,7 +484,7 @@ namespace Latios.Psyshock
         /// <param name="layer">The layer that would be used in a FindPairs operation</param>
         /// <returns>A value defining the number of job indices that will be used by the FindPairs operation.
         /// Every jobIndex will be less than this value.</returns>
-        public static int FindPairsJobIndexCount(in CollisionLayer layer) => 2 * layer.bucketCount - 1;
+        public static int FindPairsJobIndexCount(in CollisionLayer layer) => IndexStrategies.JobIndicesFromSingleLayerFindPairs(layer.cellCount);
         /// <summary>
         /// Returns the number of job indices that would be used on a FindPairs operation with these layers.
         /// This can be used for allocating the correct size NativeStream and using the optional BeginBucket()
@@ -504,7 +494,11 @@ namespace Latios.Psyshock
         /// <param name="layerB">The second layer that would be used in a FindPairs operation</param>
         /// <returns>A value defining the number of job indices that will be used by the FindPairs operation.
         /// Every jobIndex will be less than this value.</returns>
-        public static int FindPairsJobIndexCount(in CollisionLayer layerA, in CollisionLayer layerB) => 3 * layerA.bucketCount - 2;
+        public static int FindPairsJobIndexCount(in CollisionLayer layerA, in CollisionLayer layerB)
+        {
+            CheckLayersAreCompatible(in layerA, in layerB);
+            return IndexStrategies.JobIndicesFromDualLayerFindPairs(layerA.cellCount);
+        }
 
         internal static readonly Unity.Profiling.ProfilerMarker kCellMarker  = new Unity.Profiling.ProfilerMarker("Cell");
         internal static readonly Unity.Profiling.ProfilerMarker kCrossMarker = new Unity.Profiling.ProfilerMarker("Cross");
@@ -610,11 +604,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads in multiple phases.
+        /// If the CollisionLayer only contains a single cell (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>The final JobHandle for the scheduled jobs</returns>
         public JobHandle ScheduleParallel(JobHandle inputDeps = default)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layer.cellCount))
+                return ScheduleSingle(inputDeps);
+
             if (useCrossCache)
             {
                 Physics.WarnCrossCacheUnused();
@@ -627,11 +625,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads all at once without entity or body index thread-safety.
+        /// If the CollisionLayer only contains a single cell (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>A JobHandle for the scheduled job</returns>
         public JobHandle ScheduleParallelUnsafe(JobHandle inputDeps = default)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layer.cellCount))
+                return ScheduleSingle(inputDeps);
+
             if (disableEntityAliasChecks)
             {
                 Physics.WarnEntityAliasingUnchecked();
@@ -729,11 +731,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads in multiple phases.
+        /// If the CollisionLayers only contains a single cell each (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>The final JobHandle for the scheduled jobs</returns>
         public JobHandle ScheduleParallel(JobHandle inputDeps = default)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layerA.cellCount))
+                return ScheduleSingle(inputDeps);
+
             if (useCrossCache)
             {
                 Physics.WarnCrossCacheUnused();
@@ -750,11 +756,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads in a single phase, without safe write access to the second layer.
+        /// If the CollisionLayers only contains a single cell each (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>A JobHandle for the scheduled job</returns>
         public JobHandle ScheduleParallelByA(JobHandle inputDeps = default)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layerA.cellCount))
+                return ScheduleSingle(inputDeps);
+
             var scheduleMode = ScheduleMode.ParallelByA;
             if (disableEntityAliasChecks)
                 scheduleMode |= ScheduleMode.AllowEntityAliasing;
@@ -765,11 +775,15 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads all at once without entity or body index thread-safety.
+        /// If the CollisionLayers only contains a single cell each (all subdivisions == 1), this falls back to ScheduleSingle().
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>A JobHandle for the scheduled job</returns>
         public JobHandle ScheduleParallelUnsafe(JobHandle inputDeps = default)
         {
+            if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layerA.cellCount))
+                return ScheduleSingle(inputDeps);
+
             if (disableEntityAliasChecks)
             {
                 Physics.WarnEntityAliasingUnchecked();

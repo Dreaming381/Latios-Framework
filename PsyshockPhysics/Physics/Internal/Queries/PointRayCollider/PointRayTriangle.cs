@@ -537,6 +537,59 @@ namespace Latios.Psyshock
             return fraction <= 1f;
         }
 
+        internal static float3 TriangleNormalFromFeatureCode(ushort featureCode, in TriangleCollider triangle, float3 csoOutwardDir)
+        {
+            var simdTri       = triangle.AsSimdFloat3();
+            var displacements = simdTri.bcad - simdTri;
+            var planeNormal   = math.normalizesafe(math.cross(displacements.a, displacements.b));
+            if (featureCode == 0x8000)
+            {
+                if (planeNormal.Equals(float3.zero))
+                {
+                    mathex.GetDualPerpendicularNormalized(planeNormal, out var result, out _);
+                    return result;
+                }
+                return math.select(planeNormal, -planeNormal, math.dot(planeNormal, csoOutwardDir) < 0f);
+            }
+            if (featureCode < 0x4000)
+            {
+                var normalizedDisplacements = simd.normalizesafe(displacements);
+                var normalize               = simd.normalize(normalizedDisplacements.cabb - normalizedDisplacements);
+                return normalize[featureCode];
+            }
+            var outwardNormals = simd.normalizesafe(simd.cross(displacements, planeNormal));
+            return outwardNormals[featureCode & 0xff];
+        }
+
+        internal static ushort FeatureCodeFromGjk(byte count, byte a, byte b)
+        {
+            switch (count)
+            {
+                case 1:
+                {
+                    return a;
+                }
+                case 2:
+                {
+                    return (a, b) switch
+                           {
+                               (0, 1) => 0x4000,  // Hit ab-edge
+                               (1, 0) => 0x4000,
+                               (1, 2) => 0x4001,  // Hit bc-edge
+                               (2, 1) => 0x4001,
+                               (2, 0) => 0x4002,  // Hit ca-edge
+                               (0, 2) => 0x4002,
+                               _ => a
+                           };
+                }
+                case 3:
+                {
+                    return 0x8000;
+                }
+                default: return a;  // Max is 3.
+            }
+        }
+
         internal static void BestFacePlanesAndVertices(in TriangleCollider triangle,
                                                        float3 localDirectionToAlign,
                                                        out simdFloat3 edgePlaneOutwardNormals,

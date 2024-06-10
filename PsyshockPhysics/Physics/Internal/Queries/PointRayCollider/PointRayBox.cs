@@ -1,4 +1,5 @@
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -278,6 +279,95 @@ namespace Latios.Psyshock
             return (ushort)math.select(featureCodeFace, math.select(featureCodeEdge, featureCodeVertex, normalsNotZeroCount == 3), normalsNotZeroCount > 1);
         }
 
+        internal static float3 BoxNormalFromFeatureCode(ushort featureCode)
+        {
+            float root2 = 1f / math.sqrt(2f);
+            float root3 = 1f / math.sqrt(3f);
+            return featureCode switch
+                   {
+                       0x0 => new float3(root3, root3, root3),
+                       0x1 => new float3(-root3, root3, root3),
+                       0x2 => new float3(root3, -root3, root3),
+                       0x3 => new float3(-root3, -root3, root3),
+                       0x4 => new float3(root3, root3, -root3),
+                       0x5 => new float3(-root3, root3, -root3),
+                       0x6 => new float3(root3, -root3, -root3),
+                       0x7 => new float3(-root3, -root3, -root3),
+                       0x4000 => new float3(0f, root2, root2),
+                       0x4001 => new float3(0f, -root2, root2),
+                       0x4002 => new float3(0f, root2, -root2),
+                       0x4003 => new float3(0f, -root2, -root2),
+                       0x4004 => new float3(root2, 0f, root2),
+                       0x4005 => new float3(-root2, 0f, root2),
+                       0x4006 => new float3(root2, 0f, -root2),
+                       0x4007 => new float3(-root2, 0f, -root2),
+                       0x4008 => new float3(root2, root2, 0f),
+                       0x4009 => new float3(-root2, root2, 0f),
+                       0x400a => new float3(root2, -root2, 0f),
+                       0x400b => new float3(-root2, -root2, 0f),
+                       0x8000 => new float3(1f, 0f, 0f),
+                       0x8001 => new float3(0f, 1f, 0f),
+                       0x8002 => new float3(0f, 0f, 1f),
+                       0x8003 => new float3(-1f, 0f, 0f),
+                       0x8004 => new float3(0f, -1f, 0f),
+                       0x8005 => new float3(0f, 0f, -1f),
+                       _ => new float3(0f, 1f, 0f)
+                   };
+        }
+
+        internal static ushort FeatureCodeFromGjk(byte count, byte a, byte b, byte c)
+        {
+            switch (count)
+            {
+                case 1:
+                {
+                    return a;
+                }
+                case 2:
+                {
+                    var xor = a ^ b;
+                    return xor switch
+                           {
+                               1 => (ushort)(0x4000 + (a >> 1)),  // Hit x-edge
+                               2 => (ushort)(0x4004 + (a & 1) + ((a >> 1) & 2)),  // Hit y-edge
+                               3 => (ushort)(0x8002 + math.select(0, 3, (a & 4) != 0)),  // Hit z face diagonal (rare)
+                               4 => (ushort)(0x4008 + (a & 3)),  // Hit z-edge
+                               5 => (ushort)(0x8001 + math.select(0, 3, (a & 2) != 0)),  // Hit y face diagonal (rare)
+                               6 => (ushort)(0x8000 + math.select(0, 3, (a & 1) != 0)),  // Hit x face diagonal (rare)
+                               _ => a,  // We hit an interior edge somehow or returned a vertex twice. This shouldn't happen.
+                           };
+                }
+                case 3:
+                {
+                    var and = a & b & c;
+                    if (and != 0)
+                    {
+                        return and switch
+                               {
+                                   1 => 0x8003,  // Hit negative x face
+                                   2 => 0x8004,  // Hit negative y face
+                                   4 => 0x8005,  // Hit negative z face
+                                   _ => a,  // Points got duplicated or something? This shouldn't happen.
+                               };
+                    }
+                    var or = a | b | c;
+                    if (or != 7)
+                    {
+                        return or switch
+                               {
+                                   3 => 0x8002,  // Hit positive z face
+                                   5 => 0x8001,  // Hit positive y face
+                                   6 => 0x8000,  // Hit positive x face
+                                   _ => a,  // Points got duplicated or something? This shouldn't happen.
+                               };
+                    }
+                    // At this point, we hit an interior triangle somehow. This shouldn't happen.
+                    return a;
+                }
+                default: return a;  // Max is 3.
+            }
+        }
+
         internal static void BestFacePlanesAndVertices(in BoxCollider box,
                                                        float3 localDirectionToAlign,
                                                        out simdFloat3 edgePlaneOutwardNormals,
@@ -311,15 +401,15 @@ namespace Latios.Psyshock
                     vertices = new simdFloat3(firstComponent, secondCompPos, ones);
                     break;
                 case 3:  // negative X
-                    plane    = new Plane(new float3(-1f, 0f, 0f), box.halfSize.x - box.center.x);
+                    plane    = new Plane(new float3(-1f, 0f, 0f), -box.halfSize.x + box.center.x);
                     vertices = new simdFloat3(-ones, firstComponent, -secondCompPos);
                     break;
                 case 4:  // negative Y
-                    plane    = new Plane(new float3(0f, -1f, 0f), box.halfSize.y - box.center.y);
+                    plane    = new Plane(new float3(0f, -1f, 0f), -box.halfSize.y + box.center.y);
                     vertices = new simdFloat3(firstComponent, -ones, -secondCompPos);
                     break;
                 case 5:  // negative Z
-                    plane    = new Plane(new float3(0f, 0f, -1f), box.halfSize.z - box.center.z);
+                    plane    = new Plane(new float3(0f, 0f, -1f), -box.halfSize.z + box.center.z);
                     vertices = new simdFloat3(firstComponent, -secondCompPos, -ones);
                     break;
                 default:  // Should not happen

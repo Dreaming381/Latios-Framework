@@ -44,7 +44,11 @@ namespace Latios.Psyshock
         /// Returns the StreamSpan as a .NET Span
         /// </summary>
         /// <returns></returns>
-        public Span<T> AsSpan() => new Span<T>(m_ptr, length);
+        public Span<T> AsSpan()
+        {
+            PairStream.CheckNotNull(m_ptr);
+            return new Span<T>(m_ptr, length);
+        }
 
         /// <summary>
         /// Implicitly converts this StreamSpan into a DynamicStreamSpan.
@@ -74,6 +78,7 @@ namespace Latios.Psyshock
         public StreamSpan<T> GetSpan<T>() where T : unmanaged
         {
             CheckTypeHash<T>();
+            PairStream.CheckNotNull(m_ptr);
             return new StreamSpan<T> { m_ptr = (T*)m_ptr, m_length = m_length };
         }
 
@@ -112,7 +117,7 @@ namespace Latios.Psyshock
         /// <param name="worldSubdivisionsPerAxis">The number of cells per axis</param>
         /// <param name="allocator">The allocator to use for the PairStream</param>
         public PairStream(int3 worldSubdivisionsPerAxis,
-                          AllocatorManager.AllocatorHandle allocator) : this(worldSubdivisionsPerAxis.x * worldSubdivisionsPerAxis.y * worldSubdivisionsPerAxis.z + 1, allocator)
+                          AllocatorManager.AllocatorHandle allocator) : this(IndexStrategies.CellCountFromSubdivisionsPerAxis(worldSubdivisionsPerAxis) + 1, allocator)
         {
         }
         /// <summary>
@@ -120,7 +125,7 @@ namespace Latios.Psyshock
         /// </summary>
         /// <param name="settings">The settings that specify the multi-box pairs will conform to</param>
         /// <param name="allocator">The allocator to use for the PairStream</param>
-        public PairStream(in CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator) : this(settings.worldSubdivisionsPerAxis + 1, allocator)
+        public PairStream(in CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator) : this(settings.worldSubdivisionsPerAxis, allocator)
         {
         }
         /// <summary>
@@ -149,18 +154,15 @@ namespace Latios.Psyshock
             AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(m_Safety, true);
 #endif
 
-            // Parallel Unsafe Bipartite uses 3n - 2 threads where n is the number of cells plus the cross bucket.
-            // However, 2n - 2 can fall into one of three different streams depending on write-access requirements.
-            // A pair can fall into the cross bucket, the cell, or a mixed stream. Thus we are at 5n - 2 streams.
-            // If we add the NaN bucket, we get 5n - 1. And if we reserve one extra slot for islanding, we get 5n.
-            int totalStreams = 5 * math.max(bucketCountExcludingNan, 1);
+            int cellCount    = IndexStrategies.CellCountFromBucketCountWithoutNaN(bucketCountExcludingNan);
+            int totalStreams = IndexStrategies.PairStreamIndexCount(cellCount);
             data             = new SharedContainerData
             {
-                pairHeaders         = new UnsafeIndexedBlockList(UnsafeUtility.SizeOf<PairHeader>(), 4096 / UnsafeUtility.SizeOf<PairHeader>(), totalStreams, allocator),
-                blockStreamArray    = AllocatorManager.Allocate<BlockStream>(allocator, totalStreams),
-                state               = AllocatorManager.Allocate<State>(allocator),
-                expectedBucketCount = bucketCountExcludingNan,
-                allocator           = allocator
+                pairHeaders      = new UnsafeIndexedBlockList(UnsafeUtility.SizeOf<PairHeader>(), 4096 / UnsafeUtility.SizeOf<PairHeader>(), totalStreams, allocator),
+                blockStreamArray = AllocatorManager.Allocate<BlockStream>(allocator, totalStreams),
+                state            = AllocatorManager.Allocate<State>(allocator),
+                cellCount        = cellCount,
+                allocator        = allocator
             };
 
             *data.state = default;
@@ -211,7 +213,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// The number of buckets in the multibox excluding NaN. This value is the same as CollisionLayer.bucketCount.
         /// </summary>
-        public int bucketCount => data.expectedBucketCount;
+        public int bucketCount => IndexStrategies.BucketCountWithoutNaN(data.cellCount);
 
         /// <summary>
         /// Adds a Pair and allocates memory in the stream for a single instance of type T. Returns a ref to T.
@@ -393,7 +395,7 @@ namespace Latios.Psyshock
                 currentHeader          = null,
                 enumerator             = data.pairHeaders.GetEnumerator(0),
                 enumeratorVersion      = data.state->enumeratorVersion,
-                onePastLastStreamIndex = mixedIslandAggregateStream,
+                onePastLastStreamIndex = data.pairHeaders.indexCount,
             };
         }
         #endregion
@@ -477,6 +479,7 @@ namespace Latios.Psyshock
             {
                 var root = GetRaw();
                 CheckTypeHash<T>();
+                CheckNotNull(root);
                 return ref UnsafeUtility.AsRef<T>(root);
             }
             /// <summary>
@@ -584,7 +587,7 @@ namespace Latios.Psyshock
             internal int    streamIndexA;
             internal int    streamIndexB;
             internal int    streamIndexCombined;
-            internal int    expectedBucketCount;
+            internal int    cellCount;
         }
 
         [NativeContainer]
@@ -653,7 +656,7 @@ namespace Latios.Psyshock
                     streamIndexA        = pairFromOtherStream.index,
                     streamIndexB        = pairFromOtherStream.index,
                     streamIndexCombined = pairFromOtherStream.index,
-                    expectedBucketCount = pairFromOtherStream.data.expectedBucketCount
+                    cellCount           = pairFromOtherStream.data.cellCount
                 };
                 return ref AddPairAndGetRef<T>(key, pairFromOtherStream.aIsRW, pairFromOtherStream.bIsRW, out pairInThisStream);
             }
@@ -675,7 +678,7 @@ namespace Latios.Psyshock
                     streamIndexA        = pairFromOtherStream.index,
                     streamIndexB        = pairFromOtherStream.index,
                     streamIndexCombined = pairFromOtherStream.index,
-                    expectedBucketCount = pairFromOtherStream.data.expectedBucketCount
+                    cellCount           = pairFromOtherStream.data.cellCount
                 };
                 return AddPairRaw(in key, pairFromOtherStream.aIsRW, pairFromOtherStream.bIsRW, sizeInBytes, alignInBytes, out pairInThisStream);
             }
@@ -871,9 +874,9 @@ namespace Latios.Psyshock
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             void CheckKeyCompatible(in ParallelWriteKey key)
             {
-                if (key.expectedBucketCount != data.expectedBucketCount)
+                if (key.cellCount != data.cellCount)
                     throw new InvalidOperationException(
-                        $"The key is generated from a different base bucket count {key.expectedBucketCount} from what the PairStream was constructed with {data.expectedBucketCount}");
+                        $"The key is generated from a different base bucket count {IndexStrategies.BucketCountWithoutNaN(key.cellCount)} from what the PairStream was constructed with {IndexStrategies.BucketCountWithoutNaN(data.cellCount)}");
             }
 
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
@@ -957,6 +960,7 @@ namespace Latios.Psyshock
                     var newAddress         = (byte*)CollectionHelper.Align((ulong)nextFreeAddress, (ulong)alignInBytes);
                     var diff               = newAddress - nextFreeAddress;
                     bytesRemainingInBlock -= (int)diff;
+                    nextFreeAddress        = newAddress;
                 }
 
                 if (Hint.Unlikely(neededBytes > bytesRemainingInBlock))
@@ -974,7 +978,7 @@ namespace Latios.Psyshock
                     UnityEngine.Debug.Assert(CollectionHelper.IsAligned(newBlock.ptr, alignInBytes));
                     blocks.Add(newBlock);
                     nextFreeAddress       = newBlock.ptr;
-                    bytesRemainingInBlock = neededBytes;
+                    bytesRemainingInBlock = blockSize;
                 }
 
                 var result             = nextFreeAddress;
@@ -1002,7 +1006,7 @@ namespace Latios.Psyshock
             [NativeDisableUnsafePtrRestriction]
             public State* state;
 
-            public int                              expectedBucketCount;
+            public int                              cellCount;
             public AllocatorManager.AllocatorHandle allocator;
         }
         #endregion
@@ -1019,9 +1023,9 @@ namespace Latios.Psyshock
         #endregion
 
         #region Internal Helpers
-        internal int firstMixedBucketStream => 3 * data.expectedBucketCount;
-        internal int nanBucketStream => 5 * data.expectedBucketCount - 2;
-        internal int mixedIslandAggregateStream => 5 * data.expectedBucketCount - 1;
+        //internal int firstMixedBucketStream => 3 * data.expectedBucketCount;
+        //internal int nanBucketStream => 5 * data.expectedBucketCount - 2;
+        //internal int mixedIslandAggregateStream => 5 * data.expectedBucketCount - 1;
 
         void* AddPairImpl(Entity entityA,
                           int bucketA,
@@ -1040,27 +1044,20 @@ namespace Latios.Psyshock
             CheckTargetBucketIsValid(bucketB);
 
             data.state->enumeratorVersion++;
-
             int targetStream;
             if (bucketA == bucketB)
-                targetStream = bucketA;
+                targetStream = IndexStrategies.FirstStreamIndexFromBucketIndex(bucketA, data.cellCount);
             else if (!bIsRW)
-                targetStream = bucketA;
+                targetStream = IndexStrategies.FirstStreamIndexFromBucketIndex(bucketA, data.cellCount);
             else if (!aIsRW)
-                targetStream = bucketB;
+                targetStream = IndexStrategies.FirstStreamIndexFromBucketIndex(bucketB, data.cellCount);
             else
-                targetStream = firstMixedBucketStream;
+                targetStream = IndexStrategies.FirstMixedStreamIndex(data.cellCount);
 
-            if (targetStream == firstMixedBucketStream)
+            if (targetStream == IndexStrategies.FirstMixedStreamIndex(data.cellCount))
                 data.state->needsIslanding = true;
             else
-            {
                 data.state->needsAliasChecks = true;
-                if (targetStream == data.expectedBucketCount)
-                    targetStream = nanBucketStream;
-                else
-                    targetStream *= 3;
-            }
 
             var headerPtr = (PairHeader*)data.pairHeaders.Allocate(targetStream);
             *headerPtr    = new PairHeader
@@ -1162,15 +1159,17 @@ namespace Latios.Psyshock
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckTargetBucketIsValid(int bucket)
         {
-            if (bucket < 0 || bucket > data.expectedBucketCount) // greater than because add 1 for NaN bucket
-                throw new ArgumentOutOfRangeException($"The target bucket {bucket} is out of range of max buckets {data.expectedBucketCount}");
+            var bucketCount = IndexStrategies.BucketCountWithoutNaN(data.cellCount);
+            if (bucket < 0 || bucket > bucketCount) // greater than because add 1 for NaN bucket
+                throw new ArgumentOutOfRangeException($"The target bucket {bucket} is out of range of max buckets {bucketCount}");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckStreamsMatch(ref PairStream other)
         {
-            if (data.expectedBucketCount != other.data.expectedBucketCount)
-                throw new InvalidOperationException($"The streams do not have matching bucket counts: {data.expectedBucketCount} vs {other.data.expectedBucketCount}.");
+            if (data.cellCount != other.data.cellCount)
+                throw new InvalidOperationException(
+                    $"The streams do not have matching bucket counts: {IndexStrategies.BucketCountWithoutNaN(data.cellCount)} vs {IndexStrategies.BucketCountWithoutNaN(other.data.cellCount)}.");
             if (data.allocator != other.data.allocator)
                 throw new InvalidOperationException($"The allocators are not the same. Memory stealing cannot be safely performed.");
         }
@@ -1187,6 +1186,13 @@ namespace Latios.Psyshock
         {
             if (state->pairPtrVersion != version)
                 throw new InvalidOperationException($"The enumerator has been invalidated by an addition or concatenate operation.");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        internal static void CheckNotNull(void* rawPtr)
+        {
+            if (rawPtr == null)
+                throw new InvalidOperationException("Attempted to access a typed allocation from a null object.");
         }
 
         #endregion
