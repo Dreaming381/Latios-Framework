@@ -13,7 +13,8 @@ namespace Latios.Authoring
     /// <summary>
     /// Implement this interface to specify a type that can "remember" SmartBlobberHandles or
     /// other data (like additional entities) and applying them to entities later inside of a generated Baking System.
-    /// You must also subclass SmartBaker for this to be effective. The SmartBaker will create instances of this type for you.
+    /// You must also add the [BakingType] attribute to the type implementing this interface and create an associated
+    /// subclass of SmartBaker for this to be effective. The SmartBaker will create instances of this type for you.
     /// </summary>
     /// <typeparam name="TAuthoring"></typeparam>
     public interface ISmartBakeItem<TAuthoring> : ISmartPostProcessItem where TAuthoring : Component
@@ -30,6 +31,7 @@ namespace Latios.Authoring
     /// <summary>
     /// Implement this interface directly to contain data that should be applied by a baking system later.
     /// You can add instances of these via the IBaker.AddPostProcessItem extension method.
+    /// You must also add the [BakingType] attribute to the type implementing this interface.
     /// A baking system will discover and process these automatically.
     /// </summary>
     public interface ISmartPostProcessItem : IComponentData

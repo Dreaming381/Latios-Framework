@@ -10,7 +10,7 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring
 {
     /// <summary>
-    /// Override this class and attach to a GameObject to disable normal Mesh Renderer or Skinned Mesh Renderer baking
+    /// Inherit this class and attach to a GameObject to disable normal Mesh Renderer or Skinned Mesh Renderer baking
     /// </summary>
     public class OverrideMeshRendererBase : MonoBehaviour
     {

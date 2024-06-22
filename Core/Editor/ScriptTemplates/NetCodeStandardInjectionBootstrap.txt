@@ -14,6 +14,7 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
 {
     public void InitializeBakingForAllWorlds(ref CustomBakingBootstrapContext context)
     {
+        //Latios.Authoring.CoreBakingBootstrap.ForceRemoveLinkedEntityGroupsOfLength1(ref context);
         //Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
         //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);

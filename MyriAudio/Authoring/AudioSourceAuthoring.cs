@@ -52,6 +52,8 @@ namespace Latios.Myri.Authoring
         {
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
 
+            baker.GetComponent<AudioClipOverrideBase>();
+
             m_looped = authoring.looping;
             if (!authoring.looping)
             {

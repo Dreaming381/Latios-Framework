@@ -783,7 +783,7 @@ namespace Latios.Kinemation.Systems
                                     header,
                                     binInstanceOffset + workItemInstanceOffset + headerInstanceOffset,
                                     settings.BatchID.value,
-                                    (settings.Flags & BatchDrawCommandFlags.LODCrossFade) == BatchDrawCommandFlags.LODCrossFade);
+                                    UseCrossfades(settings.Flags));
 
                         headerInstanceOffset += header->NumInstances;
                         header                = header->Next;
@@ -805,7 +805,7 @@ namespace Latios.Kinemation.Systems
                                                  instanceOffset,
                                                  positionOffset,
                                                  settings.BatchID.value,
-                                                 (settings.Flags & BatchDrawCommandFlags.LODCrossFade) == BatchDrawCommandFlags.LODCrossFade);
+                                                 UseCrossfades(settings.Flags));
 
                         headerInstanceOffset += header->NumInstances;
                         header                = header->Next;
@@ -1000,6 +1000,15 @@ namespace Latios.Kinemation.Systems
                 }
 
                 return numInstances;
+            }
+
+            private static bool UseCrossfades(BatchDrawCommandFlags flags)
+            {
+#if UNITY_6000_0_OR_NEWER
+                return (flags & BatchDrawCommandFlags.LODCrossFadeValuePacked) == BatchDrawCommandFlags.LODCrossFadeValuePacked;
+#else
+                return (flags & BatchDrawCommandFlags.LODCrossFade) == BatchDrawCommandFlags.LODCrossFade;
+#endif
             }
         }
 

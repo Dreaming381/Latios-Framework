@@ -19,7 +19,7 @@ namespace Latios.Psyshock
     /// Convex hull builder.
     /// </summary>
     [NoAlias]
-    unsafe internal struct ConvexHullBuilder
+    internal unsafe struct ConvexHullBuilder
     {
         // Mesh representation of the hull
         [NoAlias]
@@ -27,7 +27,7 @@ namespace Latios.Psyshock
         [NoAlias]
         private ElementPoolBase m_triangles;
 
-        public unsafe ElementPool<Vertex> vertices
+        public ElementPool<Vertex> vertices
         {
             get
             {
@@ -38,7 +38,7 @@ namespace Latios.Psyshock
             }
         }
 
-        public unsafe ElementPool<Triangle> triangles
+        public ElementPool<Triangle> triangles
         {
             get
             {
@@ -138,14 +138,14 @@ namespace Latios.Psyshock
                 this.uid     = uid;
             }
 
-            public unsafe int GetVertex(int index)
+            public int GetVertex(int index)
             {
                 fixed (int* p = &vertex0)
                 {
                     return p[index];
                 }
             }
-            public unsafe void SetVertex(int index, int value)
+            public void SetVertex(int index, int value)
             {
                 fixed (int* p = &vertex0)
                 {
@@ -153,14 +153,14 @@ namespace Latios.Psyshock
                 }
             }
 
-            public unsafe Edge GetLink(int index)
+            public Edge GetLink(int index)
             {
                 fixed (Edge* p = &link0)
                 {
                     return p[index];
                 }
             }
-            public unsafe void SetLink(int index, Edge handle)
+            public void SetLink(int index, Edge handle)
             {
                 fixed (Edge* p = &link0)
                 {
@@ -259,8 +259,8 @@ namespace Latios.Psyshock
         // vertices must be at least large enough to hold verticesCapacity elements, triangles and planes must be large enough to hold 2 * verticesCapacity elements
         // domain is the AABB of all points that will be added to the hull
         // simplificationTolerance is the sum of tolerances that will be passed to SimplifyVertices() and SimplifyFacesAndShrink()
-        public unsafe ConvexHullBuilder(int verticesCapacity, Vertex* vertices, Triangle* triangles, Plane* planes,
-                                        Aabb domain, float simplificationTolerance, IntResolution intResolution)
+        public ConvexHullBuilder(int verticesCapacity, Vertex* vertices, Triangle* triangles, Plane* planes,
+                                 Aabb domain, float simplificationTolerance, IntResolution intResolution)
         {
             m_vertices            = new ElementPoolBase(vertices, verticesCapacity);
             m_triangles           = new ElementPoolBase(triangles, 2 * verticesCapacity);
@@ -293,8 +293,8 @@ namespace Latios.Psyshock
         /// <summary>
         /// Copy the content of another convex hull into this one.
         /// </summary>
-        public unsafe ConvexHullBuilder(int verticesCapacity, Vertex* vertices, Triangle* triangles, Plane* planes,
-                                        ConvexHullBuilder other)
+        public ConvexHullBuilder(int verticesCapacity, Vertex* vertices, Triangle* triangles, Plane* planes,
+                                 ConvexHullBuilder other)
         {
             m_vertices            = new ElementPoolBase(vertices, verticesCapacity);
             m_triangles           = new ElementPoolBase(triangles, 2 * verticesCapacity);
@@ -336,7 +336,7 @@ namespace Latios.Psyshock
         }
 
         //
-        public unsafe void Compact()
+        public void Compact()
         {
             // Compact the vertices array
             NativeArray<int> vertexRemap = new NativeArray<int>(vertices.peakCount, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
@@ -363,7 +363,7 @@ namespace Latios.Psyshock
         /// <param name="userData">User data attached to the new vertex if insertion succeeds.</param>
         /// <param name="force2D">If true, the hull will not grow beyond two dimensions.</param>
         /// <returns>true if the insertion succeeded, false otherwise.</returns>
-        public unsafe bool AddPoint(float3 point, uint userData = 0, bool force2D = false)
+        public bool AddPoint(float3 point, uint userData = 0, bool force2D = false)
         {
             // Reset faces.
             numFaces        = 0;
@@ -679,7 +679,7 @@ namespace Latios.Psyshock
         // This is used to handle edge cases where very thin 3D hulls become 2D or invalid during simplification.
         // Extremely thin 3D hulls inevitably have nearly parallel faces, which cause problems in collision detection,
         // so the best solution is to flatten them completely.
-        public unsafe void Rebuild2D()
+        public void Rebuild2D()
         {
             Assert.AreEqual(dimension, 3);
 
@@ -717,7 +717,7 @@ namespace Latios.Psyshock
         }
 
         // Helper to sort triangles in BuildFaceIndices
-        unsafe struct CompareAreaDescending : IComparer<int>
+        struct CompareAreaDescending : IComparer<int>
         {
             public NativeArray<float> areas;
             public CompareAreaDescending(NativeArray<float> areas)
@@ -984,7 +984,7 @@ namespace Latios.Psyshock
         #region Simplification
 
         // Removes vertices that are colinear with two neighbors or coplanar with all neighbors.
-        public unsafe void RemoveRedundantVertices()
+        public void RemoveRedundantVertices()
         {
             const float toleranceSq = 1e-10f;
 
@@ -1147,7 +1147,7 @@ namespace Latios.Psyshock
             return new double4x4(plane * plane.x, plane * plane.y, plane * plane.z, plane * plane.w);
         }
 
-        // Finds the minimum cost Collapse for a, b using previously computed error matrices.  Returns false if preservFaces = true and there is no collapse that would not
+        // Finds the minimum cost Collapse for a, b using previously computed error matrices.  Returns false if preserveFaces = true and there is no collapse that would not
         // violate a face, true otherwise.
         // faceIndex: if >=0, index of the one multi-triangle face on the collapsing edge. -1 if there are two multi-tri faces, -2 if there are none.
         Collapse GetCollapse(int a, int b, ref NativeArray<double4x4> matrices)
@@ -1186,8 +1186,6 @@ namespace Latios.Psyshock
                         float vError = (float)math.dot(math.mul(matrix, new double4(v, 1)), v.xyz1());
                         float xError = (float)math.dot(math.mul(matrix, x), x);
                         cost         = math.min(math.min(uError, vError), xError);
-                        float3 point = math.select(u.xyz, v.xyz, cost == vError);
-                        point        = math.select(point, x.xyz, cost == xError);
                     }
                     break;
                 }
@@ -1232,7 +1230,7 @@ namespace Latios.Psyshock
         // introducing error in excess of maxError.
         // Based on QEM, but with contractions only allowed for vertices connected by a triangle edge, and only to be replaced by vertices on the same edge
         // Note, calling this function destroys vertex user data
-        public unsafe void SimplifyVertices(float maxError, int maxVertices)
+        public void SimplifyVertices(float maxError, int maxVertices)
         {
             // Simplification is only possible in 2D / 3D
             if (dimension < 2)
@@ -1594,7 +1592,7 @@ namespace Latios.Psyshock
         // Returns - the distance that the faces were moved in by shrinking
         // Merging and shrinking are combined into a single operation because both work on the planes of the hull and require vertices to be rebuilt
         // afterwards.  Rebuilding vertices is the slowest part of hull generation, so best to do it only once.
-        public unsafe float SimplifyFacesAndShrink(float simplificationTolerance, float minAngleBetweenFaces, float shrinkDistance, int maxFaces, int maxVertices)
+        public float SimplifyFacesAndShrink(float simplificationTolerance, float minAngleBetweenFaces, float shrinkDistance, int maxFaces, int maxVertices)
         {
             // Return if merging is not allowed and shrinking is off
             if (simplificationTolerance <= 0.0f && minAngleBetweenFaces <= 0.0f && shrinkDistance <= 0.0f)
@@ -1740,14 +1738,14 @@ namespace Latios.Psyshock
                             edgePlanes[edgeIndex] = edge;
 
                             // Create an edge plane
-                            float3 normal0                = planes[i].normal;
-                            float3 normal1                = planes[neighborFaceIndex].normal;
-                            int    vertexIndex0           = triangles[edge.triangleIndex].GetVertex(edge.edgeIndex);
-                            int    vertexIndex1           = neighborTriangle.GetVertex(neighborEdge.edgeIndex);
-                            int    edgePlaneIndex         = numPlanes + edgeIndex;
-                            Plane  edgePlane              = GetEdgePlane(vertexIndex0, vertexIndex1, normal0, normal1);
+                            float3 normal0              = planes[i].normal;
+                            float3 normal1              = planes[neighborFaceIndex].normal;
+                            int    vertexIndex0         = triangles[edge.triangleIndex].GetVertex(edge.edgeIndex);
+                            int    vertexIndex1         = neighborTriangle.GetVertex(neighborEdge.edgeIndex);
+                            int    edgePlaneIndex       = numPlanes + edgeIndex;
+                            Plane  edgePlane            = GetEdgePlane(vertexIndex0, vertexIndex1, normal0, normal1);
                             edgePlane.distanceToOrigin -= simplificationTolerance / 2.0f;  // push the edge plane out slightly so it only becomes active if the face planes change significiantly
-                            planes[edgePlaneIndex]        = edgePlane;
+                            planes[edgePlaneIndex]      = edgePlane;
 
                             // Build its OLS data
                             OLSData ols = new OLSData(); ols.Init();
@@ -2319,9 +2317,9 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Compute the mass properties of the convex hull.
-        /// Note: Inertia computation adapted from S. Melax, http://www.melax.com/volint.
+        /// Note: Inertia computation adapted from S. Melax.
         /// </summary>
-        public unsafe void UpdateHullMassProperties()
+        public void UpdateHullMassProperties()
         {
             var mp = new MassProperties();
             switch (dimension)
@@ -2348,9 +2346,8 @@ namespace Latios.Psyshock
                 break;
                 case 3:
                 {
-                    float3 offset       = ComputeCentroid();
-                    int    numTriangles = 0;
-                    float* dets         = stackalloc float[triangles.capacity];
+                    float3 offset = ComputeCentroid();
+                    float* dets   = stackalloc float[triangles.capacity];
                     foreach (int i in triangles.indices)
                     {
                         float3 v0        = vertices[triangles[i].vertex0].position - offset;
@@ -2361,7 +2358,6 @@ namespace Latios.Psyshock
                         mp.volume       += w;
                         mp.surfaceArea  += math.length(math.cross(v1 - v0, v2 - v0));
                         dets[i]          = w;
-                        numTriangles++;
                     }
 
                     mp.centerOfMass = mp.centerOfMass / (mp.volume * 4) + offset;
@@ -2378,11 +2374,10 @@ namespace Latios.Psyshock
                         offd      += (v0.yzx * v1.zxy + v1.yzx * v2.zxy + v2.yzx * v0.zxy +
                                       v0.yzx * v2.zxy + v1.yzx * v0.zxy + v2.yzx * v1.zxy +
                                       (v0.yzx * v0.zxy + v1.yzx * v1.zxy + v2.yzx * v2.zxy) * 2) * dets[i];
-                        numTriangles++;
                     }
 
-                    diag /= mp.volume * (60 / 6);
-                    offd /= mp.volume * (120 / 6);
+                    diag /= mp.volume * 10f;  // (60 / 6);
+                    offd /= mp.volume * 20f;  // (120 / 6);
 
                     mp.inertiaTensor.c0 = new float3(diag.y + diag.z, -offd.z, -offd.y);
                     mp.inertiaTensor.c1 = new float3(-offd.z, diag.x + diag.z, -offd.x);
@@ -2609,14 +2604,14 @@ namespace Latios.Psyshock
 
     // ConvexHullBuilder combined with NativeArrays to store its data
     // Keeping NativeArray out of the ConvexHullBuilder itself allows ConvexHullBuilder to be passed to Burst jobs
-    internal struct ConvexHullBuilderStorage : IDisposable
+    internal unsafe struct ConvexHullBuilderStorage : IDisposable
     {
         private NativeArray<ConvexHullBuilder.Vertex>   m_vertices;
         private NativeArray<ConvexHullBuilder.Triangle> m_triangles;
         private NativeArray<Plane>                      m_planes;
         public ConvexHullBuilder                        builder;
 
-        public unsafe ConvexHullBuilderStorage(int verticesCapacity, Allocator allocator, Aabb domain, float simplificationTolerance, ConvexHullBuilder.IntResolution resolution)
+        public ConvexHullBuilderStorage(int verticesCapacity, Allocator allocator, Aabb domain, float simplificationTolerance, ConvexHullBuilder.IntResolution resolution)
         {
             int trianglesCapacity = 2 * verticesCapacity;
             m_vertices            = new NativeArray<ConvexHullBuilder.Vertex>(verticesCapacity, allocator);
@@ -2628,7 +2623,7 @@ namespace Latios.Psyshock
                                                           domain, simplificationTolerance, resolution);
         }
 
-        public unsafe ConvexHullBuilderStorage(int verticesCapacity, Allocator allocator, ref ConvexHullBuilder builder)
+        public ConvexHullBuilderStorage(int verticesCapacity, Allocator allocator, ref ConvexHullBuilder builder)
         {
             m_vertices   = new NativeArray<ConvexHullBuilder.Vertex>(verticesCapacity, allocator);
             m_triangles  = new NativeArray<ConvexHullBuilder.Triangle>(verticesCapacity * 2, allocator);
@@ -2805,7 +2800,7 @@ namespace Latios.Psyshock
     // Underlying implementation of ElementPool
     // This is split into a different structure so that it can be unmanaged (since templated structures are always managed)
     [NoAlias]
-    unsafe internal struct ElementPoolBase
+    internal unsafe struct ElementPoolBase
     {
         [NativeDisableContainerSafetyRestriction]
         [NoAlias]
@@ -2817,7 +2812,7 @@ namespace Latios.Psyshock
         public int peakCount { get; private set; }  // the maximum number of elements allocated so far
         public bool canAllocate => m_firstFreeIndex >= 0 || peakCount < capacity;
 
-        public unsafe ElementPoolBase(void* userBuffer, int capacity)
+        public ElementPoolBase(void* userBuffer, int capacity)
         {
             m_elements       = userBuffer;
             m_capacity       = capacity;
@@ -2880,7 +2875,7 @@ namespace Latios.Psyshock
             ((T*)m_elements)[index] = value;
         }
 
-        public unsafe void CopyFrom<T>(ElementPoolBase other) where T : unmanaged, IPoolElement
+        public void CopyFrom<T>(ElementPoolBase other) where T : unmanaged, IPoolElement
         {
             Assert.IsTrue(other.peakCount <= capacity);
             peakCount        = other.peakCount;
@@ -2888,7 +2883,7 @@ namespace Latios.Psyshock
             UnsafeUtility.MemCpy(m_elements, other.m_elements, peakCount * UnsafeUtility.SizeOf<T>());
         }
 
-        public unsafe void CopyFrom<T>(void* buffer, int length) where T : unmanaged, IPoolElement
+        public void CopyFrom<T>(void* buffer, int length) where T : unmanaged, IPoolElement
         {
             Assert.IsTrue(length <= capacity);
             peakCount        = length;
@@ -2899,7 +2894,7 @@ namespace Latios.Psyshock
         // Compacts the pool so that all of the allocated elements are contiguous, and resets PeakCount to the current allocated count.
         // remap may be null or an array of size at least PeakCount, if not null and the return value is true then Compact() sets remap[oldIndex] = newIndex for all allocated elements.
         // Returns true if compact occurred, false if the pool was already compact.
-        public unsafe bool Compact<T>(int* remap) where T : unmanaged, IPoolElement
+        public bool Compact<T>(int* remap) where T : unmanaged, IPoolElement
         {
             if (m_firstFreeIndex == -1)
             {
@@ -3006,7 +3001,7 @@ namespace Latios.Psyshock
     }
 
     // A fixed capacity array acting as a pool of allocated/free structs referenced by indices
-    unsafe internal struct ElementPool<T> where T : unmanaged, IPoolElement
+    internal unsafe struct ElementPool<T> where T : unmanaged, IPoolElement
     {
         public ElementPoolBase* elementPoolBase;
 
@@ -3049,17 +3044,17 @@ namespace Latios.Psyshock
             elementPoolBase->Set<T>(index, value);
         }
 
-        public unsafe void CopyFrom(ElementPool<T> other)
+        public void CopyFrom(ElementPool<T> other)
         {
             elementPoolBase->CopyFrom<T>(*other.elementPoolBase);
         }
 
-        public unsafe void CopyFrom(void* buffer, int length)
+        public void CopyFrom(void* buffer, int length)
         {
             elementPoolBase->CopyFrom<T>(buffer, length);
         }
 
-        public unsafe bool Compact(int* remap)
+        public bool Compact(int* remap)
         {
             return elementPoolBase->Compact<T>(remap);
         }

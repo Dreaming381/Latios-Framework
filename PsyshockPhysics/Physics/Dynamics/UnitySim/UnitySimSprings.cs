@@ -202,7 +202,7 @@ namespace Latios.Psyshock
             float exp2  = math.pow(exp1, 1f / iterations);
 
             constraintDamping = 1 - exp2;
-            constraintTau     = hhww / denom * constraintDamping;
+            constraintTau     = denom < math.EPSILON ? 0f : hhww / denom * constraintDamping;
         }
 
         const float rcpTwoPI = 0.5f / math.PI;
