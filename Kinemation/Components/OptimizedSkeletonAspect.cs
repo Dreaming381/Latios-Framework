@@ -137,6 +137,18 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
+        /// Begins a new inertial blend for the selected bone indices in the mask. You may call this prior to syncing if you wish.
+        /// However, needsHistorySync must be <see langword="false"/> or else results will be unusable.
+        /// </summary>
+        /// <param name="previousDeltaTime">The previous delta time used for the previous animation sample.</param>
+        /// <param name="maxBlendDurationStartingFromTimeOfPrevious">The maximum blend time, measured from when the previous sample was recorded.</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be included in the blend</param>
+        public void StartNewInertialBlend(float previousDeltaTime, float maxBlendDurationStartingFromTimeOfPrevious, ReadOnlySpan<ulong> mask)
+        {
+            StartInertialBlendInternal(previousDeltaTime, maxBlendDurationStartingFromTimeOfPrevious, mask);
+        }
+
+        /// <summary>
         /// Performs inertial blending for the entire skeleton. You may call this prior to syncing if you wish.
         /// </summary>
         /// <param name="timeSinceStartOfBlend">The time since the start of the blend, which was the sample before

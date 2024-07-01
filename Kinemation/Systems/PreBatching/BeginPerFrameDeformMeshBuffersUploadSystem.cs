@@ -128,10 +128,10 @@ namespace Latios.Kinemation.Systems
             JobHandle jho = default;
 
             uint boneOffsetsSize         = (uint)boneOffsetsGpuManager.offsets.Length;
-            uint boneOffsetsGpuSize      = boneOffsetsSize / 2;
+            uint boneOffsetsGpuSize      = boneOffsetsSize / 2 + (boneOffsetsSize & 1);
             newBuffers.boneOffsetsBuffer = broker.graphicsBufferBroker.GetBoneOffsetsBuffer(boneOffsetsGpuSize);
 
-            if (boneOffsetsGpuManager.isDirty.Value)
+            if (boneOffsetsGpuManager.isDirty.Value && boneOffsetsGpuSize > 0)
             {
                 uint metaCount                                         = (uint)math.ceil(boneOffsetsGpuSize / 64f);
                 newBuffers.boneOffsetsUploadBuffer                     = broker.graphicsBufferBroker.GetBoneOffsetsUploadBuffer(boneOffsetsGpuSize);
@@ -162,7 +162,12 @@ namespace Latios.Kinemation.Systems
             {
                 worldBlackboardEntity.SetManagedStructComponent(newBuffers);
                 worldBlackboardEntity.SetCollectionComponentAndDisposeOld(newBuffersMapped);
-                Dependency = new ClearCommandsJob { commands = meshGpuManager.uploadCommands, isDirty = boneOffsetsGpuManager.isDirty }.Schedule(Dependency);
+                Dependency = new ClearCommandsJob
+                {
+                    commands      = meshGpuManager.uploadCommands,
+                    requiredSizes = meshGpuManager.requiredBufferSizes,
+                    isDirty       = boneOffsetsGpuManager.isDirty
+                }.Schedule(Dependency);
             }
         }
 
@@ -325,9 +330,7 @@ namespace Latios.Kinemation.Systems
                 mappedMeta[index] = (uint3) new int3(startIndex / 2, startIndex / 2, count / 2);
                 for (int i = startIndex; i < startIndex + count; i += 2)
                 {
-#pragma warning disable CS0675  // Bitwise-or operator used on a sign-extended operand
-                    uint packed = (((uint)offsets[i + 1]) << 16) | ((uint)offsets[i]);
-#pragma warning restore CS0675  // Bitwise-or operator used on a sign-extended operand
+                    uint packed              = (((uint)offsets[i + 1] & 0xffff) << 16) | ((uint)offsets[i] & 0xffff);
                     mappedBoneOffsets[i / 2] = packed;
                 }
             }
@@ -336,13 +339,20 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct ClearCommandsJob : IJob
         {
-            public NativeList<MeshGpuUploadCommand> commands;
-            public NativeReference<bool>            isDirty;
+            public NativeList<MeshGpuUploadCommand>      commands;
+            public NativeReference<MeshGpuRequiredSizes> requiredSizes;
+            public NativeReference<bool>                 isDirty;
 
             public void Execute()
             {
                 commands.Clear();
-                isDirty.Value = false;
+                var rs                           = requiredSizes.Value;
+                rs.requiredVertexUploadSize      = 0;
+                rs.requiredWeightUploadSize      = 0;
+                rs.requiredBindPoseUploadSize    = 0;
+                rs.requiredBlendShapesUploadSize = 0;
+                requiredSizes.Value              = rs;
+                isDirty.Value                    = false;
             }
         }
     }

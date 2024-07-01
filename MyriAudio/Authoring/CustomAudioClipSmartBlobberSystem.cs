@@ -25,7 +25,7 @@ namespace Latios.Myri.Authoring
     /// Add to an entity that will be baked with an audio source to replace the clip with this custom clip.
     /// It is recommended the authoring component inherit AudioClipOverrideBase so that incremental baking works correctly.
     /// </summary>
-    [BakingType]
+    [TemporaryBakingType]
     public struct AudioClipOverrideRequest : IComponentData
     {
         public SmartBlobberHandle<AudioClipBlob> clipHandle;

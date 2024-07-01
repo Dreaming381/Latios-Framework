@@ -164,7 +164,7 @@ void vertexSkinMatrix(uint4 boneIndices, float4 boneWeights, uint skeletonBase, 
     {
         mat += transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.z)) * boneWeights.z;
     }
-    if (boneWeights.w > 0.0)
+    if (boneWeights.w > 0.0 && boneWeights.w < 0.5)
     {
         mat += transformUnionMatrixToMatrix(readBone(skeletonBase + boneIndices.w)) * boneWeights.w;
     }
@@ -204,7 +204,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
             bindposeReal += dqs.r * boneWeights.z;
             bindposeDual += dqs.d * boneWeights.z;
         }
-        if (boneWeights.w > 0.0)
+        if (boneWeights.w > 0.0 && boneWeights.w < 0.5)
         {
             dqs = transformUnionDqsToDqs(_latiosBindPoses[skeletonBase.y + boneIndices.w]);
             localScale += dqs.scale.xyz * boneWeights.w;
@@ -265,7 +265,7 @@ void vertexSkinDqs(uint4 boneIndices, float4 boneWeights, uint2 skeletonBase, in
             worldReal += dqs.r * boneWeights.z;
             worldDual += dqs.d * boneWeights.z;
         }
-        if (boneWeights.w > 0.0)
+        if (boneWeights.w > 0.0 && boneWeights.w < 0.5)
         {
             dqs = transformUnionDqsToDqs(readBone(skeletonBase.x + boneIndices.w));
             localScale += dqs.scale.xyz * boneWeights.w;
