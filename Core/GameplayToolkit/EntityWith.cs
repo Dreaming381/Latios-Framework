@@ -30,29 +30,9 @@ namespace Latios
             return lhs.entity == rhs.entity;
         }
 
-        public static bool operator !=(EntityWith<T> lhs, EntityWith<T> rhs)
+        public static bool operator ==(Entity lhs, EntityWith<T> rhs)
         {
-            return !(lhs == rhs);
-        }
-
-        public int CompareTo(EntityWith<T> other)
-        {
-            return entity.Index - other.entity.Index;
-        }
-
-        public override bool Equals(object compare)
-        {
-            return (compare is EntityWith<T> compareEntityWith && Equals(compareEntityWith)) || (compare is Entity compareEntity && Equals(compareEntity));
-        }
-
-        public override int GetHashCode()
-        {
-            return entity.Index;
-        }
-
-        public bool Equals(EntityWith<T> compareEntity)
-        {
-            return compareEntity.entity.Index == entity.Index && compareEntity.entity.Version == entity.Version;
+            return lhs == rhs.entity;
         }
 
         public static bool operator ==(EntityWith<T> lhs, Entity rhs)
@@ -60,14 +40,14 @@ namespace Latios
             return lhs.entity == rhs;
         }
 
-        public static bool operator !=(EntityWith<T> lhs, Entity rhs)
+        public static bool operator !=(EntityWith<T> lhs, EntityWith<T> rhs)
         {
             return !(lhs == rhs);
         }
 
-        public static bool operator ==(Entity lhs, EntityWith<T> rhs)
+        public static bool operator !=(EntityWith<T> lhs, Entity rhs)
         {
-            return lhs == rhs.entity;
+            return !(lhs == rhs);
         }
 
         public static bool operator !=(Entity lhs, EntityWith<T> rhs)
@@ -75,14 +55,34 @@ namespace Latios
             return !(lhs == rhs);
         }
 
+        public int CompareTo(EntityWith<T> other)
+        {
+            return entity.CompareTo(other);
+        }
+
         public int CompareTo(Entity other)
         {
-            return entity.Index - other.Index;
+            return entity.CompareTo(other);
+        }
+
+        public override bool Equals(object compare)
+        {
+            return (compare is EntityWith<T> compareEntityWith && Equals(compareEntityWith)) || (compare is Entity compareEntity && Equals(compareEntity));
+        }
+
+        public bool Equals(EntityWith<T> compareEntity)
+        {
+            return entity == compareEntity.entity;
         }
 
         public bool Equals(Entity compareEntity)
         {
-            return compareEntity.Index == entity.Index && compareEntity.Version == entity.Version;
+            return entity == compareEntity;
+        }
+
+        public override int GetHashCode()
+        {
+            return entity.GetHashCode();
         }
 
         public override String ToString()
@@ -121,29 +121,9 @@ namespace Latios
             return lhs.entity == rhs.entity;
         }
 
-        public static bool operator !=(EntityWithBuffer<T> lhs, EntityWithBuffer<T> rhs)
+        public static bool operator ==(Entity lhs, EntityWithBuffer<T> rhs)
         {
-            return !(lhs == rhs);
-        }
-
-        public int CompareTo(EntityWithBuffer<T> other)
-        {
-            return entity.Index - other.entity.Index;
-        }
-
-        public override bool Equals(object compare)
-        {
-            return (compare is EntityWithBuffer<T> compareEntityWithBuffer && Equals(compareEntityWithBuffer)) || (compare is Entity compareEntity && Equals(compareEntity));
-        }
-
-        public override int GetHashCode()
-        {
-            return entity.Index;
-        }
-
-        public bool Equals(EntityWithBuffer<T> compareEntity)
-        {
-            return compareEntity.entity.Index == entity.Index && compareEntity.entity.Version == entity.Version;
+            return lhs == rhs.entity;
         }
 
         public static bool operator ==(EntityWithBuffer<T> lhs, Entity rhs)
@@ -151,14 +131,14 @@ namespace Latios
             return lhs.entity == rhs;
         }
 
-        public static bool operator !=(EntityWithBuffer<T> lhs, Entity rhs)
+        public static bool operator !=(EntityWithBuffer<T> lhs, EntityWithBuffer<T> rhs)
         {
             return !(lhs == rhs);
         }
 
-        public static bool operator ==(Entity lhs, EntityWithBuffer<T> rhs)
+        public static bool operator !=(EntityWithBuffer<T> lhs, Entity rhs)
         {
-            return lhs == rhs.entity;
+            return !(lhs == rhs);
         }
 
         public static bool operator !=(Entity lhs, EntityWithBuffer<T> rhs)
@@ -166,14 +146,34 @@ namespace Latios
             return !(lhs == rhs);
         }
 
+        public int CompareTo(EntityWithBuffer<T> other)
+        {
+            return entity.CompareTo(other);
+        }
+
         public int CompareTo(Entity other)
         {
-            return entity.Index - other.Index;
+            return entity.CompareTo(other);
+        }
+
+        public override bool Equals(object compare)
+        {
+            return (compare is EntityWithBuffer<T> compareEntityWithBuffer && Equals(compareEntityWithBuffer)) || (compare is Entity compareEntity && Equals(compareEntity));
+        }
+
+        public bool Equals(EntityWithBuffer<T> compareEntity)
+        {
+            return entity == compareEntity.entity;
         }
 
         public bool Equals(Entity compareEntity)
         {
-            return compareEntity.Index == entity.Index && compareEntity.Version == entity.Version;
+            return entity == compareEntity;
+        }
+
+        public override int GetHashCode()
+        {
+            return entity.GetHashCode();
         }
 
         public override String ToString()
