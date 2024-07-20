@@ -279,7 +279,7 @@ namespace Latios.Psyshock
                 m_minBucket = math.clamp(m_minBucket, 0, layer.worldSubdivisionsPerAxis - 1);
                 m_maxBucket = math.clamp(m_maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
                 m_bucketIjk = m_minBucket;
-                m_bucket    = layer.GetBucketSlices(0);
+                m_bucket    = layer.GetBucketSlices(IndexStrategies.CellIndexFromSubdivisionIndices(m_bucketIjk, layer.worldSubdivisionsPerAxis));
                 m_result    = new FindObjectsResult(in layer, in m_bucket, 0, false);
 
                 m_qxmin     = aabb.min.x;
@@ -311,7 +311,7 @@ namespace Latios.Psyshock
                         if (m_bucketIjk.x > m_maxBucket.x)
                         {
                             // Set the target bucket to the cross bucket by adding one to the max bucket
-                            m_bucketIjk = m_maxBucket;
+                            m_bucketIjk = m_result.layer.worldSubdivisionsPerAxis - 1;
                             m_bucketIjk.z++;
                         }
                     }

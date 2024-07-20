@@ -165,7 +165,7 @@ namespace Latios.Kinemation.Authoring
         {
             if (animator == null)
             {
-                Debug.LogError($"Kinemation failed to bake clip set on animator {animator.gameObject.name}. The Animator was null.");
+                Debug.LogError($"Kinemation failed to bake clip set requested by a baker of {baker.GetAuthoringObjectForDebugDiagnostics().name}. The Animator was null.");
                 return false;
             }
             if (!clips.IsCreated)

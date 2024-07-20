@@ -6,6 +6,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Entities.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -136,7 +137,8 @@ namespace Latios.Kinemation.Authoring
         {
             if (animator == null)
             {
-                UnityEngine.Debug.LogError($"Kinemation failed to bake mesh binding paths for {animator.gameObject.name}. The Animator is null.");
+                UnityEngine.Debug.LogError(
+                    $"Kinemation failed to bake mesh binding paths requested by a baker of {baker.GetAuthoringObjectForDebugDiagnostics().name}. The Animator is null.");
                 return false;
             }
             if (animator.hasTransformHierarchy)
