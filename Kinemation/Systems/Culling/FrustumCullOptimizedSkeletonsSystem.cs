@@ -199,18 +199,10 @@ namespace Latios.Kinemation.Systems
 
                     if (chunkIn == FrustumPlanes.IntersectResult.Partial)
                     {
-                        var inMask = mask.lower.Value;
-                        for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
+                        for (int i = 0; i < chunk.Count; i++)
                         {
                             bool isIn                 = FrustumPlanes.Intersect2NoPartial(combinedSplitPlanes, worldBounds[i].bounds) != FrustumPlanes.IntersectResult.Out;
                             splitMasks.splitMasks[i] |= (byte)math.select(0u, splitMask, isIn);
-                        }
-                        inMask = mask.upper.Value;
-                        for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
-                        {
-                            bool isIn =
-                                FrustumPlanes.Intersect2NoPartial(combinedSplitPlanes, worldBounds[i + 64].bounds) != FrustumPlanes.IntersectResult.Out;
-                            splitMasks.splitMasks[i + 64] |= (byte)math.select(0u, splitMask, isIn);
                         }
                     }
                     else if (chunkIn == FrustumPlanes.IntersectResult.In)
