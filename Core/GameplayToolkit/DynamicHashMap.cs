@@ -257,7 +257,7 @@ namespace Latios
 
             public bool MoveNext()
             {
-                while (MoveNext())
+                while (m_enumerator.MoveNext())
                 {
                     if (m_enumerator.Current.isOccupied)
                         return true;
@@ -378,6 +378,7 @@ namespace Latios
                     var bucket                  = GetBucket(oldBuckets[i].key);
                     bufferPtr[bucket]           = oldBuckets[i];
                     bufferPtr[bucket].nextIndex = 0;
+                    oldBuckets[i] = default;
                 }
             }
 
@@ -398,6 +399,12 @@ namespace Latios
                     oldBuckets[overflowCount].nextIndex = 0;
                     overflowCount++;
                 }
+                else
+                {
+                    bufferPtr[bucket] = oldOverflow[i];
+                    bufferPtr[bucket].nextIndex = 0;
+                }
+                oldOverflow[i] = default;
             }
 
             // Clean up
@@ -433,9 +440,10 @@ namespace Latios
                         if (!last.isOccupied)
                         {
                             // Last is likely padding to ensure the capacity can be computed correctly.
-                            last.isOccupied = true;
-                            last.key        = key;
-                            last.value      = value;
+                            last.isOccupied         = true;
+                            last.key                = key;
+                            last.value              = value;
+                            candidate.nextIndex     = m_buffer.Length - 1;
                             IncrementCount();
                             return true;
                         }
