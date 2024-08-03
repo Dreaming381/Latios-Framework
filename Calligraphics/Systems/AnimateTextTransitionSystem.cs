@@ -43,6 +43,7 @@ namespace Latios.Calligraphics.Systems
                 textRenderControlHandle   = GetComponentTypeHandle<TextRenderControl>(false),
                 renderGlyphHandle         = GetBufferTypeHandle<RenderGlyph>(false),
                 glyphMappingElementHandle = GetBufferTypeHandle<GlyphMappingElement>(true),
+                stringHandle              = GetBufferTypeHandle<CalliByte>(false)
             }.ScheduleParallel(m_query, state.Dependency);
 
             m_rng.Shuffle();
@@ -66,12 +67,16 @@ namespace Latios.Calligraphics.Systems
             public BufferTypeHandle<TextAnimationTransition> transitionHandle;
             public BufferTypeHandle<RenderGlyph>             renderGlyphHandle;
             public ComponentTypeHandle<TextRenderControl>    textRenderControlHandle;
+            public BufferTypeHandle<CalliByte>               stringHandle;
 
             [ReadOnly] public BufferTypeHandle<GlyphMappingElement> glyphMappingElementHandle;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
+                // Dirty strings so that glyphs get "reset" next frame:
+                chunk.GetBufferAccessor(ref stringHandle);
+
                 var random              = rng.GetSequence(unfilteredChunkIndex);
                 var transitionBuffers   = chunk.GetBufferAccessor(ref transitionHandle);
                 var renderGlyphBuffers  = chunk.GetBufferAccessor(ref renderGlyphHandle);

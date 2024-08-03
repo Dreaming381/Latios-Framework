@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.10.5]
+# Latios Framework for Unity ECS – [0.10.6]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -54,9 +54,19 @@ bootstrap. Bootstrap templates are provided in the Assets Create menu.
 [Core](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Core/README.md)
 is an essentials kit for handling common programming concerns in Unity’s ECS. It
 contains many features you might have heard of such as Rng, Blackboard Entities,
-Collection Components, Instantiate Command Buffers, Smart Blobbers, and Baking
-Bootstraps. But there are many more features around. If there is a common “hard”
-problem in ECS, there’s a good chance Core has a tool to address it.
+Collection Components, Instantiate Command Buffers, Smart Blobbers, Explicit
+System Ordering, and Baking Bootstraps. But there are many more features around.
+If there is a common “hard” problem in ECS, there’s a good chance Core has a
+tool to address it.
+
+**Common Reasons to Use:**
+
+-   You use one of the other modules
+-   You want one of the features
+
+**Common Reasons to Avoid:**
+
+-   You move a large amount of entities between worlds in the middle of gameplay
 
 ### QVVS Transforms
 
@@ -72,6 +82,14 @@ If you wish to use Unity Transforms instead, you can enable a compatibility mode
 for all other modules using the scripting define LATIOS_TRANSFORMS_UNITY. Some
 features in the other modules will be disabled when you do this.
 
+**Common Reasons to Use QVVS Transforms:**
+
+-   You want a good transform hierarchy solution
+
+**Common Reasons to Use Unity Transforms:**
+
+-   You use Unity Physics, Unity Character Controller, or Unity NetCode.
+
 ### Psyshock
 
 [Psyshock
@@ -83,6 +101,17 @@ physics simulation for your game and not waste any computation on things you
 don’t need. Psyshock’s Collision Layers can be built directly from Entity
 Queries, removing all the archetype guesswork out of collisions and triggers.
 
+**Common Reasons to Use Psyshock:**
+
+-   You use QVVS Transforms
+-   You only need collision detection
+-   You want more control over physics
+-   Unity Physics events system is too expensive
+
+**Common Reasons to Use Unity Physics:**
+
+-   You want an out-of-the-box full simulator with zero code
+
 ### Myri
 
 [Myri
@@ -91,6 +120,14 @@ is an out-of-the-box pure ECS audio solution. It features 3D spatialization of
 both looping and non-looping audio sources, multiple listeners, directional and
 non-directional sources, and a voice combining feature to support massive
 amounts of sources at once. Playing audio is as simple as instantiating prefabs.
+
+**Common Reasons to Use:**
+
+-   You want something simple and easy
+
+**Common Reasons to Ignore:**
+
+-   You can afford FMOD
 
 ### Kinemation
 
@@ -106,6 +143,21 @@ configurations. It includes utilities for inertial blending. And for animation
 clips it leverages ACL, a powerful high quality animation compression solution
 used in AAA titles such as Rise of the Tomb Raider, Fortnite, and Valorant.
 
+**Common Reasons to Use:**
+
+-   You use QVVS Transforms
+-   You want better rendering performance and features related to LODs, light
+    probes, and deforming meshes
+-   You want to customize and extend ECS rendering with access to the culling
+    logic
+-   You prefer code-driven animation workflows and inertial blending
+-   You wish to build your own animation visual tool tailored to your project
+
+**Common Reasons to Avoid:**
+
+-   You absolutely require a robust out-of-the-box code-free skeletal animation
+    solution for only a small number of entities
+
 ### Calligraphics
 
 [Calligraphics](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Calligraphics/README.md)
@@ -116,6 +168,16 @@ engine, or you can make your own animations with the glyph mapping API. Rich
 text tags are supported, with much of the implementation being ported from
 TextMeshPro and made Burst-compatible. Use Calligraphics for world-space labels,
 dialog, player names, and damage numbers.
+
+**Common Reasons to Use:**
+
+-   You use QVVS Transforms
+-   You want animated text
+-   You are using any other module
+
+**Common Reasons to Avoid:**
+
+-   TextMeshDOTS works and fully covers your needs
 
 ### Mimic
 
@@ -301,7 +363,7 @@ for how to get started.
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support
--   Lewis – Improvements to EntityWith\<\> and EntityWithBuffer\<\>
+-   Lewis – Improvements to `EntityWith<>` and `EntityWithBuffer<>`
 -   Everyone else who reported bugs and made the Latios Framework more stable
     for everyone
 
