@@ -68,7 +68,7 @@ namespace Latios.Psyshock
                 maxDistance      = maxDistance,
                 processor        = (T*)UnsafeUtility.AddressOf(ref processor)
             };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor);
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor, triMesh.scale);
         }
 
         public static bool ColliderCast(in ConvexCollider convexToCast,

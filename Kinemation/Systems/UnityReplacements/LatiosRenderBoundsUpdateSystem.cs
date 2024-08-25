@@ -129,5 +129,74 @@ namespace Latios.Kinemation.Systems
             }
         }
     }
+
+    // This system is here to fix a bug in Entities Graphics. However, in the future, it may be worth rewriting
+    // so that deforming entities are included in the scene bounding volume.
+    [WorldSystemFilter(WorldSystemFilterFlags.EntitySceneOptimizations)]
+    [UpdateAfter(typeof(LatiosRenderBoundsUpdateSystem))]
+    [DisableAutoCreation]
+    partial class LatiosUpdateSceneBoundingVolumeFromRendererBounds : SystemBase
+    {
+        [BurstCompile]
+        struct CollectSceneBoundsJob : IJob
+        {
+            [ReadOnly]
+            [DeallocateOnJobCompletion]
+            public NativeArray<WorldRenderBounds> RenderBounds;
+
+            public Entity                                            SceneBoundsEntity;
+            public ComponentLookup<Unity.Scenes.SceneBoundingVolume> SceneBounds;
+
+            public void Execute()
+            {
+                var minMaxAabb = MinMaxAABB.Empty;
+                for (int i = 0; i != RenderBounds.Length; i++)
+                {
+                    var aabb = RenderBounds[i].Value;
+
+                    // MUST BE FIXED BY DOTS-2518
+                    //
+                    // Avoid empty RenderBounds AABB because is means it hasn't been computed yet
+                    // There are some unfortunate cases where RenderBoundsUpdateSystem is executed after this system
+                    //  and a bad Scene AABB is computed if we consider these empty RenderBounds AABB.
+                    if (math.lengthsq(aabb.Center) != 0.0f || math.lengthsq(aabb.Extents) != 0.0f)
+                    // D381: I changed the line above from an && to an ||.
+                    {
+                        minMaxAabb.Encapsulate(aabb);
+                    }
+                }
+                SceneBounds[SceneBoundsEntity] = new Unity.Scenes.SceneBoundingVolume { Value = minMaxAabb };
+            }
+        }
+
+        /// <inheritdoc/>
+        protected override void OnUpdate()
+        {
+            //@TODO: API does not allow me to use ChunkComponentData.
+            //Review with simon how we can improve it.
+
+            var query = GetEntityQuery(typeof(WorldRenderBounds), typeof(SceneSection));
+
+            EntityManager.GetAllUniqueSharedComponents<SceneSection>(out var sections, Allocator.Temp);
+            foreach (var section in sections)
+            {
+                if (section.Equals(default(SceneSection)))
+                    continue;
+
+                query.SetSharedComponentFilter(section);
+
+                var entity = EntityManager.CreateEntity(typeof(Unity.Scenes.SceneBoundingVolume));
+                EntityManager.AddSharedComponent(entity, section);
+
+                var job               = new CollectSceneBoundsJob();
+                job.RenderBounds      = query.ToComponentDataArray<WorldRenderBounds>(Allocator.TempJob);
+                job.SceneBoundsEntity = entity;
+                job.SceneBounds       = GetComponentLookup<Unity.Scenes.SceneBoundingVolume>();
+                job.Run();
+            }
+
+            query.ResetFilter();
+        }
+    }
 }
 

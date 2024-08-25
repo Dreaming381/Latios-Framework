@@ -273,6 +273,9 @@ namespace Latios.Psyshock
                     jobIndex++;
                 }
 
+                if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layer.cellCount))
+                    return;
+
                 var crossBucket = layer.GetBucketSlices(IndexStrategies.CrossBucketIndex(layer.cellCount));
                 for (int i = 0; i < IndexStrategies.SingleLayerPart2Count(layer.cellCount); i++)
                 {
@@ -823,6 +826,9 @@ namespace Latios.Psyshock
                     }
                     jobIndex++;
                 }
+
+                if (IndexStrategies.ScheduleParallelShouldActuallyBeSingle(layerA.cellCount))
+                    return;
 
                 var crossBucketA = layerA.GetBucketSlices(crossBucketIndex);
                 for (int i = 0; i < IndexStrategies.ParallelPart2ACount(layerA.cellCount); i++)

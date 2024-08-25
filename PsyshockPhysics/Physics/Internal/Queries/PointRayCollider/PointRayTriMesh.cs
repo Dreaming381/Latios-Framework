@@ -18,7 +18,7 @@ namespace Latios.Psyshock
                 maxDistance = maxDistance,
                 found       = false
             };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor);
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor, triMesh.scale);
             if (processor.found)
             {
                 var hit =
@@ -41,7 +41,7 @@ namespace Latios.Psyshock
                 ray   = rayInTriMeshSpace,
                 found = false
             };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor);
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor, triMesh.scale);
             if (processor.found)
             {
                 var hit                 = PointRayTriangle.Raycast(in ray, in triMesh.triMeshColliderBlob.Value.triangles[processor.bestIndex], in triMeshTransform, out result);

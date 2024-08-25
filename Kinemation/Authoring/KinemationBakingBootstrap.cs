@@ -39,7 +39,10 @@ namespace Latios.Kinemation.Authoring
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosFrozenStaticRendererSystem>());
             context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.FrozenStaticRendererSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosAddWorldAndChunkRenderBoundsSystem>());
+            context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.RenderBoundsUpdateSystem>());
             context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosRenderBoundsUpdateSystem>());
+            context.optimizationSystemTypesToDisable.Add(TypeManager.GetSystemTypeIndex<Unity.Rendering.UpdateSceneBoundingVolumeFromRendererBounds>());
+            context.optimizationSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<LatiosUpdateSceneBoundingVolumeFromRendererBounds>());
         }
     }
 }

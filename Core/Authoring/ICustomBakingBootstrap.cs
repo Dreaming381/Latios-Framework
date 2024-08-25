@@ -243,7 +243,7 @@ namespace Latios.Authoring
                 }
 
                 if (s_bakingOverride.m_optimizationSystemTypesToInject.IsCreated)
-                    BootstrapTools.InjectSystems(s_bakingOverride.m_optimizationSystemTypesToInject, World, World.GetExistingSystemManaged<BakingSystemGroup>());
+                    BootstrapTools.InjectSystems(s_bakingOverride.m_optimizationSystemTypesToInject, World, m_group);
 
                 m_initialized = true;
             }

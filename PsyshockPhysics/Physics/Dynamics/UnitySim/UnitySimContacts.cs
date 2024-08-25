@@ -143,10 +143,10 @@ namespace Latios.Psyshock
             }
 
             /// <summary>
-            /// Acquires a span of the contacts. The Span MUST only be used while this
-            /// ContactsBetweenResult instance is valid.
+            /// Acquires a span of the contacts.
+            /// WARNING: This may only be called on an instance that lives on the stack or the unmanaged heap.
+            /// The Span MUST only be used while this instance is valid.
             /// </summary>
-            /// <returns></returns>
             public Span<ContactOnB> AsSpan()
             {
                 fixed (ContactOnB* ptr = &this[0])

@@ -16,7 +16,7 @@ namespace Latios.Psyshock
         {
             var transform      = new TransformQvvs(triMeshTransform.pos, triMeshTransform.rot, 1f, triMesh.scale);
             var pointInTriMesh = qvvs.InverseTransformPoint(in transform, math.transform(sphereTransform, sphere.center));
-            var aabb           = Physics.AabbFrom(pointInTriMesh - maxDistance, pointInTriMesh + maxDistance);
+            var aabb           = Physics.AabbFrom(pointInTriMesh - maxDistance - sphere.radius, pointInTriMesh + maxDistance + sphere.radius);
             var processor      = new PointRayTriMesh.PointProcessor
             {
                 blob         = triMesh.triMeshColliderBlob,
@@ -25,7 +25,7 @@ namespace Latios.Psyshock
                 bestDistance = float.MaxValue,
                 found        = false
             };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor);
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor, triMesh.scale);
             if (processor.found)
             {
                 var hitTriangle          = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[processor.bestIndex], 1f, triMesh.scale);
@@ -57,7 +57,7 @@ namespace Latios.Psyshock
                 maxDistance      = maxDistance,
                 processor        = (T*)UnsafeUtility.AddressOf(ref processor)
             };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor);
+            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor, triMesh.scale);
         }
 
         public static bool ColliderCast(in SphereCollider sphereToCast,
