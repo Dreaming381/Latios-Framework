@@ -9,7 +9,8 @@
     "com.unity.entities": "1.2.1",
     "com.unity.audio.dspgraph": "0.1.0-preview.22",
     "com.unity.entities.graphics": "1.2.1",
-    "com.unity.burst": "1.8.12"
+    "com.unity.burst": "1.8.12",
+    "com.unity.shadergraph": "14.0.11"
   },
   "unityRelease": "13f1",
   "keywords": [
