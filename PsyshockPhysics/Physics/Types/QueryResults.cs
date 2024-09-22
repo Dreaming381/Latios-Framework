@@ -169,6 +169,10 @@ namespace Latios.Psyshock
         /// used to create the CollisionLayer
         /// </summary>
         public int sourceIndex;
+        /// <summary>
+        /// The index of the layer in the ReadOnlySpan of CollisionLayers if such a span is used, 0 otherwise
+        /// </summary>
+        public int layerIndex;
 
         /// <summary>
         /// The entity in the CollisionLayer that generated the corresponding result

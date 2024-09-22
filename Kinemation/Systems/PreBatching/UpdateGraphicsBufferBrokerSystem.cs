@@ -9,71 +9,87 @@ namespace Latios.Kinemation
 {
     [UpdateInGroup(typeof(PresentationSystemGroup), OrderFirst = true)]
     [DisableAutoCreation]
-    public partial class UpdateGraphicsBufferBrokerSystem : SubSystem
+    public partial struct UpdateGraphicsBufferBrokerSystem : ISystem
     {
-        protected override void OnCreate()
+        LatiosWorldUnmanaged latiosWorld;
+        GraphicsBufferBroker broker;
+
+        public void OnCreate(ref SystemState state)
         {
-            var broker = new GraphicsBufferBroker();
-            worldBlackboardEntity.AddManagedStructComponent(new GraphicsBufferBrokerReference
-            {
-                graphicsBufferBroker = broker,
-            });
+            latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            var copyVerticesShader        = Resources.Load<ComputeShader>("CopyVertices");
-            var copyTransformUnionsShader = Resources.Load<ComputeShader>("CopyTransformUnions");
-            var copyBlendShapesShader     = Resources.Load<ComputeShader>("CopyBlendShapes");
-            var copyByteAddressShader     = Resources.Load<ComputeShader>("CopyBytes");
+            broker = new GraphicsBufferBroker(Allocator.Persistent);
+            latiosWorld.worldBlackboardEntity.AddComponentData(broker);
+            latiosWorld.worldBlackboardEntity.AddManagedStructComponent(new GraphicsBufferBrokerDeferredDisposer { broker = broker });
 
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_skinningTransformsID,
+            var copyVerticesShader        = latiosWorld.latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("CopyVertices");
+            var copyTransformUnionsShader = latiosWorld.latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("CopyTransformUnions");
+            var copyBlendShapesShader     = latiosWorld.latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("CopyBlendShapes");
+            var copyByteAddressShader     = latiosWorld.latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("CopyBytes");
+
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.skinningTransformsID,
                                               3 * 4 * 1024,
                                               4,
                                               GraphicsBuffer.Target.Raw,
                                               copyByteAddressShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_deformedVerticesID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.deformedVerticesID,
                                               256 * 1024,
                                               3 * 3 * 4,
                                               GraphicsBuffer.Target.Structured,
                                               copyVerticesShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshVerticesID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshVerticesID,
                                               64 * 1024,
                                               3 * 3 * 4,
                                               GraphicsBuffer.Target.Structured,
                                               copyVerticesShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshWeightsID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshWeightsID,
                                               2 * 4 * 64 * 1024,
                                               4,
                                               GraphicsBuffer.Target.Raw,
                                               copyByteAddressShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBindPosesID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBindPosesID,
                                               1024,
                                               3 * 4 * 4,
                                               GraphicsBuffer.Target.Structured,
                                               copyTransformUnionsShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBlendShapesID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBlendShapesID,
                                               16 * 1024,
                                               10 * 4,
                                               GraphicsBuffer.Target.Structured,
                                               copyBlendShapesShader);
-            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_boneOffsetsID,
+            broker.InitializePersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.boneOffsetsID,
                                               512,
                                               4,
                                               GraphicsBuffer.Target.Raw,
                                               copyByteAddressShader);
 
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_meshVerticesUploadID,    3 * 3 * 4, GraphicsBuffer.Target.Structured);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_meshWeightsUploadID,     4,         GraphicsBuffer.Target.Raw);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_meshBindPosesUploadID,   3 * 4 * 4, GraphicsBuffer.Target.Structured);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_meshBlendShapesUploadID, 10 * 4,    GraphicsBuffer.Target.Structured);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_boneOffsetsUploadID,     4,         GraphicsBuffer.Target.Raw);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_bonesUploadID,           3 * 4 * 4, GraphicsBuffer.Target.Structured);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_metaUint3UploadID,       4,         GraphicsBuffer.Target.Raw);
-            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_metaUint4UploadID,       4,         GraphicsBuffer.Target.Raw);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshVerticesUploadID,    3 * 3 * 4, GraphicsBuffer.Target.Structured);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshWeightsUploadID,     4,         GraphicsBuffer.Target.Raw);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBindPosesUploadID,   3 * 4 * 4, GraphicsBuffer.Target.Structured);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBlendShapesUploadID, 10 * 4,    GraphicsBuffer.Target.Structured);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.boneOffsetsUploadID,     4,         GraphicsBuffer.Target.Raw);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.bonesUploadID,           3 * 4 * 4, GraphicsBuffer.Target.Structured);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.metaUint3UploadID,       4,         GraphicsBuffer.Target.Raw);
+            broker.InitializeUploadPool(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.metaUint4UploadID,       4,         GraphicsBuffer.Target.Raw);
         }
 
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            var broker = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferBrokerReference>();
-            broker.graphicsBufferBroker.Update();
+            var broker = latiosWorld.worldBlackboardEntity.GetComponentData<GraphicsBufferBroker>();
+            broker.Update();
+        }
+
+        public void OnDestroy(ref SystemState state)
+        {
+            //broker.Dispose();
+        }
+
+        partial struct GraphicsBufferBrokerDeferredDisposer : IManagedStructComponent
+        {
+            public GraphicsBufferBroker broker;
+
+            public void Dispose() => broker.Dispose();
         }
     }
 
@@ -85,91 +101,90 @@ namespace Latios.Kinemation
         const uint kMinMeshBlendShapesUploadSize = 1024;
         const uint kMinBoneOffsetsUploadSize     = 128;
         const uint kMinBonesSize                 = 128 * 128;
-        const uint kMinGlyphsUploadSize          = 128;
         const uint kMinDispatchMetaSize          = 128;
         const uint kMinUploadMetaSize            = 128;
 
-        public static GraphicsBuffer GetSkinningTransformsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetSkinningTransformsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_skinningTransformsID, requiredSize * 3 * 4);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.skinningTransformsID, requiredSize * 3 * 4);
         }
 
-        public static GraphicsBuffer GetDeformBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetDeformBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_deformedVerticesID, requiredSize);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.deformedVerticesID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshVerticesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshVerticesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshVerticesID, requiredSize);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshVerticesID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshWeightsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshWeightsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshWeightsID, requiredSize * 2);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshWeightsID, requiredSize * 2);
         }
 
-        public static GraphicsBuffer GetMeshWeightsBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
-            DeformationGraphicsBufferBrokerExtensions.s_meshWeightsID);
+        public static GraphicsBufferUnmanaged GetMeshWeightsBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
+            DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshWeightsID);
 
-        public static GraphicsBuffer GetMeshBindPosesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshBindPosesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBindPosesID, requiredSize);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBindPosesID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshBindPosesBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
-            DeformationGraphicsBufferBrokerExtensions.s_meshBindPosesID);
+        public static GraphicsBufferUnmanaged GetMeshBindPosesBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
+            DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBindPosesID);
 
-        public static GraphicsBuffer GetMeshBlendShapesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshBlendShapesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBlendShapesID, requiredSize);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBlendShapesID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshBlendShapesBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
-            DeformationGraphicsBufferBrokerExtensions.s_meshBlendShapesID);
+        public static GraphicsBufferUnmanaged GetMeshBlendShapesBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
+            DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBlendShapesID);
 
-        public static GraphicsBuffer GetBoneOffsetsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetBoneOffsetsBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
-            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_boneOffsetsID, requiredSize);
+            return broker.GetPersistentBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.boneOffsetsID, requiredSize);
         }
 
-        public static GraphicsBuffer GetBoneOffsetsBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
-            DeformationGraphicsBufferBrokerExtensions.s_boneOffsetsID);
+        public static GraphicsBufferUnmanaged GetBoneOffsetsBufferRO(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(
+            DeformationGraphicsBufferBrokerExtensions.s_ids.Data.boneOffsetsID);
 
-        public static GraphicsBuffer GetMeshVerticesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshVerticesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinMeshVerticesUploadSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshVerticesUploadID, requiredSize);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshVerticesUploadID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshWeightsUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshWeightsUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinMeshWeightsUploadSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshWeightsUploadID, requiredSize * 2);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshWeightsUploadID, requiredSize * 2);
         }
 
-        public static GraphicsBuffer GetMeshBindPosesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshBindPosesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinMeshBindPosesUploadSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBindPosesUploadID, requiredSize);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBindPosesUploadID, requiredSize);
         }
 
-        public static GraphicsBuffer GetMeshBlendShapesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetMeshBlendShapesUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinMeshBlendShapesUploadSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_meshBlendShapesUploadID, requiredSize);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.meshBlendShapesUploadID, requiredSize);
         }
 
-        public static GraphicsBuffer GetBoneOffsetsUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetBoneOffsetsUploadBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinBoneOffsetsUploadSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_boneOffsetsUploadID, requiredSize);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.boneOffsetsUploadID, requiredSize);
         }
 
-        public static GraphicsBuffer GetBonesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
+        public static GraphicsBufferUnmanaged GetBonesBuffer(this GraphicsBufferBroker broker, uint requiredSize)
         {
             requiredSize = math.max(requiredSize, kMinBonesSize);
-            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_bonesUploadID, requiredSize);
+            return broker.GetUploadBuffer(DeformationGraphicsBufferBrokerExtensions.s_ids.Data.bonesUploadID, requiredSize);
         }
     }
 }

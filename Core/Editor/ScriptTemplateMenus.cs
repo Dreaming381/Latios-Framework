@@ -68,6 +68,12 @@ internal class ScriptTemplateMenus
     {
         CreateScriptFromTemplate("NetCodeStandardInjectionBootstrap.txt", "NetCodeLatiosBootstrap.cs");
     }
+
+    [MenuItem("Assets/Create/Latios/Bootstrap/NetCode QVVS - Explicit Workflow")]
+    public static void CreateNetCodeQvvsExplicitBootstrap()
+    {
+        CreateScriptFromTemplate("NetCodeQvvsExplicitBootstrap.txt", "NetCodeLatiosBootstrap.cs");
+    }
 #endif
 
     public static void CreateScriptFromTemplate(string templateName, string defaultScriptName)

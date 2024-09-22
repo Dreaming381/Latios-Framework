@@ -131,47 +131,6 @@ namespace Latios.Kinemation.Authoring
                     if (renderer.isDeforming)
                         requiredPropertiesForReference |= classification;
 
-                    if (!renderer.lodSettings.Equals(default(LodSettings)))
-                    {
-                        bool negHeight = (renderer.lodSettings.lowestResLodLevel & 0x1) == 1;
-                        bool negMin    = (renderer.lodSettings.lowestResLodLevel & 0x2) == 2;
-                        bool negMax    = (renderer.lodSettings.lowestResLodLevel & 0x4) == 4;
-                        if (negHeight)
-                            renderer.lodSettings.localHeight *= -1;
-                        if (negMin)
-                            renderer.lodSettings.minScreenHeightPercent *= new half(-1f);
-                        if (negMax)
-                            renderer.lodSettings.maxScreenHeightPercent *= new half(-1f);
-
-                        if (renderer.lodSettings.minScreenHeightPercentAtCrossfadeEdge > 0f || renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge > 0f)
-                        {
-                            if (renderer.lodSettings.isSpeedTree)
-                                baker.AddComponent<SpeedTreeCrossfadeTag>(renderer.targetEntity);
-
-                            if (renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge < 0f)
-                                renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge = half.MaxValueAsHalf;
-
-                            baker.AddComponent<LodCrossfade>(renderer.targetEntity);
-                            baker.AddComponent(              renderer.targetEntity, new LodHeightPercentagesWithCrossfadeMargins
-                            {
-                                localSpaceHeight = renderer.lodSettings.localHeight,
-                                maxCrossFadeEdge = renderer.lodSettings.maxScreenHeightPercentAtCrossfadeEdge,
-                                maxPercent       = renderer.lodSettings.maxScreenHeightPercent,
-                                minCrossFadeEdge = renderer.lodSettings.minScreenHeightPercentAtCrossfadeEdge,
-                                minPercent       = renderer.lodSettings.minScreenHeightPercent
-                            });
-                        }
-                        else
-                        {
-                            baker.AddComponent(renderer.targetEntity, new LodHeightPercentages
-                            {
-                                localSpaceHeight = renderer.lodSettings.localHeight,
-                                maxPercent       = renderer.lodSettings.maxScreenHeightPercent,
-                                minPercent       = renderer.lodSettings.minScreenHeightPercent
-                            });
-                        }
-                    }
-
                     if (renderer.useLightmapsIfPossible)
                         baker.DependsOnLightBaking();
                     if (renderer.useLightmapsIfPossible && GetStaticLightingModeFromLightmapIndex(renderer.lightmapIndex) == RenderMeshUtility.StaticLightingMode.LightMapped)
@@ -205,7 +164,7 @@ namespace Latios.Kinemation.Authoring
                         {
                             mesh     = src.mesh,
                             material = src.material,
-                            submesh  = src.submesh
+                            submesh  = src.submesh | (src.lodMask << 24)
                         });
                     }
                 }
@@ -230,7 +189,7 @@ namespace Latios.Kinemation.Authoring
         static int s_legacyDotsDeformProperty    = Shader.PropertyToID("_DotsDeformationParams");
         static int s_legacyComputeDeformProperty = Shader.PropertyToID("_ComputeMeshIndex");
 
-        private static DeformClassification GetDeformClassificationFromMaterial(Material material)
+        internal static DeformClassification GetDeformClassificationFromMaterial(Material material)
         {
             DeformClassification classification = DeformClassification.None;
             if (material.HasProperty(s_legacyLbsProperty))

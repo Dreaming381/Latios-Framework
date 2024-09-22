@@ -291,24 +291,24 @@ namespace InternalSourceGen
         }
     }
 
-    internal partial struct MeshGpuUploadBuffers : IManagedStructComponent
+    internal partial struct MeshGpuUploadBuffers : IComponentData
     {
         // Not owned by this
-        public UnityEngine.GraphicsBuffer verticesBuffer;
-        public UnityEngine.GraphicsBuffer weightsBuffer;
-        public UnityEngine.GraphicsBuffer bindPosesBuffer;
-        public UnityEngine.GraphicsBuffer blendShapesBuffer;
-        public UnityEngine.GraphicsBuffer boneOffsetsBuffer;
-        public UnityEngine.GraphicsBuffer verticesUploadBuffer;
-        public UnityEngine.GraphicsBuffer weightsUploadBuffer;
-        public UnityEngine.GraphicsBuffer bindPosesUploadBuffer;
-        public UnityEngine.GraphicsBuffer blendShapesUploadBuffer;
-        public UnityEngine.GraphicsBuffer boneOffsetsUploadBuffer;
-        public UnityEngine.GraphicsBuffer verticesUploadMetaBuffer;
-        public UnityEngine.GraphicsBuffer weightsUploadMetaBuffer;
-        public UnityEngine.GraphicsBuffer bindPosesUploadMetaBuffer;
-        public UnityEngine.GraphicsBuffer blendShapesUploadMetaBuffer;
-        public UnityEngine.GraphicsBuffer boneOffsetsUploadMetaBuffer;
+        public GraphicsBufferUnmanaged verticesBuffer;
+        public GraphicsBufferUnmanaged weightsBuffer;
+        public GraphicsBufferUnmanaged bindPosesBuffer;
+        public GraphicsBufferUnmanaged blendShapesBuffer;
+        public GraphicsBufferUnmanaged boneOffsetsBuffer;
+        public GraphicsBufferUnmanaged verticesUploadBuffer;
+        public GraphicsBufferUnmanaged weightsUploadBuffer;
+        public GraphicsBufferUnmanaged bindPosesUploadBuffer;
+        public GraphicsBufferUnmanaged blendShapesUploadBuffer;
+        public GraphicsBufferUnmanaged boneOffsetsUploadBuffer;
+        public GraphicsBufferUnmanaged verticesUploadMetaBuffer;
+        public GraphicsBufferUnmanaged weightsUploadMetaBuffer;
+        public GraphicsBufferUnmanaged bindPosesUploadMetaBuffer;
+        public GraphicsBufferUnmanaged blendShapesUploadMetaBuffer;
+        public GraphicsBufferUnmanaged boneOffsetsUploadMetaBuffer;
     }
 
     internal partial struct MeshGpuUploadBuffersMapped : ICollectionComponent
@@ -442,7 +442,7 @@ namespace InternalSourceGen
 
     internal partial struct LODCrossfadePtrMap : ICollectionComponent
     {
-        public unsafe struct CrossfadePtr { public byte* ptr; }
+        public unsafe struct CrossfadePtr { public LodCrossfade* ptr; }
         public struct ChunkIdentifier : IEquatable<ChunkIdentifier>
         {
             public uint batchID;

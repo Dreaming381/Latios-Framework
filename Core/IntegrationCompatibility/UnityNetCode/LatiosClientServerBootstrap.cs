@@ -72,6 +72,19 @@ namespace Latios.Compatibility.UnityNetCode
     }
 
     /// <summary>
+    /// Implement this interface to specify default GhostComponentVariations without having to create new systems for them.
+    /// This code will run in servers, clients, and even baking worlds. The result will be statically cached after the first run.
+    /// </summary>
+    public interface ISpecifyDefaultVariantsBootstrap
+    {
+        /// <summary>
+        /// Called once after domain reload by a server world, client world, thin client world, or baking world.
+        /// </summary>
+        /// <param name="defaultVariants">Default variants to add, same as in DefaultVariantSystemBase</param>
+        public void RegisterDefaultVariants(Dictionary<ComponentType, DefaultVariantSystemBase.Rule> defaultVariants);
+    }
+
+    /// <summary>
     /// LatiosClientServerBootstrap is a derived class of <see cref="=ClientServerBootstrap"/> and has a very similar interface.
     /// The main difference is that its methods are able to invoke the custom bootstraps to create customized worlds akin to non-NetCode projects.
     /// </summary>
@@ -185,7 +198,7 @@ namespace Latios.Compatibility.UnityNetCode
         /// </summary>
         /// <param name="name">The client world name</param>
         /// <returns></returns>
-        public static new World CreateClientWorld(string name)
+        public static new World CreateClientWorld(string name, bool setAsDefault = true)
         {
 #if UNITY_SERVER && !UNITY_EDITOR
             throw new NotImplementedException();
@@ -195,7 +208,7 @@ namespace Latios.Compatibility.UnityNetCode
                 return ClientServerBootstrap.CreateClientWorld(name);
 
             var world = bootstrap.Initialize(name, WorldFlags.GameClient, WorldSystemFilterFlags.ClientSimulation | WorldSystemFilterFlags.Presentation);
-            if (World.DefaultGameObjectInjectionWorld == null)
+            if (World.DefaultGameObjectInjectionWorld == null || setAsDefault)
                 World.DefaultGameObjectInjectionWorld = world;
             ScriptBehaviourUpdateOrder.AppendWorldToCurrentPlayerLoop(world);
             ClientWorlds.Add(world);
@@ -271,6 +284,32 @@ namespace Latios.Compatibility.UnityNetCode
             }
         }
     }
+
+namespace UnityInject
+{
+    [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation | WorldSystemFilterFlags.ClientSimulation |
+                       WorldSystemFilterFlags.ThinClientSimulation | WorldSystemFilterFlags.BakingSystem)]
+    [CreateAfter(typeof(GhostComponentSerializerCollectionSystemGroup))]
+    [CreateBefore(typeof(DefaultVariantSystemGroup))]
+    [UpdateInGroup(typeof(DefaultVariantSystemGroup))]
+    public partial class BootstrappedDefaultVariantRegistrationSystem : DefaultVariantSystemBase
+    {
+        static Dictionary<ComponentType, Rule> s_defaultVariants;
+
+        protected override void RegisterDefaultVariants(Dictionary<ComponentType, Rule> defaultVariants)
+        {
+            if (s_defaultVariants == null)
+            {
+                s_defaultVariants = new Dictionary<ComponentType, Rule>();
+                var bootstrap = BootstrapTools.TryCreateCustomBootstrap<ISpecifyDefaultVariantsBootstrap>();
+                bootstrap?.RegisterDefaultVariants(s_defaultVariants);
+            }
+
+            foreach (var variant in s_defaultVariants)
+                defaultVariants.Add(variant.Key, variant.Value);
+        }
+    }
+}
 }
 #endif
 

@@ -19,25 +19,25 @@ namespace Latios.Calligraphics.Rendering.Authoring
         {
             var mesh = Resources.Load<Mesh>(kTextBackendMeshResource);
 
+            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
+
             RenderingBakingTools.GetLOD(baker, renderer, out var lodSettings);
+            RenderingBakingTools.BakeLodMaskForEntity(baker, entity, lodSettings);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
-                targetEntity                = baker.GetEntity(TransformUsageFlags.Renderable),
+                targetEntity                = entity,
                 renderMeshDescription       = new RenderMeshDescription(renderer),
                 isDeforming                 = true,
                 suppressDeformationWarnings = false,
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = renderer.lightmapIndex,
                 lightmapScaleOffset         = renderer.lightmapScaleOffset,
-                lodSettings                 = lodSettings,
                 isStatic                    = baker.IsStatic(),
                 localBounds                 = default,
             };
 
             baker.BakeMeshAndMaterial(rendererSettings, mesh, material);
-
-            var entity = baker.GetEntity(TransformUsageFlags.Renderable);
 
             baker.AddComponent(                 entity, new TextRenderControl { flags = TextRenderControl.Flags.Dirty });
             baker.AddComponent<TextShaderIndex>(entity);

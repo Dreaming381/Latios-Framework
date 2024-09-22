@@ -29,9 +29,9 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkSkinningCullingTag>(true).With<ChunkWorldRenderBounds>(true).With<ChunkPerFrameCullingMask>(
-                true)
-                          .With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false).UseWriteGroups().Build();
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkSkinningCullingTag>(true).With<ChunkWorldRenderBounds>(true)
+                          .With<ChunkPerFrameCullingMask>(true).With<ChunkPerCameraCullingMask>(false).With<ChunkPerCameraCullingSplitsMask>(false)
+                          .UseWriteGroups().Build();
 
             m_findJob = new FindChunksNeedingFrustumCullingJob
             {
@@ -42,23 +42,21 @@ namespace Latios.Kinemation.Systems
 
             m_singleJob = new SingleSplitCullingJob
             {
-                chunkWorldRenderBoundsHandle       = state.GetComponentTypeHandle<ChunkWorldRenderBounds>(true),
-                perCameraCullingMaskHandle         = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                worldRenderBoundsHandle            = state.GetComponentTypeHandle<WorldRenderBounds>(true),
-                perCameraSkeletonCullingMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraSkeletonCullingMask>(false),
-                skeletonDependentHandle            = state.GetComponentTypeHandle<SkeletonDependent>(true),
-                storageLookup                      = state.GetEntityStorageInfoLookup()
+                chunkWorldRenderBoundsHandle = state.GetComponentTypeHandle<ChunkWorldRenderBounds>(true),
+                perCameraCullingMaskHandle   = state.GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
+                worldRenderBoundsHandle      = state.GetComponentTypeHandle<WorldRenderBounds>(true),
+                skeletonDependentHandle      = state.GetComponentTypeHandle<SkeletonDependent>(true),
+                storageLookup                = state.GetEntityStorageInfoLookup()
             };
 
             m_multiJob = new MultiSplitCullingJob
             {
-                chunkWorldRenderBoundsHandle       = m_singleJob.chunkWorldRenderBoundsHandle,
-                perCameraCullingMaskHandle         = m_singleJob.perCameraCullingMaskHandle,
-                perCameraCullingSplitsMaskHandle   = state.GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(false),
-                worldRenderBoundsHandle            = m_singleJob.worldRenderBoundsHandle,
-                perCameraSkeletonCullingMaskHandle = m_singleJob.perCameraSkeletonCullingMaskHandle,
-                skeletonDependentHandle            = m_singleJob.skeletonDependentHandle,
-                storageLookup                      = m_singleJob.storageLookup
+                chunkWorldRenderBoundsHandle     = m_singleJob.chunkWorldRenderBoundsHandle,
+                perCameraCullingMaskHandle       = m_singleJob.perCameraCullingMaskHandle,
+                perCameraCullingSplitsMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(false),
+                worldRenderBoundsHandle          = m_singleJob.worldRenderBoundsHandle,
+                skeletonDependentHandle          = m_singleJob.skeletonDependentHandle,
+                storageLookup                    = m_singleJob.storageLookup
             };
         }
 
@@ -84,7 +82,6 @@ namespace Latios.Kinemation.Systems
                 m_multiJob.perCameraCullingMaskHandle.Update(ref state);
                 m_multiJob.perCameraCullingSplitsMaskHandle.Update(ref state);
                 m_multiJob.worldRenderBoundsHandle.Update(ref state);
-                m_multiJob.perCameraSkeletonCullingMaskHandle.Update(ref state);
                 m_multiJob.skeletonDependentHandle.Update(ref state);
                 m_multiJob.storageLookup.Update(ref state);
                 state.Dependency = m_multiJob.ScheduleByRef(chunkList, 1, state.Dependency);
@@ -96,16 +93,10 @@ namespace Latios.Kinemation.Systems
                 m_singleJob.cullingSplits = splits.packedSplits;
                 m_singleJob.perCameraCullingMaskHandle.Update(ref state);
                 m_singleJob.worldRenderBoundsHandle.Update(ref state);
-                m_singleJob.perCameraSkeletonCullingMaskHandle.Update(ref state);
                 m_singleJob.skeletonDependentHandle.Update(ref state);
                 m_singleJob.storageLookup.Update(ref state);
                 state.Dependency = m_singleJob.ScheduleByRef(chunkList, 1, state.Dependency);
             }
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
         }
 
         [BurstCompile]
@@ -152,8 +143,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>      skeletonDependentHandle;
             [ReadOnly] public EntityStorageInfoLookup                     storageLookup;
 
-            public ComponentTypeHandle<ChunkPerCameraCullingMask>         perCameraCullingMaskHandle;
-            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask> perCameraSkeletonCullingMaskHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraCullingMaskHandle;
 
             public void Execute(int i)
             {
@@ -186,45 +176,17 @@ namespace Latios.Kinemation.Systems
                 }
 
                 var worldBounds = chunk.GetNativeArray(ref worldRenderBoundsHandle);
-                var deps        = chunk.GetNativeArray(ref skeletonDependentHandle);
                 var inMask      = mask.lower.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
                     bool isIn         = FrustumPlanes.Intersect2NoPartial(cullingPlanes, worldBounds[i].Value) != FrustumPlanes.IntersectResult.Out;
                     mask.lower.Value &= ~(math.select(1ul, 0ul, isIn) << i);
-                    if (isIn)
-                        MarkSkeletonVisible(deps[i].root);
                 }
                 inMask = mask.upper.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
                     bool isIn         = FrustumPlanes.Intersect2NoPartial(cullingPlanes, worldBounds[i + 64].Value) != FrustumPlanes.IntersectResult.Out;
                     mask.upper.Value &= ~(math.select(1ul, 0ul, isIn) << i);
-                    if (isIn)
-                        MarkSkeletonVisible(deps[i + 64].root);
-                }
-            }
-
-#if !UNITY_BURST_EXPERIMENTAL_ATOMIC_INTRINSICS
-#error Latios Framework requires UNITY_BURST_EXPERIMENTAL_ATOMIC_INTRINSICS to be defined in your scripting define symbols.
-#endif
-
-            void MarkSkeletonVisible(Entity skeletonEntity)
-            {
-                if (storageLookup.Exists(skeletonEntity))
-                {
-                    var     esi  = storageLookup[skeletonEntity];
-                    ref var mask = ref esi.Chunk.GetChunkComponentRefRW(ref perCameraSkeletonCullingMaskHandle);
-                    if (esi.IndexInChunk >= 64)
-                    {
-                        ulong target = 1ul << (esi.IndexInChunk - 64);
-                        Common.InterlockedOr(ref mask.upper.Value, target);
-                    }
-                    else
-                    {
-                        ulong target = 1ul << esi.IndexInChunk;
-                        Common.InterlockedOr(ref mask.lower.Value, target);
-                    }
                 }
             }
         }
@@ -240,9 +202,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>      skeletonDependentHandle;
             [ReadOnly] public EntityStorageInfoLookup                     storageLookup;
 
-            public ComponentTypeHandle<ChunkPerCameraCullingMask>         perCameraCullingMaskHandle;
-            public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask>   perCameraCullingSplitsMaskHandle;
-            public ComponentTypeHandle<ChunkPerCameraSkeletonCullingMask> perCameraSkeletonCullingMaskHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingMask>       perCameraCullingMaskHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> perCameraCullingSplitsMaskHandle;
 
             public void Execute(int i)
             {
@@ -374,39 +335,6 @@ namespace Latios.Kinemation.Systems
                             upper        |= math.select(0ul, 1ul, splitMasks.splitMasks[i + 64] != 0) << i;
                         mask.lower.Value &= lower;
                         mask.upper.Value &= upper;
-                    }
-                }
-
-                {
-                    var deps   = chunk.GetNativeArray(ref skeletonDependentHandle);
-                    var inMask = mask.lower.Value;
-                    for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
-                    {
-                        MarkSkeletonVisible(deps[i].root);
-                    }
-                    inMask = mask.upper.Value;
-                    for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
-                    {
-                        MarkSkeletonVisible(deps[i + 64].root);
-                    }
-                }
-            }
-
-            void MarkSkeletonVisible(Entity skeletonEntity)
-            {
-                if (storageLookup.Exists(skeletonEntity))
-                {
-                    var     esi  = storageLookup[skeletonEntity];
-                    ref var mask = ref esi.Chunk.GetChunkComponentRefRW(ref perCameraSkeletonCullingMaskHandle);
-                    if (esi.IndexInChunk >= 64)
-                    {
-                        ulong target = 1ul << (esi.IndexInChunk - 64);
-                        Common.InterlockedOr(ref mask.upper.Value, target);
-                    }
-                    else
-                    {
-                        ulong target = 1ul << esi.IndexInChunk;
-                        Common.InterlockedOr(ref mask.lower.Value, target);
                     }
                 }
             }

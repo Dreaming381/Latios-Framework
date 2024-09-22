@@ -5,6 +5,7 @@ using System.Threading;
 using Latios.Transforms;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -469,10 +470,10 @@ namespace Latios.Kinemation.SparseUpload
         }
     }
 
-    internal class BufferPool : IDisposable
+    internal struct BufferPool : IDisposable
     {
-        private List<GraphicsBuffer> m_Buffers;
-        private NativeStack<int>     m_FreeBufferIds;
+        private NativeList<GraphicsBufferUnmanaged> m_Buffers;
+        private NativeStack<int>                    m_FreeBufferIds;
 
         private int                       m_Count;
         private int                       m_Stride;
@@ -481,7 +482,7 @@ namespace Latios.Kinemation.SparseUpload
 
         public BufferPool(int count, int stride, GraphicsBuffer.Target target, GraphicsBuffer.UsageFlags usageFlags)
         {
-            m_Buffers       = new List<GraphicsBuffer>();
+            m_Buffers       = new NativeList<GraphicsBufferUnmanaged>(Allocator.Persistent);
             m_FreeBufferIds = new NativeStack<int>(Allocator.Persistent);
 
             m_Count      = count;
@@ -492,17 +493,18 @@ namespace Latios.Kinemation.SparseUpload
 
         public void Dispose()
         {
-            for (int i = 0; i < m_Buffers.Count; ++i)
+            for (int i = 0; i < m_Buffers.Length; ++i)
             {
                 m_Buffers[i].Dispose();
             }
             m_FreeBufferIds.Dispose();
+            m_Buffers.Dispose();
         }
 
         private int AllocateBuffer()
         {
-            var id = m_Buffers.Count;
-            var cb = new GraphicsBuffer(m_Target, m_UsageFlags, m_Count, m_Stride);
+            var id = m_Buffers.Length;
+            var cb = new GraphicsBufferUnmanaged(m_Target, m_UsageFlags, m_Count, m_Stride);
             m_Buffers.Add(cb);
             return id;
         }
@@ -515,7 +517,7 @@ namespace Latios.Kinemation.SparseUpload
             return m_FreeBufferIds.Pop();
         }
 
-        public GraphicsBuffer GetBufferFromId(int id)
+        public GraphicsBufferUnmanaged GetBufferFromId(int id)
         {
             return m_Buffers[id];
         }
@@ -525,7 +527,7 @@ namespace Latios.Kinemation.SparseUpload
             m_FreeBufferIds.Push(id);
         }
 
-        public int TotalBufferCount => m_Buffers.Count;
+        public int TotalBufferCount => m_Buffers.Length;
         public int TotalBufferSize => TotalBufferCount * m_Count * m_Stride;
     }
 
@@ -567,7 +569,7 @@ namespace Latios.Kinemation.SparseUpload
 
         int m_BufferChunkSize;
 
-        GraphicsBuffer m_DestinationBuffer;
+        GraphicsBufferUnmanaged m_DestinationBuffer;
 
         BufferPool m_UploadBufferPool;
 
@@ -593,9 +595,9 @@ namespace Latios.Kinemation.SparseUpload
 
         ThreadedSparseUploaderData* m_ThreadData;
 
-        ComputeShader m_SparseUploaderShader;
-        int           m_CopyKernelIndex;
-        int           m_ReplaceKernelIndex;
+        UnityObjectRef<ComputeShader> m_SparseUploaderShader;
+        int                           m_CopyKernelIndex;
+        int                           m_ReplaceKernelIndex;
 
         int m_SrcBufferID;
         int m_DstBufferID;
@@ -609,9 +611,10 @@ namespace Latios.Kinemation.SparseUpload
         /// <summary>
         /// Constructs a new sparse uploader with the specified buffer as the target.
         /// </summary>
+        /// <param name="latiosWorld">The LatiosWorld (needed for GC preservation bug workaround)</param>
         /// <param name="destinationBuffer">The target buffer to write uploads into.</param>
         /// <param name="bufferChunkSize">The upload buffer chunk size.</param>
-        public LatiosSparseUploader(GraphicsBuffer destinationBuffer, int bufferChunkSize = 16 * 1024 * 1024)
+        public LatiosSparseUploader(LatiosWorld latiosWorld, GraphicsBufferUnmanaged destinationBuffer, int bufferChunkSize = 16 * 1024 * 1024)
         {
             m_BufferChunkSize = bufferChunkSize;
 
@@ -628,9 +631,9 @@ namespace Latios.Kinemation.SparseUpload
             m_ThreadData->m_NumBuffers = 0;
             m_ThreadData->m_CurrBuffer = 0;
 
-            m_SparseUploaderShader = Resources.Load<ComputeShader>("LatiosSparseUploader");
-            m_CopyKernelIndex      = m_SparseUploaderShader.FindKernel("CopyKernel");
-            m_ReplaceKernelIndex   = m_SparseUploaderShader.FindKernel("ReplaceKernel");
+            m_SparseUploaderShader = latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("LatiosSparseUploader");
+            m_CopyKernelIndex      = m_SparseUploaderShader.Value.FindKernel("CopyKernel");
+            m_ReplaceKernelIndex   = m_SparseUploaderShader.Value.FindKernel("ReplaceKernel");
 
             m_SrcBufferID          = Shader.PropertyToID("srcBuffer");
             m_DstBufferID          = Shader.PropertyToID("dstBuffer");
@@ -671,9 +674,9 @@ namespace Latios.Kinemation.SparseUpload
         /// </remarks>
         /// <param name="buffer">The new buffer to replace the old one with.</param>
         /// <param name="copyFromPrevious">Indicates whether to copy the contents of the old buffer to the new buffer.</param>
-        public void ReplaceBuffer(GraphicsBuffer buffer, bool copyFromPrevious = false)
+        public void ReplaceBuffer(GraphicsBufferUnmanaged buffer, bool copyFromPrevious = false)
         {
-            if (copyFromPrevious && m_DestinationBuffer != null)
+            if (copyFromPrevious && m_DestinationBuffer.IsValid())
             {
                 // Since we have no code such as Graphics.CopyBuffer(dst, src) currently
                 // we have to do this ourselves in a compute shader
@@ -832,7 +835,7 @@ namespace Latios.Kinemation.SparseUpload
             };
         }
 
-        private void DispatchUploads(int numOps, GraphicsBuffer graphicsBuffer)
+        private void DispatchUploads(int numOps, GraphicsBufferUnmanaged graphicsBuffer)
         {
             for (int iOp = 0; iOp < numOps; iOp += k_MaxThreadGroupsPerDispatch)
             {

@@ -1,4 +1,5 @@
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -11,12 +12,18 @@ namespace Latios.Transforms
     /// This component is always present, and the only required transform component for rendering with Kinemation.
     /// Usage: Typically ReadOnly. It is strongly recommended you use TransformAspect for modifying the transform in world-space.
     /// </summary>
+#if UNITY_NETCODE
+    [StructLayout(LayoutKind.Explicit)]
+#endif
     public struct WorldTransform : IComponentData
     {
         /// <summary>
         /// The actual TransformQvvs representing the world-space transform of the entity.
         /// Directly writing to this value is heavily discouraged.
         /// </summary>
+#if UNITY_NETCODE
+        [FieldOffset(0)]
+#endif
         public TransformQvvs worldTransform;
 
         /// <summary>
@@ -68,6 +75,14 @@ namespace Latios.Transforms
         /// The unit down vector (local Y-) of the entity in world-space
         /// </summary>
         public float3 downDirection => math.rotate(rotation, new float3(0f, -1f, 0f));
+
+#if UNITY_NETCODE
+        [FieldOffset(16)] public float3 __position;
+        [FieldOffset(0)]  public quaternion __rotation;
+        [FieldOffset(44)] public float __scale;
+        [FieldOffset(32)] public float3 __stretch;
+        [FieldOffset(28)] public int __worldIndex;
+#endif
     }
 
     /// <summary>

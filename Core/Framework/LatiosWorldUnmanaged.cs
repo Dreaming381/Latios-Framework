@@ -64,6 +64,21 @@ namespace Latios
             }
         }
 
+        /// <summary>
+        /// Obtains the managed LatiosWorld. Not Burst-compatible.
+        /// </summary>
+        public LatiosWorld latiosWorld
+        {
+            get
+            {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
+                return m_impl->m_worldUnmanaged.EntityManager.World as LatiosWorld;
+            }
+        }
+
         #region blackboards
         /// <summary>
         /// The worldBlackboardEntity associated with this world
@@ -731,6 +746,12 @@ namespace Latios
 
         public void CompleteOrMergeDependencies(bool isReadOnly, ref FixedList512Bytes<JobHandle> readHandles, ref JobHandle writeHandle)
         {
+            if (writeHandle.Equals(default(JobHandle)))
+            {
+                if (isReadOnly || readHandles.IsEmpty)
+                    return;
+            }
+
             if (!m_executingSystemStack.IsEmpty && m_executingSystemStack[m_executingSystemStack.Length - 1] == m_worldUnmanaged.GetCurrentlyExecutingSystem())
             {
                 ref var state = ref m_worldUnmanaged.ResolveSystemStateRef(m_executingSystemStack[m_executingSystemStack.Length - 1]);

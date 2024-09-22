@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Latios.Transforms;
-using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -21,7 +19,7 @@ namespace Latios.Kinemation.Authoring
 
         public override void Bake(SkinnedMeshRenderer authoring)
         {
-            if (GetComponent<OverrideMeshRendererBase>() != null)
+            if (RenderingBakingTools.IsOverridden(this, authoring))
                 return;
 
             var sharedMesh = authoring.sharedMesh;
@@ -65,6 +63,8 @@ namespace Latios.Kinemation.Authoring
             {
                 Debug.LogWarning($"Some materials on Skinned Mesh Renderer {authoring.gameObject.name} were not assigned. Rendering results may be incorrect.");
             }
+
+            MeshDeformDataFeatures deformFeatures = RenderingBakingTools.GetDeformFeaturesFromMaterials(m_materialsCache);
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
 
@@ -152,7 +152,7 @@ namespace Latios.Kinemation.Authoring
                     }
                 }
             }
-            if (sharedMesh.blendShapeCount > 0)
+            if (sharedMesh.blendShapeCount > 0 && (deformFeatures & MeshDeformDataFeatures.Deform) != MeshDeformDataFeatures.None)
             {
                 AddComponent<BlendShapeState>(entity);
                 var weightsBuffer = AddBuffer<BlendShapeWeight>(entity);
@@ -162,11 +162,12 @@ namespace Latios.Kinemation.Authoring
                 {
                     weights[i] = authoring.GetBlendShapeWeight(i) / 100f;
                 }
+                deformFeatures |= MeshDeformDataFeatures.BlendShapes;
             }
 
             AddComponent(entity, new PendingMeshDeformDataBlob
             {
-                blobHandle = this.RequestCreateBlobAsset(sharedMesh)
+                blobHandle = this.RequestCreateBlobAsset(sharedMesh, deformFeatures)
             });
             AddComponent<MeshDeformDataBlobReference>(entity);
 
@@ -175,6 +176,7 @@ namespace Latios.Kinemation.Authoring
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
             RenderingBakingTools.GetLOD(this, authoring, out var lodSettings);
+            RenderingBakingTools.BakeLodMaskForEntity(this, entity, lodSettings);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -185,7 +187,6 @@ namespace Latios.Kinemation.Authoring
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = authoring.lightmapIndex,
                 lightmapScaleOffset         = authoring.lightmapScaleOffset,
-                lodSettings                 = lodSettings,
                 isStatic                    = IsStatic(),
                 localBounds                 = sharedMesh != null ? sharedMesh.bounds : default,
             };
@@ -200,14 +201,15 @@ namespace Latios.Kinemation.Authoring
             }
             else
             {
-                var                            additionalEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{GetName()}-TransparentRenderEntity");
-                Span<MeshRendererBakeSettings> renderers        = stackalloc MeshRendererBakeSettings[2];
-                renderers[0]                                    = rendererSettings;
-                renderers[1]                                    = rendererSettings;
-                renderers[1].targetEntity                       = additionalEntity;
-                Span<int> counts                                = stackalloc int[2];
-                counts[0]                                       = opaqueMaterialCount;
-                counts[1]                                       = mms.Length - opaqueMaterialCount;
+                var additionalEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{GetName()}-TransparentRenderEntity");
+                RenderingBakingTools.BakeLodMaskForEntity(this, additionalEntity, lodSettings);
+                Span<MeshRendererBakeSettings> renderers = stackalloc MeshRendererBakeSettings[2];
+                renderers[0]                             = rendererSettings;
+                renderers[1]                             = rendererSettings;
+                renderers[1].targetEntity                = additionalEntity;
+                Span<int> counts                         = stackalloc int[2];
+                counts[0]                                = opaqueMaterialCount;
+                counts[1]                                = mms.Length - opaqueMaterialCount;
                 this.BakeMeshAndMaterial(renderers, mms, counts);
             }
 

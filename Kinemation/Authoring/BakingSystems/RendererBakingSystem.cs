@@ -94,7 +94,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             state.EntityManager.SetSharedComponentManaged(QueryBuilder().WithAll<LightMaps>().Build(), lightmapsSCD);
 
-            var renderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo, BakingMaterialMeshSubmesh>()
+            var renderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo>().WithAllRW<BakingMaterialMeshSubmesh>()
                                                 .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
             var meshMap       = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, Allocator.TempJob);
             var materialMap   = new NativeHashMap<UnityObjectRef<Material>, int>(128, Allocator.TempJob);
@@ -130,7 +130,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 rangesList.Clear();
                 duplicatesMap.Clear();
             }
-            var renderablesWithoutLightmapsQuery = QueryBuilder().WithAll<MaterialMeshInfo, BakingMaterialMeshSubmesh>().WithAbsent<LightMaps>()
+            var renderablesWithoutLightmapsQuery = QueryBuilder().WithAll<MaterialMeshInfo>().WithAllRW<BakingMaterialMeshSubmesh>().WithAbsent<LightMaps>()
                                                    .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
             if (!renderablesWithoutLightmapsQuery.IsEmptyIgnoreFilter)
             {
@@ -211,8 +211,10 @@ namespace Latios.Kinemation.Authoring.Systems
             public NativeHashMap<UnityObjectRef<Material>, int> materialMap;
             public NativeList<UnityObjectRef<Material> >        materialList;
 
-            public void Execute(in DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
+            public void Execute(ref DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
             {
+                AddLodDataToBuffer(ref buffer);
+
                 foreach (var element in buffer)
                 {
                     if (!meshMap.ContainsKey(element.mesh))
@@ -225,6 +227,34 @@ namespace Latios.Kinemation.Authoring.Systems
                         materialMap.Add(element.material, materialList.Length);
                         materialList.Add(element.material);
                     }
+                }
+            }
+
+            void AddLodDataToBuffer(ref DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
+            {
+                if (buffer.Length == 0)
+                    return;
+
+                ref var element0 = ref buffer.ElementAt(0);
+                if ((element0.submesh & 0xff000000) == 0xff000000)
+                {
+                    element0.submesh |= 0x00ff0000;
+                }
+                else
+                {
+                    int mask = 0;
+                    foreach (var element in buffer)
+                    {
+                        mask |= element.submesh;
+                    }
+                    element0.submesh |= (mask >> 8) & 0x00ff0000;
+                }
+
+                if (buffer.Length >= 127)
+                {
+                    buffer.ElementAt(1).submesh |= (buffer.Length << 16) & 0x00ff0000;
+                    buffer.ElementAt(2).submesh |= (buffer.Length << 8) & 0x00ff0000;
+                    buffer.ElementAt(3).submesh |= (buffer.Length) & 0x00ff0000;
                 }
             }
         }
@@ -273,7 +303,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     var meshIndex     = meshMap[element.mesh];
                     var materialIndex = materialMap[element.material];
 
-                    mmi = MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, meshIndex, (ushort)element.submesh);
+                    mmi = MaterialMeshInfo.FromRenderMeshArrayIndices(materialIndex, meshIndex, (ushort)(element.submesh & 0xffff));
                 }
                 else
                 {
@@ -315,7 +345,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         });
                     }
 
-                    mmi = MaterialMeshInfo.FromMaterialMeshIndexRange(rangesStartIndex, buffer.Length);
+                    mmi = MaterialMeshInfo.FromMaterialMeshIndexRange(rangesStartIndex, math.min(buffer.Length, 127));
                     duplicateRangesFilterMap.Add(key, entity);
                 }
             }

@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -160,6 +161,7 @@ namespace Latios.Unsafe
         private readonly int                     m_indexCount;
         private AllocatorManager.AllocatorHandle m_allocator;
 
+        #region Base API
         /// <summary>
         /// Construct a new UnsafeIndexedBlockList using a UnityEngine allocator
         /// </summary>
@@ -186,6 +188,7 @@ namespace Latios.Unsafe
                 m_perIndexBlockList[i].nextWriteAddress       = null;
                 m_perIndexBlockList[i].nextWriteAddress++;
                 m_perIndexBlockList[i].elementCount = 0;
+                m_perIndexBlockList[i].atomic       = 0;
             }
         }
 
@@ -462,89 +465,6 @@ namespace Latios.Unsafe
             }
         }
 
-        void ConcatenateBlockList(PerIndexBlockList* blockList, PerIndexBlockList* otherBlockList, AllocatorManager.AllocatorHandle otherAllocator)
-        {
-            if (otherBlockList->elementCount == 0)
-                return;
-
-            if (blockList->elementCount == 0)
-            {
-                (*blockList, *otherBlockList) = (*otherBlockList, *blockList);
-                return;
-            }
-
-            var elementsInLastBlock        = blockList->elementCount % m_elementsPerBlock;
-            var elementsStillNeededInBlock = math.select(m_elementsPerBlock - elementsInLastBlock, 0, elementsInLastBlock == 0);
-            var elementsInOtherLastBlock   = otherBlockList->elementCount % m_elementsPerBlock;
-            if (elementsInOtherLastBlock <= elementsStillNeededInBlock)
-            {
-                var otherBlock    = otherBlockList->blocks[otherBlockList->blocks.Length - 1];
-                var src           = otherBlock.ptr;
-                var blockToAppend = blockList->blocks[blockList->blocks.Length - 1];
-                var dst           = blockToAppend.ptr + elementsInLastBlock * m_elementSize;
-                UnsafeUtility.MemCpy(dst, src, elementsInOtherLastBlock * m_elementSize);
-                AllocatorManager.Free(otherAllocator, otherBlock.ptr, m_blockSize);
-                elementsStillNeededInBlock -= elementsInOtherLastBlock;
-                otherBlockList->blocks.Length--;
-                blockList->nextWriteAddress += elementsInOtherLastBlock * m_elementSize;
-                elementsInOtherLastBlock     = math.select(m_elementsPerBlock, 0, otherBlockList->blocks.Length == 0);
-            }
-            if (elementsInOtherLastBlock > elementsStillNeededInBlock)
-            {
-                var indexToStealFrom = elementsInOtherLastBlock - elementsStillNeededInBlock;
-                var otherBlock       = otherBlockList->blocks[otherBlockList->blocks.Length - 1];
-                var src              = otherBlock.ptr + indexToStealFrom * m_elementSize;
-                var blockToAppend    = blockList->blocks[blockList->blocks.Length - 1];
-                var dst              = blockToAppend.ptr + elementsInLastBlock * m_elementSize;
-                if (elementsStillNeededInBlock > 0)
-                    UnsafeUtility.MemCpy(dst, src, elementsStillNeededInBlock * m_elementSize);
-                otherBlockList->nextWriteAddress       = src;
-                otherBlockList->lastByteAddressInBlock = otherBlock.ptr + m_blockSize - 1;
-            }
-            if (otherBlockList->blocks.Length > 0)
-            {
-                blockList->blocks.AddRange(otherBlockList->blocks);
-                blockList->nextWriteAddress       = otherBlockList->nextWriteAddress;
-                blockList->lastByteAddressInBlock = otherBlockList->lastByteAddressInBlock;
-            }
-            blockList->elementCount += otherBlockList->elementCount;
-
-            otherBlockList->blocks.Clear();
-            otherBlockList->elementCount           = 0;
-            otherBlockList->lastByteAddressInBlock = null;
-            otherBlockList->nextWriteAddress       = null;
-            otherBlockList->nextWriteAddress++;
-        }
-
-        //This catches race conditions if I accidentally pass in 0 for thread index in the parallel writer because copy and paste.
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        void CheckBlockCountMatchesCount(int count, int blockCount)
-        {
-            int expectedBlocks = count / m_elementsPerBlock;
-            if (count % m_elementsPerBlock > 0)
-                expectedBlocks++;
-            if (blockCount != expectedBlocks)
-                throw new System.InvalidOperationException($"Block count: {blockCount} does not match element count: {count}");
-        }
-
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        void CheckBlockListsMatch(ref UnsafeIndexedBlockList other)
-        {
-            if (m_blockSize != other.m_blockSize || m_elementSize != other.m_elementSize || m_indexCount != other.m_indexCount || m_allocator != other.m_allocator)
-                throw new System.InvalidOperationException("UnsafeIndexedBlockLists do not match.");
-        }
-
-        [BurstCompile]
-        struct DisposeJob : IJob
-        {
-            public UnsafeIndexedBlockList uibl;
-
-            public void Execute()
-            {
-                uibl.Dispose();
-            }
-        }
-
         /// <summary>
         /// Uses a job to dispose this container
         /// </summary>
@@ -577,21 +497,9 @@ namespace Latios.Unsafe
             }
             AllocatorManager.Free(m_allocator, m_perIndexBlockList, m_indexCount);
         }
+        #endregion
 
-        private struct BlockPtr
-        {
-            public byte* ptr;
-        }
-
-        [StructLayout(LayoutKind.Sequential, Size = 64)]
-        private struct PerIndexBlockList
-        {
-            public UnsafeList<BlockPtr> blocks;
-            public byte*                nextWriteAddress;
-            public byte*                lastByteAddressInBlock;
-            public int                  elementCount;
-        }
-
+        #region Enumerator
         /// <summary>
         /// Gets an enumerator for one of the indices in the job.
         /// </summary>
@@ -728,29 +636,163 @@ namespace Latios.Unsafe
             /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
             /// <returns>A ref of the element stored, reinterpreted with the strong type</returns>
             public ref T GetCurrentAsRef<T>() where T : unmanaged => ref m_enumerator.GetCurrentAsRef<T>();
-        }
-    }
 
-    // Schedule for 128 iterations
-    //[BurstCompile]
-    //struct ExampleReadJob : IJobFor
-    //{
-    //    [NativeDisableUnsafePtrRestriction] public UnsafeParallelBlockList blockList;
-    //
-    //    public void Execute(int index)
-    //    {
-    //        var enumerator = blockList.GetEnumerator(index);
-    //
-    //        while (enumerator.MoveNext())
-    //        {
-    //            int number = enumerator.GetCurrent<int>();
-    //
-    //            if (number == 381)
-    //                UnityEngine.Debug.Log("You found me!");
-    //            else if (number == 380)
-    //                UnityEngine.Debug.Log("Where?");
-    //        }
-    //    }
-    //}
+            // Schedule for 128 iterations
+            //[BurstCompile]
+            //struct ExampleReadJob : IJobFor
+            //{
+            //    [NativeDisableUnsafePtrRestriction] public UnsafeParallelBlockList blockList;
+            //
+            //    public void Execute(int index)
+            //    {
+            //        var enumerator = blockList.GetEnumerator(index);
+            //
+            //        while (enumerator.MoveNext())
+            //        {
+            //            int number = enumerator.GetCurrent<int>();
+            //
+            //            if (number == 381)
+            //                UnityEngine.Debug.Log("You found me!");
+            //            else if (number == 380)
+            //                UnityEngine.Debug.Log("Where?");
+            //        }
+            //    }
+            //}
+        }
+        #endregion
+
+        #region Threading
+        /// <summary>
+        /// Uses atomics to lock an index for thread-safe access. If already locked by the same value, this method returns.
+        /// </summary>
+        /// <param name="index">The index to lock.</param>
+        /// <param name="lockValue">A value to represent this context owns the lock. If the index has already been locked by this value, the method returns.</param>
+        /// <param name="unlockValue">A value that specifies the index is not currently locked.</param>
+        /// <returns>Returns true if the lock was acquired while the value was previously unlockValue. Returns false if the index was already locked by lockValue.</returns>
+        public bool LockIndexReentrant(int index, int lockValue, int unlockValue = 0)
+        {
+            ref var blockList = ref m_perIndexBlockList[index];
+            int     current;
+            do
+            {
+                current = Interlocked.CompareExchange(ref blockList.atomic, lockValue, unlockValue);
+            }
+            while (current != lockValue && current != unlockValue);
+            return current == unlockValue;
+        }
+
+        /// <summary>
+        /// Unlocks the index, resetting its internal value to the unlocked state.
+        /// </summary>
+        /// <param name="index">The index this context locked.</param>
+        /// <param name="lockValue">The lock value that was stored.</param>
+        /// <param name="unlockValue">The unlock value that should be left in the index.</param>
+        public void UnlockIndex(int index, int lockValue, int unlockValue = 0)
+        {
+            ref var blockList = ref m_perIndexBlockList[index];
+            Interlocked.CompareExchange(ref blockList.atomic, unlockValue, lockValue);
+        }
+        #endregion
+
+        #region Impl
+        void ConcatenateBlockList(PerIndexBlockList* blockList, PerIndexBlockList* otherBlockList, AllocatorManager.AllocatorHandle otherAllocator)
+        {
+            if (otherBlockList->elementCount == 0)
+                return;
+
+            if (blockList->elementCount == 0)
+            {
+                (*blockList, *otherBlockList) = (*otherBlockList, *blockList);
+                return;
+            }
+
+            var elementsInLastBlock        = blockList->elementCount % m_elementsPerBlock;
+            var elementsStillNeededInBlock = math.select(m_elementsPerBlock - elementsInLastBlock, 0, elementsInLastBlock == 0);
+            var elementsInOtherLastBlock   = otherBlockList->elementCount % m_elementsPerBlock;
+            if (elementsInOtherLastBlock <= elementsStillNeededInBlock)
+            {
+                var otherBlock    = otherBlockList->blocks[otherBlockList->blocks.Length - 1];
+                var src           = otherBlock.ptr;
+                var blockToAppend = blockList->blocks[blockList->blocks.Length - 1];
+                var dst           = blockToAppend.ptr + elementsInLastBlock * m_elementSize;
+                UnsafeUtility.MemCpy(dst, src, elementsInOtherLastBlock * m_elementSize);
+                AllocatorManager.Free(otherAllocator, otherBlock.ptr, m_blockSize);
+                elementsStillNeededInBlock -= elementsInOtherLastBlock;
+                otherBlockList->blocks.Length--;
+                blockList->nextWriteAddress += elementsInOtherLastBlock * m_elementSize;
+                elementsInOtherLastBlock     = math.select(m_elementsPerBlock, 0, otherBlockList->blocks.Length == 0);
+            }
+            if (elementsInOtherLastBlock > elementsStillNeededInBlock)
+            {
+                var indexToStealFrom = elementsInOtherLastBlock - elementsStillNeededInBlock;
+                var otherBlock       = otherBlockList->blocks[otherBlockList->blocks.Length - 1];
+                var src              = otherBlock.ptr + indexToStealFrom * m_elementSize;
+                var blockToAppend    = blockList->blocks[blockList->blocks.Length - 1];
+                var dst              = blockToAppend.ptr + elementsInLastBlock * m_elementSize;
+                if (elementsStillNeededInBlock > 0)
+                    UnsafeUtility.MemCpy(dst, src, elementsStillNeededInBlock * m_elementSize);
+                otherBlockList->nextWriteAddress       = src;
+                otherBlockList->lastByteAddressInBlock = otherBlock.ptr + m_blockSize - 1;
+            }
+            if (otherBlockList->blocks.Length > 0)
+            {
+                blockList->blocks.AddRange(otherBlockList->blocks);
+                blockList->nextWriteAddress       = otherBlockList->nextWriteAddress;
+                blockList->lastByteAddressInBlock = otherBlockList->lastByteAddressInBlock;
+            }
+            blockList->elementCount += otherBlockList->elementCount;
+
+            otherBlockList->blocks.Clear();
+            otherBlockList->elementCount           = 0;
+            otherBlockList->lastByteAddressInBlock = null;
+            otherBlockList->nextWriteAddress       = null;
+            otherBlockList->nextWriteAddress++;
+        }
+
+        //This catches race conditions if I accidentally pass in 0 for thread index in the parallel writer because copy and paste.
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckBlockCountMatchesCount(int count, int blockCount)
+        {
+            int expectedBlocks = count / m_elementsPerBlock;
+            if (count % m_elementsPerBlock > 0)
+                expectedBlocks++;
+            if (blockCount != expectedBlocks)
+                throw new System.InvalidOperationException($"Block count: {blockCount} does not match element count: {count}");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckBlockListsMatch(ref UnsafeIndexedBlockList other)
+        {
+            if (m_blockSize != other.m_blockSize || m_elementSize != other.m_elementSize || m_indexCount != other.m_indexCount || m_allocator != other.m_allocator)
+                throw new System.InvalidOperationException("UnsafeIndexedBlockLists do not match.");
+        }
+
+        [BurstCompile]
+        struct DisposeJob : IJob
+        {
+            public UnsafeIndexedBlockList uibl;
+
+            public void Execute()
+            {
+                uibl.Dispose();
+            }
+        }
+
+        private struct BlockPtr
+        {
+            public byte* ptr;
+        }
+
+        [StructLayout(LayoutKind.Sequential, Size = 64)]
+        private struct PerIndexBlockList
+        {
+            public UnsafeList<BlockPtr> blocks;
+            public byte*                nextWriteAddress;
+            public byte*                lastByteAddressInBlock;
+            public int                  elementCount;
+            public int                  atomic;
+        }
+        #endregion
+    }
 }
 

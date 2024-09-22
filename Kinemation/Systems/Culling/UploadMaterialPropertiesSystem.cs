@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using Latios;
 using Latios.Kinemation.SparseUpload;
 using Latios.Transforms;
 using Unity.Burst;
@@ -10,18 +8,19 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
-using Unity.Transforms;
-using UnityEngine.Profiling;
 
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class UploadMaterialPropertiesSystem : CullingComputeDispatchSubSystemBase
+    public partial struct UploadMaterialPropertiesSystem : ISystem, ICullingComputeDispatchSystem<UploadMaterialPropertiesSystem.CollectState,
+                                                                                                  UploadMaterialPropertiesSystem.WriteState>
     {
+        LatiosWorldUnmanaged latiosWorld;
+
         EntityQuery m_metaQuery;
 
-        private UnityEngine.GraphicsBuffer        m_GPUPersistentInstanceData;
+        private GraphicsBufferUnmanaged           m_GPUPersistentInstanceData;
         internal UnityEngine.GraphicsBufferHandle m_GPUPersistentInstanceBufferHandle;
         private LatiosSparseUploader              m_GPUUploader;
         private LatiosThreadedSparseUploader      m_ThreadedGPUUploader;
@@ -33,23 +32,29 @@ namespace Latios.Kinemation.Systems
 
         internal ComponentTypeCache.BurstCompatibleTypeArray m_burstCompatibleTypeArray;
 
+        CullingComputeDispatchData<CollectState, WriteState> m_data;
+
 #if DEBUG_LOG_MEMORY_USAGE
         private static ulong PrevUsedSpace = 0;
 #endif
 
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            m_metaQuery = Fluent.With<EntitiesGraphicsChunkInfo>(false).With<ChunkHeader>(true).With<ChunkPerCameraCullingMask>(true).Build();
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_data = new CullingComputeDispatchData<CollectState, WriteState>(latiosWorld);
+
+            m_metaQuery = state.Fluent().With<EntitiesGraphicsChunkInfo>(false).With<ChunkHeader>(true).With<ChunkPerDispatchCullingMask>(true).Build();
 
             m_persistentInstanceDataSize = kGPUBufferSizeInitial;
 
-            m_GPUPersistentInstanceData = new UnityEngine.GraphicsBuffer(
+            m_GPUPersistentInstanceData = new GraphicsBufferUnmanaged(
                 UnityEngine.GraphicsBuffer.Target.Raw,
                 UnityEngine.GraphicsBuffer.UsageFlags.None,
                 (int)m_persistentInstanceDataSize / 4,
                 4);
-            m_GPUPersistentInstanceBufferHandle = m_GPUPersistentInstanceData.bufferHandle;
-            m_GPUUploader                       = new LatiosSparseUploader(m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
+            m_GPUPersistentInstanceBufferHandle = m_GPUPersistentInstanceData.ToManaged().bufferHandle;
+            m_GPUUploader                       = new LatiosSparseUploader(latiosWorld.latiosWorld, m_GPUPersistentInstanceData, kGPUUploaderChunkSize);
         }
 
         // Todo: Get rid of the hard system dependencies.
@@ -59,16 +64,16 @@ namespace Latios.Kinemation.Systems
             {
                 m_persistentInstanceDataSize = requiredPersistentBufferSize;
 
-                var newBuffer = new UnityEngine.GraphicsBuffer(
+                var newBuffer = new GraphicsBufferUnmanaged(
                     UnityEngine.GraphicsBuffer.Target.Raw,
                     UnityEngine.GraphicsBuffer.UsageFlags.None,
                     (int)(m_persistentInstanceDataSize / 4),
                     4);
                 m_GPUUploader.ReplaceBuffer(newBuffer, true);
-                m_GPUPersistentInstanceBufferHandle = newBuffer.bufferHandle;
+                m_GPUPersistentInstanceBufferHandle = newBuffer.ToManaged().bufferHandle;
                 newHandle                           = m_GPUPersistentInstanceBufferHandle;
 
-                if (m_GPUPersistentInstanceData != null)
+                if (m_GPUPersistentInstanceData.IsValid())
                     m_GPUPersistentInstanceData.Dispose();
                 m_GPUPersistentInstanceData = newBuffer;
                 return true;
@@ -77,129 +82,136 @@ namespace Latios.Kinemation.Systems
             return false;
         }
 
-        protected override IEnumerable<bool> UpdatePhase()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state) => m_data.DoUpdate(ref state, ref this);
+
+        public CollectState Collect(ref SystemState state)
         {
-            while (true)
+            var context               = latiosWorld.worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(true);
+            var materialPropertyTypes = latiosWorld.worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true);
+            var dispatchContext       = latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>();
+
+            // Conservative estimate is that every known type is in every chunk. There will be
+            // at most one operation per type per chunk, which will be either an actual
+            // chunk data upload, or a default value blit (a single type should not have both).
+            int conservativeMaximumGpuUploads = context.hybridRenderedChunkCount * materialPropertyTypes.Length;
+            var gpuUploadOperations           = CollectionHelper.CreateNativeArray<GpuUploadOperation>(
+                conservativeMaximumGpuUploads,
+                state.WorldUpdateAllocator,
+                NativeArrayOptions.UninitializedMemory);
+            var numGpuUploadOperations = new NativeReference<int>(
+                state.WorldUpdateAllocator,
+                NativeArrayOptions.ClearMemory);
+
+            m_burstCompatibleTypeArray.Update(ref state);
+            var collectJh = new ComputeOperationsJob
             {
-                if (!GetPhaseActions(CullingComputeDispatchState.Collect, out var terminate))
-                {
-                    yield return false;
-                    continue;
-                }
-                if (terminate)
-                    break;
-
-                var context               = worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(true);
-                var materialPropertyTypes = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>(true);
-                var culling               = worldBlackboardEntity.GetComponentData<CullingContext>();
-
-                // Conservative estimate is that every known type is in every chunk. There will be
-                // at most one operation per type per chunk, which will be either an actual
-                // chunk data upload, or a default value blit (a single type should not have both).
-                int conservativeMaximumGpuUploads = context.hybridRenderedChunkCount * materialPropertyTypes.Length;
-                var gpuUploadOperations           = CollectionHelper.CreateNativeArray<GpuUploadOperation>(
-                    conservativeMaximumGpuUploads,
-                    WorldUpdateAllocator,
-                    NativeArrayOptions.UninitializedMemory);
-                var numGpuUploadOperations = new NativeReference<int>(
-                    WorldUpdateAllocator,
-                    NativeArrayOptions.ClearMemory);
-
-                m_burstCompatibleTypeArray.Update(ref CheckedStateRef);
-                var collectJh = new ComputeOperationsJob
-                {
-                    ChunkHeader                     = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
-                    ChunkProperties                 = context.chunkProperties,
-                    chunkPropertyDirtyMaskHandle    = SystemAPI.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                    chunkPerCameraCullingMaskHandle = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                    ComponentTypes                  = m_burstCompatibleTypeArray,
-                    GpuUploadOperations             = gpuUploadOperations,
-                    EntitiesGraphicsChunkInfo       = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                    NumGpuUploadOperations          = numGpuUploadOperations,
-                    PreviousTransformPreviousType   = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
-                    WorldTransformInverseType       = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
-                    postProcessMatrixHandle         = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
-                    previousPostProcessMatrixHandle = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true),
+                ChunkHeader                       = SystemAPI.GetComponentTypeHandle<ChunkHeader>(true),
+                ChunkProperties                   = context.chunkProperties,
+                chunkPropertyDirtyMaskHandle      = SystemAPI.GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                chunkPerDispatchCullingMaskHandle = SystemAPI.GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
+                ComponentTypes                    = m_burstCompatibleTypeArray,
+                GpuUploadOperations               = gpuUploadOperations,
+                EntitiesGraphicsChunkInfo         = SystemAPI.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                NumGpuUploadOperations            = numGpuUploadOperations,
+                PreviousTransformPreviousType     = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousMI_Tag>(),
+                WorldTransformInverseType         = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
+                postProcessMatrixHandle           = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
+                previousPostProcessMatrixHandle   = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true),
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-                    WorldTransformType    = TypeManager.GetTypeIndex<WorldTransform>(),
-                    PreviousTransformType = TypeManager.GetTypeIndex<PreviousTransform>(),
-# elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-                    WorldTransformType    = TypeManager.GetTypeIndex<LocalToWorld>(),
-                    PreviousTransformType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
+                WorldTransformType    = TypeManager.GetTypeIndex<WorldTransform>(),
+                PreviousTransformType = TypeManager.GetTypeIndex<PreviousTransform>(),
+#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+                WorldTransformType    = TypeManager.GetTypeIndex<Unity.Transforms.LocalToWorld>(),
+                PreviousTransformType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
 #endif
-                }.ScheduleParallel(m_metaQuery, Dependency);
+            }.ScheduleParallel(m_metaQuery, state.Dependency);
 
-                var uploadSizeRequirements = new NativeReference<UploadSizeRequirements>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-                Dependency                 = new ComputeUploadSizeRequirementsJob
-                {
-                    numGpuUploadOperations = numGpuUploadOperations,
-                    gpuUploadOperations    = gpuUploadOperations,
-                    valueBlits             = context.valueBlits,
-                    requirements           = uploadSizeRequirements
-                }.Schedule(collectJh);
+            var uploadSizeRequirements = new NativeReference<UploadSizeRequirements>(state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+            state.Dependency           = new ComputeUploadSizeRequirementsJob
+            {
+                numGpuUploadOperations = numGpuUploadOperations,
+                gpuUploadOperations    = gpuUploadOperations,
+                valueBlits             = context.valueBlits,
+                requirements           = uploadSizeRequirements
+            }.Schedule(collectJh);
 
-                yield return true;
-
-                if (!GetPhaseActions(CullingComputeDispatchState.Write, out terminate))
-                    continue;
-                if (terminate)
-                    break;
-
-                UnityEngine.Debug.Assert(numGpuUploadOperations.Value <= gpuUploadOperations.Length, "Maximum GPU upload operation count exceeded");
-
-#if DEBUG_LOG_UPLOADS
-                if (numOperations > 0)
-                {
-                    Debug.Log($"GPU upload operations: {numOperations}, GPU upload bytes: {totalUploadBytes}");
-                }
-#endif
-
-                // Todo: Once blits are removed in newer Entities versions, we can add early-out checks here.
-                var sizeRequirements  = uploadSizeRequirements.Value;
-                m_ThreadedGPUUploader = m_GPUUploader.Begin(sizeRequirements.totalUploadBytes,
-                                                            sizeRequirements.biggestUploadBytes,
-                                                            sizeRequirements.numOperations,
-                                                            culling.globalSystemVersionOfLatiosEntitiesGraphics);
-
-                // This is a different update, so we need to resecure this collection component.
-                // Also, this time we write to it.
-                context = worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(false);
-
-                var writeJh = new ExecuteGpuUploads
-                {
-                    GpuUploadOperations    = gpuUploadOperations,
-                    ThreadedSparseUploader = m_ThreadedGPUUploader,
-                }.Schedule(numGpuUploadOperations.Value, 1, Dependency);
-
-                // Todo: Do only on first culling pass?
-                UploadBlitJob uploadJob = new UploadBlitJob()
-                {
-                    BlitList               = context.valueBlits,
-                    ThreadedSparseUploader = m_ThreadedGPUUploader
-                };
-                writeJh    = uploadJob.ScheduleByRef(context.valueBlits.Length, 1, writeJh);
-                Dependency = new ClearBlitsJob { blits = context.valueBlits }.Schedule(writeJh);
-
-                yield return true;
-
-                if (!GetPhaseActions(CullingComputeDispatchState.Dispatch, out terminate))
-                    continue;
-
-                try
-                {
-                    m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader);
-                }
-                finally
-                {
-                    m_GPUUploader.FrameCleanup();
-                }
-
-                if (terminate)
-                    break;
-            }
+            return new CollectState
+            {
+                globalSystemVersionOfLatiosEntitiesGraphics = dispatchContext.globalSystemVersionOfLatiosEntitiesGraphics,
+                gpuUploadOperations                         = gpuUploadOperations,
+                numGpuUploadOperations                      = numGpuUploadOperations,
+                uploadSizeRequirements                      = uploadSizeRequirements,
+            };
         }
 
-        protected override void OnDestroyDispatchSystem()
+        public WriteState Write(ref SystemState state, ref CollectState collectState)
+        {
+            var numGpuUploadOperations = collectState.numGpuUploadOperations.Value;
+            var gpuUploadOperations    = collectState.gpuUploadOperations;
+
+            UnityEngine.Debug.Assert(numGpuUploadOperations <= gpuUploadOperations.Length, "Maximum GPU upload operation count exceeded");
+
+#if DEBUG_LOG_UPLOADS
+            if (numOperations > 0)
+            {
+                Debug.Log($"GPU upload operations: {numOperations}, GPU upload bytes: {totalUploadBytes}");
+            }
+#endif
+
+            // Todo: Once blits are removed in newer Entities versions, we can add early-out checks here.
+            var sizeRequirements  = collectState.uploadSizeRequirements.Value;
+            m_ThreadedGPUUploader = m_GPUUploader.Begin(sizeRequirements.totalUploadBytes,
+                                                        sizeRequirements.biggestUploadBytes,
+                                                        sizeRequirements.numOperations,
+                                                        collectState.globalSystemVersionOfLatiosEntitiesGraphics);
+
+            // This is a different update, so we need to resecure this collection component.
+            // Also, this time we write to it.
+            var context = latiosWorld.worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(false);
+
+            var writeJh = new ExecuteGpuUploads
+            {
+                GpuUploadOperations    = gpuUploadOperations,
+                ThreadedSparseUploader = m_ThreadedGPUUploader,
+            }.Schedule(numGpuUploadOperations, 1, state.Dependency);
+
+            // Todo: Do only on first culling pass?
+            UploadBlitJob uploadJob = new UploadBlitJob()
+            {
+                BlitList               = context.valueBlits,
+                ThreadedSparseUploader = m_ThreadedGPUUploader
+            };
+            writeJh          = uploadJob.ScheduleByRef(context.valueBlits.Length, 1, writeJh);
+            state.Dependency = new ClearBlitsJob { blits = context.valueBlits }.Schedule(writeJh);
+            return default;
+        }
+
+        public void Dispatch(ref SystemState state, ref WriteState writeState)
+        {
+            //try
+            //{
+            m_GPUUploader.EndAndCommit(m_ThreadedGPUUploader);
+            //}
+            //finally
+            //{
+            m_GPUUploader.FrameCleanup();
+            //}
+        }
+
+        public struct CollectState
+        {
+            internal NativeReference<int>                    numGpuUploadOperations;
+            internal NativeArray<GpuUploadOperation>         gpuUploadOperations;
+            internal NativeReference<UploadSizeRequirements> uploadSizeRequirements;
+            internal uint                                    globalSystemVersionOfLatiosEntitiesGraphics;
+        }
+
+        public struct WriteState
+        {
+        }
+
+        public void OnDestroy(ref SystemState state)
         {
             m_GPUUploader.Dispose();
             m_GPUPersistentInstanceData.Dispose();
@@ -209,12 +221,12 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct ComputeOperationsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
-            public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>       chunkPropertyDirtyMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraCullingMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>               ChunkHeader;
-            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>         postProcessMatrixHandle;
-            [ReadOnly] public ComponentTypeHandle<PreviousPostProcessMatrix> previousPostProcessMatrixHandle;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>   EntitiesGraphicsChunkInfo;
+            public ComponentTypeHandle<ChunkMaterialPropertyDirtyMask>         chunkPropertyDirtyMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> chunkPerDispatchCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                 ChunkHeader;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>           postProcessMatrixHandle;
+            [ReadOnly] public ComponentTypeHandle<PreviousPostProcessMatrix>   previousPostProcessMatrixHandle;
 
             [ReadOnly] public NativeArray<ChunkProperty> ChunkProperties;
             public int                                   WorldTransformType;
@@ -231,14 +243,14 @@ namespace Latios.Kinemation.Systems
             {
                 // metaChunk is the chunk which contains the meta entities (= entities holding the chunk components) for the actual chunks
 
-                var hybridChunkInfos   = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
-                var chunkHeaders       = metaChunk.GetNativeArray(ref ChunkHeader);
-                var chunkDirtyMasks    = metaChunk.GetNativeArray(ref chunkPropertyDirtyMaskHandle);
-                var chunkPerCameraMask = metaChunk.GetNativeArray(ref chunkPerCameraCullingMaskHandle);
+                var hybridChunkInfos     = metaChunk.GetNativeArray(ref EntitiesGraphicsChunkInfo);
+                var chunkHeaders         = metaChunk.GetNativeArray(ref ChunkHeader);
+                var chunkDirtyMasks      = metaChunk.GetNativeArray(ref chunkPropertyDirtyMaskHandle);
+                var chunkPerDispatchMask = metaChunk.GetNativeArray(ref chunkPerDispatchCullingMaskHandle);
 
                 for (int i = 0; i < metaChunk.Count; ++i)
                 {
-                    var visibleMask = chunkPerCameraMask[i];
+                    var visibleMask = chunkPerDispatchMask[i];
                     if ((visibleMask.lower.Value | visibleMask.upper.Value) == 0)
                         continue;
 
@@ -433,7 +445,7 @@ namespace Latios.Kinemation.Systems
             }
         }
 
-        struct UploadSizeRequirements
+        internal struct UploadSizeRequirements
         {
             public int numOperations;
             public int totalUploadBytes;

@@ -6,6 +6,7 @@ using Unity.Entities;
 using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
+using Unity.Profiling;
 using Unity.Rendering;
 using UnityEngine.Rendering;
 
@@ -23,6 +24,13 @@ namespace Latios.Kinemation.Systems
         FindChunksNeedingFrustumCullingJob m_findJob;
         SingleSplitCullingJob              m_singleJob;
         MultiSplitCullingJob               m_multiJob;
+
+        ProfilerMarker m_getSplitsMarker;
+        ProfilerMarker m_allocateListMarker;
+        ProfilerMarker m_findJobMarker;
+        ProfilerMarker m_getContextMarker;
+        ProfilerMarker m_multiJobMarker;
+        ProfilerMarker m_onUpdateMarker;
 
         public void OnCreate(ref SystemState state)
         {
@@ -51,21 +59,38 @@ namespace Latios.Kinemation.Systems
                 perCameraCullingSplitsMaskHandle = state.GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(false),
                 worldRenderBoundsHandle          = m_singleJob.worldRenderBoundsHandle
             };
+
+            m_getSplitsMarker    = new ProfilerMarker("GetSplits");
+            m_allocateListMarker = new ProfilerMarker("AllocateList");
+            m_findJobMarker      = new ProfilerMarker("FindJob");
+            m_getContextMarker   = new ProfilerMarker("GetContext");
+            m_multiJobMarker     = new ProfilerMarker("MultiJob");
+            m_onUpdateMarker     = new ProfilerMarker("OnUpdateUnskinned");
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var splits = latiosWorld.worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(true);
+            m_onUpdateMarker.Begin();
 
+            //m_getSplitsMarker.Begin();
+            var splits = latiosWorld.worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(true);
+            //m_getSplitsMarker.End();
+
+            //m_allocateListMarker.Begin();
             var chunkList = new NativeList<ArchetypeChunk>(m_metaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
+            //m_allocateListMarker.End();
 
             m_findJob.chunkHeaderHandle.Update(ref state);
             m_findJob.chunksToProcess = chunkList.AsParallelWriter();
             m_findJob.perCameraCullingMaskHandle.Update(ref state);
+            //m_findJobMarker.Begin();
             state.Dependency = m_findJob.ScheduleParallelByRef(m_metaQuery, state.Dependency);
+            //m_findJobMarker.End();
 
+            //m_getContextMarker.Begin();
             var cullRequestType = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().viewType;
+            //m_getContextMarker.End();
             if (cullRequestType == BatchCullingViewType.Light)
             {
                 m_multiJob.chunksToProcess = chunkList.AsDeferredJobArray();
@@ -74,7 +99,9 @@ namespace Latios.Kinemation.Systems
                 m_multiJob.perCameraCullingMaskHandle.Update(ref state);
                 m_multiJob.perCameraCullingSplitsMaskHandle.Update(ref state);
                 m_multiJob.worldRenderBoundsHandle.Update(ref state);
+                //m_multiJobMarker.Begin();
                 state.Dependency = m_multiJob.ScheduleByRef(chunkList, 1, state.Dependency);
+                //m_multiJobMarker.End();
             }
             else
             {
@@ -85,6 +112,8 @@ namespace Latios.Kinemation.Systems
                 m_singleJob.worldRenderBoundsHandle.Update(ref state);
                 state.Dependency = m_singleJob.ScheduleByRef(chunkList, 1, state.Dependency);
             }
+
+            m_onUpdateMarker.End();
         }
 
         [BurstCompile]

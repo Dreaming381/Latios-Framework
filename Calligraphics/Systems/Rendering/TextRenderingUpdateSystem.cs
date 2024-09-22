@@ -201,7 +201,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                         continue;
                     ctrl.flags &= ~TextRenderControl.Flags.Dirty;
                     {
-                        var gpuBit = gpuResidentAllocationLookup.GetComponentEnabledRefRWOptional<GpuResidentUpdateFlag>(entity);
+                        var gpuBit = gpuResidentAllocationLookup.GetEnabledRefRWOptional<GpuResidentUpdateFlag>(entity);
                         if (gpuBit.IsValid)
                             gpuBit.ValueRW = true;
                     }
@@ -262,7 +262,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                     {
                         ref var instance = ref instances.ElementAt(i);
 
-                        var gpuBit = gpuResidentAllocationLookup.GetComponentEnabledRefRWOptional<GpuResidentUpdateFlag>(instance.entity);
+                        var gpuBit = gpuResidentAllocationLookup.GetEnabledRefRWOptional<GpuResidentUpdateFlag>(instance.entity);
                         if (gpuBit.IsValid)
                             gpuBit.ValueRW = true;
 

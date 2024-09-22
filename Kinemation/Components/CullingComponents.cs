@@ -37,9 +37,22 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// Contains the bitwise ORed visibility mask for all previous camera culling passes this frame
+    /// Contains the bitwise ORed visibility mask for all previous camera culling passes leading up to this dispatch.
     /// Usage: Read Only (No exceptions!)
-    /// You can read from this to figure out if a previous culling pass rendered an entity.
+    /// You can read from this to figure out if an entity requires GPU data dispatches.
+    /// </summary>
+    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
+    public struct ChunkPerDispatchCullingMask : IComponentData
+    {
+        public BitField64 lower;
+        public BitField64 upper;
+    }
+
+    /// <summary>
+    /// Contains the bitwise ORed visibility mask for all previous dispatches this frame.
+    /// Usage: Read Only (No exceptions!)
+    /// You can read from this to figure out if a previous culling dispatch rendered an entity.
+    /// Bitwise OR with ChunkPerDispatchCullingMask to obtain whether a previous camera pass rendered an entity.
     /// </summary>
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     public struct ChunkPerFrameCullingMask : IComponentData
@@ -88,9 +101,17 @@ namespace Latios.Kinemation
         public uint                       cullingLayerMask;
         public int                        receiverPlaneOffset;
         public int                        receiverPlaneCount;
-        public uint                       globalSystemVersionOfLatiosEntitiesGraphics;
-        public uint                       lastSystemVersionOfLatiosEntitiesGraphics;
         public int                        cullIndexThisFrame;
+    }
+
+    /// <summary>
+    /// Useful GPU dispatch parameters for the current dispatch pass (OnPerformCulling in 2022 LTS, OnFinishedCulling in Unity 6)
+    /// </summary>
+    public struct DispatchContext : IComponentData
+    {
+        public uint globalSystemVersionOfLatiosEntitiesGraphics;
+        public uint lastSystemVersionOfLatiosEntitiesGraphics;
+        public int  dispatchIndexThisFrame;
     }
 
     /// <summary>

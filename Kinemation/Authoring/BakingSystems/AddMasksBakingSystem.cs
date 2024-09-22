@@ -36,6 +36,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             var typeset = new ComponentTypeSet(ComponentType.ChunkComponent<ChunkPerCameraCullingMask>(),
                                                ComponentType.ChunkComponent<ChunkPerCameraCullingSplitsMask>(),
+                                               ComponentType.ChunkComponent<ChunkPerDispatchCullingMask>(),
                                                ComponentType.ChunkComponent<ChunkPerFrameCullingMask>(),
                                                ComponentType.ChunkComponent<ChunkMaterialPropertyDirtyMask>());
             state.EntityManager.AddComponent(m_addQuery, typeset);

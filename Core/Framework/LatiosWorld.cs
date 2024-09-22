@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Latios.Systems;
 using Unity.Collections;
@@ -58,7 +59,22 @@ namespace Latios
         /// </summary>
         public bool zeroToleranceForExceptions { get => m_unmanaged.zeroToleranceForExceptions; set => m_unmanaged.zeroToleranceForExceptions = value; }
 
+        /// <summary>
+        /// Loads an asset from Resources and preserves it in a managed store. This is a workaround for Unity engine bugs.
+        /// </summary>
+        /// <typeparam name="T">The type of asset to load</typeparam>
+        /// <param name="asset">The name of the asset</param>
+        /// <returns>An unmanaged wrapper around the asset</returns>
+        public UnityObjectRef<T> LoadFromResourcesAndPreserve<T>(string asset) where T : UnityEngine.Object
+        {
+            var loaded = UnityEngine.Resources.Load<T>(asset);
+            m_defeatGCObjects.Add(loaded);
+            return loaded;
+        }
+
         private LatiosWorldUnmanaged m_unmanaged;
+
+        private HashSet<UnityEngine.Object> m_defeatGCObjects;
 
         internal UnmanagedExtraInterfacesDispatcher UnmanagedExtraInterfacesDispatcher { get { return m_interfacesDispatcher; } }
         private UnmanagedExtraInterfacesDispatcher m_interfacesDispatcher;
@@ -88,6 +104,8 @@ namespace Latios
         public unsafe LatiosWorld(string name, WorldFlags flags = WorldFlags.Simulation, WorldRole role = WorldRole.Default) : base(name, flags)
         {
             ComponentSystemGroup.s_globalUpdateDelegate = SuperSystem.DoLatiosFrameworkComponentSystemGroupUpdate;
+
+            m_defeatGCObjects = new HashSet<UnityEngine.Object>();
 
             m_interfacesDispatcher = new UnmanagedExtraInterfacesDispatcher();
 

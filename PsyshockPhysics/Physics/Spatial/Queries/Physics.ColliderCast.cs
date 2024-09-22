@@ -1,6 +1,8 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Mathematics;
+using UnityEditor;
 
 namespace Latios.Psyshock
 {
@@ -80,6 +82,51 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits
+        /// any other collider in any of the CollisionLayers. If so, results of the hit in which the casted collider
+        /// traveled the least is reported. It is assumed that rotation, scale, and stretch remain constant
+        /// throughout the operation. Hits where the casted collider starts already overlapping a target in
+        /// a CollisionLayer are ignored.
+        /// </summary>
+        /// <param name="colliderToCast">The casted collider that should be swept through space</param>
+        /// <param name="castStart">The transform of the casted collider at the start of the cast</param>
+        /// <param name="castEnd">The position of the casted collider at the end of the cast range</param>
+        /// <param name="layers">The CollisionLayers containing 0 or more colliders the casted collider should
+        /// be tested against</param>
+        /// <param name="result">The resulting information about the least-swept hit if there is one. If there
+        /// is no hit, the contents of the result are undefined.</param>
+        /// <param name="layerBodyInfo">Additional info as to which collider in which CollisionLayer was hit</param>
+        /// <returns>True if a hit was found, false otherwise</returns>
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in TransformQvvs castStart,
+                                        float3 castEnd,
+                                        ReadOnlySpan<CollisionLayer> layers,
+                                        out ColliderCastResult result,
+                                        out LayerBodyInfo layerBodyInfo)
+        {
+            bool found    = false;
+            result        = default;
+            layerBodyInfo = default;
+            int i         = 0;
+            foreach (var layer in layers)
+            {
+                if (ColliderCast(colliderToCast, castStart, castEnd, in layer, out var newResult, out var newLayerBodyInfo))
+                {
+                    if (!found || newResult.distance < result.distance)
+                    {
+                        found                    = true;
+                        result                   = newResult;
+                        layerBodyInfo            = newLayerBodyInfo;
+                        layerBodyInfo.layerIndex = i;
+                        castEnd                  = result.distance * math.normalize(castEnd - castStart.position) + castStart.position;
+                    }
+                }
+                i++;
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits
         /// any other collider in the CollisionLayer. If so, results of the first hit the algorithm finds
         /// is reported. It is assumed that rotation, scale, and stretch remain constant throughout the operation.
         /// Hits where the casted collider starts already overlapping a target in the CollisionLayer are ignored.
@@ -111,6 +158,43 @@ namespace Latios.Psyshock
             var hit                         = result.subColliderIndexOnTarget >= 0;
             result.subColliderIndexOnTarget = math.max(result.subColliderIndexOnTarget, 0);
             return hit;
+        }
+
+        /// <summary>
+        /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits
+        /// any other collider in any of the CollisionLayers. If so, results of the first hit the algorithm finds
+        /// is reported. It is assumed that rotation, scale, and stretch remain constant throughout the operation.
+        /// Hits where the casted collider starts already overlapping a target in a CollisionLayer are ignored.
+        /// </summary>
+        /// <param name="colliderToCast">The casted collider that should be swept through space</param>
+        /// <param name="castStart">The transform of the casted collider at the start of the cast</param>
+        /// <param name="castEnd">The position of the casted collider at the end of the cast range</param>
+        /// <param name="layers">The CollisionLayers containing 0 or more colliders the casted collider should
+        /// be tested against</param>
+        /// <param name="result">The resulting information about the hit if there is one. If there is no hit,
+        /// the contents of the result are undefined.</param>
+        /// <param name="layerBodyInfo">Additional info as to which collider in which CollisionLayer was hit</param>
+        /// <returns>True if a hit was found, false otherwise</returns>
+        public static bool ColliderCastAny(Collider colliderToCast,
+                                           in TransformQvvs castStart,
+                                           float3 castEnd,
+                                           ReadOnlySpan<CollisionLayer> layers,
+                                           out ColliderCastResult result,
+                                           out LayerBodyInfo layerBodyInfo)
+        {
+            result        = default;
+            layerBodyInfo = default;
+            int i         = 0;
+            foreach (var layer in layers)
+            {
+                if (ColliderCastAny(colliderToCast, castStart, castEnd, in layer, out result, out layerBodyInfo))
+                {
+                    layerBodyInfo.layerIndex = i;
+                    return true;
+                }
+                i++;
+            }
+            return false;
         }
         #endregion
     }

@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -25,6 +26,12 @@ namespace Latios
         public static unsafe JobHandle CombineDependencies(Span<JobHandle> jobHandles)
         {
             return JobHandleUnsafeUtility.CombineDependencies((JobHandle*)UnsafeUtility.AddressOf(ref jobHandles[0]), jobHandles.Length);
+        }
+
+        public static SharedStatic<T> Initialize<T>(this SharedStatic<T> s, in T t) where T : struct
+        {
+            s.Data = t;
+            return s;
         }
     }
 }

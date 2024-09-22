@@ -4,6 +4,7 @@ using Latios;
 using Latios.Authoring;
 using Latios.Compatibility.UnityNetCode;
 using Unity.Entities;
+using Unity.NetCode;
 
 #if !LATIOS_TRANSFORMS_UNITY
 #error The currently active Latios Framework Bootstrap requires LATIOS_TRANSFORMS_UNITY to be defined for correct operation.
@@ -73,14 +74,22 @@ public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
     {
         var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Client);
 
+        UnityEngine.Application.runInBackground = true;
+
+        NetCodeBootstrapTools.InitializeNetCodeSingletonsOnTheWorldBlackboardEntity(world);
+
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
-        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+        NetCodeBootstrapTools.InjectUnityAndNetCodeGeneratedSystems(systems, world, world.simulationSystemGroup);
+
+        //NetCodeBootstrapTools.EnableDynamicAssembliesList(world.Unmanaged);
 
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+
+        BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
@@ -97,8 +106,16 @@ public class NetCodeServerLatiosBootrap : ICustomServerWorldBootstrap
     {
         var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.Server);
 
+        UnityEngine.Application.runInBackground = true;
+
+        NetCodeBootstrapTools.InitializeNetCodeSingletonsOnTheWorldBlackboardEntity(world);
+
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
-        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+        NetCodeBootstrapTools.InjectUnityAndNetCodeGeneratedSystems(systems, world, world.simulationSystemGroup);
+
+        //NetCodeBootstrapTools.EnableDynamicAssembliesList(world.Unmanaged);
+
+        BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
@@ -114,13 +131,29 @@ public class NetCodeThinClientLatiosBootrap : ICustomThinClientWorldBootstrap
     {
         var world = new LatiosWorld(defaultWorldName, worldFlags, LatiosWorld.WorldRole.ThinClient);
 
+        UnityEngine.Application.runInBackground = true;
+
+        NetCodeBootstrapTools.InitializeNetCodeSingletonsOnTheWorldBlackboardEntity(world);
+
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
-        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+        NetCodeBootstrapTools.InjectUnityAndNetCodeGeneratedSystems(systems, world, world.simulationSystemGroup);
+
+        //NetCodeBootstrapTools.EnableDynamicAssembliesList(world.Unmanaged);
+
+        BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 
         world.initializationSystemGroup.SortSystems();
         world.simulationSystemGroup.SortSystems();
 
         return world;
+    }
+}
+
+[UnityEngine.Scripting.Preserve]
+public class NetCodeDefaultVariantsRegistrationBootstrap : ISpecifyDefaultVariantsBootstrap
+{
+    public void RegisterDefaultVariants(Dictionary<ComponentType, DefaultVariantSystemBase.Rule> defaultVariants)
+    {
     }
 }
 

@@ -55,10 +55,15 @@ namespace Latios.Psyshock
         /// and can be used as the sortKey for command buffers
         /// </summary>
         public int jobIndex => m_jobIndex;
+        /// <summary>
+        /// The index of the CollisionLayer in a ReadOnlySpan of CollisionLayers if such a span is used, 0 otherwise
+        /// </summary>
+        public int layerIndex => m_layerIndex;
 
         private CollisionLayer m_layer;
         private BucketSlices   m_bucket;
         private int            m_bodyIndexRelative;
+        private int            m_layerIndex;
         private int            m_jobIndex;
         private bool           m_isThreadSafe;
 
@@ -93,13 +98,14 @@ namespace Latios.Psyshock
             }
         }
 
-        internal FindObjectsResult(in CollisionLayer layer, in BucketSlices bucket, int jobIndex, bool isThreadSafe)
+        internal FindObjectsResult(in CollisionLayer layer, in BucketSlices bucket, int jobIndex, bool isThreadSafe, int layerIndex)
         {
             m_layer             = layer;
             m_bucket            = bucket;
             m_jobIndex          = jobIndex;
             m_isThreadSafe      = isThreadSafe;
             m_bodyIndexRelative = 0;
+            m_layerIndex        = layerIndex;
         }
 
         internal void SetBucketRelativeIndex(int index)
@@ -133,7 +139,7 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Searches the CollisionLayer for all colliders whose Aabbs overlap with the queried Aabb and returns each result via Enumerator.
-        /// Use this in a foreach loop expression to iterate all found objects. Note: For better performance, receive each results as a
+        /// Use this in a foreach loop expression to iterate all found objects. Note: For better performance, receive each result as a
         /// ref readonly FindObjectsResult.
         /// </summary>
         /// <param name="aabb">The queried Aabb</param>
@@ -142,6 +148,19 @@ namespace Latios.Psyshock
         public static FindObjectsEnumerator FindObjects(in Aabb aabb, in CollisionLayer layer)
         {
             return new FindObjectsEnumerator(in aabb, layer);
+        }
+
+        /// <summary>
+        /// Searches every CollisionLayer for all colliders whose Aabbs overlap with the queried Aabb and returns each result via Enumerator.
+        /// Use this in a foreach loop expression to iterate all found objects. Note: For better performance, receive each result as a
+        /// ref readonly FindObjectsResult.
+        /// </summary>
+        /// <param name="aabb">The queried Aabb</param>
+        /// <param name="layers">The CollisionLayers to find colliders whose Aabbs overlap the queried Aabb</param>
+        /// <returns>An enumerator that searches for the next result.</returns>
+        public static FindObjectsMultiLayerEnumerator FindObjects(in Aabb aabb, ReadOnlySpan<CollisionLayer> layers)
+        {
+            return new FindObjectsMultiLayerEnumerator(in aabb, layers);
         }
     }
 
@@ -208,20 +227,49 @@ namespace Latios.Psyshock
         #endregion Schedulers
     }
 
-    public unsafe partial struct FindObjectsEnumerator : IEnumerable<FindObjectsResult>
+    public unsafe partial struct FindObjectsEnumerator
     {
         // Warning: This is only valid when the enumerator itself is valid.
         public ref readonly FindObjectsResult Current => ref UnsafeUtility.AsRef<FindObjectsResult>(UnsafeUtility.AddressOf(ref m_result));
 
-        public void Dispose()
+        public FindObjectsEnumerator GetEnumerator() => this;
+    }
+
+    public ref struct FindObjectsMultiLayerEnumerator
+    {
+        private ReadOnlySpan<CollisionLayer> collisionLayers;
+        private Aabb                         aabb;
+        private FindObjectsEnumerator        enumerator;
+        private int                          layerIndex;
+
+        public ref readonly FindObjectsResult Current => ref enumerator.Current;
+
+        public bool MoveNext()
         {
+            while (layerIndex < collisionLayers.Length)
+            {
+                if (enumerator.MoveNext())
+                {
+                    return true;
+                }
+                else
+                {
+                    layerIndex++;
+                    enumerator = new FindObjectsEnumerator(in aabb, in collisionLayers[layerIndex], layerIndex);
+                }
+            }
+            return false;
         }
 
-        public FindObjectsEnumerator GetEnumerator() => this;
+        public FindObjectsMultiLayerEnumerator GetEnumerator() => this;
 
-        IEnumerator IEnumerable.GetEnumerator() => throw new NotImplementedException();
-
-        IEnumerator<FindObjectsResult> IEnumerable<FindObjectsResult>.GetEnumerator() => throw new NotImplementedException();
+        public FindObjectsMultiLayerEnumerator(in Aabb aabb, ReadOnlySpan<CollisionLayer> collisionLayers)
+        {
+            this.collisionLayers = collisionLayers;
+            this.aabb            = aabb;
+            enumerator           = collisionLayers.Length > 0 ? new FindObjectsEnumerator(in aabb, in collisionLayers[0], 0) : default;
+            layerIndex           = 0;
+        }
     }
 }
 

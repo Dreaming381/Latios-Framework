@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -12,11 +11,13 @@ namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class BlendShapesDispatchSystem : CullingComputeDispatchSubSystemBase
+    public partial struct BlendShapesDispatchSystem : ISystem, ICullingComputeDispatchSystem<BlendShapesDispatchSystem.CollectState, BlendShapesDispatchSystem.WriteState>
     {
-        ComputeShader m_dispatchShader;
+        LatiosWorldUnmanaged latiosWorld;
 
-        EntityQuery m_query;
+        UnityObjectRef<ComputeShader>                        m_dispatchShader;
+        EntityQuery                                          m_query;
+        CullingComputeDispatchData<CollectState, WriteState> m_data;
 
         // Shader bindings
         int _srcVertices;
@@ -28,13 +29,17 @@ namespace Latios.Kinemation.Systems
         int _DeformedMeshData;
         int _PreviousFrameDeformedMeshData;
 
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            m_query = Fluent.With<BlendShapeWeight>(true).With<BlendShapeState>(true).With<BoundMesh>(true)
-                      .With<ChunkPerCameraCullingMask>(true, true).With<ChunkPerFrameCullingMask>(true, true)
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_data = new CullingComputeDispatchData<CollectState, WriteState>(latiosWorld);
+
+            m_query = state.Fluent().With<BlendShapeWeight>(true).With<BlendShapeState>(true).With<BoundMesh>(true)
+                      .With<ChunkPerDispatchCullingMask>(true, true).With<ChunkPerFrameCullingMask>(true, true)
                       .Without<DisableComputeShaderProcessingTag>().Build();
 
-            m_dispatchShader = Resources.Load<ComputeShader>("ShapeBlending");
+            m_dispatchShader = latiosWorld.latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("ShapeBlending");
 
             _srcVertices                   = Shader.PropertyToID("_srcVertices");
             _dstVertices                   = Shader.PropertyToID("_dstVertices");
@@ -46,116 +51,131 @@ namespace Latios.Kinemation.Systems
             _PreviousFrameDeformedMeshData = Shader.PropertyToID("_PreviousFrameDeformedMeshData");
         }
 
-        protected override IEnumerable<bool> UpdatePhase()
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state) => m_data.DoUpdate(ref state, ref this);
+
+        public CollectState Collect(ref SystemState state)
         {
-            while (true)
+            var streamCount       = CollectionHelper.CreateNativeArray<int>(1, state.WorldUpdateAllocator);
+            streamCount[0]        = m_query.CalculateChunkCountWithoutFiltering();
+            var streamConstructJh = NativeStream.ScheduleConstruct(out var stream, streamCount, default, state.WorldUpdateAllocator);
+            var collectJh         = new GatherUploadOperationsJob
             {
-                if (!GetPhaseActions(CullingComputeDispatchState.Collect, out var terminate))
-                {
-                    yield return false;
-                    continue;
-                }
-                if (terminate)
-                    break;
+                meshHandle                           = SystemAPI.GetComponentTypeHandle<BoundMesh>(true),
+                currentDeformShaderIndexHandle       = SystemAPI.GetComponentTypeHandle<CurrentDeformShaderIndex>(true),
+                deformClassificationMap              = latiosWorld.worldBlackboardEntity.GetCollectionComponent<DeformClassificationMap>(true).deformClassificationMap,
+                entityHandle                         = SystemAPI.GetEntityTypeHandle(),
+                legacyComputeDeformShaderIndexHandle = SystemAPI.GetComponentTypeHandle<LegacyComputeDeformShaderIndex>(true),
+                legacyDotsDeformShaderIndexHandle    = SystemAPI.GetComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>(true),
+                perDispatchMaskHandle                = SystemAPI.GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
+                perFrameMaskHandle                   = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
+                previousDeformShaderIndexHandle      = SystemAPI.GetComponentTypeHandle<PreviousDeformShaderIndex>(true),
+                stateHandle                          = SystemAPI.GetComponentTypeHandle<BlendShapeState>(true),
+                streamWriter                         = stream.AsWriter(),
+                twoAgoDeformShaderIndexHandle        = SystemAPI.GetComponentTypeHandle<TwoAgoDeformShaderIndex>(true),
+                weightsHandle                        = SystemAPI.GetBufferTypeHandle<BlendShapeWeight>(true),
+            }.ScheduleParallel(m_query, JobHandle.CombineDependencies(streamConstructJh, state.Dependency));
 
-                var streamCount       = CollectionHelper.CreateNativeArray<int>(1, WorldUpdateAllocator);
-                streamCount[0]        = m_query.CalculateChunkCountWithoutFiltering();
-                var streamConstructJh = NativeStream.ScheduleConstruct(out var stream, streamCount, default, WorldUpdateAllocator);
-                var collectJh         = new GatherUploadOperationsJob
-                {
-                    meshHandle                           = SystemAPI.GetComponentTypeHandle<BoundMesh>(true),
-                    currentDeformShaderIndexHandle       = SystemAPI.GetComponentTypeHandle<CurrentDeformShaderIndex>(true),
-                    deformClassificationMap              = worldBlackboardEntity.GetCollectionComponent<DeformClassificationMap>(true).deformClassificationMap,
-                    entityHandle                         = SystemAPI.GetEntityTypeHandle(),
-                    legacyComputeDeformShaderIndexHandle = SystemAPI.GetComponentTypeHandle<LegacyComputeDeformShaderIndex>(true),
-                    legacyDotsDeformShaderIndexHandle    = SystemAPI.GetComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>(true),
-                    perCameraMaskHandle                  = SystemAPI.GetComponentTypeHandle<ChunkPerCameraCullingMask>(true),
-                    perFrameMaskHandle                   = SystemAPI.GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
-                    previousDeformShaderIndexHandle      = SystemAPI.GetComponentTypeHandle<PreviousDeformShaderIndex>(true),
-                    stateHandle                          = SystemAPI.GetComponentTypeHandle<BlendShapeState>(true),
-                    streamWriter                         = stream.AsWriter(),
-                    twoAgoDeformShaderIndexHandle        = SystemAPI.GetComponentTypeHandle<TwoAgoDeformShaderIndex>(true),
-                    weightsHandle                        = SystemAPI.GetBufferTypeHandle<BlendShapeWeight>(true),
-                }.ScheduleParallel(m_query, JobHandle.CombineDependencies(streamConstructJh, Dependency));
+            var payloads                  = new NativeList<UploadPayload>(1, state.WorldUpdateAllocator);
+            var requiredWeightsBufferSize = new NativeReference<uint>(state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+            state.Dependency              = new MapPayloadsToWeightsBufferJob
+            {
+                streamReader              = stream.AsReader(),
+                payloads                  = payloads,
+                requiredWeightsBufferSize = requiredWeightsBufferSize
+            }.Schedule(collectJh);
 
-                var payloads                  = new NativeList<UploadPayload>(1, WorldUpdateAllocator);
-                var requiredWeightsBufferSize = new NativeReference<uint>(WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-                Dependency                    = new MapPayloadsToWeightsBufferJob
-                {
-                    streamReader              = stream.AsReader(),
-                    payloads                  = payloads,
-                    requiredWeightsBufferSize = requiredWeightsBufferSize
-                }.Schedule(collectJh);
+            // Fetching this now because culling jobs are still running (hopefully).
+            var graphicsBroker = latiosWorld.worldBlackboardEntity.GetComponentData<GraphicsBufferBroker>();
 
-                // Fetching this now because culling jobs are still running (hopefully).
-                var graphicsBroker = worldBlackboardEntity.GetManagedStructComponent<GraphicsBufferBrokerReference>().graphicsBufferBroker;
-
-                yield return true;
-
-                if (!GetPhaseActions(CullingComputeDispatchState.Write, out terminate))
-                    continue;
-                if (terminate)
-                    break;
-
-                if (payloads.IsEmpty)
-                {
-                    // skip rest of loop.
-                    yield return true;
-
-                    if (!GetPhaseActions(CullingComputeDispatchState.Dispatch, out terminate))
-                        continue;
-                    if (terminate)
-                        break;
-
-                    yield return true;
-                    continue;
-                }
-
-                var metaBufferSize = (uint)payloads.Length * 2 + requiredWeightsBufferSize.Value;
-                var metaBuffer     = graphicsBroker.GetMetaUint4UploadBuffer(metaBufferSize);
-
-                Dependency = new WriteMetaBufferJob
-                {
-                    payloads       = payloads.AsDeferredJobArray(),
-                    meshGpuEntries = worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(true).entries.AsDeferredJobArray(),
-                    metaBuffer     = metaBuffer.LockBufferForWrite<uint4>(0, (int)metaBufferSize)
-                }.Schedule(payloads, 1, Dependency);
-
-                yield return true;
-
-                if (!GetPhaseActions(CullingComputeDispatchState.Dispatch, out terminate))
-                    continue;
-
-                metaBuffer.UnlockBufferAfterWrite<uint4>((int)metaBufferSize);
-
-                if (terminate)
-                    break;
-
-                var persistentBuffer = graphicsBroker.GetDeformBuffer(worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
-                m_dispatchShader.SetBuffer(0, _srcVertices,      graphicsBroker.GetMeshVerticesBuffer());
-                m_dispatchShader.SetBuffer(0, _blendShapeDeltas, graphicsBroker.GetMeshBlendShapesBufferRO());
-                m_dispatchShader.SetBuffer(0, _dstVertices,      persistentBuffer);
-                m_dispatchShader.SetBuffer(0, _metaBuffer,       metaBuffer);
-
-                for (uint dispatchesRemaining = (uint)payloads.Length, offset = 0; dispatchesRemaining > 0;)
-                {
-                    uint dispatchCount = math.min(dispatchesRemaining, 65535);
-                    m_dispatchShader.SetInt(_startOffset, (int)offset);
-                    //UnityEngine.Debug.Log("Dispatching");
-                    m_dispatchShader.Dispatch(0, (int)dispatchCount, 1, 1);
-                    offset              += dispatchCount;
-                    dispatchesRemaining -= dispatchCount;
-                }
-
-                Shader.SetGlobalBuffer(_DeformedMeshData,              persistentBuffer);
-                Shader.SetGlobalBuffer(_PreviousFrameDeformedMeshData, persistentBuffer);
-                Shader.SetGlobalBuffer(_latiosDeformBuffer,            persistentBuffer);
-
-                yield return true;
-            }
+            return new CollectState
+            {
+                broker                    = graphicsBroker,
+                payloads                  = payloads,
+                requiredWeightsBufferSize = requiredWeightsBufferSize
+            };
         }
 
-        unsafe struct UploadPayload
+        public WriteState Write(ref SystemState state, ref CollectState collectState)
+        {
+            if (collectState.payloads.IsEmpty)
+            {
+                // skip rest of loop.
+                return default;
+            }
+
+            var graphicsBroker            = collectState.broker;
+            var payloads                  = collectState.payloads;
+            var requiredWeightsBufferSize = collectState.requiredWeightsBufferSize.Value;
+
+            var metaBufferSize = (uint)payloads.Length * 2 + requiredWeightsBufferSize;
+            var metaBuffer     = graphicsBroker.GetMetaUint4UploadBuffer(metaBufferSize);
+
+            state.Dependency = new WriteMetaBufferJob
+            {
+                payloads       = payloads.AsDeferredJobArray(),
+                meshGpuEntries = latiosWorld.worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(true).entries.AsDeferredJobArray(),
+                metaBuffer     = metaBuffer.LockBufferForWrite<uint4>(0, (int)metaBufferSize)
+            }.Schedule(payloads, 1, state.Dependency);
+
+            return new WriteState
+            {
+                broker         = graphicsBroker,
+                payloads       = payloads,
+                metaBuffer     = metaBuffer,
+                metaBufferSize = metaBufferSize
+            };
+        }
+
+        public void Dispatch(ref SystemState state, ref WriteState writeState)
+        {
+            if (!writeState.broker.isCreated)
+                return;
+
+            var graphicsBroker = writeState.broker;
+            var metaBuffer     = writeState.metaBuffer;
+            var payloads       = writeState.payloads;
+            var metaBufferSize = writeState.metaBufferSize;
+
+            metaBuffer.UnlockBufferAfterWrite<uint4>((int)metaBufferSize);
+
+            var persistentBuffer = graphicsBroker.GetDeformBuffer(latiosWorld.worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>().maxRequiredDeformVertices);
+            m_dispatchShader.SetBuffer(0, _srcVertices,      graphicsBroker.GetMeshVerticesBuffer());
+            m_dispatchShader.SetBuffer(0, _blendShapeDeltas, graphicsBroker.GetMeshBlendShapesBufferRO());
+            m_dispatchShader.SetBuffer(0, _dstVertices,      persistentBuffer);
+            m_dispatchShader.SetBuffer(0, _metaBuffer,       metaBuffer);
+
+            for (uint dispatchesRemaining = (uint)payloads.Length, offset = 0; dispatchesRemaining > 0;)
+            {
+                uint dispatchCount = math.min(dispatchesRemaining, 65535);
+                m_dispatchShader.SetInt(_startOffset, (int)offset);
+                //UnityEngine.Debug.Log("Dispatching");
+                m_dispatchShader.Dispatch(0, (int)dispatchCount, 1, 1);
+                offset              += dispatchCount;
+                dispatchesRemaining -= dispatchCount;
+            }
+
+            GraphicsUnmanaged.SetGlobalBuffer(_DeformedMeshData,              persistentBuffer);
+            GraphicsUnmanaged.SetGlobalBuffer(_PreviousFrameDeformedMeshData, persistentBuffer);
+            GraphicsUnmanaged.SetGlobalBuffer(_latiosDeformBuffer,            persistentBuffer);
+        }
+
+        public struct CollectState
+        {
+            internal GraphicsBufferBroker      broker;
+            internal NativeList<UploadPayload> payloads;
+            internal NativeReference<uint>     requiredWeightsBufferSize;
+        }
+
+        public struct WriteState
+        {
+            internal GraphicsBufferBroker      broker;
+            internal GraphicsBufferUnmanaged   metaBuffer;
+            internal NativeList<UploadPayload> payloads;
+            internal uint                      metaBufferSize;
+        }
+
+        internal unsafe struct UploadPayload
         {
             public void* weightsPtr;
             public int   meshEntryIndex;
@@ -168,7 +188,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct GatherUploadOperationsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>              perCameraMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask>            perDispatchMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>               perFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<BlendShapeState>                        stateHandle;
             [ReadOnly] public BufferTypeHandle<BlendShapeWeight>                          weightsHandle;
@@ -186,10 +206,10 @@ namespace Latios.Kinemation.Systems
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 //UnityEngine.Debug.Log("Checking chunk for upload");
-                var cameraMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
-                var frameMask  = chunk.GetChunkComponentData(ref perFrameMaskHandle);
-                var lower      = cameraMask.lower.Value & (~frameMask.lower.Value);
-                var upper      = cameraMask.upper.Value & (~frameMask.upper.Value);
+                var dispatchMask = chunk.GetChunkComponentData(ref perDispatchMaskHandle);
+                var frameMask    = chunk.GetChunkComponentData(ref perFrameMaskHandle);
+                var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
+                var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
                 if ((upper | lower) == 0)
                     return;
 

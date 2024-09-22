@@ -132,6 +132,54 @@ namespace Latios
             }
         }
 
+        /// <summary>
+        /// Finds all groups recursively included in the specified group via UpdateInGroup attributes and adds them to the hashset.
+        /// This can then be used to check if non-group systems are a descendant of the group.
+        /// </summary>
+        /// <typeparam name="T">The group all other groups should be descendants of</typeparam>
+        /// <param name="allSystems">A list of systems to consider</param>
+        /// <param name="typesToAdd">The hashset where found groups should be added</param>
+        public static void AddGroupAndAllNestedGroupsInsideToFilter<T>(NativeList<SystemTypeIndex>        allSystems,
+                                                                       ref NativeHashSet<SystemTypeIndex> typesToAdd) where T : ComponentSystemGroup
+        {
+            var rootGroup = TypeManager.GetSystemTypeIndex<T>();
+            typesToAdd.Add(rootGroup);
+            var attrMap = new NativeHashMap<SystemTypeIndex, NativeList<SystemTypeIndex> >(allSystems.Length, Allocator.Temp);
+            foreach (var s in allSystems)
+            {
+                if (!s.IsGroup)
+                    continue;
+
+                attrMap.Add(s, s.GetUpdateInGroupTargets());
+            }
+
+            var systemsToRemove = new NativeList<SystemTypeIndex>(Allocator.Temp);
+            var locallyAddedSet = new NativeHashSet<SystemTypeIndex>(allSystems.Length, Allocator.Temp);
+            locallyAddedSet.Add(rootGroup);
+            bool emptyPass = false;
+            while (!emptyPass)
+            {
+                emptyPass = true;
+                systemsToRemove.Clear();
+                foreach (var pair in attrMap)
+                {
+                    foreach (var parent in pair.Value)
+                    {
+                        if (locallyAddedSet.Contains(parent))
+                        {
+                            emptyPass = false;
+                            systemsToRemove.Add(pair.Key);
+                            locallyAddedSet.Add(pair.Key);
+                            typesToAdd.Add(pair.Key);
+                            break;
+                        }
+                    }
+                }
+                foreach (var s in systemsToRemove)
+                    attrMap.Remove(s);
+            }
+        }
+
         public struct ComponentSystemBaseSystemHandleUnion
         {
             public ComponentSystemBase systemManaged;

@@ -10,7 +10,8 @@
         "Unity.Entities.Hybrid",
         "Unity.Transforms",
         "Unity.Scenes",
-        "Unity.Transforms.Hybrid"
+        "Unity.Transforms.Hybrid",
+        "Unity.NetCode"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -19,6 +20,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.netcode",
+            "expression": "0.49",
+            "define": "UNITY_NETCODE"
+        }
+    ],
     "noEngineReferences": false
 }

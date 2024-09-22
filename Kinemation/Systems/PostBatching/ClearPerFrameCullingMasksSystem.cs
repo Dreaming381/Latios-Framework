@@ -4,6 +4,8 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 
+using static Unity.Entities.SystemAPI;
+
 namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
@@ -13,42 +15,40 @@ namespace Latios.Kinemation.Systems
     {
         EntityQuery m_metaQuery;
 
-        ComponentTypeHandle<ChunkPerFrameCullingMask> m_handle;
-
         public void OnCreate(ref SystemState state)
         {
             m_metaQuery = state.Fluent().With<ChunkPerFrameCullingMask>(false).With<ChunkPerCameraCullingMask>(false).With<ChunkHeader>(true).Build();
-            m_handle    = state.GetComponentTypeHandle<ChunkPerFrameCullingMask>(false);
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            m_handle.Update(ref state);
             state.Dependency = new ClearJob
             {
-                handle            = m_handle,
+                frameHandle       = GetComponentTypeHandle<ChunkPerFrameCullingMask>(),
+                dispatchHandle    = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(),
                 lastSystemVersion = state.LastSystemVersion
             }.ScheduleParallel(m_metaQuery, state.Dependency);
         }
 
         [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
-        }
-
-        [BurstCompile]
         struct ClearJob : IJobChunk
         {
-            public ComponentTypeHandle<ChunkPerFrameCullingMask> handle;
-            public uint                                          lastSystemVersion;
+            public ComponentTypeHandle<ChunkPerFrameCullingMask>    frameHandle;
+            public ComponentTypeHandle<ChunkPerDispatchCullingMask> dispatchHandle;
+            public uint                                             lastSystemVersion;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (chunk.DidChange(ref handle, lastSystemVersion))
+                if (chunk.DidChange(ref frameHandle, lastSystemVersion))
                 {
-                    var ptr = chunk.GetComponentDataPtrRW(ref handle);
+                    var ptr = chunk.GetComponentDataPtrRW(ref frameHandle);
                     UnsafeUtility.MemClear(ptr, sizeof(ChunkPerFrameCullingMask) * chunk.Count);
+                }
+                if (chunk.DidChange(ref dispatchHandle, lastSystemVersion))
+                {
+                    var ptr = chunk.GetComponentDataPtrRW(ref dispatchHandle);
+                    UnsafeUtility.MemClear(ptr, sizeof(ChunkPerDispatchCullingMask) * chunk.Count);
                 }
             }
         }

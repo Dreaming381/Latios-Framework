@@ -8,51 +8,6 @@ using Unity.Rendering;
 namespace Latios.Kinemation
 {
     #region All Meshes
-    public struct LodCrossfade : IComponentData, IEnableableComponent
-    {
-        public byte raw;
-
-        public void SetHiResOpacity(float opacity, bool isLowRes)
-        {
-            int snorm  = (int)math.round(opacity * 127f);
-            snorm      = math.select(snorm, -snorm, isLowRes);
-            snorm     &= 0xff;
-            raw        = (byte)snorm;
-        }
-
-        public float hiResOpacity
-        {
-            get
-            {
-                int reg = raw;
-                var pos = math.select(reg, 256 - reg, reg > 128);
-                return pos / 127f;
-            }
-        }
-    }
-
-    // Note: You might think it would be better to cache the world-space heights before the culling callbacks.
-    // However, we still need the positions for distance calculations.
-    public struct LodHeightPercentages : IComponentData
-    {
-        // Signs represent the LOD index
-        public float localSpaceHeight;
-        public half  minPercent;
-        public half  maxPercent;
-    }
-
-    public struct LodHeightPercentagesWithCrossfadeMargins : IComponentData
-    {
-        // Signs of first three fields represent the LOD index
-        public float localSpaceHeight;
-        public half  minPercent;
-        public half  maxPercent;
-        public half  minCrossFadeEdge;  // if negative, then disable crossfade
-        public half  maxCrossFadeEdge;  // if negative, then disable crossfade
-    }
-
-    public struct SpeedTreeCrossfadeTag : IComponentData { }
-
     /// <summary>
     /// An optional component that when present will be enabled for the duration of the frame
     /// following a frame it was rendered by some view (including shadows), and disabled otherwise.
@@ -392,6 +347,9 @@ namespace Latios.Kinemation
         public BlobArray<float>                maxRadialOffsetsInBoneSpaceByBone;
         public BlobArray<BoneWeightLinkedList> boneWeights;
         public BlobArray<uint>                 boneWeightBatchStarts;
+
+        public bool hasBindPoses => bindPoses.Length > 0;
+        public bool hasDeformBoneWeights => boneWeights.Length > 0;
     }
 
     /// <summary>
@@ -426,6 +384,8 @@ namespace Latios.Kinemation
         public BlobArray<BlendShapeVertexDisplacement>      gpuData;
         public BlobArray<FixedString128Bytes>               shapeNames;
         public BlobArray<float>                             maxRadialOffsets;
+
+        public bool hasBlendShapes => shapes.Length > 0;
     }
 
     /// <summary>
@@ -457,7 +417,7 @@ namespace Latios.Kinemation
         /// Packed vertex indices triplets per triangle. Prefer to use GetIndicesForTriangle() and triangleCount to iterate.
         /// If any of the submesh topologies are not triangles, this will be empty.
         /// </summary>
-        public BlobArray<uint>                  packedIndicesByTriangle;
+        public BlobArray<uint> packedIndicesByTriangle;
         /// <summary>
         /// UV0s of the mesh, used to recalculate tangents. If the mesh does not have UV0s, this will be empty.
         /// </summary>
@@ -522,6 +482,8 @@ namespace Latios.Kinemation
         /// How indices for triangles and duplicates are packed.
         /// </summary>
         public IndicesPackMode packMode;
+
+        public bool hasMeshNormalizationData => triangleCount > 0;
 
         /// <summary>
         /// Gets the 3 vertex indices for a given triangle. Duplicates are NOT redirected.
@@ -722,7 +684,8 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// Combined skinning and blend shape blob data for a Mesh
+    /// Combined skinning, blend shape, and other deformation blob data for a Mesh.
+    /// Some values may not be present, depending on the MeshDeformDataFeatures specified during baking.
     /// </summary>
     public struct MeshDeformDataBlob
     {
@@ -734,6 +697,8 @@ namespace Latios.Kinemation
         public FixedString128Bytes         name;
 
         public int uniqueVertexPositionsCount => undeformedVertices.Length - normalizationData.duplicatePositionCount;
+
+        public bool hasUndeformedVertices => undeformedVertices.Length > 0;
     }
 
     /// <summary>

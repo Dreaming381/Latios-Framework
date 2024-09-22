@@ -108,23 +108,20 @@ namespace Latios.Kinemation.Systems
         {
             var context = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
 
-            var   cameraPosition = context.lodParameters.cameraPosition;
-            var   isPerspective  = !context.lodParameters.isOrthographic;
-            float cameraMultiplier;
-            if (isPerspective)
-            {
-                cameraMultiplier = m_lodBias / (2f * math.tan(math.radians(context.lodParameters.fieldOfView) / 2f));
-            }
-            else
-            {
-                cameraMultiplier = m_lodBias / (2f * context.lodParameters.orthoSize);
-            }
+            var   cameraPosition   = context.lodParameters.cameraPosition;
+            var   isPerspective    = !context.lodParameters.isOrthographic;
+            float cameraMultiplier = LodUtilities.CameraFactorFrom(in context.lodParameters, m_lodBias);
 
             var needsCulling  = context.cullIndexThisFrame == 0;
             needsCulling     |= cameraMultiplier != m_previousCameraHeightMultiplier;
             needsCulling     |= !cameraPosition.Equals(m_previousCameraPosition);
             needsCulling     |= m_maximumLODLevel != m_previousMaxResolutionLodLevel;
             needsCulling     |= isPerspective != m_previousWasPerspective;
+
+            m_previousCameraHeightMultiplier = cameraMultiplier;
+            m_previousCameraPosition         = cameraPosition;
+            m_previousMaxResolutionLodLevel  = m_maximumLODLevel;
+            m_previousWasPerspective         = isPerspective;
 
             if (needsCulling)
             {
@@ -206,7 +203,7 @@ namespace Latios.Kinemation.Systems
 
                             LodCrossfade newCrossfade = default;
                             float        opacity      = math.unlerp(maxMargin, computedParams.maxPercent, computedParams.worldHeight);
-                            newCrossfade.SetHiResOpacity(opacity, true);
+                            newCrossfade.SetFromHiResOpacity(opacity, true);
                             crossfades[i]        = newCrossfade;
                             crossfadeEnableds[i] = true;
                         }
@@ -218,10 +215,10 @@ namespace Latios.Kinemation.Systems
                             if (computedParams.worldHeight < minMargin)
                             {
                                 // We are crossfading with a lower resolution LOD
-                                // The fromula is the same for both SpeedTree and dithered, meaning SpeedTree only uses half the snorm space
+                                // The formula is the same for both SpeedTree and dithered, meaning SpeedTree only uses half the snorm space
                                 LodCrossfade newCrossfade = default;
                                 float        opacity      = math.unlerp(computedParams.minPercent, minMargin, computedParams.worldHeight);
-                                newCrossfade.SetHiResOpacity(opacity, false);
+                                newCrossfade.SetFromHiResOpacity(opacity, false);
                                 crossfades[i]        = newCrossfade;
                                 crossfadeEnableds[i] = true;
                             }
@@ -281,9 +278,8 @@ namespace Latios.Kinemation.Systems
                 else
                     computedParams.isPromotedLod = false;
 
-                computedParams.worldHeight  = math.abs(localHeight) * math.abs(transform.scale) * math.cmax(math.abs(transform.stretch));
-                computedParams.worldHeight *= cameraHeightMultiplier;
-                computedParams.minPercent   = math.abs(minPercent);
+                computedParams.worldHeight = LodUtilities.ViewHeightFrom(localHeight, transform.scale, transform.stretch, cameraHeightMultiplier);
+                computedParams.minPercent  = math.abs(minPercent);
                 if (isPerspective)
                 {
                     computedParams.distance    = math.distance(transform.position, cameraPosition);

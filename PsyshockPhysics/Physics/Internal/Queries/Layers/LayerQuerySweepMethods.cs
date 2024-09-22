@@ -42,7 +42,7 @@ namespace Latios.Psyshock
             if (bucket.count == 0)
                 return;
 
-            var context = new AabbSweepRecursiveContext(new FindObjectsResult(layer, bucket, 0, false),
+            var context = new AabbSweepRecursiveContext(new FindObjectsResult(layer, bucket, 0, false, 0),
                                                         bucket,
                                                         new float4(aabb.max.yz, -aabb.min.yz),
                                                         aabb.min.x
@@ -230,9 +230,11 @@ namespace Latios.Psyshock
         }
     }
 
-    public unsafe partial struct FindObjectsEnumerator : IEnumerable<FindObjectsResult>
+    public unsafe partial struct FindObjectsEnumerator
     {
         FindObjectsResult m_result;
+
+        int m_layerIndex;
 
         int3         m_bucketIjk;
         int3         m_minBucket;
@@ -257,7 +259,7 @@ namespace Latios.Psyshock
             }
         }
 
-        public FindObjectsEnumerator(in Aabb aabb, in CollisionLayer layer)
+        public FindObjectsEnumerator(in Aabb aabb, in CollisionLayer layer, int layerIndex = 0)
         {
             if (math.any(math.isnan(aabb.min) | math.isnan(aabb.max)))
             {
@@ -271,6 +273,7 @@ namespace Latios.Psyshock
                 m_qxmin             = default;
                 m_qxmax             = default;
                 m_currentFrameIndex = 33;
+                m_layerIndex        = layerIndex;
             }
             else
             {
@@ -280,7 +283,9 @@ namespace Latios.Psyshock
                 m_maxBucket = math.clamp(m_maxBucket, 0, layer.worldSubdivisionsPerAxis - 1);
                 m_bucketIjk = m_minBucket;
                 m_bucket    = layer.GetBucketSlices(IndexStrategies.CellIndexFromSubdivisionIndices(m_bucketIjk, layer.worldSubdivisionsPerAxis));
-                m_result    = new FindObjectsResult(in layer, in m_bucket, 0, false);
+                m_result    = new FindObjectsResult(in layer, in m_bucket, 0, false, layerIndex);
+
+                m_layerIndex = layerIndex;
 
                 m_qxmin     = aabb.min.x;
                 m_qxmax     = aabb.max.x;
@@ -319,7 +324,7 @@ namespace Latios.Psyshock
 
                 var bucketIndex = IndexStrategies.CellIndexFromSubdivisionIndices(m_bucketIjk, m_result.layer.worldSubdivisionsPerAxis);
                 m_bucket        = m_result.layer.GetBucketSlices(bucketIndex);
-                m_result        = new FindObjectsResult(in m_result.layer, in m_bucket, bucketIndex, false);
+                m_result        = new FindObjectsResult(in m_result.layer, in m_bucket, bucketIndex, false, m_layerIndex);
 
                 m_indexInBucket     = LayerQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
                 m_currentFrameIndex = 0;

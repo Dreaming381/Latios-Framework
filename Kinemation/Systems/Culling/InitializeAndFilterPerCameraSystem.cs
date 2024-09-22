@@ -57,7 +57,7 @@ namespace Latios.Kinemation.Systems
             {
                 chunkInfoHandle        = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
                 headerHandle           = GetComponentTypeHandle<ChunkHeader>(true),
-                maskHandle             = GetComponentTypeHandle<ChunkPerCameraCullingMask>(),
+                perCameraMaskHandle    = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
                 filterHandle           = GetSharedComponentTypeHandle<RenderFilterSettings>(),
                 lightMapsHandle        = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
                 materialMeshInfoHandle = m_materialMeshInfoHandle,
@@ -89,7 +89,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct Job : IJobChunk
         {
-            public ComponentTypeHandle<ChunkPerCameraCullingMask>             maskHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingMask>             perCameraMaskHandle;
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> filterHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>                headerHandle;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>  chunkInfoHandle;
@@ -98,9 +98,11 @@ namespace Latios.Kinemation.Systems
 
             public CullingContext cullingContext;
 
+            public bool clearDispatch;
+
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var chunkPerCameraMasks = metaChunk.GetComponentDataPtrRW(ref maskHandle);
+                var chunkPerCameraMasks = metaChunk.GetComponentDataPtrRW(ref perCameraMaskHandle);
                 UnsafeUtility.MemClear(chunkPerCameraMasks, sizeof(ChunkPerCameraCullingMask) * metaChunk.Count);
 
                 var chunkHeaders = metaChunk.GetComponentDataPtrRO(ref headerHandle);

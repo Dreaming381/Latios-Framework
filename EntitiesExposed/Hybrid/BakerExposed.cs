@@ -24,6 +24,8 @@ namespace Unity.Entities.Exposed
     public static class BlobAssetStoreExposedExtensions
     {
         public static uint GetTypeHashForBurst<T>(this BlobAssetStore bas) => BlobAssetStore.ComputeTypeHash(typeof(T));
+        public static bool TryAddBlobAssetWithBurstHash<T>(this BlobAssetStore bas, uint typeHash, ref BlobAssetReference<T> blob) where T : unmanaged => bas.TryAdd(ref blob,
+                                                                                                                                                                     typeHash);
         public static bool TryAddBlobAssetWithBurstHash<T>(this BlobAssetStore bas, Hash128 customHash, uint typeHash,
                                                            ref BlobAssetReference<T> blob) where T : unmanaged => bas.TryAdd(customHash, typeHash, ref blob);
         public static bool TryGetBlobAssetWithBurstHash<T>(this BlobAssetStore bas, Hash128 customHash, uint typeHash,

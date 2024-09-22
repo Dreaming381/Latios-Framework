@@ -102,7 +102,7 @@ namespace Latios.Kinemation
         /// The time value to sample the the clip in seconds.
         /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
         /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
-        /// <returns>A bone transform sampled from the clip in local space of the bone</returns>
+        /// <returns>A bone transform sampled from the clip in local space of the bone, with its weight set to 1f</returns>
         public unsafe TransformQvvs SampleBone(int boneIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
         {
             var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
@@ -114,7 +114,7 @@ namespace Latios.Kinemation
             {
                 rotation   = qvv.rotation,
                 position   = qvv.translation.xyz,
-                worldIndex = math.asint(qvv.translation.w),
+                worldIndex = math.asint(1f),
                 stretch    = qvv.stretchScale.xyz,
                 scale      = qvv.stretchScale.w
             };

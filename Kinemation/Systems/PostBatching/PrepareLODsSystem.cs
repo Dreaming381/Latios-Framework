@@ -70,7 +70,7 @@ namespace Latios.Kinemation.Systems
 
                 var info       = chunk.GetChunkComponentRefRO(ref entitiesGraphicsChunkInfoHandle);
                 var identifier = new LODCrossfadePtrMap.ChunkIdentifier { batchID = (uint)info.ValueRO.BatchIndex, batchStartIndex = info.ValueRO.CullingData.ChunkOffsetInBatch };
-                var ptr        = new LODCrossfadePtrMap.CrossfadePtr { ptr = (byte*)chunk.GetRequiredComponentDataPtrRO(ref lodCrossfadeHandle) };
+                var ptr        = new LODCrossfadePtrMap.CrossfadePtr { ptr = (LodCrossfade*)chunk.GetRequiredComponentDataPtrRO(ref lodCrossfadeHandle) };
                 map.Add(identifier, ptr);
             }
         }
