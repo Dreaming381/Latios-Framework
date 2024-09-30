@@ -41,7 +41,6 @@ namespace Latios.Kinemation
     /// Usage: Read Only (No exceptions!)
     /// You can read from this to figure out if an entity requires GPU data dispatches.
     /// </summary>
-    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     public struct ChunkPerDispatchCullingMask : IComponentData
     {
         public BitField64 lower;

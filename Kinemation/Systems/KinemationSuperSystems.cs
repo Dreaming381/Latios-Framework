@@ -220,6 +220,9 @@ namespace Latios.Kinemation.Systems
         protected override void CreateSystems()
         {
             GetOrCreateAndAddManagedSystem<KinemationCullingSuperSystem>();
+#if UNITY_6000_0_OR_NEWER
+            GetOrCreateAndAddManagedSystem<KinemationCullingDispatchSuperSystem>();
+#endif
         }
 
         // This is just for showing in the Editor.

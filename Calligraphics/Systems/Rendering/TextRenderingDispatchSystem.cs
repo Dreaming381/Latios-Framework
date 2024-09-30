@@ -86,16 +86,16 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             if (!latiosWorld.worldBlackboardEntity.HasComponent<GraphicsBufferBroker>())
                 throw new System.InvalidOperationException("Calligraphics must be installed after Kinemation.");
-            var broker = latiosWorld.worldBlackboardEntity.GetComponentData<GraphicsBufferBroker>();
-            broker.InitializePersistentBuffer(kGlyphsBufferID, 128 * 96, 4, GraphicsBuffer.Target.Raw, copyByteAddressShader);
-            broker.InitializeUploadPool(kGlyphsUploadID, 4, GraphicsBuffer.Target.Raw);
-            broker.InitializePersistentBuffer(kGlyphMasksBufferID, 128 * 4, 4, GraphicsBuffer.Target.Raw, copyByteAddressShader);
-            broker.InitializeUploadPool(kGlyphMasksUploadID, 4, GraphicsBuffer.Target.Raw);
+            graphicsBroker = latiosWorld.worldBlackboardEntity.GetComponentData<GraphicsBufferBroker>();
+            graphicsBroker.InitializePersistentBuffer(kGlyphsBufferID, 128 * 96, 4, GraphicsBuffer.Target.Raw, copyByteAddressShader);
+            graphicsBroker.InitializeUploadPool(kGlyphsUploadID, 4, GraphicsBuffer.Target.Raw);
+            graphicsBroker.InitializePersistentBuffer(kGlyphMasksBufferID, 128 * 4, 4, GraphicsBuffer.Target.Raw, copyByteAddressShader);
+            graphicsBroker.InitializeUploadPool(kGlyphMasksUploadID, 4, GraphicsBuffer.Target.Raw);
 
             m_glyphsBufferID     = kGlyphsBufferID;
             m_glyphMasksBufferID = kGlyphMasksBufferID;
             m_glyphsUploadID     = kGlyphsUploadID;
-            m_glyphMasksUploadID = kGlyphsUploadID;
+            m_glyphMasksUploadID = kGlyphMasksUploadID;
         }
 
         [BurstCompile]

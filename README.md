@@ -1,15 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.11.0-beta.1]
-
-**This is a prerelease version of the Latios Framework version 0.11 which is
-still under development. Changelogs and Documentation are currently being
-updated to reflect the new features and changes in 0.11.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**This version of the beta uses Unity 2022.3.36 with Entities 1.3.2.**
+# Latios Framework for Unity ECS – [0.11.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -37,10 +28,10 @@ adaptations of top-class solutions in the industry (see [Third Party
 Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
-This version targets Entities 1.2.1 with ENTITY_STORE_V1 and a minimum editor
-version of 2022.3.13f1.
+This version targets Entities 1.3.2 with ENTITY_STORE_V1 and a minimum editor
+version of 2022.3.36f1.
 
-*[0.9.x] users, please read the* [*Upgrade
+*[0.10.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 **If you have any experience with DOTS, please take** [**this
@@ -204,12 +195,10 @@ into Unity ECS and the Latios Framework.
 
 ### Future Modules
 
--   Mach-Axle AI – A utility AI evaluator designed for high throughput
 -   Unika – A high-performance scripting solution including support for
     interfaces and coroutines using source generators
 -   Life FX – VFX simulations which add immersion to stylized worlds
--   Unnamed Environment – Terrain, water, vegetation, weather, proc-gen, and
-    many other things to build worlds
+-   Mach-Axle AI – A utility AI evaluator designed for high throughput
 -   Unnamed Networking – Something fast and flexible at scale
 
 ## Why Use the Latios Framework?
@@ -345,7 +334,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.9.X) will always preserve backwards compatibility back to the
+Patch releases (0.11.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
