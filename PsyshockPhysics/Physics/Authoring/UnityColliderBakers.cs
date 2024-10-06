@@ -4,21 +4,16 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace Latios.Psyshock.Authoring.Systems
+namespace Latios.Psyshock.Authoring
+{
+namespace Systems
 {
     [DisableAutoCreation]
     public class SphereColliderBaker : Baker<UnityEngine.SphereCollider>
     {
-        ColliderBakerHelper m_helper;
-
-        public SphereColliderBaker()
-        {
-            m_helper = new ColliderBakerHelper(this);
-        }
-
         public override void Bake(UnityEngine.SphereCollider authoring)
         {
-            if (!m_helper.ShouldBake(authoring))
+            if (!this.ShouldBakeSingleCollider(authoring))
                 return;
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
@@ -34,16 +29,9 @@ namespace Latios.Psyshock.Authoring.Systems
     [DisableAutoCreation]
     public class CapsuleColliderBaker : Baker<UnityEngine.CapsuleCollider>
     {
-        ColliderBakerHelper m_helper;
-
-        public CapsuleColliderBaker()
-        {
-            m_helper = new ColliderBakerHelper(this);
-        }
-
         public override void Bake(UnityEngine.CapsuleCollider authoring)
         {
-            if (!m_helper.ShouldBake(authoring))
+            if (!this.ShouldBakeSingleCollider(authoring))
                 return;
 
             float3 dir;
@@ -73,16 +61,9 @@ namespace Latios.Psyshock.Authoring.Systems
     [DisableAutoCreation]
     public class BoxColliderBaker : Baker<UnityEngine.BoxCollider>
     {
-        ColliderBakerHelper m_helper;
-
-        public BoxColliderBaker()
-        {
-            m_helper = new ColliderBakerHelper(this);
-        }
-
         public override void Bake(UnityEngine.BoxCollider authoring)
         {
-            if (!m_helper.ShouldBake(authoring))
+            if (!this.ShouldBakeSingleCollider(authoring))
                 return;
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
@@ -103,7 +84,7 @@ namespace Latios.Psyshock.Authoring.Systems
 
         public bool Bake(UnityEngine.MeshCollider authoring, IBaker baker)
         {
-            if (!(baker as MeshColliderBaker).m_helper.ShouldBake(authoring))
+            if (!baker.ShouldBakeSingleCollider(authoring))
                 return false;
 
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
@@ -142,12 +123,6 @@ namespace Latios.Psyshock.Authoring.Systems
     [DisableAutoCreation]
     public class MeshColliderBaker : SmartBaker<UnityEngine.MeshCollider, MeshColliderBakeItem>
     {
-        internal ColliderBakerHelper m_helper;
-
-        public MeshColliderBaker()
-        {
-            m_helper = new ColliderBakerHelper(this);
-        }
     }
 
     [TemporaryBakingType]
@@ -157,53 +132,14 @@ namespace Latios.Psyshock.Authoring.Systems
 
         public bool Bake(UnityEngine.Collider authoring, IBaker baker)
         {
-            var smartBaker = baker as CompoundColliderBaker;
-            smartBaker.m_colliderCache.Clear();
-            smartBaker.GetComponents(smartBaker.m_colliderCache);
-            if (smartBaker.m_colliderCache.Count < 2)
-                return false;
-
-            smartBaker.m_compoundCache.Clear();
-            smartBaker.GetComponentsInParent(smartBaker.m_compoundCache);
-            foreach (var compoundAuthoring in smartBaker.m_compoundCache)
-            {
-                if (compoundAuthoring.colliderType == AuthoringColliderTypes.None)
-                    continue;
-                if (!compoundAuthoring.enabled)
-                    continue;
-                if (compoundAuthoring.generateFromChildren)
-                    return false;
-
-                foreach (var child in compoundAuthoring.colliders)
-                {
-                    if (child.gameObject == authoring.gameObject)
-                        return false;
-                }
-            }
-
-            // We only want to process once for all colliders. If any collider is modified, added, or removed,
-            // dependencies will trigger a rebake for all colliders due to GetComponents(), so it only matters
-            // that one is picked for a single bake but which gets picked doesn't matter.
-            // But for consistency, we need to acquire other components to perform additional checks.
-            var transform = smartBaker.GetComponent<UnityEngine.Transform>();
-
-            if (smartBaker.m_colliderCache[0].GetInstanceID() != authoring.GetInstanceID())
-                return false;
-
-            for (int i = 0; i < smartBaker.m_colliderCache.Count; i++)
-            {
-                if (!smartBaker.m_colliderCache[i].enabled)
-                {
-                    smartBaker.m_colliderCache.RemoveAtSwapBack(i);
-                    i--;
-                }
-            }
-            if (smartBaker.m_colliderCache.Count < 2)
+            var mode = baker.GetMultiColliderBakeMode(authoring, out var colliders);
+            if (mode != MultiColliderBakeMode.PrimaryOfMultiCollider)
                 return false;
 
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
             baker.AddComponent<Collider>(entity);
-            m_handle = smartBaker.RequestCreateBlobAsset(smartBaker.m_colliderCache, transform);
+            var transform = baker.GetComponent<UnityEngine.Transform>();
+            m_handle      = baker.RequestCreateBlobAsset(colliders, transform);
             return true;
         }
 
@@ -223,55 +159,110 @@ namespace Latios.Psyshock.Authoring.Systems
     [DisableAutoCreation]
     public class CompoundColliderBaker : SmartBaker<UnityEngine.Collider, CompoundColliderBakerWorker>
     {
-        internal List<UnityEngine.Collider> m_colliderCache = new List<UnityEngine.Collider>();
-        internal List<ColliderAuthoring>    m_compoundCache = new List<ColliderAuthoring>();
+    }
+}
+
+    /// <summary>
+    /// Determines how the collider will be baked using default collider baking
+    /// </summary>
+    public enum MultiColliderBakeMode
+    {
+        SingleCollider = 0,
+        PrimaryOfMultiCollider = 1,
+        Ignore = 2
     }
 
-    internal class ColliderBakerHelper
+    public static class UnityColliderBakerUtiltities
     {
-        IBaker                     m_baker;
-        List<UnityEngine.Collider> m_colliderCache = new List<UnityEngine.Collider>();
-        List<ColliderAuthoring>    m_compoundCache = new List<ColliderAuthoring>();
+        static List<UnityEngine.Collider> s_colliderCache = new List<UnityEngine.Collider>();
+        static List<ColliderAuthoring>    s_compoundCache = new List<ColliderAuthoring>();
 
-        public ColliderBakerHelper(IBaker baker)
+        /// <summary>
+        /// Returns true if this collider is not part of a compound collider
+        /// </summary>
+        /// <param name="authoring">The collider to evaluate</param>
+        /// <returns>True if the collider is not part of a compound collider, false otherwise</returns>
+        public static bool ShouldBakeSingleCollider(this IBaker baker, UnityEngine.Collider authoring)
         {
-            m_baker = baker;
+            return Evaluate(baker, authoring, true) == MultiColliderBakeMode.SingleCollider;
         }
 
-        public bool ShouldBake(UnityEngine.Collider authoring)
+        /// <summary>
+        /// Determines if this collider is to be baked as a single non-compound collider,
+        /// or if it is the primary collider target from which to assemble a compound collider.
+        /// You can check if the result is not Ignore to determine if you should add additional
+        /// components like tags to it.
+        /// </summary>
+        /// <param name="authoring">The collider to consider</param>
+        /// <param name="compoundColliderListIfPrimary">If the result is PrimaryOfMultiCollider,
+        /// then this list will contain the list of colliders to be baked into the compound.
+        /// This list gets reused for each call to this method, so do not hold onto it.</param>
+        /// <returns></returns>
+        public static MultiColliderBakeMode GetMultiColliderBakeMode(this IBaker baker, UnityEngine.Collider authoring,
+                                                                     out List<UnityEngine.Collider> compoundColliderListIfPrimary)
+        {
+            var evaluation                = Evaluate(baker, authoring, false);
+            compoundColliderListIfPrimary = evaluation == MultiColliderBakeMode.PrimaryOfMultiCollider ? s_colliderCache : null;
+            return evaluation;
+        }
+
+        internal static MultiColliderBakeMode Evaluate(IBaker baker, UnityEngine.Collider authoring, bool ignoreMulti)
         {
             if (!authoring.enabled)
-                return false;
+                return MultiColliderBakeMode.Ignore;
 
-            m_colliderCache.Clear();
-            m_baker.GetComponents(m_colliderCache);
-            if (m_colliderCache.Count > 1)
+            s_colliderCache.Clear();
+            baker.GetComponents(s_colliderCache);
+            int enabledCount = 1;
+            if (s_colliderCache.Count > 1)
             {
-                int enabledCount = 0;
-                foreach (var c in m_colliderCache)
+                enabledCount = 0;
+                foreach (var c in s_colliderCache)
                     enabledCount += c.enabled ? 1 : 0;
-                if (enabledCount > 1)
-                    return false;
+                if (enabledCount > 1 && ignoreMulti)
+                    return MultiColliderBakeMode.Ignore;
             }
-            m_compoundCache.Clear();
-            m_baker.GetComponentsInParent(m_compoundCache);
-            foreach (var compoundAuthoring in m_compoundCache)
+            s_compoundCache.Clear();
+            baker.GetComponentsInParent(s_compoundCache);
+            foreach (var compoundAuthoring in s_compoundCache)
             {
                 if (compoundAuthoring.colliderType == AuthoringColliderTypes.None)
                     continue;
                 if (!compoundAuthoring.enabled)
                     continue;
                 if (compoundAuthoring.generateFromChildren)
-                    return false;
+                    return MultiColliderBakeMode.Ignore;
 
                 foreach (var child in compoundAuthoring.colliders)
                 {
                     if (child.gameObject == authoring.gameObject)
-                        return false;
+                        return MultiColliderBakeMode.Ignore;
                 }
             }
+            if (enabledCount == 1)
+                return MultiColliderBakeMode.SingleCollider;
 
-            return true;
+            // We only want to process once for all colliders. If any collider is modified, added, or removed,
+            // dependencies will trigger a rebake for all colliders due to GetComponents(), so it only matters
+            // that one is picked for a single bake but which gets picked doesn't matter.
+            // But for consistency, we need to acquire other components to perform additional checks.
+            bool foundFirst = false;
+            for (int i = 0; i < s_colliderCache.Count; i++)
+            {
+                if (!s_colliderCache[i].enabled)
+                {
+                    s_colliderCache.RemoveAtSwapBack(i);
+                    i--;
+                }
+                else if (!foundFirst)
+                {
+                    if (s_colliderCache[i] != authoring)
+                        return MultiColliderBakeMode.Ignore;
+                    else
+                        foundFirst = true;
+                }
+            }
+            return MultiColliderBakeMode.PrimaryOfMultiCollider;
         }
     }
 }

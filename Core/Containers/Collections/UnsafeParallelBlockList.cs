@@ -709,6 +709,7 @@ namespace Latios.Unsafe
             var elementsInLastBlock        = blockList->elementCount % m_elementsPerBlock;
             var elementsStillNeededInBlock = math.select(m_elementsPerBlock - elementsInLastBlock, 0, elementsInLastBlock == 0);
             var elementsInOtherLastBlock   = otherBlockList->elementCount % m_elementsPerBlock;
+            elementsInOtherLastBlock       = math.select(elementsInOtherLastBlock, m_elementsPerBlock, elementsInOtherLastBlock == 0);
             if (elementsInOtherLastBlock <= elementsStillNeededInBlock)
             {
                 var otherBlock    = otherBlockList->blocks[otherBlockList->blocks.Length - 1];
@@ -717,6 +718,7 @@ namespace Latios.Unsafe
                 var dst           = blockToAppend.ptr + elementsInLastBlock * m_elementSize;
                 UnsafeUtility.MemCpy(dst, src, elementsInOtherLastBlock * m_elementSize);
                 AllocatorManager.Free(otherAllocator, otherBlock.ptr, m_blockSize);
+                elementsInLastBlock        += elementsInOtherLastBlock;
                 elementsStillNeededInBlock -= elementsInOtherLastBlock;
                 otherBlockList->blocks.Length--;
                 blockList->nextWriteAddress += elementsInOtherLastBlock * m_elementSize;

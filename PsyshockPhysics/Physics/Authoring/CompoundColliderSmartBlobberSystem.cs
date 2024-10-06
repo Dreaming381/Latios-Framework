@@ -17,6 +17,13 @@ namespace Latios.Psyshock.Authoring
 {
     public static class CompoundColliderSmartBlobberExtensions
     {
+        /// <summary>
+        /// Requests the creation of a compound collider using a list of Unity Collider objects.
+        /// The list is not serialized, so you can reuse the list after this call.
+        /// </summary>
+        /// <param name="colliders">The list of colliders to bake into the compound</param>
+        /// <param name="compoundTransform">A reference transform that the colliders are baked relative to</param>
+        /// <returns></returns>
         public static SmartBlobberHandle<CompoundColliderBlob> RequestCreateBlobAsset(this IBaker baker, List<UnityCollider> colliders, UnityEngine.Transform compoundTransform)
         {
             return baker.RequestCreateBlobAsset<CompoundColliderBlob, CompoundColliderBakeData>(new CompoundColliderBakeData

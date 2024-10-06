@@ -340,7 +340,8 @@ namespace Latios.Psyshock
                 ref var otherStream = ref pairStreamToStealFrom.data.blockStreamArray[i];
                 if (!stream.blocks.IsCreated)
                 {
-                    stream = otherStream;
+                    stream      = otherStream;
+                    otherStream = default;
                 }
                 else if (otherStream.blocks.IsCreated)
                 {
@@ -494,7 +495,7 @@ namespace Latios.Psyshock
             /// </summary>
             public ushort userUShort
             {
-                get => ReadHeader().userUshort;
+                get => ReadHeaderParallel().userUshort;
                 set => WriteHeader().userUshort = value;
             }
             /// <summary>
@@ -504,7 +505,7 @@ namespace Latios.Psyshock
             /// </summary>
             public byte userByte
             {
-                get => ReadHeader().userByte;
+                get => ReadHeaderParallel().userByte;
                 set => WriteHeader().userByte = value;
             }
             /// <summary>
@@ -512,26 +513,26 @@ namespace Latios.Psyshock
             /// </summary>
             public bool enabled
             {
-                get => (ReadHeader().flags & PairHeader.kEnabled) == PairHeader.kEnabled;
+                get => (ReadHeaderParallel().flags & PairHeader.kEnabled) == PairHeader.kEnabled;
                 set => WriteHeader().flags |= PairHeader.kEnabled;
             }
 
             /// <summary>
             /// If true, the pair's associated object was allocated as a raw pointer.
             /// </summary>
-            public bool isRaw => (ReadHeader().flags & PairHeader.kRootPtrIsRaw) == PairHeader.kRootPtrIsRaw;
+            public bool isRaw => (ReadHeaderParallel().flags & PairHeader.kRootPtrIsRaw) == PairHeader.kRootPtrIsRaw;
             /// <summary>
             /// If true, the first entity in the pair was granted read-write access upon creation.
             /// However, read-write access may still not be permitted depending on the context
             /// (it is disallowed for immediate contexts).
             /// </summary>
-            public bool aIsRW => (ReadHeader().flags & PairHeader.kWritableA) == PairHeader.kWritableA;
+            public bool aIsRW => (ReadHeaderParallel().flags & PairHeader.kWritableA) == PairHeader.kWritableA;
             /// <summary>
             /// If true, the second entity in the pair was granted read-write access upon creation.
             /// However, read-write access may still not be permitted depending on the context
             /// (it is disallowed for immediate contexts).
             /// </summary>
-            public bool bIsRW => (ReadHeader().flags & PairHeader.kWritableB) == PairHeader.kWritableB;
+            public bool bIsRW => (ReadHeaderParallel().flags & PairHeader.kWritableB) == PairHeader.kWritableB;
             /// <summary>
             /// The index of the stream this pair resides in
             /// </summary>
@@ -539,8 +540,7 @@ namespace Latios.Psyshock
             {
                 get
                 {
-                    CheckReadAccess();
-                    CheckPairPtrVersionMatches(data.state, version);
+                    ReadHeaderParallel();
                     return index;
                 }
             }
@@ -750,6 +750,15 @@ namespace Latios.Psyshock
                 CheckWriteAccess();
                 CheckPairPtrVersionMatches(data.state, version);
                 return ref *header;
+            }
+
+            ref PairHeader ReadHeaderParallel()
+            {
+                // Bypass AtomicWriteOnly safety access.
+                if (isParallelKeySafe)
+                    return ref WriteHeader();
+                else
+                    return ref ReadHeader();
             }
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
