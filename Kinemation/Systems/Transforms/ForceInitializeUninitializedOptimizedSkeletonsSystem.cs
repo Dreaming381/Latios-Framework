@@ -1,4 +1,3 @@
-using Latios.Transforms.Systems;
 using Unity.Burst;
 using Unity.Entities;
 
@@ -6,7 +5,11 @@ namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(PreTransformSuperSystem))]
+#if !LATIOS_TRANSFORMS_UNITY
+    [UpdateInGroup(typeof(Latios.Transforms.Systems.PreTransformSuperSystem))]
+#else
+    [UpdateInGroup(typeof(Unity.Transforms.TransformSystemGroup))]
+#endif
     [UpdateBefore(typeof(CopyTransformFromBoneSystem))]
     [DisableAutoCreation]
     [BurstCompile]

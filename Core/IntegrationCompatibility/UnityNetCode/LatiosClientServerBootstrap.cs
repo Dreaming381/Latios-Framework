@@ -192,6 +192,7 @@ namespace Latios.Compatibility.UnityNetCode
 #endif
         }
 
+#pragma warning disable CS0109  // The member 'LatiosClientServerBootstrap.CreateClientWorld(string, bool)' does not hide an accessible member. The new keyword is not required.
         /// <summary>
         /// Utility method for creating new clients worlds.
         /// Can be used in custom implementations of `Initialize` as well at runtime, to add new clients dynamically.
@@ -215,6 +216,7 @@ namespace Latios.Compatibility.UnityNetCode
             return world;
 #endif
         }
+#pragma warning restore CS0109
 
         /// <summary>
         /// Utility method for creating a new server world.

@@ -249,6 +249,8 @@ namespace Latios.Kinemation.Systems
                     skeletonRootTagLookup             = GetComponentLookup<SkeletonRootTag>(true),
                     meshBlobRefHandle                 = GetComponentTypeHandle<MeshDeformDataBlobReference>(true),
                     rootRefHandle                     = GetComponentTypeHandle<BindSkeletonRoot>(true),
+                    prefabLookup                      = GetComponentLookup<Prefab>(true),
+                    disabledLookup                    = GetComponentLookup<Disabled>(true)
                 };
 
                 if (haveNewMeshes)
@@ -716,6 +718,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentLookup<BindSkeletonRoot>                  bindSkeletonRootLookup;
             [ReadOnly] public ComponentLookup<BoneOwningSkeletonReference>       boneOwningSkeletonReferenceLookup;
             [ReadOnly] public ComponentLookup<SkeletonBindingPathsBlobReference> skeletonBindingPathsBlobRefLookup;
+            [ReadOnly] public ComponentLookup<Prefab>                            prefabLookup;
+            [ReadOnly] public ComponentLookup<Disabled>                          disabledLookup;
 
             // Optional
             [ReadOnly] public ComponentTypeHandle<BindSkeletonRoot>              rootRefHandle;
@@ -837,6 +841,17 @@ namespace Latios.Kinemation.Systems
                         {
                             UnityEngine.Debug.LogError(
                                 $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is not a skeleton nor references one.");
+                            continue;
+                        }
+
+                        if (disabledLookup.HasComponent(root))
+                        {
+                            UnityEngine.Debug.LogError($"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is disabled.");
+                            continue;
+                        }
+                        if (prefabLookup.HasComponent(root))
+                        {
+                            UnityEngine.Debug.LogError($"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is a prefab.");
                             continue;
                         }
 
