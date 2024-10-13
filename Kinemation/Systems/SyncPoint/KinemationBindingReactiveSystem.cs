@@ -371,7 +371,7 @@ namespace Latios.Kinemation.Systems
                                                                                                   ComponentType.ReadWrite<LocalTransform>(),
                                                                                                   ComponentType.ReadWrite<ParentToWorldTransform>()));
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-                state.EntityManager.RemoveComponent<CopyLocalToParentFromBone>(m_newMeshesQuery);
+                state.EntityManager.RemoveComponent<CopyLocalToParentFromBone>(m_newSkinnedMeshesQuery);
 #endif
                 var skinnedMeshAddTypes = new FixedList128Bytes<ComponentType>();
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<BoundMesh>());

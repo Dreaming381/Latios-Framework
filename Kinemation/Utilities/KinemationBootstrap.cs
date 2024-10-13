@@ -41,18 +41,19 @@ namespace Latios.Kinemation
             if (unityUpdateBounds != null)
                 unityUpdateBounds.Enabled = false;
 
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateGraphicsBufferBrokerSystem>(),                 world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderUpdateSuperSystem>(),                world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderSyncPointSuperSystem>(),             world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationFrameSyncPointSuperSystem>(),              world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosEntitiesGraphicsSystem>(),                     world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationPostRenderSuperSystem>(),                  world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosUpdateEntitiesGraphicsChunkStructureSystem>(), world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosLightProbeUpdateSystem>(),                     world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateGraphicsBufferBrokerSystem>(),                     world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderUpdateSuperSystem>(),                    world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationRenderSyncPointSuperSystem>(),                 world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationFrameSyncPointSuperSystem>(),                  world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosEntitiesGraphicsSystem>(),                         world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationPostRenderSuperSystem>(),                      world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosUpdateEntitiesGraphicsChunkStructureSystem>(),     world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosLightProbeUpdateSystem>(),                         world);
 
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<CopyTransformFromBoneSystem>(),                      world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<RotateAnimatedBuffersSystem>(),                      world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateMatrixPreviousSystem>(),                       world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<ForceInitializeUninitializedOptimizedSkeletonsSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<CopyTransformFromBoneSystem>(),                          world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<RotateAnimatedBuffersSystem>(),                          world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateMatrixPreviousSystem>(),                           world);
         }
     }
 }
