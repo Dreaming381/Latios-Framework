@@ -286,6 +286,22 @@ namespace Latios.Kinemation
 #endif
             return context.stride;
         }
+
+        internal static void SetGraphicsBufferName(GraphicsBufferUnmanaged unmanaged, in FixedString128Bytes name)
+        {
+            var context = new SetGraphicsBufferNameContext
+            {
+                listIndex = unmanaged.index,
+                name      = name,
+                success   = false
+            };
+            DoManagedExecute((IntPtr)(&context), 12);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Failed to set the name for the GraphicsBufferUnmanaged.");
+#endif
+        }
         #endregion
 
         #region State
@@ -418,6 +434,14 @@ namespace Latios.Kinemation
             public int  stride;
             public bool success;
         }
+
+        // Code 12
+        struct SetGraphicsBufferNameContext
+        {
+            public int                 listIndex;
+            public FixedString128Bytes name;
+            public bool                success;
+        }
         #endregion
 
         static void DoManagedExecute(IntPtr context, int operation)
@@ -531,6 +555,14 @@ namespace Latios.Kinemation
                         ref var ctx    = ref *(GetGraphicsBufferStrideContext*)context;
                         var     buffer = buffers[ctx.listIndex];
                         ctx.stride     = buffer.stride;
+                        ctx.success    = true;
+                        break;
+                    }
+                    case 12:
+                    {
+                        ref var ctx    = ref *(SetGraphicsBufferNameContext*)context;
+                        var     buffer = buffers[ctx.listIndex];
+                        buffer.name    = ctx.name.ToString();
                         ctx.success    = true;
                         break;
                     }

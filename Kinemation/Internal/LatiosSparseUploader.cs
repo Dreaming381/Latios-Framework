@@ -474,6 +474,7 @@ namespace Latios.Kinemation.SparseUpload
     {
         private NativeList<GraphicsBufferUnmanaged> m_Buffers;
         private NativeStack<int>                    m_FreeBufferIds;
+        private NativeStack<int>                    m_BuffersReleased;
 
         private int                       m_Count;
         private int                       m_Stride;
@@ -482,8 +483,9 @@ namespace Latios.Kinemation.SparseUpload
 
         public BufferPool(int count, int stride, GraphicsBuffer.Target target, GraphicsBuffer.UsageFlags usageFlags)
         {
-            m_Buffers       = new NativeList<GraphicsBufferUnmanaged>(Allocator.Persistent);
-            m_FreeBufferIds = new NativeStack<int>(Allocator.Persistent);
+            m_Buffers         = new NativeList<GraphicsBufferUnmanaged>(Allocator.Persistent);
+            m_FreeBufferIds   = new NativeStack<int>(Allocator.Persistent);
+            m_BuffersReleased = new NativeStack<int>(Allocator.Persistent);
 
             m_Count      = count;
             m_Stride     = stride;
@@ -495,18 +497,30 @@ namespace Latios.Kinemation.SparseUpload
         {
             for (int i = 0; i < m_Buffers.Length; ++i)
             {
-                m_Buffers[i].Dispose();
+                if (m_Buffers[i].IsValid())
+                    m_Buffers[i].Dispose();
             }
             m_FreeBufferIds.Dispose();
+            m_BuffersReleased.Dispose();
             m_Buffers.Dispose();
         }
 
         private int AllocateBuffer()
         {
-            var id = m_Buffers.Length;
-            var cb = new GraphicsBufferUnmanaged(m_Target, m_UsageFlags, m_Count, m_Stride);
-            m_Buffers.Add(cb);
-            return id;
+            var cb  = new GraphicsBufferUnmanaged(m_Target, m_UsageFlags, m_Count, m_Stride);
+            cb.name = "LatiosSparseUploaderBuffer";
+            if (!m_BuffersReleased.IsEmpty)
+            {
+                var id        = m_BuffersReleased.Pop();
+                m_Buffers[id] = cb;
+                return id;
+            }
+            else
+            {
+                var id = m_Buffers.Length;
+                m_Buffers.Add(cb);
+                return id;
+            }
         }
 
         public int GetBufferId()
@@ -525,6 +539,26 @@ namespace Latios.Kinemation.SparseUpload
         public void PutBufferId(int id)
         {
             m_FreeBufferIds.Push(id);
+        }
+
+        /*
+         * Prune free buffers to allow up to maxMemoryToRetainInBytes to remain.
+         * Note that this will only release buffers that are marked free, so the actual memory retained might be higher than requested
+         */
+        public void PruneFreeBuffers(int maxMemoryToRetainInBytes)
+        {
+            int memoryToFree = TotalBufferSize - maxMemoryToRetainInBytes;
+            if (memoryToFree <= 0)
+                return;
+
+            while (memoryToFree > 0 && !m_FreeBufferIds.IsEmpty)
+            {
+                var id     = m_FreeBufferIds.Pop();
+                var buffer = GetBufferFromId(id);
+                buffer.Dispose();
+                m_BuffersReleased.Push(id);
+                memoryToFree -= m_Count * m_Stride;
+            }
         }
 
         public int TotalBufferCount => m_Buffers.Length;
@@ -604,6 +638,9 @@ namespace Latios.Kinemation.SparseUpload
         int m_OperationsBaseID;
         int m_ReplaceOperationSize;
 
+        int  m_RequestedUploadBufferPoolMaxSizeBytes;
+        bool m_PruneUploadBufferPool;
+
         uint m_frameIndex;
         bool m_firstUpdate;
         bool m_firstUpdateThisFrame;
@@ -642,6 +679,9 @@ namespace Latios.Kinemation.SparseUpload
 
             m_CurrentFrameUploadSize = 0;
             m_MaxUploadSize          = 0;
+
+            m_RequestedUploadBufferPoolMaxSizeBytes = 0;
+            m_PruneUploadBufferPool                 = false;
 
             m_frameIndex           = 0;
             m_firstUpdate          = true;
@@ -916,6 +956,16 @@ namespace Latios.Kinemation.SparseUpload
         }
 
         /// <summary>
+        /// Requests pruning of upload buffers. The actual release will happen in FrameCleanup.
+        /// </summary>
+        /// <param name="requestedMaxSizeRetainedInBytes">Maximum memory target to keep alive in upload buffer pool. Only buffers marked as free will be pruned, so the memory retained might be more than requested.</param>
+        public void PruneUploadBufferPoolOnFrameCleanup(int requestedMaxSizeRetainedInBytes)
+        {
+            m_RequestedUploadBufferPoolMaxSizeBytes = requestedMaxSizeRetainedInBytes;
+            m_PruneUploadBufferPool                 = true;
+        }
+
+        /// <summary>
         /// Cleans up internal data and recovers buffers into the free buffer pool.
         /// </summary>
         /// <remarks>
@@ -925,22 +975,27 @@ namespace Latios.Kinemation.SparseUpload
         {
             var numBuffers = m_ThreadData->m_NumBuffers;
 
-            if (numBuffers == 0)
-                return;
-
-            // These buffers where never used, so they gets returned to the pool at once
-            for (int iBuf = 0; iBuf < numBuffers; ++iBuf)
+            if (numBuffers > 0)
             {
-                var mappedBuffer = m_MappedBuffers[iBuf];
-                MappedBuffer.UnpackMarker(mappedBuffer.m_Marker, out var operationOffset, out var dataOffset);
-                var graphicsBufferID = mappedBuffer.m_BufferID;
-                var graphicsBuffer   = m_UploadBufferPool.GetBufferFromId(graphicsBufferID);
+                // These buffers were never used, so they gets returned to the pool at once
+                for (int iBuf = 0; iBuf < numBuffers; ++iBuf)
+                {
+                    var mappedBuffer = m_MappedBuffers[iBuf];
+                    MappedBuffer.UnpackMarker(mappedBuffer.m_Marker, out var operationOffset, out var dataOffset);
+                    var graphicsBufferID = mappedBuffer.m_BufferID;
+                    var graphicsBuffer   = m_UploadBufferPool.GetBufferFromId(graphicsBufferID);
 
-                graphicsBuffer.UnlockBufferAfterWrite<byte>(0);
-                m_UploadBufferPool.PutBufferId(graphicsBufferID);
+                    graphicsBuffer.UnlockBufferAfterWrite<byte>(0);
+                    m_UploadBufferPool.PutBufferId(graphicsBufferID);
+                }
+
+                m_MappedBuffers.Dispose();
             }
-
-            m_MappedBuffers.Dispose();
+            if (m_PruneUploadBufferPool)
+            {
+                m_UploadBufferPool.PruneFreeBuffers(m_RequestedUploadBufferPoolMaxSizeBytes);
+                m_PruneUploadBufferPool = false;
+            }
 
             StepFrame();
         }

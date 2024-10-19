@@ -86,6 +86,12 @@ namespace Latios.Kinemation.Authoring
                         Debug.LogWarning($"MeshMaterialSubmeshSettings at index {mmsIndex} has a null material for object {authoringForLogging.name}", authoringForLogging);
                         continue;
                     }
+                    if (material.shader == null)
+                    {
+                        Debug.LogWarning($"MeshMaterialSubmeshSettings at index {mmsIndex} has a null shader on material {material.name} for object {authoringForLogging.name}",
+                                         authoringForLogging);
+                        continue;
+                    }
 
                     baker.DependsOn(mesh);
                     baker.DependsOn(material);
@@ -107,6 +113,7 @@ namespace Latios.Kinemation.Authoring
 
                     materialSpan[0] = material;
                     flags.AppendDepthSortedFlag(materialSpan);
+                    flags.AppendPerVertexMotionPassFlag(materialSpan);
 
                     s_validIndexCache.Add(mmsIndex);
                 }

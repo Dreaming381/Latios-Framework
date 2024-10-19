@@ -106,6 +106,18 @@ namespace Latios.Kinemation
             }
         }
 
+        /// <summary>
+        /// The debug label for the GraphicsBuffer (setter only).
+        /// </summary>
+        public FixedString128Bytes name
+        {
+            set
+            {
+                CheckValid();
+                GraphicsUnmanaged.SetGraphicsBufferName(this, value);
+            }
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         internal void CheckValid()
         {

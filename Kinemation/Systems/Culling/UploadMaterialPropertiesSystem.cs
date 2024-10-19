@@ -38,6 +38,15 @@ namespace Latios.Kinemation.Systems
         private static ulong PrevUsedSpace = 0;
 #endif
 
+        /// <summary>
+        /// Prune sparse uploader gpu buffer pool.
+        /// </summary>
+        /// <param name="maxMemoryToRetainInUploadPoolBytes">Maximum memory target to keep alive in upload buffer pool. Only buffers marked as free will be pruned, so the memory retained might be more than requested.</param>
+        public void PruneUploadBufferPool(int maxMemoryToRetainInUploadPoolBytes)
+        {
+            m_GPUUploader.PruneUploadBufferPoolOnFrameCleanup(maxMemoryToRetainInUploadPoolBytes);
+        }
+
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();

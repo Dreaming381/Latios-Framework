@@ -2,13 +2,17 @@
 
 All notable changes to this package will be documented in this file.
 
-The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
-and this project adheres to [Semantic
-Versioning](http://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-You can find changelogs for the individual modules in the [official Latios
-Framework Documentation
-repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
+You can find changelogs for the individual modules in the [official Latios Framework Documentation repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
+
+## [0.11.4] – 2024-10-19
+
+Officially supports Entities [1.3.5]
+
+### Changed
+
+-   Updated Kinemation to v0.11.4
 
 ## [0.11.3] – 2024-10-13
 
@@ -323,8 +327,7 @@ Officially supports Entities [1.0.10]
 
 ### Changed
 
--   Moved Documentation to
-    <https://github.com/Dreaming381/Latios-Framework-Documentation>
+-   Moved Documentation to <https://github.com/Dreaming381/Latios-Framework-Documentation>
 -   Updated Core to v0.7.0
 -   Updated Psyshock to v0.7.0
 -   Updated Myri to v0.7.0

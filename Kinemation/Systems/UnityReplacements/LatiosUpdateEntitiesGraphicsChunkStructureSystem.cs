@@ -19,6 +19,7 @@ namespace Latios.Kinemation.Systems
     {
         private EntityQuery m_MissingHybridChunkInfo;
         private EntityQuery m_DisabledRenderingQuery;
+        private EntityQuery m_destroyedChunkInfoQuery;
 #if UNITY_EDITOR
         private EntityQuery m_HasHybridChunkInfo;
 #endif
@@ -36,6 +37,8 @@ namespace Latios.Kinemation.Systems
                     ComponentType.ReadOnly<DisableRendering>(),
                 },
             });
+
+            m_destroyedChunkInfoQuery = state.Fluent().With<EntitiesGraphicsChunkInfo>(true, true).Without<MaterialMeshInfo>().Build();
 
 #if UNITY_EDITOR
             m_HasHybridChunkInfo = state.GetEntityQuery(new EntityQueryDesc
@@ -66,6 +69,7 @@ namespace Latios.Kinemation.Systems
 
             state.EntityManager.AddComponent(m_MissingHybridChunkInfo, ComponentType.ChunkComponent<EntitiesGraphicsChunkInfo>());
             state.EntityManager.RemoveChunkComponentData<EntitiesGraphicsChunkInfo>(m_DisabledRenderingQuery);
+            state.EntityManager.RemoveChunkComponentData<EntitiesGraphicsChunkInfo>(m_destroyedChunkInfoQuery);
         }
     }
 }

@@ -127,6 +127,7 @@ namespace Latios.Kinemation.Systems
                 motionVectorDeformQueryMask = m_motionVectorDeformQueryMask,
                 PostProcessMatrix           = GetComponentTypeHandle<PostProcessMatrix>(true),
                 MaterialMeshInfo            = GetComponentTypeHandle<MaterialMeshInfo>(true),
+                ProceduralMotion            = GetComponentTypeHandle<PerVertexMotionVectors_Tag>(true),
                 ProfilerEmitChunk           = m_profilerEmitChunk,
                 RenderFilterSettings        = GetSharedComponentTypeHandle<RenderFilterSettings>(),
                 RenderMeshArray             = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
@@ -322,6 +323,7 @@ namespace Latios.Kinemation.Systems
 #endif
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
             [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag>            DepthSorted;
+            [ReadOnly] public ComponentTypeHandle<PerVertexMotionVectors_Tag> ProceduralMotion;
             [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>      RenderMeshArray;
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
             [ReadOnly] public SharedComponentTypeHandle<LightMaps>            LightMaps;
@@ -396,10 +398,10 @@ namespace Latios.Kinemation.Systems
                         bool orderChanged     = chunk.DidOrderChange(LastSystemVersion);
                         bool transformChanged = chunk.DidChange(ref WorldTransform, LastSystemVersion);
                         if (hasPostProcess)
-                            transformChanged |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
-                        bool isDeformed       = motionVectorDeformQueryMask.MatchesIgnoreFilter(chunk);
-
-                        hasMotion = orderChanged || transformChanged || isDeformed;
+                            transformChanged     |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
+                        bool isDeformed           = motionVectorDeformQueryMask.MatchesIgnoreFilter(chunk);
+                        bool hasProceduralMotion  = chunk.Has(ref ProceduralMotion);
+                        hasMotion                 = orderChanged || transformChanged || isDeformed || hasProceduralMotion;
                     }
 
                     int chunkStartIndex = entitiesGraphicsChunkInfo.CullingData.ChunkOffsetInBatch;
