@@ -208,9 +208,7 @@ namespace Systems
 
         internal static MultiColliderBakeMode Evaluate(IBaker baker, UnityEngine.Collider authoring, bool ignoreMulti)
         {
-            if (!authoring.enabled)
-                return MultiColliderBakeMode.Ignore;
-
+            // Reminder: Unity does not bake disabled components!
             s_colliderCache.Clear();
             baker.GetComponents(s_colliderCache);
             int enabledCount = 1;

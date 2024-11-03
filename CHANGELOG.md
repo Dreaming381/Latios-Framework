@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) a
 
 You can find changelogs for the individual modules in the [official Latios Framework Documentation repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.11.5] – 2024-11-2
+
+Officially supports Entities [1.3.5]
+
+### Changed
+
+-   Updated Psyshock to v0.11.5
+-   Updated Kinemation to v0.11.5
+
 ## [0.11.4] – 2024-10-19
 
 Officially supports Entities [1.3.5]

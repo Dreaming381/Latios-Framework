@@ -5,6 +5,7 @@ using Latios.Transforms;
 using Latios.Transforms.Abstract;
 using Latios.Unsafe;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -2081,9 +2082,17 @@ namespace Latios.Kinemation.Systems
                             boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload] = TransformQvvs.identity;
                             for (int i = 1; i < bones.Length; i++)
                             {
-                                var entity                                                             = bones[i].bone;
-                                var boneWorldTransform                                                 = previousTransformLookup[entity].worldTransform;
-                                var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
+                                var entity = bones[i].bone;
+                                if (Hint.Unlikely(!previousTransformLookup.TryGetComponent(entity, out var previousTransform)))
+                                {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                                    UnityEngine.Debug.LogError(
+                                        $"Bone {entity.ToFixedString()} at index {i} does not have the required PreviousTransform. Using WorldTansform instead.");
+#endif
+                                    previousTransform.worldTransform = worldTransformLookup[entity].worldTransformQvvs;
+                                }
+                                var boneToRoot = qvvs.inversemulqvvs(in skeletonWorldTransform,
+                                                                     in previousTransform.worldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
 
@@ -2103,9 +2112,17 @@ namespace Latios.Kinemation.Systems
                                     boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload] = TransformQvvs.identity;
                                     continue;
                                 }
-                                var entity                                                             = bones[offsets[i]].bone;
-                                var boneWorldTransform                                                 = previousTransformLookup[entity].worldTransform;
-                                var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
+                                var entity = bones[offsets[i]].bone;
+                                if (Hint.Unlikely(!previousTransformLookup.TryGetComponent(entity, out var previousTransform)))
+                                {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                                    UnityEngine.Debug.LogError(
+                                        $"Bone {entity.ToFixedString()} at index {i} does not have the required PreviousTransform. Using WorldTansform instead.");
+#endif
+                                    previousTransform.worldTransform = worldTransformLookup[entity].worldTransformQvvs;
+                                }
+                                var boneToRoot = qvvs.inversemulqvvs(in skeletonWorldTransform,
+                                                                     in previousTransform.worldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
 
@@ -2120,9 +2137,17 @@ namespace Latios.Kinemation.Systems
                             boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload] = TransformQvvs.identity;
                             for (int i = 1; i < bones.Length; i++)
                             {
-                                var entity                                                             = bones[i].bone;
-                                var boneWorldTransform                                                 = twoAgoTransformLookup[entity].worldTransform;
-                                var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
+                                var entity = bones[i].bone;
+                                if (Hint.Unlikely(!twoAgoTransformLookup.TryGetComponent(entity, out var twoAgoTransform)))
+                                {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                                    UnityEngine.Debug.LogError(
+                                        $"Bone {entity.ToFixedString()} at index {i} does not have the required TwoAgoTransform. Using WorldTansform instead.");
+#endif
+                                    twoAgoTransform.worldTransform = worldTransformLookup[entity].worldTransformQvvs;
+                                }
+                                var boneToRoot = qvvs.inversemulqvvs(in skeletonWorldTransform,
+                                                                     in twoAgoTransform.worldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
 
@@ -2142,9 +2167,17 @@ namespace Latios.Kinemation.Systems
                                     boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload] = TransformQvvs.identity;
                                     continue;
                                 }
-                                var entity                                                             = bones[offsets[i]].bone;
-                                var boneWorldTransform                                                 = twoAgoTransformLookup[entity].worldTransform;
-                                var boneToRoot                                                         = qvvs.inversemulqvvs(in skeletonWorldTransform, in boneWorldTransform);
+                                var entity = bones[offsets[i]].bone;
+                                if (Hint.Unlikely(!twoAgoTransformLookup.TryGetComponent(entity, out var twoAgoTransform)))
+                                {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+                                    UnityEngine.Debug.LogError(
+                                        $"Bone {entity.ToFixedString()} at index {i} does not have the required TwoAgoTransform. Using WorldTansform instead.");
+#endif
+                                    twoAgoTransform.worldTransform = worldTransformLookup[entity].worldTransformQvvs;
+                                }
+                                var boneToRoot = qvvs.inversemulqvvs(in skeletonWorldTransform,
+                                                                     in twoAgoTransform.worldTransform);
                                 boneTransformsUploadBuffer[(int)prefixSums.boneTransformsToUpload + i] = boneToRoot;
                             }
 

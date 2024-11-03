@@ -7,6 +7,9 @@ namespace Latios.Psyshock
 {
     public static partial class UnitySim
     {
+        /// <summary>
+        /// A struct which contains a solver-optimized form of a 3D rotation constraint.
+        /// </summary>
         public struct Rotation3DConstraintJacobianParameters
         {
             public quaternion inertialPoseAInInertialPoseBSpace;
@@ -20,6 +23,20 @@ namespace Latios.Psyshock
             public float damping;
         }
 
+        /// <summary>
+        /// Constructs a 3D rotaton constraint
+        /// </summary>
+        /// <param name="parameters">The resulting constraint data</param>
+        /// <param name="inertialPoseWorldRotationA">The current world rotation of the inertia tensor diagonal of the first body A</param>
+        /// <param name="jointRotationInInertialPoseASpace">The inertial-pose relative rotation of the "joint" in A,
+        /// which when the constraint is in the rest pose, the world-space version of rotation should match the world-space counterpart in B</param>
+        /// <param name="inertialPoseWorldRotationB">The current world rotation of the inertia tensor diagonal of the second body B</param>
+        /// <param name="jointRotationInInertialPoseBSpace">The inertial-pose relative rotation of the "joint" in B,
+        /// which when the constraint is in the rest pose, the world-space version of rotation should match the world-space counterpart in A</param>
+        /// <param name="minAngle">The minimum angle allowed in the range of [-2*pi, 2*pi]</param>
+        /// <param name="maxAngle">The maximum angle allowed in the range of [-2*pi, 2*pi]</param>
+        /// <param name="tau">The normalized stiffness factor</param>
+        /// <param name="damping">The normalized damping factor</param>
         public static void BuildJacobian(out Rotation3DConstraintJacobianParameters parameters,
                                          quaternion inertialPoseWorldRotationA, quaternion jointRotationInInertialPoseASpace,
                                          quaternion inertialPoseWorldRotationB, quaternion jointRotationInInertialPoseBSpace,
@@ -42,7 +59,17 @@ namespace Latios.Psyshock
             }
         }
 
-        // Returns the impulse applied only to the angular velocity for the axes.
+        /// <summary>
+        /// Solves the 3D rotation constraint for the pair of bodies
+        /// </summary>
+        /// <param name="velocityA">The velocity of the first body</param>
+        /// <param name="massA">The mass of the first body</param>
+        /// <param name="velocityB">The velocity of the second body</param>
+        /// <param name="massB">The mass of the second body</param>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="deltaTime">The timestep over which this constraint is being solved</param>
+        /// <param name="inverseDeltaTime">The reciprocal of deltaTime, should be: 1f / deltaTime</param>
+        /// <returns>The scalar impulses applied only to the angular velocity for each of the three rotational axes</returns>
         public static float3 SolveJacobian(ref Velocity velocityA, in Mass massA, ref Velocity velocityB, in Mass massB,
                                            in Rotation3DConstraintJacobianParameters parameters, float deltaTime, float inverseDeltaTime)
         {

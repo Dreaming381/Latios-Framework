@@ -41,8 +41,8 @@ namespace Latios.Psyshock
             /// Forces such as gravity should be applied to the velocity prior to calling this.
             /// </summary>
             /// <param name="velocity">The velocity of the object, after forces have been applied.</param>
-            /// <param name="deltaTime"></param>
-            /// <param name="angularExpansionFactor"></param>
+            /// <param name="deltaTime">The time step across which the expansion should account for</param>
+            /// <param name="angularExpansionFactor">The factor by which the AABB may expand as it rotates</param>
             public MotionExpansion(in Velocity velocity, float deltaTime, float angularExpansionFactor)
             {
                 var linear = velocity.linear * deltaTime;

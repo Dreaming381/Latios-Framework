@@ -524,7 +524,7 @@ namespace Latios.Psyshock
                 filteredChunkCache = filteredChunkCache,
                 typeGroup          = handles
             };
-            for (int i = 0; i < layer.count; i++)
+            for (int i = 0; i < filteredChunkCache.Length; i++)
             {
                 p1.Execute(i);
             }

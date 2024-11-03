@@ -6,19 +6,44 @@ namespace Latios.Psyshock
 {
     public static partial class UnitySim
     {
+        /// <summary>
+        /// An extremely stiff spring frequency which can be used to represent rigid constraints
+        /// </summary>
         public const float kStiffSpringFrequency = 74341.31f;
-        public const float kStiffDampingRatio    = 2530.126f;
+        /// <summary>
+        /// An extremely stiff damping ratio which can be used to represent rigid constraints
+        /// </summary>
+        public const float kStiffDampingRatio = 2530.126f;
 
+        /// <summary>
+        /// Converts the spring constant of a spring force and its mass into a mass-independent frequency
+        /// </summary>
+        /// <param name="springConstant">The spring force constant, as specified by Hooke's Law</param>
+        /// <param name="inverseMass">The reciprocal of the mass</param>
+        /// <returns>A frequency of oscillation that the spring exhibits when no damping is present</returns>
         public static float SpringFrequencyFrom(float springConstant, float inverseMass)
         {
             return springConstant * inverseMass * rcpTwoPI;
         }
 
+        /// <summary>
+        /// Converts the spring mass-independent frequency into a spring force constant
+        /// </summary>
+        /// <param name="springFrequency">The natural frequency of oscillation of the spring</param>
+        /// <param name="mass">The mass load of the spring which results in the frequency of oscillation</param>
+        /// <returns>The spring force constant, as specified by Hooke's Law</returns>
         public static float SpringConstantFrom(float springFrequency, float mass)
         {
             return springFrequency * mass * 2f * math.PI;
         }
 
+        /// <summary>
+        /// Computes the mass-independent spring damping ratio from various other spring properties
+        /// </summary>
+        /// <param name="springConstant">The spring force constant, as specified by Hooke's Law</param>
+        /// <param name="dampingConstant">A damping force constant from a spring-damper model</param>
+        /// <param name="mass">The mass load of the spring</param>
+        /// <returns>A mass-independent damping ratio which can be used alongside a spring frequency to parameterize a joint</returns>
         public static float DampingRatioFrom(float springConstant, float dampingConstant, float mass)
         {
             var product = springConstant * mass;
@@ -33,6 +58,13 @@ namespace Latios.Psyshock
             return dampingConstant / (2f * math.sqrt(product));  // damping coefficient / critical damping coefficient
         }
 
+        /// <summary>
+        /// Computes the spring damping constant given its damping ratio and other spring properties
+        /// </summary>
+        /// <param name="springConstant">The spring force constant, as specified by Hooke's Law</param>
+        /// <param name="dampingRatio">The mass-independent damping ratio of the spring</param>
+        /// <param name="mass">The mass load of the spring</param>
+        /// <returns>The mass constant in the spring-damper model</returns>
         public static float DampingConstantFrom(float springConstant, float dampingRatio, float mass)
         {
             var product = springConstant * mass;
@@ -46,6 +78,15 @@ namespace Latios.Psyshock
             return dampingRatio * 2f * math.sqrt(product);
         }
 
+        /// <summary>
+        /// Computes the spring frequency and damping ratio from the simulation-normalized solver constraint parameters
+        /// </summary>
+        /// <param name="constraintTau">The normalized constraint parameter of the spring's force</param>
+        /// <param name="constraintDamping">The normalized constraint parameter of the spring's internal resistance</param>
+        /// <param name="deltaTime">The timestep from which the simulation-normalized parameters were derived</param>
+        /// <param name="iterations">The number of velocity solver iterations from which the simulation-normalized parameters were derived</param>
+        /// <param name="springFrequency">The resulting mass-independent spring frequency of oscillation</param>
+        /// <param name="dampingRatio">The resulting mass-independent internal resistance parameter of the spring</param>
         public static void SpringFrequencyAndDampingRatioFrom(float constraintTau, float constraintDamping, float deltaTime, int iterations,
                                                               out float springFrequency, out float dampingRatio)
         {
@@ -66,6 +107,15 @@ namespace Latios.Psyshock
         }
 
         // This is the inverse function to CalculateSpringFrequencyAndDamping
+        /// <summary>
+        /// Computes the spring constraint solver normalization parameters relative to the simulation timestep and iteration count
+        /// </summary>
+        /// <param name="springFrequency">The spring's mass-independent oscillating frequency when no internal resistance is present</param>
+        /// <param name="dampingRatio">The spring's mass-independent internal resistance factor</param>
+        /// <param name="deltaTime">The timestep of the simulation</param>
+        /// <param name="iterations">The number of velocity solver iterations to be used with the parameters</param>
+        /// <param name="constraintTau">The resulting constraint solver normalized parameter of the spring's force</param>
+        /// <param name="constraintDamping">The resulting constraint solver normalized parameter of the spring's internal resistance</param>
         public static void ConstraintTauAndDampingFrom(float springFrequency, float dampingRatio, float deltaTime, int iterations,
                                                        out float constraintTau, out float constraintDamping)
         {

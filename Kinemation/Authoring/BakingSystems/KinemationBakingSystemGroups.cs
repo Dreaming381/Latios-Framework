@@ -4,7 +4,7 @@ using Unity.Entities;
 namespace Latios.Kinemation.Authoring.Systems
 {
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
+    [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderFirst = true)]
     [DisableAutoCreation]
     public partial class KinemationPreTransformsBakingGroup : ComponentSystemGroup
     {

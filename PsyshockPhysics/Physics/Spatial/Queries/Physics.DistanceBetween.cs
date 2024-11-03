@@ -175,7 +175,8 @@ namespace Latios.Psyshock
 
         #region Collider vs Collider
         /// <summary>
-        /// Checks if the distance between the surfaces of two colliders are within maxDistance. If the colliders are overlapping, the determined distance is negative.
+        /// Checks if the distance between the surfaces of two colliders are within maxDistance. If the colliders are overlapping, the determined distance is negative,
+        /// and the magnitude represents the distance of penetration, that is, the minimum distance required to fully separate the two closest subcolliders.
         /// If the signed distance is less than maxDistance, info about the pair of surface points, one for each collider, is generated and reported.
         /// </summary>
         /// <param name="colliderA">The first of the two colliders to test for distance</param>

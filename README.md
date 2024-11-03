@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.11.4]
+# Latios Framework for Unity ECS – [0.11.5]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and feature-sets for Unity’s ECS which aims to give you back control over your gameplay. If you like the general paradigms, syntax, and workflows of Unity’s ECS, but find Unity’s offerings to be incomplete or frustratingly full of quirky unintuitive details, then this framework may be exactly what you need to achieve your vision.
 

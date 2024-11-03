@@ -38,8 +38,7 @@ namespace Latios.Psyshock.Authoring
 
         public bool Bake(ColliderAuthoring authoring, IBaker baker)
         {
-            if (!authoring.enabled)
-                return false;
+            // Reminder: Unity does not bake disabled components!
             if (authoring.colliderType == AuthoringColliderTypes.None)
                 return false;
 

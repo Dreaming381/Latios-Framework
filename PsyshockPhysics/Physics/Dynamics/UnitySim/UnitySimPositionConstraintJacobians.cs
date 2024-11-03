@@ -6,6 +6,9 @@ namespace Latios.Psyshock
 {
     public static partial class UnitySim
     {
+        /// <summary>
+        /// A struct which contains a solver-optimized form of a position constraint along 1, 2, or 3 dimensions.
+        /// </summary>
         public struct PositionConstraintJacobianParameters
         {
             public float3 jointPositionInInertialPoseASpace;
@@ -33,6 +36,22 @@ namespace Latios.Psyshock
             public bool is1D;
         }
 
+        /// <summary>
+        /// Constructs a position constraint
+        /// </summary>
+        /// <param name="parameters">The resulting constraint data</param>
+        /// <param name="inertialPoseWorldTransformA">The current world-space center of mass and inertia tensor diagonal orientation of the first body A</param>
+        /// <param name="jointPositionInInertialPoseASpace">The inertial-pose relative position of the "joint" in A,
+        /// which when the constraint is in the rest pose, the world-space version of position should match the world-space counterpart in B</param>
+        /// <param name="inertialPoseWorldTransformB">The current world-space center of mass and inertia tensor diagonal orientation of the second body B</param>
+        /// <param name="jointTransformInInertialPoseBSpace">The inertial-pose relative position and rotation of the "joint" in B,
+        /// which when the constraint is in the rest pose, the world-space version of position should match the world-space counterpart in A,
+        /// and the rotation should be aligned to the constraint axes</param>
+        /// <param name="minDistance">The minimum distance allowed between the joint positions in world space within the axis, plane, or volume of the constrained axes</param>
+        /// <param name="maxDistance">The maximum distance allowed between the joint positions in world space within the axis, plane, or volume of the constrained axes</param>
+        /// <param name="tau">The normalized stiffness factor</param>
+        /// <param name="damping">The normalized damping factor</param>
+        /// <param name="constrainedAxes">For each axis, true if it is constrained, false otherwise</param>
         public static void BuildJacobian(out PositionConstraintJacobianParameters parameters,
                                          in RigidTransform inertialPoseWorldTransformA, float3 jointPositionInInertialPoseASpace,
                                          in RigidTransform inertialPoseWorldTransformB, in RigidTransform jointTransformInInertialPoseBSpace,
@@ -83,7 +102,19 @@ namespace Latios.Psyshock
             parameters.initialError = CalculatePositionConstraintError(in parameters, in inertialPoseWorldTransformA, in inertialPoseWorldTransformB, out _);
         }
 
-        // Returns the world-space impulse applied to A. The world-space impulse applied to B is simply the negative of this value.
+        /// <summary>
+        /// Solves the position constraint for the pair of bodies
+        /// </summary>
+        /// <param name="velocityA">The velocity of the first body</param>
+        /// <param name="inertialPoseWorldTransformA">The world-space center of mass and inertia tensor diagonal orientation of the first body</param>
+        /// <param name="massA">The mass of the first body</param>
+        /// <param name="velocityB">The velocity of the second body</param>
+        /// <param name="inertialPoseWorldTransformB">The world-space center of mass and inertia tensor diagonal orientation of the second body</param>
+        /// <param name="massB">The mass of the second body</param>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="deltaTime">The timestep over which this constraint is being solved</param>
+        /// <param name="inverseDeltaTime">The reciprocal of deltaTime, should be: 1f / deltaTime</param>
+        /// <returns>The world-space impulse applied to A. The world-space impulse applied to B is simply the negative of this value.</returns>
         public static float3 SolveJacobian(ref Velocity velocityA, in RigidTransform inertialPoseWorldTransformA, in Mass massA,
                                            ref Velocity velocityB, in RigidTransform inertialPoseWorldTransformB, in Mass massB,
                                            in PositionConstraintJacobianParameters parameters, float deltaTime, float inverseDeltaTime)
