@@ -479,6 +479,17 @@ namespace Latios.Kinemation.Systems
             m_dispatchPassIndexThisFrame   = 0;
             m_cullPassIndexForLastDispatch = -1;
 
+            if (worldBlackboardEntity.HasComponent<EnableCustomGraphicsTag>())
+            {
+                m_dispatchPassIndexThisFrame = 1;
+                worldBlackboardEntity.SetComponentData(new DispatchContext
+                {
+                    dispatchIndexThisFrame                      = 0,
+                    lastSystemVersionOfLatiosEntitiesGraphics   = LastSystemVersion,
+                    globalSystemVersionOfLatiosEntitiesGraphics = GlobalSystemVersion
+                });
+            }
+
             m_LastSystemVersionAtLastUpdate   = LastSystemVersion;
             m_globalSystemVersionAtLastUpdate = GlobalSystemVersion;
 

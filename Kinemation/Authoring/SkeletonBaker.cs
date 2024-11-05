@@ -109,16 +109,16 @@ namespace Latios.Kinemation.Authoring
                 });
                 AddComponent<OptimizedSkeletonHierarchyBlobReference>(entity);
 
-                var boneEntityBuffer = AddBuffer<OptimizedSkeletonExportedBone>(entity);
-                var boneGoBuffer     = AddBuffer<ExportedBoneGameObjectRef>(entity);
+                var boneEntityBuffer = AddBuffer<ImportedSocket>(entity);
+                var boneGoBuffer     = AddBuffer<ImportedSocketGameObjectRef>(entity);
                 for (int i = 0; i < GetChildCount(); i++)
                 {
                     var child = GetChild(i);
                     if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<ExcludeFromSkeletonAuthoring>(child) != null || GetComponent<Animator>(child) != null)
                         continue;
 
-                    boneGoBuffer.Add(new ExportedBoneGameObjectRef { authoringGameObjectForBone = child });
-                    boneEntityBuffer.Add(new OptimizedSkeletonExportedBone { boneEntity         = GetEntity(child, TransformUsageFlags.Dynamic) });
+                    boneGoBuffer.Add(new ImportedSocketGameObjectRef { authoringGameObjectForBone = child });
+                    boneEntityBuffer.Add(new ImportedSocket { boneEntity         = GetEntity(child, TransformUsageFlags.Dynamic) });
                 }
 
                 AddBuffer<OptimizedBoneInertialBlendState>(entity);

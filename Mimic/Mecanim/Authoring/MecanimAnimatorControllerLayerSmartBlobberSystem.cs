@@ -77,7 +77,7 @@ namespace Latios.Mimic.Addons.Mecanim.Authoring.Systems
         {
             int count = SystemAPI.QueryBuilder().WithAll<MecanimControllerBlobRequest>().WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)
                         .Build().CalculateEntityCountWithoutFiltering();
-            var hashmap = new NativeParallelHashMap<UnityObjectRef<AnimatorController>, BlobAssetReference<MecanimControllerBlob> >(count * 2, Allocator.TempJob);
+            var hashmap = new NativeParallelHashMap<UnityObjectRef<AnimatorController>, BlobAssetReference<MecanimControllerBlob> >(count * 2, WorldUpdateAllocator);
 
             new GatherJob { hashmap = hashmap.AsParallelWriter() }.ScheduleParallel();
             CompleteDependency();
@@ -92,8 +92,6 @@ namespace Latios.Mimic.Addons.Mecanim.Authoring.Systems
                 var controllerBlob = hashmap[request.animatorController];
                 result.blob        = UnsafeUntypedBlobAssetReference.Create(controllerBlob);
             }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
-
-            Dependency = hashmap.Dispose(Dependency);
         }
 
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]

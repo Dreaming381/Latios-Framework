@@ -3,6 +3,7 @@ using Unity.Mathematics;
 
 namespace Latios.Transforms
 {
+    [System.Serializable]
     [StructLayout(LayoutKind.Explicit, Size = 48)]
     public struct TransformQvvs
     {
@@ -49,6 +50,7 @@ namespace Latios.Transforms
         }
     }
 
+    [System.Serializable]
     [StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct TransformQvs
     {

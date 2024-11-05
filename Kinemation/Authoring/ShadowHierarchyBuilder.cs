@@ -92,7 +92,7 @@ namespace Latios.Kinemation.Authoring
 
                 // If the child has an Animator or SkinnedMeshRenderer, it shouldn't be animated, so delete it.
                 if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null ||
-                    shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
+                    shadowChild.GetComponent<SocketAuthoring>() != null || shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
                 {
                     RecurseTagSkinnedOrDelete(sourceChild, shadowChild);
                     continue;
@@ -101,7 +101,7 @@ namespace Latios.Kinemation.Authoring
                 var tracker    = shadowChild.gameObject.AddComponent<HideThis.ShadowCloneTracker>();
                 tracker.source = sourceChild.gameObject;
 
-                // In an optimized hierarchy, only the first layer of children are valid, as they are the exported bones.
+                // In an optimized hierarchy, only the first layer of children are valid, as they are the imported sockets.
                 // We delete the rest in the shadow hierarchy, so that what remains are just the bones we care about.
                 // But before we delete them, we need to extract any SkinnedMeshRenderers to get the bones array.
                 // So any child that has a SkinnedMeshRenderer descendent will get that path tagged for later deletion instead.

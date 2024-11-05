@@ -28,7 +28,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             m_lookup.Update(ref state);
 
-            var ecb                                 = new EntityCommandBuffer(Allocator.TempJob);
+            var ecb                                 = new EntityCommandBuffer(state.WorldUpdateAllocator);
             var writer                              = ecb.AsParallelWriter();
             new SkeletonBindingPathsJob { ecb       = writer, resolverLookup = m_lookup }.ScheduleParallel();
             new OptimizedSkeletonHierarchyJob { ecb = writer, resolverLookup = m_lookup }.ScheduleParallel();
@@ -37,7 +37,6 @@ namespace Latios.Kinemation.Authoring.Systems
 
             state.CompleteDependency();
             ecb.Playback(state.EntityManager);
-            ecb.Dispose();
         }
 
         [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]

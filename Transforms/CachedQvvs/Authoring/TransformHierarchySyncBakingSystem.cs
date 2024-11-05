@@ -41,7 +41,7 @@ namespace Latios.Transforms.Authoring.Systems
         public void OnUpdate(ref SystemState state)
         {
             int count = m_childQuery.CalculateEntityCountWithoutFiltering();
-            var map   = new NativeParallelMultiHashMap<Entity, Entity>(count * 2, Allocator.TempJob);
+            var map   = new NativeParallelMultiHashMap<Entity, Entity>(count * 2, state.WorldUpdateAllocator);
 
             state.Dependency = new FindChildrenJob
             {
@@ -61,8 +61,6 @@ namespace Latios.Transforms.Authoring.Systems
                 hierarchyUpdateModeLookup = GetComponentLookup<HierarchyUpdateMode>(true),
                 lastSystemVersion         = state.LastSystemVersion
             }.ScheduleParallel(m_parentQuery, state.Dependency);
-
-            state.Dependency = map.Dispose(state.Dependency);
         }
 
         [BurstCompile]

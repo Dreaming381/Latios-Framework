@@ -366,10 +366,10 @@ namespace Latios.Kinemation.Systems
                                                                                                                          ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>(),
                                                                                                                          ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
-                // If CopyLocalToParentFromBone somehow gets added by accident, we might as well remove it.
+                // If Socket somehow gets added by accident, we might as well remove it.
                 // Also, we remove the LocalTransform and ParentToWorldTransform now to possibly prevent a structural change later.
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
-                state.EntityManager.RemoveComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<CopyLocalToParentFromBone>(),
+                state.EntityManager.RemoveComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<Socket>(),
                                                                                                   ComponentType.ReadWrite<LocalTransform>(),
                                                                                                   ComponentType.ReadWrite<ParentToWorldTransform>()));
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY

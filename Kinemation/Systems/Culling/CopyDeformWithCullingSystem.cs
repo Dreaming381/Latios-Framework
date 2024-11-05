@@ -474,6 +474,176 @@ namespace Latios.Kinemation.Systems
     }
 #endif
 
+    [RequireMatchingQueriesForUpdate]
+    [DisableAutoCreation]
+    [BurstCompile]
+    public partial struct CopyDeformCustomSystem : ISystem
+    {
+        EntityQuery          m_metaQuery;
+        LatiosWorldUnmanaged latiosWorld;
+
+        public void OnCreate(ref SystemState state)
+        {
+            latiosWorld = state.GetLatiosWorldUnmanaged();
+
+            m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<ChunkCopyDeformTag>(true).With<ChunkPerFrameCullingMask>(true)
+                          .With<ChunkPerDispatchCullingMask>(false).UseWriteGroups().Build();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            var chunkList = new NativeList<ArchetypeChunk>(m_metaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
+
+            state.Dependency = new FindChunksNeedingCopyingJob
+            {
+                chunkHeaderHandle            = GetComponentTypeHandle<ChunkHeader>(true),
+                chunksToProcess              = chunkList.AsParallelWriter(),
+                perDispatchCullingMaskHandle = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true)
+            }.ScheduleParallel(m_metaQuery, state.Dependency);
+
+            var skinCopier = new SkinCopier
+            {
+                deformClassificationMap    = latiosWorld.worldBlackboardEntity.GetCollectionComponent<DeformClassificationMap>(true).deformClassificationMap,
+                materialMaskHandle         = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
+                materialPropertyTypeLookup = GetBufferLookup<MaterialPropertyComponentType>(true),
+                worldBlackboardEntity      = latiosWorld.worldBlackboardEntity,
+
+                currentDeformHandle        = GetComponentTypeHandle<CurrentDeformShaderIndex>(false),
+                currentDqsVertexHandle     = GetComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>(false),
+                currentMatrixVertexHandle  = GetComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>(false),
+                legacyComputeDeformHandle  = GetComponentTypeHandle<LegacyComputeDeformShaderIndex>(false),
+                legacyDotsDeformHandle     = GetComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>(false),
+                legacyLbsHandle            = GetComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex>(false),
+                previousDeformHandle       = GetComponentTypeHandle<PreviousDeformShaderIndex>(false),
+                previousDqsVertexHandle    = GetComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>(false),
+                previousMatrixVertexHandle = GetComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex>(false),
+                twoAgoDeformHandle         = GetComponentTypeHandle<TwoAgoDeformShaderIndex>(false),
+                twoAgoDqsVertexHandle      = GetComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>(false),
+                twoAgoMatrixVertexHandle   = GetComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>(false),
+
+                currentDeformLookup        = GetComponentLookup<CurrentDeformShaderIndex>(false),
+                currentDqsVertexLookup     = GetComponentLookup<CurrentDqsVertexSkinningShaderIndex>(false),
+                currentMatrixVertexLookup  = GetComponentLookup<CurrentMatrixVertexSkinningShaderIndex>(false),
+                legacyComputeDeformLookup  = GetComponentLookup<LegacyComputeDeformShaderIndex>(false),
+                legacyDotsDeformLookup     = GetComponentLookup<LegacyDotsDeformParamsShaderIndex>(false),
+                legacyLbsLookup            = GetComponentLookup<LegacyLinearBlendSkinningShaderIndex>(false),
+                previousDeformLookup       = GetComponentLookup<PreviousDeformShaderIndex>(false),
+                previousDqsVertexLookup    = GetComponentLookup<PreviousDqsVertexSkinningShaderIndex>(false),
+                previousMatrixVertexLookup = GetComponentLookup<PreviousMatrixVertexSkinningShaderIndex>(false),
+                twoAgoDeformLookup         = GetComponentLookup<TwoAgoDeformShaderIndex>(false),
+                twoAgoDqsVertexLookup      = GetComponentLookup<TwoAgoDqsVertexSkinningShaderIndex>(false),
+                twoAgoMatrixVertexLookup   = GetComponentLookup<TwoAgoMatrixVertexSkinningShaderIndex>(false),
+            };
+
+            state.Dependency = new CopySkinJob
+            {
+                chunkPerDispatchMaskHandle = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(false),
+                chunksToProcess            = chunkList.AsDeferredJobArray(),
+                esiLookup                  = GetEntityStorageInfoLookup(),
+                referenceHandle            = GetComponentTypeHandle<CopyDeformFromEntity>(true),
+                skinCopier                 = skinCopier,
+            }.Schedule(chunkList, 1, state.Dependency);
+        }
+
+        [BurstCompile]
+        struct FindChunksNeedingCopyingJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> perDispatchCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                 chunkHeaderHandle;
+
+            public NativeList<ArchetypeChunk>.ParallelWriter chunksToProcess;
+
+            [Unity.Burst.CompilerServices.SkipLocalsInit]
+            public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var chunksCache = stackalloc ArchetypeChunk[128];
+                int chunksCount = 0;
+                var masks       = metaChunk.GetNativeArray(ref perDispatchCullingMaskHandle);
+                var headers     = metaChunk.GetNativeArray(ref chunkHeaderHandle);
+                for (int i = 0; i < metaChunk.Count; i++)
+                {
+                    var mask = masks[i];
+                    if ((mask.lower.Value | mask.upper.Value) != 0)
+                    {
+                        chunksCache[chunksCount] = headers[i].ArchetypeChunk;
+                        chunksCount++;
+                    }
+                }
+
+                if (chunksCount > 0)
+                {
+                    chunksToProcess.AddRangeNoResize(chunksCache, chunksCount);
+                }
+            }
+        }
+
+        [BurstCompile]
+        unsafe struct CopySkinJob : IJobParallelForDefer
+        {
+            [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
+
+            [ReadOnly] public ComponentTypeHandle<CopyDeformFromEntity> referenceHandle;
+
+            [ReadOnly] public EntityStorageInfoLookup esiLookup;
+
+            public ComponentTypeHandle<ChunkPerDispatchCullingMask> chunkPerDispatchMaskHandle;
+            public SkinCopier                                       skinCopier;
+
+            public void Execute(int i)
+            {
+                Execute(chunksToProcess[i]);
+            }
+
+            void Execute(in ArchetypeChunk chunk)
+            {
+                SkinCopier.Context context = default;
+                skinCopier.InitContext();
+
+                var     references   = chunk.GetNativeArray(ref referenceHandle);
+                ref var dispatchMask = ref chunk.GetChunkComponentRefRW(ref chunkPerDispatchMaskHandle);
+
+                var inMask = dispatchMask.lower.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
+                {
+                    bool isIn = IsReferenceVisible(in chunk,
+                                                   references[i].sourceDeformedEntity,
+                                                   i,
+                                                   ref context);
+                    dispatchMask.lower.Value &= ~(math.select(1ul, 0ul, isIn) << i);
+                }
+                inMask = dispatchMask.upper.Value;
+                for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
+                {
+                    bool isIn = IsReferenceVisible(in chunk,
+                                                   references[i + 64].sourceDeformedEntity,
+                                                   i + 64,
+                                                   ref context);
+                    dispatchMask.upper.Value &= ~(math.select(1ul, 0ul, isIn) << i);
+                }
+            }
+
+            bool IsReferenceVisible(in ArchetypeChunk chunk, Entity reference, int entityIndex, ref SkinCopier.Context context)
+            {
+                if (reference == Entity.Null || !esiLookup.Exists(reference))
+                    return false;
+
+                var  info          = esiLookup[reference];
+                var  referenceMask = info.Chunk.GetChunkComponentData(ref chunkPerDispatchMaskHandle);
+                bool result;
+                if (info.IndexInChunk >= 64)
+                    result = referenceMask.upper.IsSet(info.IndexInChunk - 64);
+                else
+                    result = referenceMask.lower.IsSet(info.IndexInChunk);
+                if (result)
+                {
+                    skinCopier.CopySkin(ref context, in chunk, entityIndex, reference);
+                }
+                return result;
+            }
+        }
+    }
+
     struct SkinCopier
     {
         [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;

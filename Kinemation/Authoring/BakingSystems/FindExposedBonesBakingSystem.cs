@@ -44,7 +44,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             new ClearJob().ScheduleParallel();
 
-            var ecbAdd                  = new EntityCommandBuffer(Allocator.TempJob);
+            var ecbAdd                  = new EntityCommandBuffer(state.WorldUpdateAllocator);
             var cullingIndexLookup      = GetComponentLookup<BoneCullingIndex>(true);
             var skeletonReferenceLookup = GetComponentLookup<BoneOwningSkeletonReference>(false);
             var boneIndexLookup         = GetComponentLookup<BoneIndex>(false);
@@ -57,16 +57,13 @@ namespace Latios.Kinemation.Authoring.Systems
                 boneIndexLookup         = boneIndexLookup
             }.ScheduleParallel();
 
-            var ecbRemove                        = new EntityCommandBuffer(Allocator.TempJob);
+            var ecbRemove                        = new EntityCommandBuffer(state.WorldUpdateAllocator);
             new RemoveDisconnectedBonesJob { ecb = ecbRemove.AsParallelWriter(), componentTypesToRemove = exposedBoneTypesToRemove }.ScheduleParallel();
 
             state.CompleteDependency();
 
             ecbAdd.Playback(state.EntityManager);
             ecbRemove.Playback(state.EntityManager);
-
-            ecbAdd.Dispose();
-            ecbRemove.Dispose();
         }
 
         [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]

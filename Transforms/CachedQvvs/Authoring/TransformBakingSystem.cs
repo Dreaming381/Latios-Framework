@@ -33,7 +33,7 @@ namespace Latios.Transforms.Authoring.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var ecb = new EntityCommandBuffer(Allocator.TempJob);
+            var ecb = new EntityCommandBuffer(state.WorldUpdateAllocator);
 
             var job = new Job
             {
@@ -52,7 +52,6 @@ namespace Latios.Transforms.Authoring.Systems
             state.CompleteDependency();
 
             ecb.Playback(state.EntityManager);
-            ecb.Dispose();
         }
 
         [BurstCompile]

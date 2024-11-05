@@ -8,7 +8,7 @@ namespace Latios.Kinemation.Authoring.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
-    public partial class AssignExportedBoneIndicesSystem : SystemBase
+    public partial class AssignSocketIndicesSystem : SystemBase
     {
         Queue<UnityEngine.Transform> m_breadthQueue;
 
@@ -17,7 +17,7 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_breadthQueue == null)
                 m_breadthQueue = new Queue<UnityEngine.Transform>();
 
-            Entities.ForEach((ref DynamicBuffer<OptimizedSkeletonExportedBone> exportedBones, in DynamicBuffer<ExportedBoneGameObjectRef> gameObjectRefs,
+            Entities.ForEach((ref DynamicBuffer<ImportedSocket> sockets, in DynamicBuffer<ImportedSocketGameObjectRef> gameObjectRefs,
                               in ShadowHierarchyReference shadowRef) =>
             {
                 m_breadthQueue.Clear();
@@ -38,7 +38,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         {
                             if (go.authoringGameObjectForBone.GetHashCode() == id)
                             {
-                                exportedBones.ElementAt(i).boneIndex = currentIndex;
+                                sockets.ElementAt(i).boneIndex = currentIndex;
                                 break;
                             }
                             i++;

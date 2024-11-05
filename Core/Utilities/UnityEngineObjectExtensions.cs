@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 
-namespace Latios.Authoring
+namespace Latios
 {
-    public static class ObjectAuthoringExtensions
+    public static class UnityEngineObjectExtensions
     {
         public static void DestroySafelyFromAnywhere(this Object unityEngineObject)
         {

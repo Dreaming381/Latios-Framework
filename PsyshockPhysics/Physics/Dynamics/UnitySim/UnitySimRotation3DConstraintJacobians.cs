@@ -12,7 +12,7 @@ namespace Latios.Psyshock
         /// </summary>
         public struct Rotation3DConstraintJacobianParameters
         {
-            public quaternion inertialPoseAInInertialPoseBSpace;
+            public quaternion inertialRotationAInInertialPoseBSpace;
             public quaternion jointOrientationBindFrame;
 
             public float minAngle;
@@ -44,19 +44,34 @@ namespace Latios.Psyshock
         {
             parameters = new Rotation3DConstraintJacobianParameters
             {
-                inertialPoseAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA)),
-                jointOrientationBindFrame         = math.inverse(math.mul(jointRotationInInertialPoseBSpace, jointRotationInInertialPoseASpace)),
-                minAngle                          = minAngle,
-                maxAngle                          = maxAngle,
-                tau                               = tau,
-                damping                           = damping,
+                inertialRotationAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA)),
+                jointOrientationBindFrame             = math.inverse(math.mul(jointRotationInInertialPoseBSpace, jointRotationInInertialPoseASpace)),
+                minAngle                              = minAngle,
+                maxAngle                              = maxAngle,
+                tau                                   = tau,
+                damping                               = damping,
             };
             // Calculate the initial error
             {
-                quaternion jointOrientation = math.mul(parameters.jointOrientationBindFrame, parameters.inertialPoseAInInertialPoseBSpace);
+                quaternion jointOrientation = math.mul(parameters.jointOrientationBindFrame, parameters.inertialRotationAInInertialPoseBSpace);
                 float      initialAngle     = math.asin(math.length(jointOrientation.value.xyz)) * 2.0f;
                 parameters.initialError     = CalculateError(initialAngle, parameters.minAngle, parameters.maxAngle);
             }
+        }
+
+        /// <summary>
+        /// Updates the 3D rotation constraint with newly integrated inertial pose world rotations
+        /// </summary>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="inertialPoseWorldRotationA">The new world-space orientation of the first body's inertia tensor diagonal</param>
+        /// <param name="inertialPoseWorldRotationB">The new world-space orientation of the second body's inertia tensor diagonal</param>
+        public static void UpdateJacobian(ref Rotation3DConstraintJacobianParameters parameters,
+                                          quaternion inertialPoseWorldRotationA, quaternion inertialPoseWorldRotationB)
+        {
+            parameters.inertialRotationAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA));
+            quaternion jointOrientation                      = math.mul(parameters.jointOrientationBindFrame, parameters.inertialRotationAInInertialPoseBSpace);
+            float      initialAngle                          = math.asin(math.length(jointOrientation.value.xyz)) * 2.0f;
+            parameters.initialError                          = CalculateError(initialAngle, parameters.minAngle, parameters.maxAngle);
         }
 
         /// <summary>
@@ -74,7 +89,7 @@ namespace Latios.Psyshock
                                            in Rotation3DConstraintJacobianParameters parameters, float deltaTime, float inverseDeltaTime)
         {
             // Predict the relative orientation at the end of the step
-            quaternion futureBFromA = IntegrateOrientationBFromA(parameters.inertialPoseAInInertialPoseBSpace, velocityA.angular, velocityB.angular, deltaTime);
+            quaternion futureBFromA = IntegrateOrientationBFromA(parameters.inertialRotationAInInertialPoseBSpace, velocityA.angular, velocityB.angular, deltaTime);
 
             // Find the future axis and angle of rotation between the free axes
             float3     jacA0, jacA1, jacA2, jacB0, jacB1, jacB2;

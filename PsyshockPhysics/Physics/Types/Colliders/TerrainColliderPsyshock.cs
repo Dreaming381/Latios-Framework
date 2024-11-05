@@ -40,6 +40,8 @@ namespace Latios.Psyshock
 
     internal struct TerrainColliderBlob
     {
+        internal short minHeight;
+        internal short maxHeight;
         internal short quadsPerAxis;
         internal short patchesPerAxis;
         internal short tilesPerAxis;
@@ -67,20 +69,20 @@ namespace Latios.Psyshock
             [FieldOffset(6)] internal short  startY;
             [FieldOffset(8)] internal ulong  triangleSplitParity;
             [FieldOffset(16)] internal v128  minA;
-            [FieldOffset(32)] internal v128  minB;
+            [FieldOffset(32)] internal v128  minC;  // Ordering is a little weird to optimize AVX2
             [FieldOffset(48)] internal v128  maxA;
-            [FieldOffset(64)] internal v128  maxB;
-            [FieldOffset(80)] internal v128  minC;
+            [FieldOffset(64)] internal v128  maxC;
+            [FieldOffset(80)] internal v128  minB;
             [FieldOffset(96)] internal v128  minD;
-            [FieldOffset(112)] internal v128 maxC;
+            [FieldOffset(112)] internal v128 maxB;
             [FieldOffset(128)] internal v128 maxD;
             [FieldOffset(144)] internal v128 minE;
-            [FieldOffset(160)] internal v128 minF;
+            [FieldOffset(160)] internal v128 minG;
             [FieldOffset(176)] internal v128 maxE;
-            [FieldOffset(192)] internal v128 maxF;
-            [FieldOffset(208)] internal v128 minG;
+            [FieldOffset(192)] internal v128 maxG;
+            [FieldOffset(208)] internal v128 minF;
             [FieldOffset(224)] internal v128 minH;
-            [FieldOffset(240)] internal v128 maxG;
+            [FieldOffset(240)] internal v128 maxF;
             [FieldOffset(256)] internal v128 maxH;
             [FieldOffset(272)] internal v128 isValid;
             [FieldOffset(288)] internal v128 normalXPositive;
@@ -102,44 +104,101 @@ namespace Latios.Psyshock
             {
                 if (X86.Avx2.IsAvx2Supported)
                 {
-                    var  mins    = X86.Avx.mm256_set1_epi16(minHeight);
-                    var  maxs    = X86.Avx.mm256_set1_epi16(maxHeight);
-                    v256 zero    = default;
-                    var  a       = X86.Avx2.mm256_and_si256(X86.Avx2.mm256_cmpgt_epi16(maxs, new v256(minA, minB)), X86.Avx2.mm256_cmpgt_epi16(new v256(maxA, maxB), mins));
-                    var  result  = (ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(a, zero));
-                    var  b       = X86.Avx2.mm256_and_si256(X86.Avx2.mm256_cmpgt_epi16(maxs, new v256(minC, minD)), X86.Avx2.mm256_cmpgt_epi16(new v256(maxC, maxD), mins));
-                    result      |= ((ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(b, zero))) << 16;
-                    var c        = X86.Avx2.mm256_and_si256(X86.Avx2.mm256_cmpgt_epi16(maxs, new v256(minE, minF)), X86.Avx2.mm256_cmpgt_epi16(new v256(maxE, maxF), mins));
-                    result      |= ((ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(c, zero))) << 32;
-                    var d        = X86.Avx2.mm256_and_si256(X86.Avx2.mm256_cmpgt_epi16(maxs, new v256(minG, minH)), X86.Avx2.mm256_cmpgt_epi16(new v256(maxG, maxH), mins));
-                    result      |= ((ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(d, zero))) << 48;
-                    return result;
+                    // 18 intrinsics, 8 loads, and 3 scalar ops
+                    var mins    = X86.Avx.mm256_set1_epi16(minHeight);
+                    var maxs    = X86.Avx.mm256_set1_epi16(maxHeight);
+                    var a       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minA, minC), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxA, maxC)));
+                    var b       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minB, minD), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxB, maxD)));
+                    var result  = (ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(a, b));
+                    var c       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minE, minG), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxE, maxG)));
+                    var d       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minF, minH), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxF, maxH)));
+                    result     |= ((ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(c, d))) << 32;
+                    return ~result;
                 }
                 else if (X86.Sse2.IsSse2Supported)
                 {
-                    var  mins    = X86.Sse2.set1_epi16(minHeight);
-                    var  maxs    = X86.Sse2.set1_epi16(maxHeight);
-                    v128 zero    = default;
-                    var  a       = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minA), X86.Sse2.cmplt_epi16(mins, maxA));
-                    var  result  = (ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(a, zero));
-                    var  b       = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minB), X86.Sse2.cmplt_epi16(mins, maxB));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(b, zero))) << 8;
-                    var c        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minC), X86.Sse2.cmplt_epi16(mins, maxC));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(c, zero))) << 16;
-                    var d        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minD), X86.Sse2.cmplt_epi16(mins, maxD));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(d, zero))) << 24;
-                    var e        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minE), X86.Sse2.cmplt_epi16(mins, maxE));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(e, zero))) << 32;
-                    var f        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minF), X86.Sse2.cmplt_epi16(mins, maxF));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(f, zero))) << 40;
-                    var g        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minG), X86.Sse2.cmplt_epi16(mins, maxG));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(g, zero))) << 48;
-                    var h        = X86.Sse2.and_si128(X86.Sse2.cmpgt_epi16(maxs, minH), X86.Sse2.cmplt_epi16(mins, maxH));
-                    result      |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(h, zero))) << 56;
+                    // 34 intrinsics, 16 loads, and 7 scalar ops
+                    var mins    = X86.Sse2.set1_epi16(minHeight);
+                    var maxs    = X86.Sse2.set1_epi16(maxHeight);
+                    var a       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minA, maxs), X86.Sse2.cmplt_epi16(maxA, mins));
+                    var b       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minB, maxs), X86.Sse2.cmplt_epi16(maxB, mins));
+                    var result  = (ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(a, b));
+                    var c       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minC, maxs), X86.Sse2.cmplt_epi16(maxC, mins));
+                    var d       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minD, maxs), X86.Sse2.cmplt_epi16(maxD, mins));
+                    result     |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(c, d))) << 16;
+                    var e       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minE, maxs), X86.Sse2.cmplt_epi16(maxE, mins));
+                    var f       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minF, maxs), X86.Sse2.cmplt_epi16(maxF, mins));
+                    result     |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(e, f))) << 32;
+                    var g       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minG, maxs), X86.Sse2.cmplt_epi16(maxG, mins));
+                    var h       = X86.Sse2.or_si128(X86.Sse2.cmpgt_epi16(minH, maxs), X86.Sse2.cmplt_epi16(maxH, mins));
+                    result     |= ((ulong)X86.Sse2.movemask_epi8(X86.Sse2.packs_epi16(g, h))) << 48;
+                    return ~result;
+                }
+                else if (Arm.Neon.IsNeonSupported)
+                {
+                    // 40 intrinsics, 16 loads, 1 constant load, and 1 scalar op
+                    var  mins     = Arm.Neon.vmovq_n_s16(minHeight);
+                    var  maxs     = Arm.Neon.vmovq_n_s16(maxHeight);
+                    v128 mask     = new v128(0x1, 0x2, 0x4, 0x8, 0x10, 0x20, 0x40, 0x80);
+                    var  a        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minA, maxs), Arm.Neon.vcltq_s16(maxA, mins)), mask);
+                    var  b        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minB, maxs), Arm.Neon.vcltq_s16(maxB, mins)), mask);
+                    var  c        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minC, maxs), Arm.Neon.vcltq_s16(maxC, mins)), mask);
+                    var  d        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minD, maxs), Arm.Neon.vcltq_s16(maxD, mins)), mask);
+                    var  e        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minE, maxs), Arm.Neon.vcltq_s16(maxE, mins)), mask);
+                    var  f        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minF, maxs), Arm.Neon.vcltq_s16(maxF, mins)), mask);
+                    var  g        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minG, maxs), Arm.Neon.vcltq_s16(maxG, mins)), mask);
+                    var  h        = Arm.Neon.vandq_s16(Arm.Neon.vorrq_s16(Arm.Neon.vcgtq_s16(minH, maxs), Arm.Neon.vcltq_s16(maxH, mins)), mask);
+                    var  ab       = Arm.Neon.vpaddq_s16(a, b);
+                    var  cd       = Arm.Neon.vpaddq_s16(c, d);
+                    var  ef       = Arm.Neon.vpaddq_s16(e, f);
+                    var  gh       = Arm.Neon.vpaddq_s16(g, h);
+                    var  abcd     = Arm.Neon.vpaddq_s16(ab, cd);
+                    var  efgh     = Arm.Neon.vpaddq_s16(ef, gh);
+                    var  abcdefgh = Arm.Neon.vpaddq_s16(abcd, efgh);
+                    return ~Arm.Neon.vmovn_s16(abcdefgh).ULong0;
+                }
+                else
+                {
+                    static void Eval8(ref ulong bits, ref ulong bitSetter, short smin, short smax, v128 vmin, v128 vmax)
+                    {
+                        bool set    = smax >= vmin.SShort0 && smin <= vmax.SShort0;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort1 && smin <= vmax.SShort1;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort2 && smin <= vmax.SShort2;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort3 && smin <= vmax.SShort3;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort4 && smin <= vmax.SShort4;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort5 && smin <= vmax.SShort5;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort6 && smin <= vmax.SShort6;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                        set         = smax >= vmin.SShort7 && smin <= vmax.SShort7;
+                        bits       |= math.select(0, bitSetter, set);
+                        bitSetter <<= 1;
+                    }
+
+                    ulong result    = 0;
+                    ulong bitSetter = 1;
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minA, maxA);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minB, maxB);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minC, maxC);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minD, maxD);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minE, maxE);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minF, maxF);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minG, maxG);
+                    Eval8(ref result, ref bitSetter, minHeight, maxHeight, minH, maxH);
                     return result;
                 }
-                else // Todo
-                    throw new NotImplementedException();
             }
 
             internal ulong GetBorderMask(int minX, int minY, int maxX, int maxY)

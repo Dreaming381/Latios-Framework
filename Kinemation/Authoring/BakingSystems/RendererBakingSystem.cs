@@ -39,8 +39,8 @@ namespace Latios.Kinemation.Authoring.Systems
 
             m_lightmapBakingContext.BeginConversion();
 
-            var entitiesWithBadIndices = new NativeList<Entity>(Allocator.TempJob);
-            var uniqueIndicesSet       = new NativeHashSet<int>(128, Allocator.TempJob);
+            var entitiesWithBadIndices = new NativeList<Entity>(WorldUpdateAllocator);
+            var uniqueIndicesSet       = new NativeHashSet<int>(128, WorldUpdateAllocator);
 
             var lightmaps = LightmapSettings.lightmaps;
             new CollectUniqueIndicesJob
@@ -50,7 +50,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 maxIndex               = lightmaps.Length
             }.Run();
 
-            var uniqueIndicesSorted = new NativeList<int>(Allocator.TempJob);
+            var uniqueIndicesSorted = new NativeList<int>(WorldUpdateAllocator);
             new SortUniqueIndicesJob
             {
                 dst = uniqueIndicesSorted,
@@ -63,11 +63,8 @@ namespace Latios.Kinemation.Authoring.Systems
                                                    ComponentType.ReadWrite<LightMaps>());
 
             state.EntityManager.RemoveComponent(entitiesWithBadIndices.AsArray(), lightmapSet);
-            entitiesWithBadIndices.Dispose();
-            uniqueIndicesSet.Dispose();
 
             m_lightmapBakingContext.ProcessLightMapsForConversion(uniqueIndicesSorted.AsArray(), lightmaps);
-            uniqueIndicesSorted.Dispose();
 
             var lightmapsSCD = new LightMaps();
 
@@ -96,12 +93,12 @@ namespace Latios.Kinemation.Authoring.Systems
 
             var renderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo>().WithAllRW<BakingMaterialMeshSubmesh>()
                                                 .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
-            var meshMap       = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, Allocator.TempJob);
-            var materialMap   = new NativeHashMap<UnityObjectRef<Material>, int>(128, Allocator.TempJob);
-            var meshList      = new NativeList<UnityObjectRef<Mesh> >(Allocator.TempJob);
-            var materialList  = new NativeList<UnityObjectRef<Material> >(Allocator.TempJob);
-            var rangesList    = new NativeList<MaterialMeshIndex>(Allocator.TempJob);
-            var duplicatesMap = new NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>(128, Allocator.TempJob);
+            var meshMap       = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, WorldUpdateAllocator);
+            var materialMap   = new NativeHashMap<UnityObjectRef<Material>, int>(128, WorldUpdateAllocator);
+            var meshList      = new NativeList<UnityObjectRef<Mesh> >(WorldUpdateAllocator);
+            var materialList  = new NativeList<UnityObjectRef<Material> >(WorldUpdateAllocator);
+            var rangesList    = new NativeList<MaterialMeshIndex>(WorldUpdateAllocator);
+            var duplicatesMap = new NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>(128, WorldUpdateAllocator);
             if (!renderablesWithLightmapsQuery.IsEmptyIgnoreFilter)
             {
                 new CollectUniqueMeshesAndMaterialsJob
@@ -153,13 +150,6 @@ namespace Latios.Kinemation.Authoring.Systems
                 var rma = CreateRenderMeshArrayFromRefArrays(meshList.AsArray(), materialList.AsArray(), rangesList.AsArray());
                 state.EntityManager.SetSharedComponentManaged(renderablesWithoutLightmapsQuery, rma);
             }
-
-            meshMap.Dispose();
-            meshList.Dispose();
-            materialMap.Dispose();
-            materialList.Dispose();
-            rangesList.Dispose();
-            duplicatesMap.Dispose();
 
             m_lightmapBakingContext.EndConversion();
         }

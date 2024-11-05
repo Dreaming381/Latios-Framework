@@ -55,13 +55,14 @@ namespace Latios.Kinemation.Systems
             var cullingContext = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
             state.Dependency   = new Job
             {
-                chunkInfoHandle        = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                headerHandle           = GetComponentTypeHandle<ChunkHeader>(true),
-                perCameraMaskHandle    = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                filterHandle           = GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                lightMapsHandle        = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
-                materialMeshInfoHandle = m_materialMeshInfoHandle,
-                cullingContext         = cullingContext
+                chunkInfoHandle                    = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                headerHandle                       = GetComponentTypeHandle<ChunkHeader>(true),
+                perCameraMaskHandle                = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
+                filterHandle                       = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                lightMapsHandle                    = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                usedOnlyForCustomGraphicsTagHandle = GetComponentTypeHandle<UsedOnlyForCustomGraphicsTag>(true),
+                materialMeshInfoHandle             = m_materialMeshInfoHandle,
+                cullingContext                     = cullingContext
             }.ScheduleParallel(m_metaQuery, state.Dependency);
 
 #if UNITY_EDITOR
@@ -89,12 +90,13 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct Job : IJobChunk
         {
-            public ComponentTypeHandle<ChunkPerCameraCullingMask>             perCameraMaskHandle;
-            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> filterHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                headerHandle;
-            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>  chunkInfoHandle;
-            [ReadOnly] public SharedComponentTypeHandle<LightMaps>            lightMapsHandle;
-            [ReadOnly] public DynamicComponentTypeHandle                      materialMeshInfoHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingMask>               perCameraMaskHandle;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings>   filterHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                  headerHandle;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>    chunkInfoHandle;
+            [ReadOnly] public SharedComponentTypeHandle<LightMaps>              lightMapsHandle;
+            [ReadOnly] public DynamicComponentTypeHandle                        materialMeshInfoHandle;
+            [ReadOnly] public ComponentTypeHandle<UsedOnlyForCustomGraphicsTag> usedOnlyForCustomGraphicsTagHandle;
 
             public CullingContext cullingContext;
 
@@ -115,6 +117,9 @@ namespace Latios.Kinemation.Systems
                         continue;
 
                     ref var chunk = ref chunkHeaders[i].ArchetypeChunk;
+
+                    if (chunk.Has(ref usedOnlyForCustomGraphicsTagHandle))
+                        continue;
 
                     var filter = chunk.Has(filterHandle) ? chunk.GetSharedComponent(filterHandle) : RenderFilterSettings.Default;
                     if (cullingContext.viewType == BatchCullingViewType.Light && filter.ShadowCastingMode == ShadowCastingMode.Off)

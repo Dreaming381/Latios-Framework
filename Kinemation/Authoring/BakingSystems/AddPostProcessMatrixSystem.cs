@@ -26,17 +26,13 @@ namespace Latios.Kinemation.Authoring.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent().With<TransformAuthoring>().Build();
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
+            m_query.SetChangedVersionFilter(ComponentType.ReadWrite<TransformAuthoring>());
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var ecb = new EntityCommandBuffer(Allocator.TempJob);
+            var ecb = new EntityCommandBuffer(state.WorldUpdateAllocator);
 
             state.Dependency = new Job
             {
@@ -49,7 +45,6 @@ namespace Latios.Kinemation.Authoring.Systems
             state.CompleteDependency();
 
             ecb.Playback(state.EntityManager);
-            ecb.Dispose();
         }
 
         [BurstCompile]

@@ -236,6 +236,23 @@ namespace Latios.Psyshock
             return AabbFrom(in triMesh, new RigidTransform(transform.rotation, transform.position));
         }
 
+        private static Aabb AabbFrom(in TerrainCollider terrain, in RigidTransform transform)
+        {
+            int  halfDimInt   = terrain.terrainColliderBlob.Value.quadsPerAxis / 2;
+            int  minHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.minHeight;
+            int  maxHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.maxHeight;
+            int3 minInt       = new int3(-halfDimInt, minHeightInt, halfDimInt);
+            int3 maxInt       = new int3(-halfDimInt, maxHeightInt, halfDimInt);
+            var  localAabb    = new Aabb(minInt * terrain.scale, maxInt * terrain.scale);
+            return TransformAabb(new TransformQvvs(transform), localAabb);
+        }
+
+        private static Aabb AabbFrom(TerrainCollider terrain, in TransformQvvs transform)
+        {
+            ScaleStretchCollider(ref terrain, transform.scale, transform.stretch);
+            return AabbFrom(in terrain, new RigidTransform(transform.rotation, transform.position));
+        }
+
         private static Aabb AabbFrom(in CompoundCollider compound, in RigidTransform transform)
         {
             var         local = compound.compoundColliderBlob.Value.localAabb;

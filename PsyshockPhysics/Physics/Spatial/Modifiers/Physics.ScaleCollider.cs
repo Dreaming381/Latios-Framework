@@ -158,6 +158,17 @@ namespace Latios.Psyshock
             return triMesh;
         }
 
+        internal static void ScaleStretchCollider(ref TerrainCollider terrain, float scale, float3 stretch)
+        {
+            terrain.scale *= stretch * scale;
+        }
+
+        internal static TerrainCollider ScaleStretchCollider(TerrainCollider terrain, float scale, float3 stretch)
+        {
+            ScaleStretchCollider(ref terrain, scale, stretch);
+            return terrain;
+        }
+
         internal static void ScaleStretchCollider(ref CompoundCollider compound, float scale, float3 stretch)
         {
             switch (compound.stretchMode)

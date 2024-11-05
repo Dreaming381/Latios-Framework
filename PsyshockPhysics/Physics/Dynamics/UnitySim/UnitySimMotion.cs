@@ -43,11 +43,12 @@ namespace Latios.Psyshock
             /// <param name="velocity">The velocity of the object, after forces have been applied.</param>
             /// <param name="deltaTime">The time step across which the expansion should account for</param>
             /// <param name="angularExpansionFactor">The factor by which the AABB may expand as it rotates</param>
-            public MotionExpansion(in Velocity velocity, float deltaTime, float angularExpansionFactor)
+            /// <param name="collisionTolerance">An extra padding tolerance that should be added to the expansion</param>
+            public MotionExpansion(in Velocity velocity, float deltaTime, float angularExpansionFactor, float collisionTolerance = 0.01f)
             {
                 var linear = velocity.linear * deltaTime;
                 // math.length(AngularVelocity) * timeStep is conservative approximation of sin((math.length(AngularVelocity) * timeStep)
-                var uniform       = 0.05f + math.min(math.length(velocity.angular) * deltaTime * angularExpansionFactor, angularExpansionFactor);
+                var uniform       = 0.5f * collisionTolerance + math.min(math.length(velocity.angular) * deltaTime * angularExpansionFactor, angularExpansionFactor);
                 uniformXlinearYzw = new float4(uniform, linear);
             }
 
@@ -70,10 +71,11 @@ namespace Latios.Psyshock
             /// The search distance should be used in a call to DistanceBetween() or DistanceBetweenAll().
             /// </summary>
             /// <param name="motionExpansion">The motion expansion of the moving collider</param>
+            /// <param name="collisionTolerance">An extra padding tolerance that should be added to the "static body"</param>
             /// <returns>The max search distance required to anticipate contact within a timestep</returns>
-            public static float GetMaxDistance(in MotionExpansion motionExpansion)
+            public static float GetMaxDistance(in MotionExpansion motionExpansion, float collisionTolerance = 0.01f)
             {
-                return math.length(motionExpansion.uniformXlinearYzw.yzw) + motionExpansion.uniformXlinearYzw.x + 0.05f;
+                return math.length(motionExpansion.uniformXlinearYzw.yzw) + motionExpansion.uniformXlinearYzw.x + 0.5f * collisionTolerance;
             }
 
             /// <summary>

@@ -19,8 +19,8 @@ namespace Latios.Kinemation.Authoring.Systems
         protected override void OnUpdate()
         {
             int hashmapCapacity = m_query.CalculateEntityCountWithoutFiltering();
-            var hashmap         = new NativeHashMap<ShadowHierarchyRequest, ShadowHierarchyReference>(hashmapCapacity, Allocator.TempJob);
-            var list            = new NativeList<ShadowHierarchyRequest>(hashmapCapacity, Allocator.TempJob);
+            var hashmap         = new NativeHashMap<ShadowHierarchyRequest, ShadowHierarchyReference>(hashmapCapacity, WorldUpdateAllocator);
+            var list            = new NativeList<ShadowHierarchyRequest>(hashmapCapacity, WorldUpdateAllocator);
 
             CompleteDependency();
 
@@ -40,9 +40,6 @@ namespace Latios.Kinemation.Authoring.Systems
             EntityManager.AddComponent<ShadowHierarchyReference>(m_query);
 
             new ApplyJob { hashmap = hashmap }.Run();
-
-            hashmap.Dispose();
-            list.Dispose();
         }
 
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]

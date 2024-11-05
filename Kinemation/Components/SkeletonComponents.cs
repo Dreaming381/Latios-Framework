@@ -22,11 +22,11 @@ namespace Latios.Kinemation
     public struct SkeletonRootTag : IComponentData { }
 
     /// <summary>
-    /// A reference to the skeleton entity used by an exposed or exported bone
+    /// A reference to the skeleton entity used by an exposed bone or socket
     /// Usage: Typically Read Only (Add/Write for procedural skeletons)
     /// This component is used internally to point mesh bindings to the skeleton
-    /// root and for when exported bones look up copy their transforms.
-    /// After conversion, it is not maintained internally.
+    /// root and for when sockets update their transforms.
+    /// Outside of baking, it is not maintained internally.
     /// If you make procedural changes to the skeleton,
     /// you are responsible for maintaining this component.
     /// </summary>
@@ -245,12 +245,12 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// Describes an exported bone entity which should inherit the root transform
+    /// Describes a socket entity which should inherit the root transform
     /// of an optimized bone as the the entity's LocalTransform.
     /// Usage: Add to an entity to make it track a bone in an optimized skeleton.
-    /// The exported bone should be parented to the skeleton entity.
+    /// The socket should be parented to the skeleton entity.
     /// </summary>
-    public struct CopyLocalToParentFromBone : IComponentData
+    public struct Socket : IComponentData
     {
         public short boneIndex;
     }

@@ -10,7 +10,7 @@ namespace Latios.Kinemation.Systems
 #else
     [UpdateInGroup(typeof(Unity.Transforms.TransformSystemGroup))]
 #endif
-    [UpdateBefore(typeof(CopyTransformFromBoneSystem))]
+    [UpdateBefore(typeof(UpdateSocketsSystem))]
     [DisableAutoCreation]
     [BurstCompile]
     public partial struct ForceInitializeUninitializedOptimizedSkeletonsSystem : ISystem

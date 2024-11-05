@@ -26,7 +26,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             new ClearJob().ScheduleParallel();
 
-            var ecbAdd                 = new EntityCommandBuffer(Allocator.TempJob);
+            var ecbAdd                 = new EntityCommandBuffer(state.WorldUpdateAllocator);
             var bindSkeletonRootLookup = GetComponentLookup<BindSkeletonRoot>(false);
             new BindJob
             {
@@ -34,16 +34,13 @@ namespace Latios.Kinemation.Authoring.Systems
                 rootLookup = bindSkeletonRootLookup
             }.ScheduleParallel();
 
-            var ecbRemove       = new EntityCommandBuffer(Allocator.TempJob);
+            var ecbRemove       = new EntityCommandBuffer(state.WorldUpdateAllocator);
             new UnbindJob { ecb = ecbRemove.AsParallelWriter() }.ScheduleParallel();
 
             state.CompleteDependency();
 
             ecbAdd.Playback(state.EntityManager);
             ecbRemove.Playback(state.EntityManager);
-
-            ecbAdd.Dispose();
-            ecbRemove.Dispose();
         }
 
         [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]

@@ -50,7 +50,7 @@ namespace Latios.Authoring.Systems
             m_resultHandle.Update(ref state);
             m_hashHandle.Update(ref state);
 
-            var blobsToDispose = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<UnsafeUntypedBlobAssetReference>(), 64, Allocator.TempJob);
+            var blobsToDispose = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<UnsafeUntypedBlobAssetReference>(), 64, state.WorldUpdateAllocator);
 
             state.Dependency = new Job
             {
@@ -137,7 +137,6 @@ namespace Latios.Authoring.Systems
                     set.Add(blob);
                     blob.Dispose();
                 }
-                blobsToDispose.Dispose();
             }
         }
 

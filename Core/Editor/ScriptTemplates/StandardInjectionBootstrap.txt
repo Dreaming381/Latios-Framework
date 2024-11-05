@@ -48,12 +48,14 @@ public class LatiosBootstrap : ICustomBootstrap
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default);
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
+        //Latios.CoreBootstrap.InstallSceneManager(world);
         Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+        //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 

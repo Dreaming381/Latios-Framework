@@ -51,7 +51,7 @@ namespace Latios.Kinemation
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<LatiosLightProbeUpdateSystem>(),                         world);
 
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<ForceInitializeUninitializedOptimizedSkeletonsSystem>(), world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<CopyTransformFromBoneSystem>(),                          world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateSocketsSystem>(),                                  world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<RotateAnimatedBuffersSystem>(),                          world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateMatrixPreviousSystem>(),                           world);
         }

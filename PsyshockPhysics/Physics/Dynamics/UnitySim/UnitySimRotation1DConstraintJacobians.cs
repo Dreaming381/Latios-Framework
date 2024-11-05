@@ -11,7 +11,7 @@ namespace Latios.Psyshock
         /// </summary>
         public struct Rotation1DConstraintJacobianParameters
         {
-            public quaternion inertialPoseAInInertialPoseBSpace;
+            public quaternion inertialRotationAInInertialPoseBSpace;
             public quaternion jointRotationInInertialPoseASpace;
             public quaternion jointRotationInInertialPoseBSpace;
 
@@ -50,17 +50,30 @@ namespace Latios.Psyshock
         {
             parameters = new Rotation1DConstraintJacobianParameters
             {
-                inertialPoseAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA)),
-                jointRotationInInertialPoseASpace = jointRotationInInertialPoseASpace,
-                jointRotationInInertialPoseBSpace = jointRotationInInertialPoseBSpace,
-                axisInInertialPoseASpace          = new float3x3(jointRotationInInertialPoseASpace)[axisIndex],
-                minAngle                          = minAngle,
-                maxAngle                          = maxAngle,
-                tau                               = tau,
-                damping                           = damping,
-                axisIndex                         = axisIndex
+                inertialRotationAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA)),
+                jointRotationInInertialPoseASpace     = jointRotationInInertialPoseASpace,
+                jointRotationInInertialPoseBSpace     = jointRotationInInertialPoseBSpace,
+                axisInInertialPoseASpace              = new float3x3(jointRotationInInertialPoseASpace)[axisIndex],
+                minAngle                              = minAngle,
+                maxAngle                              = maxAngle,
+                tau                                   = tau,
+                damping                               = damping,
+                axisIndex                             = axisIndex
             };
-            parameters.initialError = CalculateRotation1DConstraintError(in parameters, parameters.inertialPoseAInInertialPoseBSpace);
+            parameters.initialError = CalculateRotation1DConstraintError(in parameters, parameters.inertialRotationAInInertialPoseBSpace);
+        }
+
+        /// <summary>
+        /// Updates the 1D rotation constraint with newly integrated inertial pose world rotations
+        /// </summary>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="inertialPoseWorldRotationA">The new world-space orientation of the first body's inertia tensor diagonal</param>
+        /// <param name="inertialPoseWorldRotationB">The new world-space orientation of the second body's inertia tensor diagonal</param>
+        public static void UpdateJacobian(ref Rotation1DConstraintJacobianParameters parameters,
+                                          quaternion inertialPoseWorldRotationA, quaternion inertialPoseWorldRotationB)
+        {
+            parameters.inertialRotationAInInertialPoseBSpace = math.normalize(math.InverseRotateFast(inertialPoseWorldRotationB, inertialPoseWorldRotationA));
+            parameters.initialError                          = CalculateRotation1DConstraintError(in parameters, parameters.inertialRotationAInInertialPoseBSpace);
         }
 
         /// <summary>
@@ -78,7 +91,7 @@ namespace Latios.Psyshock
                                           in Rotation1DConstraintJacobianParameters parameters, float deltaTime, float inverseDeltaTime)
         {
             // Predict the relative orientation at the end of the step
-            quaternion futureMotionBFromA = IntegrateOrientationBFromA(parameters.inertialPoseAInInertialPoseBSpace, velocityA.angular, velocityB.angular, deltaTime);
+            quaternion futureMotionBFromA = IntegrateOrientationBFromA(parameters.inertialRotationAInInertialPoseBSpace, velocityA.angular, velocityB.angular, deltaTime);
 
             // Calculate the effective mass
             float3 axisInMotionB = math.mul(futureMotionBFromA, -parameters.axisInInertialPoseASpace);

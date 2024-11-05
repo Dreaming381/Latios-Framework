@@ -32,6 +32,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default, true);
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
+        //Latios.CoreBootstrap.InstallNetCodePreSpawnEnableInEditorSystem(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
 
@@ -56,6 +57,7 @@ public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+        //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 
@@ -88,6 +90,7 @@ public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+        //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
 

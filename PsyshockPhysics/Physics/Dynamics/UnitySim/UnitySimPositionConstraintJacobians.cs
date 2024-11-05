@@ -11,8 +11,8 @@ namespace Latios.Psyshock
         /// </summary>
         public struct PositionConstraintJacobianParameters
         {
-            public float3 jointPositionInInertialPoseASpace;
-            public float3 jointPositionInInertialPoseBSpace;
+            public float3         jointPositionInInertialPoseASpace;
+            public RigidTransform jointTransformInInertialPoseBSpace;
 
             // If the constraint limits 1 DOF, this is the constrained axis.
             // If the constraint limits 2 DOF, this is the free axis.
@@ -31,6 +31,8 @@ namespace Latios.Psyshock
 
             // Fraction of the velocity error to correct per step
             public float damping;
+
+            public bool3 constrainedAxes;
 
             // True if the jacobian limits one degree of freedom
             public bool is1D;
@@ -59,13 +61,27 @@ namespace Latios.Psyshock
         {
             parameters = default;
 
-            parameters.minDistance                       = minDistance;
-            parameters.maxDistance                       = maxDistance;
-            parameters.tau                               = tau;
-            parameters.damping                           = damping;
-            parameters.jointPositionInInertialPoseASpace = jointPositionInInertialPoseASpace;
-            parameters.jointPositionInInertialPoseBSpace = jointTransformInInertialPoseBSpace.pos;
+            parameters.minDistance                        = minDistance;
+            parameters.maxDistance                        = maxDistance;
+            parameters.tau                                = tau;
+            parameters.damping                            = damping;
+            parameters.jointPositionInInertialPoseASpace  = jointPositionInInertialPoseASpace;
+            parameters.jointTransformInInertialPoseBSpace = jointTransformInInertialPoseBSpace;
+            parameters.constrainedAxes                    = constrainedAxes;
+            parameters.is1D                               = !math.all(constrainedAxes) && (constrainedAxes.x ^ constrainedAxes.y ^ constrainedAxes.z);
 
+            UpdateJacobian(ref parameters, in inertialPoseWorldTransformA, in inertialPoseWorldTransformB);
+        }
+
+        /// <summary>
+        /// Updates a position constraint with newly integrated inertial pose world transforms
+        /// </summary>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="inertialPoseWorldTransformA">The new world-space center of mass and inertia tensor diagonal orientation of the first body</param>
+        /// <param name="inertialPoseWorldTransformB">The new world-space center of mass and inertia tensor diagonal orientation of the second body</param>
+        public static void UpdateJacobian(ref PositionConstraintJacobianParameters parameters,
+                                          in RigidTransform inertialPoseWorldTransformA, in RigidTransform inertialPoseWorldTransformB)
+        {
             // TODO.ma - this code is not always correct in its choice of pivotB.
             // The constraint model is asymmetrical.  B is the master, and the constraint feature is defined in B-space as a region affixed to body B.
             // For example, we can conceive of a 1D constraint as a plane attached to body B through constraint.PivotB, and constraint.PivotA is constrained to that plane.
@@ -79,22 +95,20 @@ namespace Latios.Psyshock
             // probably the best solution is to make two jacobians whenever min != max.  My assumption is that 99% of these are ball and sockets with min = max = 0, so I would rather have
             // some waste in the min != max case than generalize this code to deal with different pivots and effective masses depending on which limit is hit.
 
-            if (!math.all(constrainedAxes))
+            if (!math.all(parameters.constrainedAxes))
             {
-                parameters.is1D = constrainedAxes.x ^ constrainedAxes.y ^ constrainedAxes.z;
-
                 // Project pivot A onto the line or plane in B that it is attached to
                 RigidTransform bFromA     = math.mul(math.inverse(inertialPoseWorldTransformB), inertialPoseWorldTransformA);
-                float3         pivotAinB  = math.transform(bFromA, jointPositionInInertialPoseASpace);
-                float3         diff       = pivotAinB - jointTransformInInertialPoseBSpace.pos;
-                var            jointBAxes = new float3x3(jointTransformInInertialPoseBSpace.rot);
+                float3         pivotAinB  = math.transform(bFromA, parameters.jointPositionInInertialPoseASpace);
+                float3         diff       = pivotAinB - parameters.jointTransformInInertialPoseBSpace.pos;
+                var            jointBAxes = new float3x3(parameters.jointTransformInInertialPoseBSpace.rot);
                 for (int i = 0; i < 3; i++)
                 {
                     float3 column      = jointBAxes[i];
-                    parameters.axisInB = math.select(column, parameters.axisInB, parameters.is1D ^ constrainedAxes[i]);
+                    parameters.axisInB = math.select(column, parameters.axisInB, parameters.is1D ^ parameters.constrainedAxes[i]);
 
-                    float3 dot                                    = math.select(math.dot(column, diff), 0.0f, constrainedAxes[i]);
-                    parameters.jointPositionInInertialPoseBSpace += column * dot;
+                    float3 dot                                         = math.select(math.dot(column, diff), 0.0f, parameters.constrainedAxes[i]);
+                    parameters.jointTransformInInertialPoseBSpace.pos += column * dot;
                 }
             }
 
@@ -123,8 +137,8 @@ namespace Latios.Psyshock
             var futureTransformB = IntegrateWithoutDamping(inertialPoseWorldTransformB, in velocityB, deltaTime);
 
             // Calculate the angulars
-            CalculateAngulars(parameters.jointPositionInInertialPoseASpace, futureTransformA.rot, out float3 angA0, out float3 angA1, out float3 angA2);
-            CalculateAngulars(parameters.jointPositionInInertialPoseBSpace, futureTransformB.rot, out float3 angB0, out float3 angB1, out float3 angB2);
+            CalculateAngulars(parameters.jointPositionInInertialPoseASpace,      futureTransformA.rot, out float3 angA0, out float3 angA1, out float3 angA2);
+            CalculateAngulars(parameters.jointTransformInInertialPoseBSpace.pos, futureTransformB.rot, out float3 angB0, out float3 angB1, out float3 angB2);
 
             // Calculate effective mass
             float3 effectiveMassDiag, effectiveMassOffDiag;
@@ -189,7 +203,7 @@ namespace Latios.Psyshock
         {
             // Find the direction from pivot A to B and the distance between them
             float3 pivotA = math.transform(inertialPoseWorldTransformA, parameters.jointPositionInInertialPoseASpace);
-            float3 pivotB = math.transform(inertialPoseWorldTransformB, parameters.jointPositionInInertialPoseBSpace);
+            float3 pivotB = math.transform(inertialPoseWorldTransformB, parameters.jointTransformInInertialPoseBSpace.pos);
             float3 axis   = math.mul(inertialPoseWorldTransformB.rot, parameters.axisInB);
             direction     = pivotB - pivotA;
             float dot     = math.dot(direction, axis);

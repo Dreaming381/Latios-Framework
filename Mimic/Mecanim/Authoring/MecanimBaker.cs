@@ -144,7 +144,6 @@ namespace Latios.Mimic.Addons.Mecanim.Authoring
 
             // Bake controller
             baker.AddComponent(entity, new MecanimController { speed = authoring.speed, applyRootMotion = authoring.applyRootMotion });
-            baker.SetComponentEnabled<MecanimController>(entity, authoring.enabled);
 
             AnimatorController animatorController = baker.FindAnimatorController(runtimeAnimatorController);
 

@@ -63,9 +63,9 @@ namespace Latios.Transforms.Authoring.Systems
             int flagCount = QueryBuilder().WithAll<HierarchyUpdateModeRequestFlags>().WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)
                             .Build().CalculateEntityCountWithoutFiltering();
 
-            var flagMap = new NativeParallelMultiHashMap<Entity, HierarchyUpdateMode.Flags>(flagCount, Allocator.TempJob);
-            var ecbA    = new EntityCommandBuffer(Allocator.TempJob);
-            var ecbB    = new EntityCommandBuffer(Allocator.TempJob);
+            var flagMap = new NativeParallelMultiHashMap<Entity, HierarchyUpdateMode.Flags>(flagCount, state.WorldUpdateAllocator);
+            var ecbA    = new EntityCommandBuffer(state.WorldUpdateAllocator);
+            var ecbB    = new EntityCommandBuffer(state.WorldUpdateAllocator);
 
             new JobA
             {
@@ -76,7 +76,6 @@ namespace Latios.Transforms.Authoring.Systems
 
             state.CompleteDependency();
             ecbA.Playback(state.EntityManager);
-            ecbA.Dispose();
 
             new JobB
             {
@@ -85,8 +84,6 @@ namespace Latios.Transforms.Authoring.Systems
             }.ScheduleParallel();
             state.CompleteDependency();
             ecbB.Playback(state.EntityManager);
-            ecbB.Dispose();
-            flagMap.Dispose();
         }
 
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]

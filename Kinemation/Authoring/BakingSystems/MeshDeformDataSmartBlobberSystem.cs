@@ -128,7 +128,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             m_meshCache.Clear();
             int count   = m_query.CalculateEntityCountWithoutFiltering();
-            var hashmap = new NativeParallelHashMap<MeshReference, BlobAndFeatures>(count, Allocator.TempJob);
+            var hashmap = new NativeParallelHashMap<MeshReference, BlobAndFeatures>(count, WorldUpdateAllocator);
             Entities.WithStoreEntityQueryInField(ref m_query).ForEach((in MeshReference meshRef, in MeshFeatures features) =>
             {
                 //Debug.Log($"Adding MeshRef key: {meshRef.GetHashCode()}");
@@ -140,10 +140,11 @@ namespace Latios.Kinemation.Authoring.Systems
                 }
             }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
 
-            var builders                 = new NativeArray<MeshDeformDataBuilder>(hashmap.Count(), Allocator.TempJob, NativeArrayOptions.ClearMemory);
-            var blendShapeRequestBuffers = new NativeArray<NativeArray<uint> >(builders.Length, Allocator.TempJob, NativeArrayOptions.ClearMemory);
-            var blendShapeRequests       =
-                new NativeArray<UnityEngine.Rendering.AsyncGPUReadbackRequest>(builders.Length, Allocator.TempJob, NativeArrayOptions.ClearMemory);
+            var builders                 = CollectionHelper.CreateNativeArray<MeshDeformDataBuilder>(hashmap.Count(), WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+            var blendShapeRequestBuffers = CollectionHelper.CreateNativeArray<NativeArray<uint> >(builders.Length, WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+            var blendShapeRequests       = CollectionHelper.CreateNativeArray<UnityEngine.Rendering.AsyncGPUReadbackRequest>(builders.Length,
+                                                                                                                             WorldUpdateAllocator,
+                                                                                                                             NativeArrayOptions.ClearMemory);
             int index = 0;
             foreach (var pair in hashmap)
             {
@@ -163,7 +164,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 if (requiresBindposes && mesh.bindposeCount > 0)
                 {
                     var bindposes     = mesh.GetBindposes();
-                    var bindposesList = new UnsafeList<Matrix4x4>(bindposes.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    var bindposesList = new UnsafeList<Matrix4x4>(bindposes.Length, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
                     bindposesList.AddRange(bindposes.GetUnsafeReadOnlyPtr(), bindposes.Length);
                     builder.bindPoses = bindposesList;
                 }
@@ -171,11 +172,11 @@ namespace Latios.Kinemation.Authoring.Systems
                 if (requiresDeformWeights && mesh.bindposeCount > 0)
                 {
                     var weightsArray = mesh.GetAllBoneWeights();
-                    var boneWeights  = new UnsafeList<BoneWeight1>(weightsArray.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    var boneWeights  = new UnsafeList<BoneWeight1>(weightsArray.Length, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
                     boneWeights.AddRange(weightsArray.GetUnsafeReadOnlyPtr(), weightsArray.Length);
 
                     var weightCountsArray = mesh.GetBonesPerVertex();
-                    var weightCounts      = new UnsafeList<byte>(weightCountsArray.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    var weightCounts      = new UnsafeList<byte>(weightCountsArray.Length, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
                     weightCounts.AddRange(weightCountsArray.GetUnsafeReadOnlyPtr(), weightCountsArray.Length);
 
                     builder.boneWeightCountsPerVertex = weightCounts;
@@ -186,8 +187,8 @@ namespace Latios.Kinemation.Authoring.Systems
                 if (requiresBlendShapes && blendShapeCount > 0)
                 {
                     var gpuBuffer            = mesh.GetBlendShapeBuffer(UnityEngine.Rendering.BlendShapeBufferLayout.PerShape);
-                    builder.blendShapeNames  = new UnsafeList<FixedString128Bytes>(blendShapeCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-                    builder.blendShapeRanges = new UnsafeList<BlendShapeBufferRange>(blendShapeCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                    builder.blendShapeNames  = new UnsafeList<FixedString128Bytes>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+                    builder.blendShapeRanges = new UnsafeList<BlendShapeBufferRange>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
                     uint verticesCount = 0;
                     for (int shapeIndex = 0; shapeIndex < blendShapeCount; shapeIndex++)
@@ -227,11 +228,9 @@ namespace Latios.Kinemation.Authoring.Systems
                         var builder = builders[i];
                         blendShapeRequestBuffers[i].Dispose();
                         blendShapeRequestBuffers[i] = default;
-                        builder.blendShapeNames.Dispose();
-                        builder.blendShapeNames = default;
-                        builder.blendShapeRanges.Dispose();
-                        builder.blendShapeRanges = default;
-                        builders[i]              = builder;
+                        builder.blendShapeNames     = default;
+                        builder.blendShapeRanges    = default;
+                        builders[i]                 = builder;
                     }
                     else
                     {
@@ -241,7 +240,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         //    if (buffer[n].targetVertexIndex > builder.reference.mesh.Value.vertexCount)
                         //        UnityEngine.Debug.LogWarning("Async readback is returning a corrupted blend shape buffer.");
                         builder.blendShapeVertices = new UnsafeList<BlendShapeVertexDisplacement>((int)builder.blendShapeBufferSize,
-                                                                                                  Allocator.TempJob,
+                                                                                                  WorldUpdateAllocator,
                                                                                                   NativeArrayOptions.UninitializedMemory);
                         builder.blendShapeVertices.AddRange(buffer.GetUnsafeReadOnlyPtr(), (int)builder.blendShapeBufferSize);
                         buffer.Dispose();
@@ -253,8 +252,6 @@ namespace Latios.Kinemation.Authoring.Systems
             foreach (var disposable in m_graphicsBufferCache)
                 disposable.Dispose();
             m_graphicsBufferCache.Clear();
-            blendShapeRequests.Dispose();
-            blendShapeRequestBuffers.Dispose();
 
             var context = new MeshDeformDataContext
             {
@@ -282,9 +279,6 @@ namespace Latios.Kinemation.Authoring.Systems
             {
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[reference].blob);
             }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
-
-            Dependency = builders.Dispose(Dependency);
-            Dependency = hashmap.Dispose(Dependency);
         }
 
         struct MeshDeformDataBuilder
@@ -881,19 +875,6 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 // Finish
                 resultBlob = builder.CreateBlobAssetReference<MeshDeformDataBlob>(Allocator.Persistent);
-
-                if (bindPoses.IsCreated)
-                    bindPoses.Dispose();
-                if (boneWeights.IsCreated)
-                    boneWeights.Dispose();
-                if (boneWeightCountsPerVertex.IsCreated)
-                    boneWeightCountsPerVertex.Dispose();
-                if (blendShapeNames.IsCreated)
-                    blendShapeNames.Dispose();
-                if (blendShapeRanges.IsCreated)
-                    blendShapeRanges.Dispose();
-                if (blendShapeVertices.IsCreated)
-                    blendShapeVertices.Dispose();
             }
         }
 

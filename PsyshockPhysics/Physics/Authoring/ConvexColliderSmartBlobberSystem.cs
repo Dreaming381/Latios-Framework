@@ -76,7 +76,7 @@ namespace Latios.Psyshock.Authoring.Systems
         {
             int count = m_query.CalculateEntityCountWithoutFiltering();
 
-            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, Allocator.TempJob);
+            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, WorldUpdateAllocator);
             var mapWriter = hashmap.AsParallelWriter();
 
             Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in ConvexColliderBlobBakeData data) =>
@@ -84,8 +84,8 @@ namespace Latios.Psyshock.Authoring.Systems
                 mapWriter.TryAdd(data.mesh.GetHashCode(), new UniqueItem { bakeData = data });
             }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
 
-            var meshes   = new NativeList<UnityObjectRef<Mesh> >(Allocator.TempJob);
-            var builders = new NativeList<ConvexBuilder>(Allocator.TempJob);
+            var meshes   = new NativeList<UnityObjectRef<Mesh> >(WorldUpdateAllocator);
+            var builders = new NativeList<ConvexBuilder>(WorldUpdateAllocator);
 
             Job.WithCode(() =>
             {
@@ -148,10 +148,6 @@ namespace Latios.Psyshock.Authoring.Systems
             {
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
             }).ScheduleParallel();
-
-            Dependency = hashmap.Dispose(Dependency);
-            Dependency = meshes.Dispose(Dependency);
-            Dependency = builders.Dispose(Dependency);
         }
 
         struct ConvexBuilder

@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.Kinemation
@@ -44,6 +45,10 @@ namespace Latios.Kinemation
         BlackboardEntity            worldBlackboardEntity;
         CullingComputeDispatchState nextExpectedState;
 
+#if LATIOS_BL_FORK
+        JobHandle previousUpdateJH;
+#endif
+
         /// <summary>
         /// Create the backing state. Call this in OnCreate() and assign to a member on the system.
         /// </summary>
@@ -54,6 +59,10 @@ namespace Latios.Kinemation
             written               = default;
             worldBlackboardEntity = latiosWorld.worldBlackboardEntity;
             nextExpectedState     = CullingComputeDispatchState.Collect;
+
+#if LATIOS_BL_FORK
+            previousUpdateJH = default;
+#endif
         }
 
         /// <summary>
@@ -69,6 +78,9 @@ namespace Latios.Kinemation
             {
                 UnityEngine.Debug.LogError("The CullingComputeDispatch expected state does not match the current state. Behavior may not be correct.");
             }
+#if LATIOS_BL_FORK
+            previousUpdateJH.Complete();
+#endif
             switch (activeState.state)
             {
                 case CullingComputeDispatchState.Collect:
@@ -84,6 +96,9 @@ namespace Latios.Kinemation
                     nextExpectedState = CullingComputeDispatchState.Collect;
                     break;
             }
+#if LATIOS_BL_FORK
+            previousUpdateJH = state.Dependency;
+#endif
         }
     }
 }

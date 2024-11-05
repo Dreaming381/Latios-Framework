@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Latios.Authoring;
 using Latios.Kinemation.Authoring;
 using Latios.Transforms;
 using Unity.Burst;
@@ -53,6 +52,8 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
                 taa.Add(tf);
             shadowHierarchy.SetActive(false);
         }
+
+        public int boneCount => parentIndices.Length;
 
         // -1 for no parent
         public short GetBoneParent(int boneIndex) => parentIndices[boneIndex];
@@ -115,12 +116,19 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
             return result;
         }
 
-        public void Dispose()
+        public void Dispose() => Dispose(false);
+
+        public void Dispose(bool forceRuntimeDispose)
         {
             taa.Dispose();
-            shadowHierarchy.DestroySafelyFromAnywhere();
+            if (forceRuntimeDispose)
+                GameObject.Destroy(shadowHierarchy);
+            else
+                shadowHierarchy.DestroySafelyFromAnywhere();
             parentIndices.Dispose();
         }
+
+        internal Transform GetShadowTransformForBone(int boneIndex) => taa[boneIndex];
 
         void SampleClip(ref UnsafeList<TransformQvvs>                          boneTransforms,
                         AnimationClip clip,

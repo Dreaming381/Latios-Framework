@@ -577,6 +577,11 @@ namespace Latios.Unsafe
                 return ref UnsafeUtility.AsRef<T>(m_readAddress);
             }
 
+            /// <summary>
+            /// Returns the current element's raw address within the block list.
+            /// </summary>
+            public void* GetCurrentPtr() => m_readAddress;
+
             internal Enumerator GetNextIndexEnumerator()
             {
                 return new Enumerator(m_perThreadBlockList + 1, m_elementSize, m_elementsPerBlock);
@@ -636,6 +641,11 @@ namespace Latios.Unsafe
             /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
             /// <returns>A ref of the element stored, reinterpreted with the strong type</returns>
             public ref T GetCurrentAsRef<T>() where T : unmanaged => ref m_enumerator.GetCurrentAsRef<T>();
+
+            /// <summary>
+            /// Returns the current element's raw address within the block list.
+            /// </summary>
+            public void* GetCurrentPtr() => m_enumerator.GetCurrentPtr();
 
             // Schedule for 128 iterations
             //[BurstCompile]

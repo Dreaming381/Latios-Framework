@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
@@ -87,7 +88,7 @@ namespace Latios.Myri.Authoring.Systems
         {
             int count = m_query.CalculateEntityCountWithoutFiltering();
 
-            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, Allocator.TempJob);
+            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, WorldUpdateAllocator);
             var mapWriter = hashmap.AsParallelWriter();
 
             Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in AudioClipBlobBakeData data) =>
@@ -95,8 +96,8 @@ namespace Latios.Myri.Authoring.Systems
                 mapWriter.TryAdd(data.clip.GetHashCode(), new UniqueItem { bakeData = data });
             }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
 
-            var clips    = new NativeList<UnityObjectRef<AudioClip> >(Allocator.TempJob);
-            var builders = new NativeList<AudioClipBuilder>(Allocator.TempJob);
+            var clips    = new NativeList<UnityObjectRef<AudioClip> >(WorldUpdateAllocator);
+            var builders = new NativeList<AudioClipBuilder>(WorldUpdateAllocator);
 
             Job.WithCode(() =>
             {
@@ -148,12 +149,18 @@ namespace Latios.Myri.Authoring.Systems
             {
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.clip.GetHashCode()].blob);
             }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
-
-            Dependency = hashmap.Dispose(Dependency);
-            Dependency = clips.Dispose(Dependency);
-            Dependency = builders.Dispose(Dependency);
         }
 
+#if UNITY_6000_0_OR_NEWER
+        void ReadClip(AudioClip clip, ref UnsafeList<float> samples)
+        {
+            int sampleCount = clip.samples * clip.channels;
+            samples = new UnsafeList<float>(sampleCount, WorldUpdateAllocator);
+            samples.Resize(sampleCount, NativeArrayOptions.UninitializedMemory);
+            Span<float> span = new Span<float>(samples.Ptr, sampleCount);
+            clip.GetData(span, 0);
+        }
+#else
         #region Cache
         float[] m_cache1;
         float[] m_cache2;
@@ -189,7 +196,7 @@ namespace Latios.Myri.Authoring.Systems
         void ReadClip(AudioClip clip, ref UnsafeList<float> samples)
         {
             int sampleCount = clip.samples * clip.channels;
-            samples         = new UnsafeList<float>(sampleCount, Allocator.TempJob);
+            samples         = new UnsafeList<float>(sampleCount, WorldUpdateAllocator);
             //samples.Resize(sampleCount, NativeArrayOptions.UninitializedMemory);
 
             int sampleCountRemaining     = sampleCount;
@@ -383,6 +390,7 @@ namespace Latios.Myri.Authoring.Systems
             if (m_cache65536Ptr != null)
                 UnsafeUtility.ReleaseGCObject(m_cache65536Handle);
         }
+#endif
 
         struct AudioClipBuilder
         {
@@ -426,8 +434,6 @@ namespace Latios.Myri.Authoring.Systems
                 }
                 root.sampleRate = sampleRate;
                 root.name       = name;
-
-                samples.Dispose();
 
                 result = builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent);
             }

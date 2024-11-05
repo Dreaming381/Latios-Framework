@@ -15,8 +15,8 @@ namespace Latios.Kinemation.Authoring.Systems
         protected override void OnUpdate()
         {
             int hashmapCapacity = m_query.CalculateEntityCountWithoutFiltering();
-            var hashset         = new NativeHashSet<int>(hashmapCapacity, Allocator.TempJob);
-            var list            = new NativeList<ShadowHierarchyReference>(hashmapCapacity, Allocator.TempJob);
+            var hashset         = new NativeHashSet<int>(hashmapCapacity, WorldUpdateAllocator);
+            var list            = new NativeList<ShadowHierarchyReference>(hashmapCapacity, WorldUpdateAllocator);
 
             CompleteDependency();
 
@@ -30,9 +30,6 @@ namespace Latios.Kinemation.Authoring.Systems
             {
                 ShadowHierarchyBuilder.DeleteSkinnedMeshPaths(reference.shadowHierarchyRoot);
             }
-
-            hashset.Dispose();
-            list.Dispose();
         }
     }
 }
