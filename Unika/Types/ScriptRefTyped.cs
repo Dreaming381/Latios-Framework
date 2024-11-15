@@ -5,6 +5,10 @@ using Unity.Mathematics;
 
 namespace Latios.Unika
 {
+    /// <summary>
+    /// A typed reference to another script, which must be resolved before use.
+    /// </summary>
+    /// <typeparam name="T">The type of script referenced</typeparam>
     public unsafe struct ScriptRef<T> : IEquatable<ScriptRef<T> >, IEquatable<ScriptRef>,
                                         IComparable<ScriptRef<T> >, IComparable<ScriptRef>
         where T : unmanaged, IUnikaScript, IUnikaScriptGen
@@ -14,6 +18,9 @@ namespace Latios.Unika
         internal int    m_cachedHeaderIndex;
 
         #region Main API
+        /// <summary>
+        /// The entity the referenced script belongs to
+        /// </summary>
         public Entity entity => m_entity;
 
         public static implicit operator ScriptRef(ScriptRef<T> script)
@@ -45,8 +52,14 @@ namespace Latios.Unika
 
         public override string ToString() => ((ScriptRef)this).ToString();
 
+        /// <summary>
+        /// Gets a Burst-compatible string representation of the script for debug logging purposes
+        /// </summary>
         public FixedString128Bytes ToFixedString() => ((ScriptRef)this).ToFixedString();
 
+        /// <summary>
+        /// A null ScriptRef to assign or compare to
+        /// </summary>
         public static ScriptRef<T> Null => default;
         #endregion
 

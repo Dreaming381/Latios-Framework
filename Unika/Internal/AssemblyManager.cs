@@ -137,7 +137,10 @@ namespace Latios.Unika
         {
             var method = interfaceType.GetMethod("__Initialize", BindingFlags.Static | BindingFlags.Public);
             if (method == null)
+            {
+                UnityEngine.Debug.LogError($"Unika failed to intialize {interfaceType}. Are you missing the `partial` keyword?");
                 return;
+            }
             var invokable = method.CreateDelegate(typeof(InitializeDelegate)) as InitializeDelegate;
             invokable();
         }
@@ -146,7 +149,10 @@ namespace Latios.Unika
         {
             var method = scriptType.GetMethod("__Initialize", BindingFlags.Static | BindingFlags.Public);
             if (method == null)
+            {
+                UnityEngine.Debug.LogError($"Unika failed to intialize {scriptType}. Are you missing the `partial` keyword?");
                 return;
+            }
             var invokable = method.CreateDelegate(typeof(InitializeDelegate)) as InitializeDelegate;
             invokable();
         }

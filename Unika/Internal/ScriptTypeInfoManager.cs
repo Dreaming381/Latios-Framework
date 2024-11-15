@@ -82,6 +82,9 @@ namespace Latios.Unika
             var stableHash = TypeHash.CalculateStableTypeHash(typeof(T), s_stableTypeHashCache);
             ScriptStableHashToIdAndMaskMap.s_map.Data.Add(stableHash, idAndMask);
 
+            ScriptTypeExtraction.extractors.Add(new ScriptTypeExtraction.Extractor<T>());
+            UnityEngine.Assertions.Assert.IsTrue(runtimeScriptCounter == ScriptTypeExtraction.extractors.Count);
+
             s_entityOffsetCache.Clear();
             s_blobOffsetCache.Clear();
             s_assetOffsetCache.Clear();
@@ -144,7 +147,7 @@ namespace Latios.Unika
             return ScriptInterfaceInfoLookup<T>.s_runtimeTypeIndex.Data;
         }
 
-        public static IdAndMask GetScriptRuntimeId<T>() where T : unmanaged, IUnikaScript, IUnikaScriptGen
+        public static IdAndMask GetScriptRuntimeIdAndMask<T>() where T : unmanaged, IUnikaScript, IUnikaScriptGen
         {
             return ScriptTypeInfoLookup<T>.s_runtimeTypeIndex.Data;
         }

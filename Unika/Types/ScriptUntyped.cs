@@ -6,6 +6,9 @@ using Unity.Mathematics;
 
 namespace Latios.Unika
 {
+    /// <summary>
+    /// A resolved untyped script which can be operated on
+    /// </summary>
     public unsafe struct Script : IScriptExtensionsApi, IEquatable<Script>, IComparable<Script>, IEquatable<ScriptRef>, IComparable<ScriptRef>
     {
         internal NativeArray<ScriptHeader> m_scriptBuffer;
@@ -17,24 +20,42 @@ namespace Latios.Unika
         internal ref readonly ScriptHeader m_headerRO => ref *(ScriptHeader*)((byte*)m_scriptBuffer.GetUnsafeReadOnlyPtr() + m_headerOffset);
 
         #region Main API
+        /// <summary>
+        /// The entity this script belongs to
+        /// </summary>
         public Entity entity => m_entity;
 
+        /// <summary>
+        /// Obtains the full set of scripts attached to the entity this script belongs to
+        /// </summary>
         public EntityScriptCollection allScripts => new EntityScriptCollection { m_buffer = m_scriptBuffer, m_entity = m_entity };
 
+        /// <summary>
+        /// Obtains the index of this script within the full set of scripts attached to the entity
+        /// </summary>
         public int indexInEntity => (m_headerOffset / UnsafeUtility.SizeOf<ScriptHeader>()) - 1;
 
+        /// <summary>
+        /// A user byte value which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public byte userByte
         {
             get => m_headerRO.userByte;
             set => m_header.userByte = value;
         }
 
+        /// <summary>
+        /// The first of two user flag values which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public bool userFlagA
         {
             get => m_headerRO.userFlagA;
             set => m_header.userFlagA = value;
         }
 
+        /// <summary>
+        /// The second of two user flag values which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public bool userFlagB
         {
             get => m_headerRO.userFlagB;
@@ -82,6 +103,9 @@ namespace Latios.Unika
             return Equals(Null) ? "Script.Null" : $"Script{{{m_entity.ToFixedString()}, id:{m_headerRO.instanceId}, type:{m_headerRO.scriptType}}}";
         }
 
+        /// <summary>
+        /// Gets a Burst-compatible string representation of the script for debug logging purposes
+        /// </summary>
         public FixedString128Bytes ToFixedString()
         {
             if (Equals(Null))
@@ -96,6 +120,9 @@ namespace Latios.Unika
             return result;
         }
 
+        /// <summary>
+        /// A null unresolved script to assign or compare to
+        /// </summary>
         public static Script Null => default;
         #endregion
 

@@ -1,0 +1,42 @@
+﻿using Latios.Transforms;
+using Latios.Unika;
+using Latios.Unika.Authoring;
+using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Collections;
+
+#ROOTNAMESPACEBEGIN#
+    namespace Authoring
+    {
+        public partial class #SCRIPTNAME# : UnikaScriptAuthoring<Scripts.#SCRIPTNAME#>
+        {
+            #NOTRIM#
+            
+            public override void Bake(IBaker baker, ref AuthoredScriptAssignment toAssign, Entity smartPostProcessTarget)
+            {
+                var script = new Scripts.#SCRIPTNAME# 
+                { 
+                    #NOTRIM#
+                };
+                toAssign.Assign(ref script);
+                toAssign.transformUsageFlags = TransformUsageFlags.None;
+                toAssign.userFlagA           = false;
+                toAssign.userFlagB           = false;
+                toAssign.userByte            = 0;
+            }
+
+            public override bool IsValid()
+            {
+                return true;
+            }
+        }
+    }
+
+    namespace Scripts
+    {
+        public partial struct #SCRIPTNAME# : IUnikaScript
+        {
+            #NOTRIM#
+        }
+    }
+#ROOTNAMESPACEEND#

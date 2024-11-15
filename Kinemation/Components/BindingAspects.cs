@@ -47,7 +47,7 @@ namespace Latios.Kinemation
 
     public readonly partial struct SkeletonSkinBindingsAspect : IAspect
     {
-        readonly DynamicBuffer<DependentSkinnedMesh> m_meshes;
+        [ReadOnly] readonly DynamicBuffer<DependentSkinnedMesh> m_meshes;
 
         /// <summary>
         /// An index into the SkinBoneBindingsCollectionAspect. The lifecycle is guaranteed to be

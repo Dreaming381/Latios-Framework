@@ -17,6 +17,7 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
         //Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
         //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);
+        Latios.Unika.Authoring.UnikaBakingBootstrap.InstallUnikaEntitySerialization(ref context);
     }
 }
 
@@ -56,6 +57,7 @@ public class LatiosBootstrap : ICustomBootstrap
         //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
+        Latios.Unika.UnikaBootstrap.InstallUnikaEntitySerialization(world);
         //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);

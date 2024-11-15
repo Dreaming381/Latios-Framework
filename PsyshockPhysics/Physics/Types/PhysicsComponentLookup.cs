@@ -130,9 +130,9 @@ namespace Latios.Psyshock
             lookup.SetComponentEnabled(safeEntity, enabled);
         }
 
-        public static implicit operator PhysicsComponentLookup<T>(ComponentLookup<T> componentDataFromEntity)
+        public static implicit operator PhysicsComponentLookup<T>(ComponentLookup<T> componentLookup)
         {
-            return new PhysicsComponentLookup<T> { lookup = componentDataFromEntity };
+            return new PhysicsComponentLookup<T> { lookup = componentLookup };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -153,16 +153,16 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("PhysicsComponentDataFromEntity cannot be used inside a RunImmediate context. Use ComponentDataFromEntity instead.");
+                throw new InvalidOperationException("PhysicsComponentLookup cannot be used inside a RunImmediate context. Use ComponentLookup instead.");
             }
 #endif
         }
     }
 
     /// <summary>
-    /// A struct which wraps BufferFromEntity<typeparamref name="T"/> and allows for performing
+    /// A struct which wraps BufferLookup<typeparamref name="T"/> and allows for performing
     /// Read-Write access in parallel using SafeEntity types when it is guaranteed safe to do so.
-    /// You can implicitly cast a BufferFromEntity<typeparamref name="T"/> to this type.
+    /// You can implicitly cast a BufferLookup<typeparamref name="T"/> to this type.
     /// </summary>
     /// <typeparam name="T">A type implementing IComponentData</typeparam>
     public struct PhysicsBufferLookup<T> where T : unmanaged, IBufferElementData
@@ -176,7 +176,6 @@ namespace Latios.Psyshock
         /// be guaranteed.
         /// </summary>
         /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
-        /// <returns></returns>
         public DynamicBuffer<T> this[SafeEntity safeEntity]
         {
             get
@@ -263,7 +262,62 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("PhysicsBufferFromEntity cannot be used inside a RunImmediate context. Use BufferFromEntity instead.");
+                throw new InvalidOperationException("PhysicsBufferLookup cannot be used inside a RunImmediate context. Use BufferLookup instead.");
+            }
+#endif
+        }
+    }
+
+    /// <summary>
+    /// A struct which wraps an IAspect.Lookup and allows for performing
+    /// Read-Write access in parallel using SafeEntity types when it is guaranteed safe to do so.
+    /// </summary>
+    /// <typeparam name="TAspectType">A type implementing IAspect</typeparam>
+    /// <typeparam name="TLookupType">The IAspect.Lookup for the specific IAspect type</typeparam>
+    public struct PhysicsAspectLookup<TAspectType, TLookupType> where TAspectType : unmanaged, IAspect where TLookupType : unmanaged,
+                                                                      Unity.Entities.Internal.InternalCompilerInterface.IAspectLookup<TAspectType>
+    {
+        [NativeDisableParallelForRestriction] TLookupType m_lookup;
+
+        /// <summary>
+        /// Constructs the wrapper around the specified initialized IAspect.Lookup
+        /// </summary>
+        /// <param name="lookup">An initialized IAspect.Lookup</param>
+        public PhysicsAspectLookup(TLookupType lookup)
+        {
+            m_lookup = lookup;
+        }
+
+        public static implicit operator PhysicsAspectLookup<TAspectType, TLookupType>(TLookupType lookup) => new PhysicsAspectLookup<TAspectType, TLookupType>(lookup);
+
+        /// <summary>
+        /// Updates the type handles of the wrapped IAspect.Lookup
+        /// </summary>
+        /// <param name="state">The SystemState to update the handles</param>
+        public void Update(ref SystemState state) => m_lookup.Update(ref state);
+
+        /// <summary>
+        /// Gets an Aspect on the entity represented by safeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot
+        /// be guaranteed.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        public TAspectType this[SafeEntity entity]
+        {
+            get
+            {
+                ValidateSafeEntityIsSafe(entity);
+                return m_lookup[entity];
+            }
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (safeEntity.m_entity.Index < 0)
+            {
+                throw new InvalidOperationException("AspectLookup cannot be used inside a RunImmediate context. Use <TAspectType>.Lookup instead.");
             }
 #endif
         }
@@ -332,5 +386,78 @@ namespace Latios.Psyshock
         }
     }
 #endif
+
+    public static class ComponentBrokerPhysicsExtensions
+    {
+        /// <summary>
+        /// Acquires an optional RefRO to the component on the entity represented by safeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot
+        /// be guaranteed.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <returns>A RefRO instance which may or may not be valid (use IsValid to check)</returns>
+        public static RefRO<T> GetRO<T>(ref this ComponentBroker broker, SafeEntity entity) where T : unmanaged, IComponentData
+        {
+            if (broker.IsReadOnlyAccessType<T>())
+                return broker.GetRO<T>(entity);
+            ValidateSafeEntityIsSafe(entity);
+            return broker.GetROIgnoreParallelSafety<T>(entity);
+        }
+
+        /// <summary>
+        /// Acquires an optional RefRW to the component on the entity represented by safeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot
+        /// be guaranteed.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <returns>A RefRW instance which may or may not be valid (use IsValid to check)</returns>
+        public static RefRW<T> GetRW<T>(ref this ComponentBroker broker, SafeEntity entity) where T : unmanaged, IComponentData
+        {
+            ValidateSafeEntityIsSafe(entity);
+            return broker.GetRWIgnoreParallelSafety<T>(entity);
+        }
+
+        /// <summary>
+        /// Acquires an optional DynamicBuffer on the entity represented by safeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot
+        /// be guaranteed.
+        /// </summary>
+        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
+        /// <returns>A DynamicBuffer instance which may or may not be valid (use IsCreated to check)</returns>
+        public static DynamicBuffer<T> GetBuffer<T>(ref this ComponentBroker broker, SafeEntity entity) where T : unmanaged, IBufferElementData
+        {
+            if (broker.IsReadOnlyAccessType<T>())
+                return broker.GetBuffer<T>(entity);
+            ValidateSafeEntityIsSafe(entity);
+            return broker.GetBufferIgnoreParallelSafety<T>(entity);
+        }
+
+#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+        /// <summary>
+        /// Tries to get a TransformAspect on the specified entity represented by safeEntity.
+        /// When safety checks are enabled, this throws when parallel safety cannot
+        /// be guaranteed.
+        /// </summary>
+        /// <param name="entity">The entity to get the component from.</param>
+        /// <param name="transformAspect">The TransformAspect from the entity, or default if not valid</param>
+        /// <returns>True if the entity has the required components to form the TransformAspect, false otherwise</returns>
+        public static bool TryGetTransformAspect(ref this ComponentBroker broker, SafeEntity entity, out TransformAspect transformAspect)
+        {
+            ValidateSafeEntityIsSafe(entity);
+            return broker.TryGetTransformAspectIgnoreParallelSafety(entity, out transformAspect);
+        }
+#endif
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (safeEntity.m_entity.Index < 0)
+            {
+                throw new InvalidOperationException("SafeEntity for a ComponentBroker cannot be used inside a RunImmediate context. Use SafeEntity.entity instead.");
+            }
+#endif
+        }
+    }
 }
 

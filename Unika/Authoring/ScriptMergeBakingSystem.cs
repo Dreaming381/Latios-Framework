@@ -130,6 +130,7 @@ namespace Latios.Unika.Authoring.Systems
                 {
                     var bytes = combineTargetsCache[currentIndex].bytes;
                     UnsafeUtility.MemCpy(s.GetUnsafePtrAsBytePtr(), bytes.GetUnsafeReadOnlyPtr(), bytes.Length);
+                    currentIndex++;
                 }
             }
 

@@ -6,6 +6,10 @@ using Unity.Mathematics;
 
 namespace Latios.Unika
 {
+    /// <summary>
+    /// A resolved strongly-typed script which can be operated on
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public unsafe struct Script<T> : IScriptTypedExtensionsApi,
                                      IEquatable<Script<T> >, IEquatable<Script>, IEquatable<ScriptRef<T> >, IEquatable<ScriptRef>,
                                      IComparable<Script<T> >, IComparable<Script>, IComparable<ScriptRef<T> >, IComparable<ScriptRef>
@@ -20,27 +24,51 @@ namespace Latios.Unika
         internal ref readonly ScriptHeader m_headerRO => ref *(ScriptHeader*)((byte*)m_scriptBuffer.GetUnsafeReadOnlyPtr() + m_headerOffset);
 
         #region Main API
+        /// <summary>
+        /// Obtains a read-write reference to the script struct stored directly in the script buffer
+        /// </summary>
         public ref T valueRW => ref *(T*)((byte*)m_scriptBuffer.GetUnsafePtr() + m_byteOffset);
+        /// <summary>
+        /// Obtains a read-only reference to the script struct stored directly in the script buffer
+        /// </summary>
         public ref readonly T valueRO => ref *(T*)((byte*)m_scriptBuffer.GetUnsafeReadOnlyPtr() + m_byteOffset);
 
+        /// <summary>
+        /// The entity this script belongs to
+        /// </summary>
         public Entity entity => m_entity;
 
+        /// <summary>
+        /// Obtains the full set of scripts attached to the entity this script belongs to
+        /// </summary>
         public EntityScriptCollection allScripts => new EntityScriptCollection { m_buffer = m_scriptBuffer, m_entity = m_entity };
 
+        /// <summary>
+        /// Obtains the index of this script within the full set of scripts attached to the entity
+        /// </summary>
         public int indexInEntity => (m_headerOffset / UnsafeUtility.SizeOf<ScriptHeader>()) - 1;
 
+        /// <summary>
+        /// A user byte value which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public byte userByte
         {
             get => m_headerRO.userByte;
             set => m_header.userByte = value;
         }
 
+        /// <summary>
+        /// The first of two user flag values which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public bool userFlagA
         {
             get => m_headerRO.userFlagA;
             set => m_header.userFlagA = value;
         }
 
+        /// <summary>
+        /// The second of two user flag values which can be used for fast early-out operations without having to load the full script state
+        /// </summary>
         public bool userFlagB
         {
             get => m_headerRO.userFlagB;
@@ -91,8 +119,14 @@ namespace Latios.Unika
 
         public override string ToString() => ((Script)this).ToString();
 
+        /// <summary>
+        /// Gets a Burst-compatible string representation of the script for debug logging purposes
+        /// </summary>
         public FixedString128Bytes ToFixedString() => ((Script)this).ToFixedString();
 
+        /// <summary>
+        /// A null unresolved script to assign or compare to
+        /// </summary>
         public static Script<T> Null => default;
         #endregion
 
@@ -135,8 +169,21 @@ namespace Latios.Unika
 
         bool IScriptTypedExtensionsApi.Is(in Script script) => ScriptCast.IsScript<T>(in script);
 
-        bool IScriptTypedExtensionsApi.TryCastInit(in Script script) => ScriptCast.TryCast(in script, out this);
+        bool IScriptTypedExtensionsApi.TryCastInit(in Script script, IScriptTypedExtensionsApi.WrappedThisPtr thisPtr)
+        {
+            var result = ScriptCast.TryCastScript(in script, out this);
+            UnsafeUtility.CopyStructureToPtr(ref this, thisPtr.ptr);
+            return result;
+        }
 
+        IScriptTypedExtensionsApi.WrappedIdAndMask IScriptTypedExtensionsApi.GetIdAndMask() => new IScriptTypedExtensionsApi.WrappedIdAndMask
+        {
+            idAndMask = ScriptTypeInfoManager.GetScriptRuntimeIdAndMask<T>()
+        };
+
+        /// <summary>
+        /// Gets an untyped but resolved reference to this script
+        /// </summary>
         public Script ToScript() => this;
     }
 }

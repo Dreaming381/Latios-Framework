@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.12.0-alpha.1]
+# Latios Framework for Unity ECS – [0.12.0-alpha.2]
 
 **This is a prerelease version of the Latios Framework version 0.12 which is still under development. Changelogs and Documentation, including the remainder of this README, have not been updated to reflect the new features and changes in 0.12. Git hashes may not be preserved on transition to beta or official release.**
 

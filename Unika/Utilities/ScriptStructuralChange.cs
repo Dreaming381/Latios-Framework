@@ -5,15 +5,27 @@ using Unity.Mathematics;
 
 namespace Latios.Unika
 {
+    /// <summary>
+    /// Utility methods for adding and removing scripts at runtime.
+    /// WARNING: Calling this on a script buffer from within a script that lives in that buffer can corrupt memory and result in crashes.
+    /// </summary>
     public static class ScriptStructuralChange
     {
+        /// <summary>
+        /// Adds a script to the entity
+        /// </summary>
+        /// <typeparam name="T">The type of script to add</typeparam>
+        /// <param name="script">The script initial field values to add</param>
+        /// <param name="userByte">The initial userByte value for the script</param>
+        /// <param name="userFlagA">The initial userFlagA value for the script</param>
+        /// <param name="userFlagB">The initial userFlagB value for the script</param>
         public static void AddScript<T>(this DynamicBuffer<UnikaScripts> scriptsBuffer,
                                         in T script,
                                         byte userByte = 0,
                                         bool userFlagA = false,
                                         bool userFlagB = false) where T : unmanaged, IUnikaScript, IUnikaScriptGen
         {
-            var scriptType  = ScriptTypeInfoManager.GetScriptRuntimeId<T>().runtimeId;
+            var scriptType  = ScriptTypeInfoManager.GetScriptRuntimeIdAndMask<T>().runtimeId;
             var index       = ScriptStructuralChangeInternal.AllocateScript(ref scriptsBuffer, scriptType);
             var result      = scriptsBuffer.AllScripts(default)[index];
             var typedResult = new Script<T>
@@ -29,6 +41,10 @@ namespace Latios.Unika
             typedResult.userFlagB = userFlagB;
         }
 
+        /// <summary>
+        /// Removes the script at the specified index from the entity
+        /// </summary>
+        /// <param name="index">The index to remove of the script within the list of all scripts on the entity</param>
         public static void RemoveScript(this DynamicBuffer<UnikaScripts> scriptsBuffer, int index)
         {
             CheckInRange(ref scriptsBuffer, index);

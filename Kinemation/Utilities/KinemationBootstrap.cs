@@ -11,7 +11,7 @@ namespace Latios.Kinemation
         /// This must be installed in a LatiosWorldUnmanaged, but can be safely installed in ICustomEditorBootstrap.
         /// This should be installed in both the Editor and runtime worlds.
         /// </summary>
-        /// <param name="world">The World to install Kinemation into. Must be a LatiosWorldUnmanaged.</param>
+        /// <param name="world">The World to install Kinemation into. Must be a LatiosWorld.</param>
         public static void InstallKinemation(World world)
         {
             RenderMeshUtilityReplacer.PatchRenderMeshUtility();

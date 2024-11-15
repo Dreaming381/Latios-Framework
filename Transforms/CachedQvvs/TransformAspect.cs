@@ -676,6 +676,59 @@ namespace Latios.Transforms
 #endif
         }
     }
+
+    public static class ComponentBrokerTransformAspectExtensions
+    {
+        /// <summary>
+        /// Adds the required component types needed by TransformAspect to the builder.
+        /// </summary>
+        public static ComponentBrokerBuilder WithTransformAspect(this ComponentBrokerBuilder builder)
+        {
+            return builder.With<WorldTransform, LocalTransform>(false).With<ParentToWorldTransform>(true);
+        }
+
+        /// <summary>
+        /// Tries to get a TransformAspect on the specified entity. If the entity is not the
+        /// entity used last in SetupEntity(), then a parallel job safety check may trigger an exception.
+        /// </summary>
+        /// <param name="entity">The entity to get the component from.</param>
+        /// <param name="transformAspect">The TransformAspect from the entity, or default if not valid</param>
+        /// <returns>True if the entity has the required components to form the TransformAspect, false otherwise</returns>
+        public static bool TryGetTransformAspect(ref this ComponentBroker broker, Entity entity, out TransformAspect transformAspect)
+        {
+            var worldTransform = broker.GetRW<WorldTransform>(entity);
+            if (!worldTransform.IsValid)
+            {
+                transformAspect = default;
+                return false;
+            }
+            var localTransform  = broker.GetRW<LocalTransform>(entity);
+            var parentTransform = broker.GetRO<ParentToWorldTransform>(entity);
+            transformAspect     = new TransformAspect(localTransform, parentTransform, worldTransform);
+            return true;
+        }
+
+        /// <summary>
+        /// Tries to get a TransformAspect on the specified entity, ignoring parallel safety checks as if
+        /// [NativeDisableParallelForRestriction] was used.
+        /// </summary>
+        /// <param name="entity">The entity to get the component from.</param>
+        /// <param name="transformAspect">The TransformAspect from the entity, or default if not valid</param>
+        /// <returns>True if the entity has the required components to form the TransformAspect, false otherwise</returns>
+        public static bool TryGetTransformAspectIgnoreParallelSafety(ref this ComponentBroker broker, Entity entity, out TransformAspect transformAspect)
+        {
+            var worldTransform = broker.GetRWIgnoreParallelSafety<WorldTransform>(entity);
+            if (!worldTransform.IsValid)
+            {
+                transformAspect = default;
+                return false;
+            }
+            var localTransform  = broker.GetRWIgnoreParallelSafety<LocalTransform>(entity);
+            var parentTransform = broker.GetROIgnoreParallelSafety<ParentToWorldTransform>(entity);
+            transformAspect     = new TransformAspect(localTransform, parentTransform, worldTransform);
+            return true;
+        }
+    }
 }
 #endif
 

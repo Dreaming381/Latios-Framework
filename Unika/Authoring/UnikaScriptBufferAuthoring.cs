@@ -3,8 +3,13 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace Latios.Unika
+namespace Latios.Unika.Authoring
 {
+    /// <summary>
+    /// This should be added to any GameObject that will be baked into an entity and have scripts assigned to it.
+    /// </summary>
+    [AddComponentMenu("Latios/Unika/Unika Script Buffer")]
+    [DisallowMultipleComponent]
     public class UnikaScriptBufferAuthoring : MonoBehaviour
     {
     }
@@ -13,13 +18,26 @@ namespace Latios.Unika
     {
         public override void Bake(UnikaScriptBufferAuthoring authoring)
         {
+            var                              entity = GetEntity(TransformUsageFlags.None);
+            FixedList128Bytes<ComponentType> types  = default;
+            types.Add(ComponentType.ReadWrite<UnikaScripts>());
+            types.Add(ComponentType.ReadWrite<UnikaSerializedEntityReference>());
+            types.Add(ComponentType.ReadWrite<UnikaSerializedBlobReference>());
+            types.Add(ComponentType.ReadWrite<UnikaSerializedAssetReference>());
+            types.Add(ComponentType.ReadWrite<UnikaSerializedObjectReference>());
+            types.Add(ComponentType.ReadWrite<UnikaSerializedTypeIds>());
+            AddComponent(entity, new ComponentTypeSet(in types));
+        }
+    }
+
+    [DisableAutoCreation]
+    public class UnikaScriptBufferEntitySerializationBaker : Baker<UnikaScriptBufferAuthoring>
+    {
+        public override void Bake(UnikaScriptBufferAuthoring authoring)
+        {
             var entity = GetEntity(TransformUsageFlags.None);
-            AddBuffer<UnikaScripts>(                  entity);
-            AddBuffer<UnikaSerializedEntityReference>(entity);
-            AddBuffer<UnikaSerializedBlobReference>(  entity);
-            AddBuffer<UnikaSerializedAssetReference>( entity);
-            AddBuffer<UnikaSerializedObjectReference>(entity);
-            AddComponent<UnikaSerializedTypeIds>(entity);
+            AddComponent<UnikaEntitySerializationController>(entity);
+            SetComponentEnabled<UnikaEntitySerializationController>(entity, true);
         }
     }
 }

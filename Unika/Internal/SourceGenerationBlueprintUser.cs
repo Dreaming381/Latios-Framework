@@ -50,6 +50,8 @@ namespace Latios.Unika.SGB
             sref.Resolve(default).TryCastScript(out suOut);
             s.TryCast(out IUpdate.Interface iOut);
             i.ToScript().TryCast(out suOut);
+            Context context = default;
+            i.Update(ref context);
         }
     }
 }

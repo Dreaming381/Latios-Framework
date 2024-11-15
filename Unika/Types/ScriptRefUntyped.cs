@@ -5,6 +5,9 @@ using Unity.Mathematics;
 
 namespace Latios.Unika
 {
+    /// <summary>
+    /// An untyped reference to another script, which must be resolved before use.
+    /// </summary>
     public unsafe struct ScriptRef : IEquatable<ScriptRef>, IComparable<ScriptRef>
     {
         internal Entity m_entity;
@@ -12,6 +15,9 @@ namespace Latios.Unika
         internal int    m_cachedHeaderIndex;
 
         #region Main API
+        /// <summary>
+        /// The entity the referenced script belongs to
+        /// </summary>
         public Entity entity => m_entity;
         #endregion
 
@@ -48,6 +54,9 @@ namespace Latios.Unika
             return Equals(Null) ? "ScriptRef.Null" : $"Script{{{m_entity.ToFixedString()}, id:{m_instanceId}}}";
         }
 
+        /// <summary>
+        /// Gets a Burst-compatible string representation of the script for debug logging purposes
+        /// </summary>
         public FixedString128Bytes ToFixedString()
         {
             if (Equals(Null))
@@ -60,6 +69,9 @@ namespace Latios.Unika
             return result;
         }
 
+        /// <summary>
+        /// A null ScriptRef to assign or compare to
+        /// </summary>
         public static ScriptRef Null => default;
         #endregion
     }
