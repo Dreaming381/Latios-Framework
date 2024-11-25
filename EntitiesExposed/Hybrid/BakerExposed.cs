@@ -19,6 +19,11 @@ namespace Unity.Entities.Exposed
             else
                 return baker._State.AuthoringSource;
         }
+
+        public static UnityEngine.GameObject GetAuthoringGameObjectWithoutDependency(this IBaker baker)
+        {
+            return baker._State.AuthoringObject;
+        }
     }
 
     public static class BlobAssetStoreExposedExtensions

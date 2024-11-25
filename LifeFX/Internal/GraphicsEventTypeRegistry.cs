@@ -38,12 +38,60 @@ namespace Latios.LifeFX
 
         public static readonly SharedStatic<UnsafeList<EventMetadata> > s_eventMetadataList = SharedStatic<UnsafeList<EventMetadata> >.GetOrCreate<EventMetadata>();
 
-        static bool s_initialized = false;
+        public struct EventHashManager
+        {
+            UnsafeHashMap<UnityObjectRef<GraphicsEventTunnelBase>, UnityObjectRef<GraphicsEventTunnelBase> > deduplicateTargetMap;
+            UnsafeHashMap<Unity.Entities.Hash128, UnityObjectRef<GraphicsEventTunnelBase> >                  firstRegisteredMap;
+            bool                                                                                             lockForReading;
+
+            public void Init()
+            {
+                deduplicateTargetMap = new UnsafeHashMap<UnityObjectRef<GraphicsEventTunnelBase>, UnityObjectRef<GraphicsEventTunnelBase> >(32, Allocator.Persistent);
+                firstRegisteredMap   = new UnsafeHashMap<Unity.Entities.Hash128, UnityObjectRef<GraphicsEventTunnelBase> >(64, Allocator.Persistent);
+                lockForReading       = false;
+            }
+
+            public void Dispose()
+            {
+                deduplicateTargetMap.Dispose();
+                firstRegisteredMap.Dispose();
+            }
+
+            // Should only be called from main thread
+            public void Add(UnityObjectRef<GraphicsEventTunnelBase> instance, Unity.Entities.Hash128 hash)
+            {
+                if (lockForReading)
+                    throw new System.InvalidOperationException("Cannot add a new GraphicsEventTunnel while a system is using it.");
+
+                if (firstRegisteredMap.TryGetValue(hash, out var target))
+                    deduplicateTargetMap.TryAdd(instance, target);
+                else
+                {
+                    firstRegisteredMap.Add(hash, instance);
+                    deduplicateTargetMap.Add(instance, instance);
+                }
+            }
+
+            public UnityObjectRef<GraphicsEventTunnelBase> this[UnityObjectRef<GraphicsEventTunnelBase> key] => deduplicateTargetMap[key];
+
+            public void SetLock(bool lockForReading) => this.lockForReading = lockForReading;
+        }
+
+        public static readonly SharedStatic<EventHashManager> s_eventHashManager = SharedStatic<EventHashManager>.GetOrCreate<EventHashManager>();
+
+        static bool s_initialized    = false;
+        static bool s_isInitializing = false;
+
+        public static bool IsInitializing() => s_isInitializing;
 
         public static void Init()
         {
-            if (s_initialized)
+            if (s_initialized || s_isInitializing)
                 return;
+
+            s_isInitializing = true;
+
+            s_eventHashManager.Data.Init();
 
             s_eventMetadataList.Data = new UnsafeList<EventMetadata>(16, Allocator.Persistent);
 
@@ -109,12 +157,14 @@ namespace Latios.LifeFX
             // There is no domain unload in player builds, so we must be sure to shutdown when the process exits.
             AppDomain.CurrentDomain.ProcessExit += (_, __) => { Shutdown(); };
 
-            s_initialized = true;
+            s_initialized    = true;
+            s_isInitializing = false;
         }
 
         static void Shutdown()
         {
             s_eventMetadataList.Data.Dispose();
+            s_eventHashManager.Data.Dispose();
         }
     }
 }

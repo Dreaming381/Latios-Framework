@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Latios.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -8,24 +9,24 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring
 {
     /// <summary>
-    /// Inherit this class and attach to a GameObject to disable normal Mesh Renderer or Skinned Mesh Renderer baking
+    /// Implement this interface on a MonoBehaviour and attach to a GameObject to disable normal Mesh Renderer or Skinned Mesh Renderer baking
     /// for possibly all descendants in the hierarchy. Each descendant's baker will query the ShouldOverride() method.
     /// </summary>
-    public abstract class OverrideHierarchyRendererBase : MonoBehaviour
+    public interface IOverrideHierarchyRenderer
     {
         /// <summary>
         /// Return true if default baking should be disabled for this renderer. False otherwise.
         /// </summary>
-        public abstract bool ShouldOverride(IBaker baker, Renderer renderer);
+        public bool ShouldOverride(IBaker baker, Renderer renderer);
     }
 
     public static partial class RenderingBakingTools
     {
-        static List<OverrideHierarchyRendererBase> s_overrideHCache = new List<OverrideHierarchyRendererBase>();
-        static List<OverrideMeshRendererBase>      s_overrideMCache = new List<OverrideMeshRendererBase>();
+        static List<IOverrideHierarchyRenderer> s_overrideHCache = new List<IOverrideHierarchyRenderer>();
+        static List<IOverrideMeshRenderer>      s_overrideMCache = new List<IOverrideMeshRenderer>();
 
         /// <summary>
-        /// Test if the Renderer has an OverrideMeshRendererBase or OverrideHierarchyRendererBase that should apply to it
+        /// Test if the Renderer has an IOverrideMeshRenderer or IOverrideHierarchyRenderer that should apply to it
         /// and is not in the ignore list.
         /// </summary>
         /// <param name="baker">The current baker processing an authoring component</param>
@@ -35,7 +36,7 @@ namespace Latios.Kinemation.Authoring
         /// <returns>Returns true if a valid override was found</returns>
         public static bool IsOverridden(IBaker baker, Renderer authoring, Span<UnityObjectRef<MonoBehaviour> > overridesToIgnore = default)
         {
-            if (overridesToIgnore.IsEmpty && baker.GetComponent<OverrideMeshRendererBase>(authoring) != null)
+            if (overridesToIgnore.IsEmpty && baker.GetComponent<IOverrideMeshRenderer>(authoring) != null)
                 return true;
             else if (!overridesToIgnore.IsEmpty)
             {
@@ -43,7 +44,7 @@ namespace Latios.Kinemation.Authoring
                 baker.GetComponents(authoring, s_overrideMCache);
                 foreach (var o in s_overrideMCache)
                 {
-                    UnityObjectRef<MonoBehaviour> oref        = o;
+                    UnityObjectRef<MonoBehaviour> oref        = o as MonoBehaviour;
                     bool                          foundIgnore = false;
                     foreach (var i in overridesToIgnore)
                     {
@@ -62,7 +63,7 @@ namespace Latios.Kinemation.Authoring
             baker.GetComponentsInParent(s_overrideHCache);
             foreach (var o in s_overrideHCache)
             {
-                UnityObjectRef<MonoBehaviour> oref        = o;
+                UnityObjectRef<MonoBehaviour> oref        = o as MonoBehaviour;
                 bool                          foundIgnore = false;
                 foreach (var i in overridesToIgnore)
                 {

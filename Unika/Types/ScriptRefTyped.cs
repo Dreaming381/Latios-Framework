@@ -9,7 +9,8 @@ namespace Latios.Unika
     /// A typed reference to another script, which must be resolved before use.
     /// </summary>
     /// <typeparam name="T">The type of script referenced</typeparam>
-    public unsafe struct ScriptRef<T> : IEquatable<ScriptRef<T> >, IEquatable<ScriptRef>,
+    public unsafe struct ScriptRef<T> : IScriptRefTypedExtensionsApi,
+                                        IEquatable<ScriptRef<T> >, IEquatable<ScriptRef>,
                                         IComparable<ScriptRef<T> >, IComparable<ScriptRef>
         where T : unmanaged, IUnikaScript, IUnikaScriptGen
     {
@@ -75,6 +76,8 @@ namespace Latios.Unika
 
         public bool Equals(ScriptRef other) => this == other;
         #endregion
+
+        ScriptRef IScriptRefTypedExtensionsApi.ToScriptRef() => this;
     }
 }
 

@@ -1,4 +1,5 @@
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+using Latios.Systems;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -10,8 +11,7 @@ namespace Latios.Transforms.Systems
 {
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]
-    [UpdateAfter(typeof(EndInitializationEntityCommandBufferSystem))]
+    [UpdateInGroup(typeof(PostSyncPointGroup))]
     public partial class MotionHistoryUpdateSuperSystem : SuperSystem
     {
         protected override void CreateSystems()

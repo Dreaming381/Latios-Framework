@@ -77,6 +77,8 @@ namespace Latios.LifeFX.Systems
                 return default;
             }
 
+            GraphicsEventTypeRegistry.s_eventHashManager.Data.SetLock(true);
+
             // Normally, we'd want to use our custom allocator. However, we need some of these arrays to stay valid while we are
             // dispatching to Mono, because user code could interact with entities and produce new events within that time, which
             // means we need to rewind before Mono dispatch.
@@ -173,6 +175,9 @@ namespace Latios.LifeFX.Systems
 
         public void Dispatch(ref SystemState state, ref WriteState written)
         {
+            // It is safe to unlock here because map resizing does not impact this logic.
+            GraphicsEventTypeRegistry.s_eventHashManager.Data.SetLock(false);
+
             if (!written.broker.isCreated)
                 return;
 
@@ -394,12 +399,13 @@ namespace Latios.LifeFX.Systems
                     tunnelIndex++;
                 }
 
-                var blocklist  = postal.blocklistPairArray[typeIndex].tunnelTargets;
-                var enumerator = blocklist.GetEnumerator();
+                ref var hashRemapper = ref GraphicsEventTypeRegistry.s_eventHashManager.Data;
+                var     blocklist    = postal.blocklistPairArray[typeIndex].tunnelTargets;
+                var     enumerator   = blocklist.GetEnumerator();
                 while (enumerator.MoveNext())
                 {
                     var target = enumerator.GetCurrent<UnityObjectRef<GraphicsEventTunnelBase> >();
-                    if (tunnelToIndexMap.TryGetValue(target, out var index))
+                    if (tunnelToIndexMap.TryGetValue(hashRemapper[target], out var index))
                     {
                         eventRanges.ElementAt(index).y++;
                     }
@@ -446,16 +452,17 @@ namespace Latios.LifeFX.Systems
                     tunnelIndex++;
                 }
 
-                var blocklistPair    = postal.blocklistPairArray[typeIndex];
-                var targetEnumerator = blocklistPair.tunnelTargets.GetEnumerator();
-                var eventEnumerator  = blocklistPair.events.GetEnumerator();
-                var eventSize        = blocklistPair.events.elementSize;
-                var buffer           = buffers[typeIndex];
+                ref var hashRemapper     = ref GraphicsEventTypeRegistry.s_eventHashManager.Data;
+                var     blocklistPair    = postal.blocklistPairArray[typeIndex];
+                var     targetEnumerator = blocklistPair.tunnelTargets.GetEnumerator();
+                var     eventEnumerator  = blocklistPair.events.GetEnumerator();
+                var     eventSize        = blocklistPair.events.elementSize;
+                var     buffer           = buffers[typeIndex];
                 while (targetEnumerator.MoveNext())
                 {
                     eventEnumerator.MoveNext();
                     var target = targetEnumerator.GetCurrent<UnityObjectRef<GraphicsEventTunnelBase> >();
-                    if (tunnelToIndexMap.TryGetValue(target, out var index))
+                    if (tunnelToIndexMap.TryGetValue(hashRemapper[target], out var index))
                     {
                         ref var range = ref eventRanges.ElementAt(index);
                         var     src   = eventEnumerator.GetCurrentPtr();

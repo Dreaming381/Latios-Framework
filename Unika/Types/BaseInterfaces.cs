@@ -63,6 +63,11 @@ namespace Latios.Unika
         }
     }
 
+    public interface IScriptRefTypedExtensionsApi
+    {
+        public ScriptRef ToScriptRef();
+    }
+
     // This interface is to mark Unika interfaces that have been processed by source generators.
     // If you get an error about this, you probably forgot the partial keyword.
     public interface IUnikaInterfaceGen

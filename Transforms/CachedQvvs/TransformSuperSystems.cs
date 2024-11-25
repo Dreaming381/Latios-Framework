@@ -58,7 +58,7 @@ namespace Latios.Transforms.Systems
     /// If you create GameObjectEntities at runtime, make sure such systems update before this system.
     /// This system also updates Disabled statuses for Unity's built-in Companion GameObjects.
     /// </summary>
-    [UpdateInGroup(typeof(LatiosWorldSyncGroup))]
+    [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderLast = true)]
     [DisableAutoCreation]
     public partial class HybridTransformsSyncPointSuperSystem : SuperSystem
     {
@@ -92,8 +92,7 @@ namespace Latios.Transforms.Systems
 
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]
-    [UpdateAfter(typeof(EndInitializationEntityCommandBufferSystem))]
+    [UpdateInGroup(typeof(PostSyncPointGroup))]
     public partial class MotionHistoryUpdateSuperSystem : SuperSystem
     {
         protected override void CreateSystems()

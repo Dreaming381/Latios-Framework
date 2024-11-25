@@ -7,8 +7,11 @@ using Unity.Entities.Exposed.Dangerous;
 namespace Latios.Systems
 {
     /// <summary>
-    /// A group that runs after blackboard entities, collection components, and managed struct components are processed.
-    /// Add systems to this group that perform structural changes to avoid synchronizing jobs, as jobs are usually synchronized at this point.
+    /// The main sync-point group in initialization that LAtios Framework systems that need to perform structural changes try to update within.
+    /// Blackboard entities, collection components, and managed struct components are processed in the OrderFirst bucket.
+    /// Add spawning systems to this group in the default bucket to avoid syncrhonizing jobs, as jobs are usually synchronized at this point.
+    /// Add reactive systems to this group with OrderLast = true to react to all spawned and destroyed entities from LatiosWorld.syncPoint
+    /// and the prior systems in this group.
     /// </summary>
     [DisableAutoCreation]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
@@ -27,6 +30,17 @@ namespace Latios.Systems
     [UpdateBefore(typeof(BeginInitializationEntityCommandBufferSystem))]
     [UpdateBefore(typeof(SyncPointPlaybackSystemDispatch))]
     public partial class PreSyncPointGroup : ComponentSystemGroup
+    {
+    }
+
+    /// <summary>
+    /// A group that runs at the very end of InitializationSystemGroup after all sync points.
+    /// Use this group to set up entities for the frame in a job prior to simulation or rendering (N - 1).
+    /// </summary>
+    [DisableAutoCreation]
+    [UpdateInGroup(typeof(InitializationSystemGroup), OrderLast = true)]
+    [UpdateAfter(typeof(EndInitializationEntityCommandBufferSystem))]
+    public partial class PostSyncPointGroup : ComponentSystemGroup
     {
     }
 

@@ -10,7 +10,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Unika.Systems
 {
-    [UpdateInGroup(typeof(LatiosWorldSyncGroup), OrderLast = true)]
+    [UpdateInGroup(typeof(PostSyncPointGroup))]
     [DisableAutoCreation]
     [RequireMatchingQueriesForUpdate]
     [BurstCompile]

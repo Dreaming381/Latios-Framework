@@ -35,7 +35,7 @@ namespace Latios.LifeFX
                 buffer = latiosWorld.EntityManager.AddBuffer<GraphicsEventTunnelDestination>(gameObjectEntity);
             buffer.Add(new GraphicsEventTunnelDestination
             {
-                tunnel         = tunnel,
+                tunnel         = GraphicsEventTypeRegistry.s_eventHashManager.Data[tunnel],
                 requestor      = this,
                 eventTypeIndex = tunnel.GetEventIndex(),
             });

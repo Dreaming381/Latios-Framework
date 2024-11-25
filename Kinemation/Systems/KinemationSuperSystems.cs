@@ -107,7 +107,7 @@ namespace Latios.Kinemation.Systems
     /// This super system runs during the Latios Framework sync point stage in InitializationSystemGroup.
     /// This helps prevent sync points from happening in PresentationSystemGroup.
     /// </summary>
-    [UpdateInGroup(typeof(Latios.Systems.LatiosWorldSyncGroup))]
+    [UpdateInGroup(typeof(Latios.Systems.LatiosWorldSyncGroup), OrderLast = true)]
     [DisableAutoCreation]
     public partial class KinemationFrameSyncPointSuperSystem : SuperSystem
     {
@@ -115,7 +115,9 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<LiveBakingCheckForReinitsSystem>();
+            if ((World.Flags & WorldFlags.Editor) == WorldFlags.Editor)
+                GetOrCreateAndAddUnmanagedSystem<LiveBakingCheckForReinitsSystem>();
+
             GetOrCreateAndAddUnmanagedSystem<LatiosUpdateEntitiesGraphicsChunkStructureSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosAddWorldAndChunkRenderBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<KinemationBindingReactiveSystem>();

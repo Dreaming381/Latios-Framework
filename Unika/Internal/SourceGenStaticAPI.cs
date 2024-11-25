@@ -82,7 +82,7 @@ namespace Latios.Unika.InternalSourceGen
             }
         }
 
-        public interface IInterfaceRefData
+        public interface IInterfaceRefData : IScriptRefTypedExtensionsApi
         {
         }
 
