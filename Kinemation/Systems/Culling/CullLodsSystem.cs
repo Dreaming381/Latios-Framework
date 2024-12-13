@@ -228,7 +228,7 @@ namespace Latios.Kinemation.Systems
                         if (i < 64)
                             chunkInfo.CullingData.InstanceLodEnableds.Enabled[0] |= 1ul << i;
                         else
-                            chunkInfo.CullingData.InstanceLodEnableds.Enabled[0] |= 1ul << (i - 64);
+                            chunkInfo.CullingData.InstanceLodEnableds.Enabled[1] |= 1ul << (i - 64);
                     }
                 }
                 else
@@ -247,7 +247,7 @@ namespace Latios.Kinemation.Systems
                         if (i < 64)
                             chunkInfo.CullingData.InstanceLodEnableds.Enabled[0] |= 1ul << i;
                         else
-                            chunkInfo.CullingData.InstanceLodEnableds.Enabled[0] |= 1ul << (i - 64);
+                            chunkInfo.CullingData.InstanceLodEnableds.Enabled[1] |= 1ul << (i - 64);
                     }
                 }
             }

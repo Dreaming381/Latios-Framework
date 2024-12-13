@@ -36,6 +36,13 @@ namespace Latios.Kinemation
         public BitField64 upper;
 
         public ulong GetUlongFromIndex(int index) => index == 0 ? lower.Value : upper.Value;
+        public void ClearBitAtIndex(int index)
+        {
+            if (index < 64)
+                lower.SetBits(index, false);
+            else
+                upper.SetBits(index - 64, false);
+        }
     }
 
     /// <summary>
@@ -60,6 +67,14 @@ namespace Latios.Kinemation
     {
         public BitField64 lower;
         public BitField64 upper;
+
+        internal void ClearBitAtIndex(int index)
+        {
+            if (index < 64)
+                lower.SetBits(index, false);
+            else
+                upper.SetBits(index - 64, false);
+        }
     }
 
     /// <summary>

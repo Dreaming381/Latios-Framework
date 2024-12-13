@@ -24,6 +24,7 @@ namespace Latios.Kinemation.Authoring
 
             context.filteredBakerTypes.Add(typeof(DefaultMeshRendererBaker));
             context.filteredBakerTypes.Remove(typeof(Unity.Rendering.MeshRendererBaker));
+            context.filteredBakerTypes.Remove(typeof(LODGroupBaker));
 
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationPreTransformsBakingGroup>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberBakingGroup>());

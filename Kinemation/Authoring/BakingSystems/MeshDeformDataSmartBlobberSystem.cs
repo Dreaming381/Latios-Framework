@@ -186,25 +186,44 @@ namespace Latios.Kinemation.Authoring.Systems
                 var  blendShapeCount     = mesh.blendShapeCount;
                 if (requiresBlendShapes && blendShapeCount > 0)
                 {
-                    var gpuBuffer            = mesh.GetBlendShapeBuffer(UnityEngine.Rendering.BlendShapeBufferLayout.PerShape);
-                    builder.blendShapeNames  = new UnsafeList<FixedString128Bytes>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-                    builder.blendShapeRanges = new UnsafeList<BlendShapeBufferRange>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-
-                    uint verticesCount = 0;
-                    for (int shapeIndex = 0; shapeIndex < blendShapeCount; shapeIndex++)
+                    GraphicsBuffer gpuBuffer = default;
+                    try
                     {
-                        builder.blendShapeNames.Add(mesh.GetBlendShapeName(shapeIndex));
-                        var range = mesh.GetBlendShapeBufferRange(shapeIndex);
-                        builder.blendShapeRanges.Add(in range);
-                        verticesCount = math.max(verticesCount, range.endIndex + 1);
+                        gpuBuffer = mesh.GetBlendShapeBuffer(UnityEngine.Rendering.BlendShapeBufferLayout.PerShape);
                     }
-                    builder.blendShapeBufferSize = verticesCount;
-                    var cpuBuffer                = new NativeArray<uint>(math.max(gpuBuffer.count, (int)verticesCount * 10),
-                                                                         Allocator.Persistent,
-                                                                         NativeArrayOptions.ClearMemory);
-                    blendShapeRequests[index]       = UnityEngine.Rendering.AsyncGPUReadback.RequestIntoNativeArray(ref cpuBuffer, gpuBuffer);
-                    blendShapeRequestBuffers[index] = cpuBuffer;
-                    m_graphicsBufferCache.Add(gpuBuffer);
+                    catch (Exception e)
+                    {
+                        // Yes, this can fail. I don't know why. But I reproduced it once in a user's project. It is either a Unity bug, or a corrupted mesh.
+                        // We try to fail a little more gracefully here by just not baking blend shapes. This will result in a blend shape count of 0,
+                        // which the runtime already is prepared for.
+                        UnityEngine.Debug.LogException(e);
+                        UnityEngine.Debug.LogError(
+                            $"The mesh {mesh.name} reports having a blendShapeCount > 0 but Kinemation was unable to obtain the blend shape GraphicsBuffer from it. This is either a Unity bug, or an issue with the mesh itself.");
+                        blendShapeRequestBuffers[index] = default;
+                        blendShapeRequests[index]       = default;
+                        gpuBuffer                       = default;
+                    }
+                    if (gpuBuffer != default)
+                    {
+                        builder.blendShapeNames  = new UnsafeList<FixedString128Bytes>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+                        builder.blendShapeRanges = new UnsafeList<BlendShapeBufferRange>(blendShapeCount, WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+
+                        uint verticesCount = 0;
+                        for (int shapeIndex = 0; shapeIndex < blendShapeCount; shapeIndex++)
+                        {
+                            builder.blendShapeNames.Add(mesh.GetBlendShapeName(shapeIndex));
+                            var range = mesh.GetBlendShapeBufferRange(shapeIndex);
+                            builder.blendShapeRanges.Add(in range);
+                            verticesCount = math.max(verticesCount, range.endIndex + 1);
+                        }
+                        builder.blendShapeBufferSize = verticesCount;
+                        var cpuBuffer                = new NativeArray<uint>(math.max(gpuBuffer.count, (int)verticesCount * 10),
+                                                                             Allocator.Persistent,
+                                                                             NativeArrayOptions.ClearMemory);
+                        blendShapeRequests[index]       = UnityEngine.Rendering.AsyncGPUReadback.RequestIntoNativeArray(ref cpuBuffer, gpuBuffer);
+                        blendShapeRequestBuffers[index] = cpuBuffer;
+                        m_graphicsBufferCache.Add(gpuBuffer);
+                    }
                 }
                 else
                 {

@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using AOT;
+using Latios.Kinemation.Systems;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Latios.Kinemation
 {
@@ -26,6 +28,7 @@ namespace Latios.Kinemation
             if (initialized)
                 return;
 
+            meshListCache         = new List<Mesh>();
             buffers               = new List<GraphicsBuffer>();
             handles.Data.freeList = new UnsafeList<int>(128, Allocator.Persistent);
             handles.Data.versions = new UnsafeList<int>(128, Allocator.Persistent);
@@ -61,6 +64,93 @@ namespace Latios.Kinemation
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (!context.success)
                 throw new System.InvalidOperationException("Setting the Graphics Buffer globally failed.");
+#endif
+        }
+
+        /// <summary>
+        /// Creates multiple Mesh objects
+        /// </summary>
+        /// <param name="outputMeshes">An array to store references to the mesh objects. The length of the array determines the number of Mesh instances to create.</param>
+        /// <param name="optionalMeshNames">An optional array of names to assign to each new Mesh.</param>
+        public static void CreateMeshes(NativeArray<UnityObjectRef<Mesh> > outputMeshes, NativeArray<FixedString128Bytes> optionalMeshNames = default)
+        {
+            var context = new CreateMeshesContext
+            {
+                meshes  = outputMeshes,
+                names   = optionalMeshNames,
+                success = false
+            };
+            DoManagedExecute((IntPtr)(&context), 13);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Creating the meshes failed.");
+#endif
+        }
+
+        /// <summary>
+        /// Destroys multiple Mesh objects
+        /// </summary>
+        /// <param name="meshes">An arrayof mesh objects to destroy</param>
+        public static void DestroyMeshes(NativeArray<UnityObjectRef<Mesh> > meshes)
+        {
+            var context = new DestroyMeshesContext
+            {
+                meshes  = meshes,
+                success = false
+            };
+            DoManagedExecute((IntPtr)(&context), 16);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Destroying the meshes failed.");
+#endif
+        }
+
+        /// <summary>
+        /// Registers multiple meshes with the LatiosEntitiesGraphicsSystem within the specified World.
+        /// </summary>
+        /// <param name="meshes">The meshes to register</param>
+        /// <param name="outputIDs">The array to store the resulting BatchMeshID values corresponding to the registered meshes</param>
+        /// <param name="world">The world which contains the LatiosEntitiesGraphicsSystem performing the rendering</param>
+        public static void RegisterMeshes(NativeArray<UnityObjectRef<Mesh> > meshes, NativeArray<BatchMeshID> outputIDs, WorldUnmanaged world)
+        {
+            var context = new RegisterMeshesContext
+            {
+                meshes                       = meshes,
+                world                        = world,
+                latiosEntitiesGraphicsSystem = TypeManager.GetSystemTypeIndex<LatiosEntitiesGraphicsSystem>(),
+                success                      = false
+            };
+            DoManagedExecute((IntPtr)(&context), 14);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Registering the meshes failed.");
+#endif
+        }
+
+        /// <summary>
+        /// Applies data defined in MeshData structs to Mesh objects.
+        /// Note: You can create the MeshDataArray from Burst using Mesh.AcquireWritableMeshData().
+        /// </summary>
+        /// <param name="data">The mesh data array.</param>
+        /// <param name="meshes">The destination Meshes. Must match the size of the mesh data array.</param>
+        /// <param name="flags">The mesh data update flags.</param>
+        public static void ApplyAndDisposeWritableMeshData(Mesh.MeshDataArray data, NativeArray<UnityObjectRef<Mesh> > meshes, UnityEngine.Rendering.MeshUpdateFlags flags)
+        {
+            var context = new ApplyAndDisposeWritableMeshDataContext
+            {
+                data    = data,
+                meshes  = meshes,
+                flags   = flags,
+                success = false
+            };
+            DoManagedExecute((IntPtr)(&context), 15);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Applying the meshes failed.");
 #endif
         }
         #endregion
@@ -305,6 +395,8 @@ namespace Latios.Kinemation
         #endregion
 
         #region State
+        static List<Mesh> meshListCache;
+
         static List<GraphicsBuffer>              buffers;
         static readonly SharedStatic<HandleData> handles     = SharedStatic<HandleData>.GetOrCreate<HandleData>();
         static bool                              initialized = false;
@@ -442,6 +534,40 @@ namespace Latios.Kinemation
             public FixedString128Bytes name;
             public bool                success;
         }
+
+        // Code 13
+        struct CreateMeshesContext
+        {
+            public NativeArray<UnityObjectRef<Mesh> > meshes;
+            public NativeArray<FixedString128Bytes>   names;
+            public bool                               success;
+        }
+
+        // Code 14
+        struct RegisterMeshesContext
+        {
+            public NativeArray<UnityObjectRef<Mesh> > meshes;
+            public NativeArray<BatchMeshID>           outputIDs;
+            public WorldUnmanaged                     world;
+            public SystemTypeIndex                    latiosEntitiesGraphicsSystem;
+            public bool                               success;
+        }
+
+        // Code 15
+        struct ApplyAndDisposeWritableMeshDataContext
+        {
+            public Mesh.MeshDataArray                    data;
+            public NativeArray<UnityObjectRef<Mesh> >    meshes;
+            public UnityEngine.Rendering.MeshUpdateFlags flags;
+            public bool                                  success;
+        }
+
+        // Code 16
+        struct DestroyMeshesContext
+        {
+            public NativeArray<UnityObjectRef<Mesh> > meshes;
+            public bool                               success;
+        }
         #endregion
 
         static void DoManagedExecute(IntPtr context, int operation)
@@ -564,6 +690,55 @@ namespace Latios.Kinemation
                         var     buffer = buffers[ctx.listIndex];
                         buffer.name    = ctx.name.ToString();
                         ctx.success    = true;
+                        break;
+                    }
+                    case 13:
+                    {
+                        ref var ctx      = ref *(CreateMeshesContext*)context;
+                        bool    hasNames = ctx.names.IsCreated;
+                        for (int i = 0; i < ctx.meshes.Length; i++)
+                        {
+                            var mesh = new Mesh();
+                            if (hasNames)
+                                mesh.name = ctx.names[i].ToString();
+                            ctx.meshes[i] = mesh;
+                        }
+                        ctx.success = true;
+                        break;
+                    }
+                    case 14:
+                    {
+                        ref var ctx    = ref *(RegisterMeshesContext*)context;
+                        var     system = ctx.world.EntityManager.World.GetExistingSystemManaged(ctx.latiosEntitiesGraphicsSystem) as LatiosEntitiesGraphicsSystem;
+                        // Todo: Unity has a Span registration API, but it is internal.
+                        int i = 0;
+                        foreach (var mesh in ctx.meshes)
+                        {
+                            ctx.outputIDs[i] = system.RegisterMesh(mesh);
+                            i++;
+                        }
+                        ctx.success = true;
+                        break;
+                    }
+                    case 15:
+                    {
+                        ref var ctx = ref *(ApplyAndDisposeWritableMeshDataContext*)context;
+                        meshListCache.Clear();
+                        foreach (var mesh in ctx.meshes)
+                        {
+                            meshListCache.Add(mesh);
+                        }
+                        Mesh.ApplyAndDisposeWritableMeshData(ctx.data, meshListCache, ctx.flags);
+                        meshListCache.Clear();  // Clear to help GC maybe?
+                        ctx.success = true;
+                        break;
+                    }
+                    case 16:
+                    {
+                        ref var ctx = ref *(DestroyMeshesContext*)context;
+                        foreach (var mesh in ctx.meshes)
+                            mesh.Value.DestroySafelyFromAnywhere();
+                        ctx.success = true;
                         break;
                     }
                 }

@@ -11,17 +11,17 @@ using UnityEngine.Rendering;
 namespace Latios.Kinemation
 {
     #region Meshes
-namespace InternalSourceGen
-{
-    public struct SkeletonDependent : ICleanupComponentData
+    namespace InternalSourceGen
     {
-        public EntityWith<SkeletonRootTag>                  root;
-        public BlobAssetReference<MeshBindingPathsBlob>     meshBindingBlob;
-        public BlobAssetReference<SkeletonBindingPathsBlob> skeletonBindingBlob;
-        public int                                          boneOffsetEntryIndex;
-        public int                                          indexInDependentSkinnedMeshesBuffer;
+        public struct SkeletonDependent : ICleanupComponentData
+        {
+            public EntityWith<SkeletonRootTag>                  root;
+            public BlobAssetReference<MeshBindingPathsBlob>     meshBindingBlob;
+            public BlobAssetReference<SkeletonBindingPathsBlob> skeletonBindingBlob;
+            public int                                          boneOffsetEntryIndex;
+            public int                                          indexInDependentSkinnedMeshesBuffer;
+        }
     }
-}
 
     internal struct BoundMesh : ICleanupComponentData
     {
@@ -72,25 +72,30 @@ namespace InternalSourceGen
 
     [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     internal struct ChunkCopyDeformTag : IComponentData { }
+
+    internal struct TrackedUniqueMesh : ICleanupComponentData
+    {
+        public UnityObjectRef<UnityEngine.Mesh> mesh;
+    }
     #endregion
 
     #region Skeletons
-namespace InternalSourceGen
-{
-    // This is system state to prevent copies on instantiate
-    [InternalBufferCapacity(1)]
-    public struct DependentSkinnedMesh : ICleanupBufferElementData
+    namespace InternalSourceGen
     {
-        public EntityWith<SkeletonDependent> skinnedMesh;
-        // Todo: Store entry indices instead?
-        public uint  meshVerticesStart;
-        public uint  meshWeightsStart;
-        public uint  meshBindPosesStart;
-        public uint  boneOffsetsCount;
-        public uint  boneOffsetsStart;
-        public float meshRadialOffset;
+        // This is system state to prevent copies on instantiate
+        [InternalBufferCapacity(1)]
+        public struct DependentSkinnedMesh : ICleanupBufferElementData
+        {
+            public EntityWith<SkeletonDependent> skinnedMesh;
+            // Todo: Store entry indices instead?
+            public uint  meshVerticesStart;
+            public uint  meshWeightsStart;
+            public uint  meshBindPosesStart;
+            public uint  boneOffsetsCount;
+            public uint  boneOffsetsStart;
+            public float meshRadialOffset;
+        }
     }
-}
 
     internal struct SkeletonBoundsOffsetFromMeshes : IComponentData
     {
@@ -460,6 +465,33 @@ namespace InternalSourceGen
 
         // The data is owned by a world or system rewindable allocator.
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
+    }
+
+    internal partial struct UniqueMeshPool : ICollectionComponent
+    {
+        public NativeList<UnityObjectRef<UnityEngine.Mesh> >                 unusedMeshes;
+        public NativeList<UnityObjectRef<UnityEngine.Mesh> >                 allMeshes;
+        public NativeHashSet<BatchMeshID>                                    invalidMeshesToCull;
+        public NativeHashSet<BatchMeshID>                                    meshesPrevalidatedThisFrame;
+        public NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, BatchMeshID>  meshToIdMap;
+        public NativeHashMap<BatchMeshID, UnityObjectRef<UnityEngine.Mesh> > idToMeshMap;
+
+        public JobHandle TryDispose(JobHandle inputDeps)
+        {
+            if (unusedMeshes.IsCreated)
+            {
+                inputDeps.Complete();
+                GraphicsUnmanaged.DestroyMeshes(allMeshes.AsArray());
+                unusedMeshes.Dispose();
+                allMeshes.Dispose();
+                invalidMeshesToCull.Dispose();
+                meshesPrevalidatedThisFrame.Dispose();
+                meshToIdMap.Dispose();
+                idToMeshMap.Dispose();
+                return default;
+            }
+            return inputDeps;
+        }
     }
     #endregion
 }

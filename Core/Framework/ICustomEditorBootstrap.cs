@@ -70,7 +70,7 @@ namespace Latios
 #if UNITY_EDITOR
     public static class UnityEditorTool
     {
-        [UnityEditor.MenuItem("Edit/Restart Editor World")]
+        [UnityEditor.MenuItem("Edit/Latios/Restart Editor World")]
         public static void RestartEditorWorld()
         {
             var previousEditorWorld = World.DefaultGameObjectInjectionWorld;

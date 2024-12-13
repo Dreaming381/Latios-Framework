@@ -1,4 +1,5 @@
-﻿using Latios.Transforms.Abstract;
+﻿using Latios.Myri.Driver;
+using Latios.Transforms.Abstract;
 using Unity.Audio;
 using Unity.Burst;
 using Unity.Collections;
@@ -18,11 +19,10 @@ namespace Latios.Myri.Systems
     {
         bool m_initialized;
 
-        private DSPGraph             m_graph;
-        private LatiosDSPGraphDriver m_driver;
-        private AudioOutputHandle    m_outputHandle;
-        private int                  m_sampleRate;
-        private int                  m_samplesPerFrame;
+        private DSPGraph m_graph;
+        private int      m_driverKey;
+        private int      m_sampleRate;
+        private int      m_samplesPerFrame;
 
         private DSPNode              m_mixNode;
         private DSPConnection        m_mixToLimiterMasterConnection;
@@ -89,7 +89,10 @@ namespace Latios.Myri.Systems
         public bool ShouldUpdateSystem(ref SystemState state)
         {
             if (m_initialized)
+            {
+                DriverManager.Update();
                 return true;
+            }
 
             if (m_aliveListenersQuery.IsEmptyIgnoreFilter && m_deadListenersQuery.IsEmptyIgnoreFilter && m_loopedQuery.IsEmptyIgnoreFilter && m_oneshotsQuery.IsEmptyIgnoreFilter &&
                 m_oneshotsToDestroyWhenFinishedQuery.IsEmptyIgnoreFilter)
@@ -113,10 +116,9 @@ namespace Latios.Myri.Systems
             var format   = ChannelEnumConverter.GetSoundFormatFromSpeakerMode(UnityEngine.AudioSettings.speakerMode);
             var channels = ChannelEnumConverter.GetChannelCountFromSoundFormat(format);
             UnityEngine.AudioSettings.GetDSPBufferSize(out m_samplesPerFrame, out _);
-            m_sampleRate   = UnityEngine.AudioSettings.outputSampleRate;
-            m_graph        = DSPGraph.Create(format, channels, m_samplesPerFrame, m_sampleRate);
-            m_driver       = new LatiosDSPGraphDriver { Graph = m_graph };
-            m_outputHandle = m_driver.AttachToDefaultOutput();
+            m_sampleRate = UnityEngine.AudioSettings.outputSampleRate;
+            m_graph      = DSPGraph.Create(format, channels, m_samplesPerFrame, m_sampleRate);
+            m_driverKey  = DriverManager.RegisterGraph(ref m_graph);
 
             var commandBlock = m_graph.CreateCommandBlock();
             m_mixNode        = commandBlock.CreateDSPNode<MixStereoPortsNode.Parameters, MixStereoPortsNode.SampleProviders, MixStereoPortsNode>();
@@ -149,6 +151,7 @@ namespace Latios.Myri.Systems
                                                                                                                                                             m_ildNode);
             commandBlock.Cancel();
 
+            DriverManager.Update();
             return true;
         }
 
@@ -440,8 +443,7 @@ namespace Latios.Myri.Systems
             commandBlock.ReleaseDSPNode(m_mixNode);
             commandBlock.ReleaseDSPNode(m_limiterMasterNode);
             commandBlock.Complete();
-            AudioOutputExtensions.DisposeOutputHook(ref m_outputHandle);
-            m_driver.Dispose();
+            DriverManager.DeregisterAndDisposeGraph(m_driverKey);
 
             m_lastUpdateJobHandle.Complete();
             m_mixNodePortFreelist.Dispose();

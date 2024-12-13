@@ -355,7 +355,7 @@ namespace Latios.Kinemation.Authoring
                     Debug.LogWarning(
                         $"LOD renderer {renderer.gameObject.name} has a different world position than the LOD Group {group.gameObject.name} it belongs to. This is currently not supported and artifacts may occur. If you are seeing this message, please report it to the Latios Framework developers so that we can better understand your use case.");
                 }
-                lodSettings.localHeight /= math.cmax(relativeTransform.scale * relativeTransform.stretch);
+                lodSettings.localHeight = group.size / math.cmax(relativeTransform.scale * relativeTransform.stretch);
             }
         }
 

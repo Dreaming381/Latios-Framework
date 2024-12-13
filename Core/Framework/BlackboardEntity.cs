@@ -10,7 +10,7 @@ namespace Latios
     {
         private Entity               entity;
         private LatiosWorldUnmanaged latiosWorld;
-        private EntityManager em => latiosWorld.m_impl->m_worldUnmanaged.EntityManager;
+        internal EntityManager em => latiosWorld.m_impl->m_worldUnmanaged.EntityManager;
 
         /// <summary>
         /// Create a blackboard entity

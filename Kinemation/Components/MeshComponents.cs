@@ -42,6 +42,13 @@ namespace Latios.Kinemation
         public float3x4 postProcessMatrix;
     }
 
+    /// <summary>
+    /// When present on an entity with a MaterialMeshInfo that uses ranges, every mesh instance
+    /// in the range will be replaced with the mesh specified directly by the MaterialMeshInfo.
+    /// This allows you to render multiple materials in a single entity using a runtime-generated mesh.
+    /// </summary>
+    public struct OverrideMeshInRangeTag : IComponentData { }
+
     /// <summary></summary>
     /// An optional flag which specifies when a deformed mesh needs to be rebound
     /// Usage: Add/Enable this component whenever binding needs to occur.
@@ -239,6 +246,198 @@ namespace Latios.Kinemation
         internal static readonly int[] TwoAgoFromMask   = { 2, 0, 1, 1, 1, 2, 0 };
     }
 
+    #endregion
+
+    #region Unique Meshes
+    /// <summary>
+    /// When present, this component specifies that this entity has a UniqueMesh.
+    /// Enable this component to mark the mesh as dirty.
+    /// </summary>
+    public struct UniqueMeshConfig : IComponentData, IEnableableComponent
+    {
+        internal byte packed;
+
+        /// <summary>
+        /// Commands Kinemation to automatically recalculate normals. The UniqueMeshNormal buffer does not need to be present,
+        /// but if it is, it will be overwritten with the result of this calculation. This operation will fail if the mesh does
+        /// not contain position elements.
+        /// </summary>
+        public bool calculateNormals
+        {
+            get => Bits.GetBit(packed, 0);
+            set => Bits.SetBit(ref packed, 0, value);
+        }
+        /// <summary>
+        /// Commands Kinemation to automatically recalculate tangents. The UniqueMeshTangent buffer does not need to be present,
+        /// but if it is, it will be overwritten with the result of this calculation. This operation will fail if the mesh does
+        /// not contain position and Uv0xy elements, and it will also fail if it does not contain normals and calculateNormals is false.
+        /// </summary>
+        public bool calculateTangents
+        {
+            get => Bits.GetBit(packed, 1);
+            set => Bits.SetBit(ref packed, 1, value);
+        }
+        /// <summary>
+        /// Commands Kinemation to clear and deallocate all Unique Mesh dynamic buffers after writing to the backing Mesh object.
+        /// This can be used to save memory. This setting is ignored if the mesh is determined to be invalid.
+        /// </summary>
+        public bool reclaimDynamicBufferMemoryAfterUpload
+        {
+            get => Bits.GetBit(packed, 2);
+            set => Bits.SetBit(ref packed, 2, value);
+        }
+        /// <summary>
+        /// Commands Kinemation to ignore the fact that a mesh may be empty or invalid and to generate a draw command anyways if the
+        /// entity otherwise passes culling. In Unity 6 and newer, you must set this if you modify the mesh during DispatchRoundRobinEarlyExtensionsSuperSystem.
+        /// </summary>
+        public bool disableEmptyAndInvalidMeshCulling
+        {
+            get => Bits.GetBit(packed, 3);
+            set => Bits.SetBit(ref packed, 3, value);
+        }
+        /// <summary>
+        /// Commands Kinemation to upload the mesh, even if the entity is culled from rendering.
+        /// </summary>
+        public bool forceUpload
+        {
+            get => Bits.GetBit(packed, 4);
+            set => Bits.SetBit(ref packed, 4, value);
+        }
+    }
+    /// <summary>
+    /// Specifies the vertex positions of the unique mesh. The RenderBounds will NOT be automatically updated.
+    /// It is the responsibility of the writer of the positions to update the RenderBounds (or some other system
+    /// if the positions are written to in DispatchRoundRobinEarlyExtensionsSuperSystem).
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshPosition : IBufferElementData
+    {
+        public float3 position;
+    }
+
+    /// <summary>
+    /// Specifies the vertex normals of the unique mesh
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshNormal : IBufferElementData
+    {
+        public float3 normal;
+    }
+
+    /// <summary>
+    /// Specifies the vertex tangents of the unique mesh
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshTangent : IBufferElementData
+    {
+        public float4 tangent;
+    }
+
+    /// <summary>
+    /// Specifies the vertex colors of the unique mesh
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshColor : IBufferElementData
+    {
+        public float4 color;
+    }
+
+    /// <summary>
+    /// Specifies the x and y components of UV0 of the unique mesh.
+    /// These UV values are typically used for sampling textures.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshUv0xy : IBufferElementData
+    {
+        public float2 uv;
+    }
+
+    /// <summary>
+    /// Specifies the x, y, and z components of UV3 of the unique mesh.
+    /// A typically use case for these would be as an input to custom motion vectors in shader graph
+    /// in the case the mesh is animated.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshUv3xyz : IBufferElementData
+    {
+        public float3 uv;
+    }
+
+    /// <summary>
+    /// Specifies the vertex indices used to define primitives in submeshes.
+    /// Typically, it is best to call `Reinterpret<int3>(4)` on the buffer to specify triangles.
+    /// If not present, the indices used will be a sequential count of the vertices. (0, 1, 2, 3, 4, ...)
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct UniqueMeshIndex : IBufferElementData
+    {
+        public int index;
+    }
+
+    /// <summary>
+    /// Specifies the submeshes that compose the mesh.
+    /// If not present, it is assumed there is a single submesh using the entire mesh rendered as triangles.
+    /// </summary>
+    [InternalBufferCapacity(1)]
+    public struct UniqueMeshSubmesh : IBufferElementData
+    {
+        internal int packedA;
+        internal int packedB;
+
+        /// <summary>
+        /// The first index in the submesh
+        /// </summary>
+        public int indexStart
+        {
+            get => Bits.GetBits(packedA, 0, 28);
+            set => Bits.SetBits(ref packedA, 0, 28, value);
+        }
+
+        /// <summary>
+        /// The number of indices in the submesh
+        /// </summary>
+        public int indexCount
+        {
+            get => Bits.GetBits(packedB, 0, 28);
+            set => Bits.SetBits(ref packedB, 0, 28, value);
+        }
+
+        public enum Topology : byte
+        {
+            Triangles = 0,
+            Lines = 1,
+            LineStrip = 2,
+            Points = 3
+        }
+
+        /// <summary>
+        /// The topology of the submesh
+        /// </summary>
+        public Topology topology
+        {
+            get => (Topology)Bits.GetBits(packedA, 28, 2);
+            set => Bits.SetBits(ref packedA, 28, 2, (int)value);
+        }
+
+        public enum NormalHint : byte
+        {
+            PositiveX,
+            PositiveY,
+            PositiveZ,
+            NegativeX,
+            NegativeY,
+            NegativeZ,
+        }
+
+        /// <summary>
+        /// A hint for the normal direction when not using Triangle topology
+        /// </summary>
+        public NormalHint normalHint
+        {
+            get => (NormalHint)Bits.GetBits(packedB, 28, 3);
+            set => Bits.SetBits(ref packedB, 28, 3, (int)value);
+        }
+    }
     #endregion
 
     #region Material Properties
