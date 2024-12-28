@@ -104,13 +104,28 @@ namespace Latios.Kinemation
 
     /// <summary>
     /// Specifies the height and screen percentages for a 2-LOD entity with the UseMmiRangeLodTag.
-    /// This is the best choice for high entity counts, such as projectiles.
+    /// This is the best choice for high entity counts, such as projectiles. If height is negative,
+    /// LOD1 is treated as a culled LOD level.
     /// </summary>
     public struct MmiRange2LodSelect : IComponentData
     {
         public float height;
         public half  fullLod0ScreenHeightFraction;
         public half  fullLod1ScreenHeightFraction;
+    }
+
+    /// <summary>
+    /// Specifies the height and screen percentages for a 3-LOD entity with the UseMmiRangeLodTag.
+    /// This is the best choice for high static entity counts, such as static environment props.
+    /// If height is negative, LOD2 is treated as a culled LOD level.
+    /// </summary>
+    public struct MmiRange3LodSelect : IComponentData
+    {
+        public float height;
+        public half  fullLod0ScreenHeightFraction;
+        public half  fullLod1ScreenHeightMaxFraction;
+        public half  fullLod1ScreenHeightMinFraction;
+        public half  fullLod2ScreenHeightFraction;
     }
 
     /// <summary>

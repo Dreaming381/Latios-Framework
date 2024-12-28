@@ -9,7 +9,7 @@ using UnityEngine.Serialization;
 namespace Latios.Calligraphics.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Calligraphics/Text Animation")]
+    [AddComponentMenu("Latios/Calligraphics/Text Animation (Calligraphics)")]
     [RequireComponent(typeof(TextRendererAuthoring))]
     public class TextAnimationAuthoring : MonoBehaviour
     {

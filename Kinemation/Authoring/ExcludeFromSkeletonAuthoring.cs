@@ -10,7 +10,7 @@ namespace Latios.Kinemation.Authoring
     /// This does not prevent skinned meshes from being bound to the skeleton if the mesh has bindposes.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Kinemation/Exclude From Skeleton")]
+    [AddComponentMenu("Latios/Kinemation/Exclude From Skeleton (Kinemation)")]
     public class ExcludeFromSkeletonAuthoring : MonoBehaviour
     {
     }

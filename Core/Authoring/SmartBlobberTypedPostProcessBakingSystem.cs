@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GameObject = UnityEngine.GameObject;
@@ -56,7 +57,19 @@ namespace Latios.Authoring.Systems
                 entityHandle       = m_entityHandle
             }.ScheduleParallel(m_query, Dependency);
 
-            // Step 3: Filter with BlobAssetStore and Deduplicate
+            // Step 3: Find duplicates within this run and deduplicate
+            var duplicateBlobs = new NativeHashSet<WrappedBlob>(128, CheckedStateRef.WorldUpdateAllocator);
+            Dependency         = new DeduplicateHashesJob
+            {
+                resultHandle       = m_resultHandle,
+                trackingDataHandle = m_trackingDataHandle,
+                blobsToDispose     = duplicateBlobs,
+            }.Schedule(m_query, Dependency);
+
+            // Step 4: Dispose the duplicates from this run
+            Dependency = new DisposeDuplicateBlobsJob { blobsToDispose = duplicateBlobs }.Schedule(Dependency);
+
+            // Step 5: Filter with BlobAssetStore and Deduplicate
             Dependency = new SmartBlobberTools<TBlobType>.DeduplicateBlobsWithBlobAssetStoreJob
             {
                 blobAssetStore     = blobAssetStore,
@@ -65,6 +78,27 @@ namespace Latios.Authoring.Systems
                 trackingDataHandle = m_trackingDataHandle,
             }.Schedule(m_query, Dependency);
         }
+    }
+
+    // UnsafeUntypedBlobAssetReference does not override GetHashCode()
+    struct WrappedBlob : IEquatable<WrappedBlob>
+    {
+        public UnsafeUntypedBlobAssetReference blob;
+
+        public bool Equals(WrappedBlob other)
+        {
+            return blob.Equals(other.blob);
+        }
+
+        public override int GetHashCode()
+        {
+            return blob.Reinterpret<int>().GetHashCode();
+        }
+
+        public static implicit operator WrappedBlob(UnsafeUntypedBlobAssetReference b) => new WrappedBlob {
+            blob = b
+        };
+        public static implicit operator UnsafeUntypedBlobAssetReference(WrappedBlob b) => b.blob;
     }
 
     [BurstCompile]
@@ -108,6 +142,53 @@ namespace Latios.Authoring.Systems
             }
         }
     }
+
+    // Single
+    [BurstCompile]
+    struct DeduplicateHashesJob : IJobChunk
+    {
+        public ComponentTypeHandle<SmartBlobberTrackingData> trackingDataHandle;
+        public ComponentTypeHandle<SmartBlobberResult>       resultHandle;
+        public NativeHashSet<WrappedBlob>                    blobsToDispose;
+
+        UnsafeHashMap<Hash128, UnsafeUntypedBlobAssetReference> firstMap;
+
+        public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+        {
+            if (!firstMap.IsCreated)
+                firstMap = new UnsafeHashMap<Hash128, UnsafeUntypedBlobAssetReference>(128, Allocator.Temp);
+
+            var trackingDatas = chunk.GetNativeArray(ref trackingDataHandle);
+            var blobs         = chunk.GetNativeArray(ref resultHandle).Reinterpret<UnsafeUntypedBlobAssetReference>();
+            for (int i = 0; i < chunk.Count; i++)
+            {
+                var td = trackingDatas[i];
+                if (td.isNull)
+                    continue;
+
+                if (firstMap.TryGetValue(td.hash, out var replacementBlob))
+                {
+                    blobsToDispose.Add(blobs[i]);
+                    blobs[i] = replacementBlob;
+                }
+                else
+                {
+                    firstMap.Add(td.hash, blobs[i]);
+                }
+            }
+        }
+    }
+
+    struct DisposeDuplicateBlobsJob : IJob
+    {
+        public NativeHashSet<WrappedBlob> blobsToDispose;
+
+        public void Execute()
+        {
+            foreach (var blob in blobsToDispose)
+                blob.blob.Dispose();
+        }
+    }
 }
 
 namespace Latios.Authoring
@@ -115,6 +196,7 @@ namespace Latios.Authoring
     [BurstCompile]
     public partial struct SmartBlobberTools<TBlobType> where TBlobType : unmanaged
     {
+        // Single
         [BurstCompile]
         internal struct DeduplicateBlobsWithBlobAssetStoreJob : IJobChunk
         {

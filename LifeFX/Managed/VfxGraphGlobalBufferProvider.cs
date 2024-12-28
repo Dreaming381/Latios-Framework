@@ -11,7 +11,7 @@ namespace Latios.LifeFX
     /// _latiosDeformBuffer
     /// _latiosBoneTransforms
     /// </remarks>
-    [AddComponentMenu("Latios/LifeFX/VFX Graph Global Buffer Provider")]
+    [AddComponentMenu("Latios/LifeFX/VFX Graph Global Buffer Provider (LifeFX)")]
     public class VfxGraphGlobalBufferProvider : GraphicsGlobalBufferReceptor
     {
         [Header("VFX Graph Properties")]

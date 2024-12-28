@@ -16,7 +16,7 @@ using UnityEngine.TextCore.Text;
 namespace Latios.Calligraphics.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Calligraphics/Text Renderer")]
+    [AddComponentMenu("Latios/Calligraphics/Text Renderer (Calligraphics)")]
     public class TextRendererAuthoring : MonoBehaviour
     {
         [TextArea(5, 10)]
@@ -105,9 +105,9 @@ namespace Latios.Calligraphics.Authoring
                 enableKerning     = authoring.enableKerning,
                 fontStyle         = authoring.fontStyle,
                 fontWeight        = authoring.fontWeight,
-                wordSpacing = authoring.wordSpacing,
-                lineSpacing = authoring.lineSpacing,
-                paragraphSpacing = authoring.paragraphSpacing,
+                wordSpacing       = authoring.wordSpacing,
+                lineSpacing       = authoring.lineSpacing,
+                paragraphSpacing  = authoring.paragraphSpacing,
             });
         }
 

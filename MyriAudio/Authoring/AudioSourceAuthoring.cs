@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Latios.Myri.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Audio (Myri)/Audio Source")]
+    [AddComponentMenu("Latios/Myri/Audio Source (Myri)")]
     public class AudioSourceAuthoring : MonoBehaviour
     {
         [Tooltip("An audio clip which will be converted into a DOTS representation and played by this source")]

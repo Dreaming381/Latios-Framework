@@ -9,6 +9,7 @@ namespace Latios.Unika
     /// <summary>
     /// The base interface any Unika interface should explicitly specify.
     /// </summary>
+    [UnityEngine.Scripting.RequireImplementors]
     public interface IUnikaInterface
     {
     }
@@ -16,6 +17,7 @@ namespace Latios.Unika
     /// <summary>
     /// The base interface any Unika script should explicitly specify.
     /// </summary>
+    [UnityEngine.Scripting.RequireImplementors]
     public interface IUnikaScript
     {
     }

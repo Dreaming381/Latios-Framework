@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Kinemation/Socket")]
+    [AddComponentMenu("Latios/Kinemation/Socket (Kinemation)")]
     public class SocketAuthoring : MonoBehaviour
     {
         public short boneIndex;

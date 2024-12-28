@@ -9,7 +9,7 @@ namespace Latios.LifeFX
     /// A base class or standalone provider of a GPU events sent to a specific tunnel in the form of an element range within a GraphicsBuffer.
     /// Attach this to the same GameObject that has a GameObjectEntity component.
     /// </summary>
-    [AddComponentMenu("Latios/LifeFX/Graphics Event Buffer Receptor")]
+    [AddComponentMenu("Latios/LifeFX/Graphics Event Buffer Receptor (LifeFX)")]
     public class GraphicsEventBufferReceptor : MonoBehaviour, IInitializeGameObjectEntity
     {
         [SerializeField] private GraphicsEventTunnelBase tunnel;

@@ -169,27 +169,28 @@ namespace Latios
         /// <summary>
         /// Provides an EntityTypeHandle for convenience.
         /// </summary>
-        public EntityTypeHandle entityTypeHandle => entityHandle;
+        public EntityTypeHandle entityTypeHandle => esil.AsEntityTypeHandle();
 
         /// <summary>
         /// Sets up the ComponentBroker to permit read-write access for components on the entity in a parallel job.
         /// Using this incorrectly (when you don't have exclusive access to the entity's chunk) will result in race conditions.
+        /// An example of correct usage is inside an IJobChunk using the ArchetypeChunk passed into the Execute() method.
         /// </summary>
-        /// <param name="chunk"></param>
-        /// <param name="indexInChunk"></param>
+        /// <param name="chunk">The chunk in which the calling context has exclusive access to</param>
+        /// <param name="indexInChunk">The entity index within the chunk</param>
         public void SetupEntity(in ArchetypeChunk chunk, int indexInChunk)
         {
             if (chunk != currentChunk)
             {
                 currentChunk  = chunk;
-                currentEntity = chunk.GetEntityDataPtrRO(entityHandle)[indexInChunk];
+                currentEntity = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
                 indexInChunk  = currentIndexInChunk;
             }
 
             if (indexInChunk != currentIndexInChunk)
             {
                 indexInChunk  = currentIndexInChunk;
-                currentEntity = chunk.GetEntityDataPtrRO(entityHandle)[indexInChunk];
+                currentEntity = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
             }
         }
 
@@ -630,9 +631,8 @@ namespace Latios
         /// <param name="allocator">The allocator that dictates the lifecycle of this ComponentBroker, typically the same as the system it is used in</param>
         public ComponentBroker(ref SystemState state, ComponentBrokerBuilder builder, AllocatorManager.AllocatorHandle allocator)
         {
-            this         = default;
-            esil         = state.GetEntityStorageInfoLookup();
-            entityHandle = state.GetEntityTypeHandle();
+            this = default;
+            esil = state.GetEntityStorageInfoLookup();
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             singleThreadedSafetyChecker = new NativeReference<int>(allocator);
@@ -707,7 +707,6 @@ namespace Latios
         public void Update(ref SystemState state)
         {
             esil.Update(ref state);
-            entityHandle.Update(ref state);
 
             fixed (DynamicComponentTypeHandle* ptr = &c0)
             {
@@ -764,7 +763,6 @@ namespace Latios
 #endif
 
         [ReadOnly] EntityStorageInfoLookup esil;
-        [ReadOnly] EntityTypeHandle        entityHandle;
 
         internal DynamicComponentTypeHandle c0;
         DynamicComponentTypeHandle          c1;
@@ -1131,6 +1129,14 @@ namespace Latios
             {
                 return chunk.GetBufferAccessor<T>(ref c0Ptr[broker.handleIndices[typeIndex].index]);
             }
+        }
+
+        public static EntityTypeHandle AsEntityTypeHandle(this EntityStorageInfoLookup esil)
+        {
+            // EntityStorageInfoLookup is a safety handle for Entity plus the EntityDataAccess pointer.
+            // EntityTypeHandle is just the safety handle for Entity.
+            // Therefore, EntityStorageInfoLookup can downcast to an EntityTypeHandle.
+            return UnsafeUtility.As<EntityStorageInfoLookup, EntityTypeHandle>(ref esil);
         }
     }
 }

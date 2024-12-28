@@ -8,7 +8,7 @@ namespace Latios.Unika.Authoring
     /// <summary>
     /// This should be added to any GameObject that will be baked into an entity and have scripts assigned to it.
     /// </summary>
-    [AddComponentMenu("Latios/Unika/Unika Script Buffer")]
+    [AddComponentMenu("Latios/Unika/Script Buffer (Unika)")]
     [DisallowMultipleComponent]
     public class UnikaScriptBufferAuthoring : MonoBehaviour
     {

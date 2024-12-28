@@ -8,12 +8,6 @@ using Unity.Mathematics;
 
 using static Unity.Entities.SystemAPI;
 
-#if UNITY_6000_0_OR_NEWER
-using ChunkPerCallbackCullingMask = Latios.Kinemation.ChunkPerDispatchCullingMask;
-#else
-using ChunkPerCallbackCullingMask = Latios.Kinemation.ChunkPerCameraCullingMask;
-#endif
-
 // This system doesn't actually allocate the graphics buffers.
 // Doing so now would introduce a sync point.
 // This system just calculates the required size and distributes instance shader properties.
@@ -47,7 +41,7 @@ namespace Latios.Kinemation.Systems
                 deformClassificationMap = map,
                 meshHandle              = GetComponentTypeHandle<BoundMesh>(true),
                 metaHandle              = GetComponentTypeHandle<ChunkDeformPrefixSums>(false),
-                perCameraMaskHandle     = GetComponentTypeHandle<ChunkPerCallbackCullingMask>(true),
+                perDispatchMaskHandle   = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
                 perFrameMaskHandle      = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
             }.ScheduleParallel(m_query, state.Dependency);
 
@@ -55,7 +49,7 @@ namespace Latios.Kinemation.Systems
             {
                 maxRequiredDeformDataLookup = GetComponentLookup<MaxRequiredDeformData>(false),
                 metaHandle                  = GetComponentTypeHandle<ChunkDeformPrefixSums>(false),
-                perCameraMaskHandle         = GetComponentTypeHandle<ChunkPerCallbackCullingMask>(true),
+                perDispatchMaskHandle       = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
                 perFrameMaskHandle          = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
                 worldBlackboardEntity       = latiosWorld.worldBlackboardEntity
             }.Schedule(m_metaQuery, prefixesJh);
@@ -77,7 +71,7 @@ namespace Latios.Kinemation.Systems
                 twoAgoMatrixVertexHandle   = GetComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>(false),
                 meshHandle                 = GetComponentTypeHandle<BoundMesh>(true),
                 metaHandle                 = GetComponentTypeHandle<ChunkDeformPrefixSums>(true),
-                perCameraMaskHandle        = GetComponentTypeHandle<ChunkPerCallbackCullingMask>(true),
+                perDispatchMaskHandle      = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
                 perFrameMaskHandle         = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
                 meshGpuEnties              = meshGpuEntries,
             }.ScheduleParallel(m_query, prefixesJh);
@@ -86,7 +80,7 @@ namespace Latios.Kinemation.Systems
             var dirtyJh = new MarkMaterialPropertiesDirtyJob
             {
                 deformClassificationMap    = map,
-                perCameraMaskHandle        = GetComponentTypeHandle<ChunkPerCallbackCullingMask>(true),
+                perDispatchMaskHandle      = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
                 perFrameMaskHandle         = GetComponentTypeHandle<ChunkPerFrameCullingMask>(true),
                 chunkHeaderHandle          = GetComponentTypeHandle<ChunkHeader>(true),
                 materialMaskHandle         = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
@@ -105,7 +99,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct GatherChunkSumsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCallbackCullingMask> perCameraMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> perDispatchMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>    perFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<BoundMesh>                   meshHandle;
             public ComponentTypeHandle<ChunkDeformPrefixSums>                  metaHandle;
@@ -114,10 +108,10 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var callbackMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
+                var dispatchMask = chunk.GetChunkComponentData(ref perDispatchMaskHandle);
                 var frameMask    = chunk.GetChunkComponentData(ref perFrameMaskHandle);
-                var lower        = callbackMask.lower.Value & (~frameMask.lower.Value);
-                var upper        = callbackMask.upper.Value & (~frameMask.upper.Value);
+                var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
+                var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
                 if ((upper | lower) == 0)
                     return; // The masks get re-checked in ChunkPrefixSumJob so we can quit now.
 
@@ -157,7 +151,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct ChunkPrefixSumJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCallbackCullingMask> perCameraMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> perDispatchMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>    perFrameMaskHandle;
             public ComponentTypeHandle<ChunkDeformPrefixSums>                  metaHandle;
             public ComponentLookup<MaxRequiredDeformData>                      maxRequiredDeformDataLookup;
@@ -167,16 +161,16 @@ namespace Latios.Kinemation.Systems
             {
                 var maxes = maxRequiredDeformDataLookup[worldBlackboardEntity];
 
-                var callbackMaskArray = chunk.GetNativeArray(ref perCameraMaskHandle);
+                var dispatchMaskArray = chunk.GetNativeArray(ref perDispatchMaskHandle);
                 var frameMaskArray    = chunk.GetNativeArray(ref perFrameMaskHandle);
                 var metaArray         = chunk.GetNativeArray(ref metaHandle);
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
-                    var callbackMask = callbackMaskArray[i];
+                    var dispatchMask = dispatchMaskArray[i];
                     var frameMask    = frameMaskArray[i];
-                    var lower        = callbackMask.lower.Value & (~frameMask.lower.Value);
-                    var upper        = callbackMask.upper.Value & (~frameMask.upper.Value);
+                    var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
+                    var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
                     if ((upper | lower) == 0)
                         continue;
 
@@ -211,7 +205,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct AssignMaterialPropertiesJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCallbackCullingMask> perCameraMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> perDispatchMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>    perFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<BoundMesh>                   meshHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkDeformPrefixSums>       metaHandle;
@@ -237,10 +231,10 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var prefixSums   = chunk.GetChunkComponentData(ref metaHandle);
-                var callbackMask = chunk.GetChunkComponentData(ref perCameraMaskHandle);
+                var dispatchMask = chunk.GetChunkComponentData(ref perDispatchMaskHandle);
                 var frameMask    = chunk.GetChunkComponentData(ref perFrameMaskHandle);
-                var lower        = callbackMask.lower.Value & (~frameMask.lower.Value);
-                var upper        = callbackMask.upper.Value & (~frameMask.upper.Value);
+                var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
+                var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
 
                 var meshArray      = chunk.GetNativeArray(ref meshHandle);
                 var classification = deformClassificationMap[chunk];
@@ -386,7 +380,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct MarkMaterialPropertiesDirtyJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCallbackCullingMask>            perCameraMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask>            perDispatchMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>               perFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>                            chunkHeaderHandle;
             [ReadOnly] public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
@@ -398,7 +392,7 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var callbackMaskArray = metaChunk.GetNativeArray(ref perCameraMaskHandle);
+                var dispatchMaskArray = metaChunk.GetNativeArray(ref perDispatchMaskHandle);
                 var frameMaskArray    = metaChunk.GetNativeArray(ref perFrameMaskHandle);
                 var chunkHeaderArray  = metaChunk.GetNativeArray(ref chunkHeaderHandle);
                 var materialMaskArray = metaChunk.GetNativeArray(ref materialMaskHandle);
@@ -459,10 +453,10 @@ namespace Latios.Kinemation.Systems
 
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
-                    var callbackMask = callbackMaskArray[i];
+                    var dispatchMask = dispatchMaskArray[i];
                     var frameMask    = frameMaskArray[i];
-                    var lower        = callbackMask.lower.Value & (~frameMask.lower.Value);
-                    var upper        = callbackMask.upper.Value & (~frameMask.upper.Value);
+                    var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
+                    var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
                     if ((upper | lower) == 0)
                         continue;
 

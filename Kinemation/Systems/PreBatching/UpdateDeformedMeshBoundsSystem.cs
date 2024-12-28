@@ -120,11 +120,22 @@ namespace Latios.Kinemation.Systems
                         var     mask         = (int)(state.state & BlendShapeState.Flags.RotationMask);
                         bool    dirty        = (state.state & BlendShapeState.Flags.IsDirty) == BlendShapeState.Flags.IsDirty;
                         var     weightsBase  = dirty ? BlendShapeState.CurrentFromMask[mask] : BlendShapeState.PreviousFromMask[mask];
-                        weights              = weights.GetSubArray(weightsBase, shapeOffsets.Length);
-                        for (int j = 0; j < shapeOffsets.Length; j++)
+                        if (weights.Length < weightsBase + shapeOffsets.Length)
                         {
-                            //UnityEngine.Debug.Log($"j: {j} offset: {shapeOffsets[j]}, weight: {weights[j]}");
-                            localRadialBounds[i] += weights[j] * shapeOffsets[j];
+                            // We are unitialized, so just grab all the weights we do have.
+                            for (int j = 0; j < math.min(weights.Length, shapeOffsets.Length); j++)
+                            {
+                                localRadialBounds[i] += weights[j] * shapeOffsets[j];
+                            }
+                        }
+                        else
+                        {
+                            weights = weights.GetSubArray(weightsBase, shapeOffsets.Length);
+                            for (int j = 0; j < shapeOffsets.Length; j++)
+                            {
+                                //UnityEngine.Debug.Log($"j: {j} offset: {shapeOffsets[j]}, weight: {weights[j]}");
+                                localRadialBounds[i] += weights[j] * shapeOffsets[j];
+                            }
                         }
                     }
                 }

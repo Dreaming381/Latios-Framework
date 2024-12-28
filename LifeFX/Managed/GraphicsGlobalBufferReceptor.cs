@@ -14,7 +14,7 @@ namespace Latios.LifeFX
     /// _latiosDeformBuffer
     /// _latiosBoneTransforms
     /// </remarks>
-    [AddComponentMenu("Latios/LifeFX/Graphics Global Buffer Receptor")]
+    [AddComponentMenu("Latios/LifeFX/Graphics Global Buffer Receptor (LifeFX)")]
     public class GraphicsGlobalBufferReceptor : MonoBehaviour, IInitializeGameObjectEntity
     {
         [SerializeField] private string m_bufferShaderProperty;

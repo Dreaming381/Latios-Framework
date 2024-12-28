@@ -15,7 +15,7 @@ namespace Latios.Psyshock.Authoring
     }
 
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Physics (Psyshock)/Custom Collider")]
+    [AddComponentMenu("Latios/Psyshock/Custom Collider (Psyshock)")]
     public class ColliderAuthoring : MonoBehaviour
     {
         private void OnEnable()

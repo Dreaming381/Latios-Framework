@@ -262,7 +262,7 @@ namespace Latios.Kinemation
         /// but if it is, it will be overwritten with the result of this calculation. This operation will fail if the mesh does
         /// not contain position elements.
         /// </summary>
-        public bool calculateNormals
+        internal bool calculateNormals
         {
             get => Bits.GetBit(packed, 0);
             set => Bits.SetBit(ref packed, 0, value);
@@ -272,7 +272,7 @@ namespace Latios.Kinemation
         /// but if it is, it will be overwritten with the result of this calculation. This operation will fail if the mesh does
         /// not contain position and Uv0xy elements, and it will also fail if it does not contain normals and calculateNormals is false.
         /// </summary>
-        public bool calculateTangents
+        internal bool calculateTangents
         {
             get => Bits.GetBit(packed, 1);
             set => Bits.SetBit(ref packed, 1, value);

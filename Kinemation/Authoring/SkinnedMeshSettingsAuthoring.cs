@@ -9,7 +9,7 @@ namespace Latios.Kinemation.Authoring
     /// Specifies additional customizations to be made for baking a SkinnedMeshRenderer.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Kinemation/Skinned Mesh Settings")]
+    [AddComponentMenu("Latios/Kinemation/Skinned Mesh Settings (Kinemation)")]
     public class SkinnedMeshSettingsAuthoring : MonoBehaviour
     {
         /// <summary>

@@ -202,12 +202,10 @@ namespace Latios.Kinemation.Systems
         MaxBytesPerCBuffer :
         kMaxBytesPerBatchRawBuffer;
 
-        KinemationCullingSuperSystem m_cullingSuperSystem;
-#if UNITY_6000_0_OR_NEWER
+        KinemationCullingSuperSystem         m_cullingSuperSystem;
         KinemationCullingDispatchSuperSystem m_cullingDispatchSuperSystem;
-#endif
-        int m_cullPassIndexThisFrame;
-        int m_dispatchPassIndexThisFrame;
+        int                                  m_cullPassIndexThisFrame;
+        int                                  m_dispatchPassIndexThisFrame;
 #pragma warning disable CS0414  // Variable assigned but unused in 2022 LTS
         int m_cullPassIndexForLastDispatch;
 #pragma warning restore CS0414
@@ -237,10 +235,8 @@ namespace Latios.Kinemation.Systems
                 return;
             }
 
-            m_cullingSuperSystem = World.GetOrCreateSystemManaged<KinemationCullingSuperSystem>();
-#if UNITY_6000_0_OR_NEWER
+            m_cullingSuperSystem         = World.GetOrCreateSystemManaged<KinemationCullingSuperSystem>();
             m_cullingDispatchSuperSystem = World.GetOrCreateSystemManaged<KinemationCullingDispatchSuperSystem>();
-#endif
             worldBlackboardEntity.AddComponent<CullingContext>();
             worldBlackboardEntity.AddComponent<DispatchContext>();
             worldBlackboardEntity.AddBuffer<CullingPlane>();
@@ -291,16 +287,12 @@ namespace Latios.Kinemation.Systems
             // Ideally, we want to remain compatible with plugins that register custom meshes and materials.
             // But we need our own BRG to specify our own culling callback.
             // The solution is to steal the BRG, destroy it, and then swap it with our replacement.
-#if UNITY_6000_0_OR_NEWER
             m_BatchRendererGroup = new BatchRendererGroup(new BatchRendererGroupCreateInfo
             {
                 cullingCallback         = this.OnPerformCulling,
                 finishedCullingCallback = this.OnFinishedCulling,
                 userContext             = IntPtr.Zero
             });
-#else
-            m_BatchRendererGroup = new BatchRendererGroup(this.OnPerformCulling, IntPtr.Zero);
-#endif
             var brgField = entitiesGraphicsSystem.GetType().GetField("m_BatchRendererGroup",
                                                                      System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
             var oldBrg = brgField.GetValue(entitiesGraphicsSystem) as BatchRendererGroup;
@@ -543,9 +535,8 @@ namespace Latios.Kinemation.Systems
         {
             using var callbackMarker = m_latiosPerformCullingMarker.Auto();
 
-#if UNITY_6000_0_OR_NEWER
             cullingOutput.customCullingResult[0] = (IntPtr)m_cullPassIndexThisFrame;
-#endif
+
             //UnityEngine.Debug.Log($"OnPerformCulling pass {m_cullPassIndexThisFrame} of type {batchCullingContext.viewType}");
 
             var setup = new BurstCullingSetup
@@ -584,18 +575,10 @@ namespace Latios.Kinemation.Systems
             DoBurstCullingFinalize(&finalize);
 
             m_cullPassIndexThisFrame++;
-#if !UNITY_6000_0_OR_NEWER
-            m_dispatchPassIndexThisFrame++;
-            if (m_dispatchPassIndexThisFrame > 1024)
-            {
-                JobHandle.CompleteAll(m_cullingCallbackFinalJobHandles.AsArray());
-                m_ThreadLocalAllocators.Rewind();
-            }
-#endif
+
             return finalize.finalHandle;
         }
 
-#if UNITY_6000_0_OR_NEWER
         private unsafe void OnFinishedCulling(IntPtr customCullingResult)
         {
             //UnityEngine.Debug.Log($"OnFinishedCulling pass {(int)customCullingResult}");
@@ -612,7 +595,6 @@ namespace Latios.Kinemation.Systems
                 m_ThreadLocalAllocators.Rewind();
             }
         }
-#endif
         #endregion
 
         #region Burst Culling

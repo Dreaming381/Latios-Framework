@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Latios.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Core/Blackboard Entity Data")]
+    [AddComponentMenu("Latios/Core/Blackboard Entity Data (Latios Core)")]
     public class BlackboardEntityDataAuthoring : MonoBehaviour
     {
         public BlackboardScope blackboardScope;

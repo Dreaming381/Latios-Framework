@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Latios.Myri.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Audio (Myri)/Audio Listener")]
+    [AddComponentMenu("Latios/Myri/Audio Listener (Myri)")]
     public class AudioListenerAuthoring : MonoBehaviour
     {
         [Tooltip("The raw volume applied to everything the listener hears. This value is not in decibels.")]

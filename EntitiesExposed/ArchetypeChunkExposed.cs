@@ -81,6 +81,14 @@ namespace Unity.Entities.Exposed
         {
             return query._GetImpl()->_QueryData->HasEnableableComponents != 0;
         }
+
+        public static unsafe ulong GetBloomMask(in this EntityArchetype archetype) => archetype.Archetype->BloomFilterMask;
+        public static unsafe bool HasChunkHeader(in this EntityArchetype archetype) => archetype.Archetype->HasChunkHeader;
+        public static unsafe bool HasSystemInstanceComponents(in this EntityArchetype archetype) => archetype.Archetype->HasSystemInstanceComponents;
+        public static unsafe int GetChunkComponentCount(in this EntityArchetype archetype) => archetype.Archetype->NumChunkComponents;
+        public static unsafe int GetBufferComponentCount(in this EntityArchetype archetype) => archetype.Archetype->NumBufferComponents;
+        public static unsafe TypeIndex GetTypeAtIndex(in this EntityArchetype archetype, int index) => archetype.Archetype->Types[index].TypeIndex;
+        public static unsafe ArchetypeChunk GetChunkAtIndex(in this EntityArchetype archetype, int index) => new ArchetypeChunk(archetype.Archetype->Chunks[index], archetype.Archetype->EntityComponentStore);
     }
 }
 

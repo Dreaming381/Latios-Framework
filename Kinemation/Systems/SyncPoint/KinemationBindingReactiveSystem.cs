@@ -980,7 +980,6 @@ namespace Latios.Kinemation.Systems
 
                     EnabledMask needs = default;
 
-                    // Todo: This should be flipped in 0.10.0-beta.4
                     if (hasNeedsBindings)
                         needs = chunk.GetEnabledMask(ref needsBindingHandle);
 

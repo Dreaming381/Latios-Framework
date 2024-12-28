@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Latios.Myri.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Audio (Myri)/Audio Settings")]
+    [AddComponentMenu("Latios/Myri/Audio Settings (Myri)")]
     public class AudioSettingsAuthoring : MonoBehaviour
     {
         [Tooltip("The number of additional audio frames to generate in case the main thread stalls")]

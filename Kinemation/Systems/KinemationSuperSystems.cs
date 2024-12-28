@@ -225,26 +225,12 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedEntitiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedPostProcessEntitiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<FrustumCullUnskinnedEntitiesSystem>();
-
-#if UNITY_6000_0_OR_NEWER
             GetOrCreateAndAddUnmanagedSystem<CopyDeformCullingSystem>();
-#else
-            GetOrCreateAndAddUnmanagedSystem<AllocateDeformMaterialPropertiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<CopyDeformWithCullingSystem>();
-            GetOrCreateAndAddUnmanagedSystem<CopyPerCameraMasksToPerDispatchMasksSystem>();
-
-            GetOrCreateAndAddManagedSystem<CullingRoundRobinDispatchSuperSystem>();
-#endif
-
             GetOrCreateAndAddUnmanagedSystem<SelectMmiRangeLodsSystem>();
             GetOrCreateAndAddUnmanagedSystem<GenerateBrgDrawCommandsSystem>();
-#if !UNITY_6000_0_OR_NEWER
-            GetOrCreateAndAddUnmanagedSystem<SetRenderVisibilityFeedbackFlagsSystem>();
-#endif
         }
     }
 
-#if UNITY_6000_0_OR_NEWER
     /// <summary>
     /// This super system executes for each dispatch pass callback from Unity and may
     /// run multiple times per frame. If you need a new hook point into this culling loop
@@ -266,7 +252,6 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<SetRenderVisibilityFeedbackFlagsSystem>();
         }
     }
-#endif
 
     /// <summary>
     /// This super system executes special dispatch culling systems in round-robin fashion.
@@ -311,9 +296,7 @@ namespace Latios.Kinemation.Systems
         protected override void CreateSystems()
         {
             GetOrCreateAndAddManagedSystem<KinemationCullingSuperSystem>();
-#if UNITY_6000_0_OR_NEWER
             GetOrCreateAndAddManagedSystem<KinemationCullingDispatchSuperSystem>();
-#endif
         }
 
         // This is just for showing in the Editor.

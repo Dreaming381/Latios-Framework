@@ -54,7 +54,7 @@ namespace Latios
         }
 
         /// <summary>
-        /// Injects all systems made by Unity (or systems that use "Unity" in their namespace or assembly) from the systems list.
+        /// Injects all systems made by Unity (or systems that use "Unity" in their namespace or assembly) and tightly-integrated partners from the systems list.
         /// Automatically creates parent ComponentSystemGroups if necessary.
         /// Use this instead of InjectSystemsFromNamespace because Unity sometimes forgets to put namespaces on things.
         /// </summary>
@@ -71,14 +71,18 @@ namespace Latios
                 var type = system.GetManagedType();
                 if (type.Namespace == null)
                 {
-                    if (type.Assembly.FullName.Contains("Unity") && !silenceWarnings)
+                    if (!silenceWarnings && type.Assembly.FullName.Contains("Unity"))
                     {
-                        Debug.LogWarning("Hey Unity Devs! You forget a namespace for " + type.ToString());
+                        Debug.LogWarning($"Hey Unity Devs! You forgot a namespace for {type}");
+                    }
+                    else if (!silenceWarnings && type.Assembly.FullName.Contains("Havok"))
+                    {
+                        Debug.LogWarning($"Hey Havok Devs! You forgot a namespace for {type}");
                     }
                     else
                         continue;
                 }
-                else if (!type.Namespace.Contains("Unity"))
+                else if (!type.Namespace.Contains("Unity") && !type.Namespace.Contains("Havok"))
                     continue;
 
                 sysList.Add(system);

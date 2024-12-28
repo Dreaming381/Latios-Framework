@@ -1,5 +1,4 @@
 using Unity.Burst;
-using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -7,7 +6,6 @@ using Unity.Entities;
 using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Rendering;
 using UnityEngine.Rendering;
 
 using static Unity.Entities.SystemAPI;
@@ -17,11 +15,7 @@ namespace Latios.Kinemation.Systems
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
-#if UNITY_6000_0_OR_NEWER
     public partial struct CopyDeformCullingSystem : ISystem
-#else
-    public partial struct CopyDeformWithCullingSystem : ISystem
-#endif
     {
         EntityQuery          m_metaQuery;
         LatiosWorldUnmanaged latiosWorld;
@@ -46,42 +40,6 @@ namespace Latios.Kinemation.Systems
                 perCameraCullingMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingMask>(true)
             }.ScheduleParallel(m_metaQuery, state.Dependency);
 
-            var skinCopier = new SkinCopier
-            {
-#if !UNITY_6000_0_OR_NEWER
-                deformClassificationMap    = latiosWorld.worldBlackboardEntity.GetCollectionComponent<DeformClassificationMap>(true).deformClassificationMap,
-                materialMaskHandle         = GetComponentTypeHandle<ChunkMaterialPropertyDirtyMask>(false),
-                materialPropertyTypeLookup = GetBufferLookup<MaterialPropertyComponentType>(true),
-                worldBlackboardEntity      = latiosWorld.worldBlackboardEntity,
-
-                currentDeformHandle        = GetComponentTypeHandle<CurrentDeformShaderIndex>(false),
-                currentDqsVertexHandle     = GetComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>(false),
-                currentMatrixVertexHandle  = GetComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>(false),
-                legacyComputeDeformHandle  = GetComponentTypeHandle<LegacyComputeDeformShaderIndex>(false),
-                legacyDotsDeformHandle     = GetComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>(false),
-                legacyLbsHandle            = GetComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex>(false),
-                previousDeformHandle       = GetComponentTypeHandle<PreviousDeformShaderIndex>(false),
-                previousDqsVertexHandle    = GetComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>(false),
-                previousMatrixVertexHandle = GetComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex>(false),
-                twoAgoDeformHandle         = GetComponentTypeHandle<TwoAgoDeformShaderIndex>(false),
-                twoAgoDqsVertexHandle      = GetComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>(false),
-                twoAgoMatrixVertexHandle   = GetComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>(false),
-
-                currentDeformLookup        = GetComponentLookup<CurrentDeformShaderIndex>(false),
-                currentDqsVertexLookup     = GetComponentLookup<CurrentDqsVertexSkinningShaderIndex>(false),
-                currentMatrixVertexLookup  = GetComponentLookup<CurrentMatrixVertexSkinningShaderIndex>(false),
-                legacyComputeDeformLookup  = GetComponentLookup<LegacyComputeDeformShaderIndex>(false),
-                legacyDotsDeformLookup     = GetComponentLookup<LegacyDotsDeformParamsShaderIndex>(false),
-                legacyLbsLookup            = GetComponentLookup<LegacyLinearBlendSkinningShaderIndex>(false),
-                previousDeformLookup       = GetComponentLookup<PreviousDeformShaderIndex>(false),
-                previousDqsVertexLookup    = GetComponentLookup<PreviousDqsVertexSkinningShaderIndex>(false),
-                previousMatrixVertexLookup = GetComponentLookup<PreviousMatrixVertexSkinningShaderIndex>(false),
-                twoAgoDeformLookup         = GetComponentLookup<TwoAgoDeformShaderIndex>(false),
-                twoAgoDqsVertexLookup      = GetComponentLookup<TwoAgoDqsVertexSkinningShaderIndex>(false),
-                twoAgoMatrixVertexLookup   = GetComponentLookup<TwoAgoMatrixVertexSkinningShaderIndex>(false),
-#endif
-            };
-
             var cullRequestType = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().viewType;
             if (cullRequestType == BatchCullingViewType.Light)
             {
@@ -93,7 +51,6 @@ namespace Latios.Kinemation.Systems
                     chunksToProcess                = chunkList.AsDeferredJobArray(),
                     esiLookup                      = GetEntityStorageInfoLookup(),
                     referenceHandle                = GetComponentTypeHandle<CopyDeformFromEntity>(true),
-                    skinCopier                     = skinCopier,
                 }.Schedule(chunkList, 1, state.Dependency);
             }
             else
@@ -105,14 +62,8 @@ namespace Latios.Kinemation.Systems
                     chunksToProcess          = chunkList.AsDeferredJobArray(),
                     esiLookup                = GetEntityStorageInfoLookup(),
                     referenceHandle          = GetComponentTypeHandle<CopyDeformFromEntity>(true),
-                    skinCopier               = skinCopier,
                 }.Schedule(chunkList, 1, state.Dependency);
             }
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
         }
 
         [BurstCompile]
@@ -158,7 +109,6 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public EntityStorageInfoLookup esiLookup;
 
             public ComponentTypeHandle<ChunkPerCameraCullingMask> chunkPerCameraMaskHandle;
-            public SkinCopier                                     skinCopier;
 
             public void Execute(int i)
             {
@@ -167,9 +117,6 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                SkinCopier.Context context = default;
-                skinCopier.InitContext();
-
                 var references                 = chunk.GetNativeArray(ref referenceHandle);
                 var invertedFrameMasks         = chunk.GetChunkComponentData(ref chunkPerFrameMaskHandle);
                 invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
@@ -179,26 +126,18 @@ namespace Latios.Kinemation.Systems
                 var inMask = cameraMask.lower.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    bool isIn = IsReferenceVisible(in chunk,
-                                                   references[i].sourceDeformedEntity,
-                                                   invertedFrameMasks.lower.IsSet(i),
-                                                   i,
-                                                   ref context);
+                    bool isIn               = IsReferenceVisible(references[i].sourceDeformedEntity);
                     cameraMask.lower.Value &= ~(math.select(1ul, 0ul, isIn) << i);
                 }
                 inMask = cameraMask.upper.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    bool isIn = IsReferenceVisible(in chunk,
-                                                   references[i + 64].sourceDeformedEntity,
-                                                   invertedFrameMasks.upper.IsSet(i),
-                                                   i + 64,
-                                                   ref context);
+                    bool isIn               = IsReferenceVisible(references[i + 64].sourceDeformedEntity);
                     cameraMask.upper.Value &= ~(math.select(1ul, 0ul, isIn) << i);
                 }
             }
 
-            bool IsReferenceVisible(in ArchetypeChunk chunk, Entity reference, bool needsCopy, int entityIndex, ref SkinCopier.Context context)
+            bool IsReferenceVisible(Entity reference)
             {
                 if (reference == Entity.Null || !esiLookup.Exists(reference))
                     return false;
@@ -210,10 +149,6 @@ namespace Latios.Kinemation.Systems
                     result = referenceMask.upper.IsSet(info.IndexInChunk - 64);
                 else
                     result = referenceMask.lower.IsSet(info.IndexInChunk);
-                if (result && needsCopy)
-                {
-                    skinCopier.CopySkin(ref context, in chunk, entityIndex, reference);
-                }
                 return result;
             }
         }
@@ -231,8 +166,6 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraMaskHandle;
             public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraSplitsMaskHandle;
 
-            public SkinCopier skinCopier;
-
             public void Execute(int i)
             {
                 Execute(chunksToProcess[i]);
@@ -240,9 +173,6 @@ namespace Latios.Kinemation.Systems
 
             void Execute(in ArchetypeChunk chunk)
             {
-                SkinCopier.Context context = default;
-                skinCopier.InitContext();
-
                 var references                 = chunk.GetNativeArray(ref referenceHandle);
                 var invertedFrameMasks         = chunk.GetChunkComponentData(ref chunkPerFrameMaskHandle);
                 invertedFrameMasks.lower.Value = ~invertedFrameMasks.lower.Value;
@@ -254,30 +184,20 @@ namespace Latios.Kinemation.Systems
                 var inMask = cameraMask.lower.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    bool isIn = IsReferenceVisible(in chunk,
-                                                   references[i].sourceDeformedEntity,
-                                                   invertedFrameMasks.lower.IsSet(i),
-                                                   i,
-                                                   ref context,
-                                                   out var splits);
+                    bool isIn                       = IsReferenceVisible(references[i].sourceDeformedEntity, out var splits);
                     cameraMask.lower.Value         &= ~(math.select(1ul, 0ul, isIn) << i);
                     cameraSplitsMask.splitMasks[i]  = splits;
                 }
                 inMask = cameraMask.upper.Value;
                 for (int i = math.tzcnt(inMask); i < 64; inMask ^= 1ul << i, i = math.tzcnt(inMask))
                 {
-                    bool isIn = IsReferenceVisible(in chunk,
-                                                   references[i + 64].sourceDeformedEntity,
-                                                   invertedFrameMasks.upper.IsSet(i),
-                                                   i + 64,
-                                                   ref context,
-                                                   out var splits);
+                    bool isIn                            = IsReferenceVisible(references[i + 64].sourceDeformedEntity, out var splits);
                     cameraMask.upper.Value              &= ~(math.select(1ul, 0ul, isIn) << i);
                     cameraSplitsMask.splitMasks[i + 64]  = splits;
                 }
             }
 
-            bool IsReferenceVisible(in ArchetypeChunk chunk, Entity reference, bool needsCopy, int entityIndex, ref SkinCopier.Context context, out byte splits)
+            bool IsReferenceVisible(Entity reference, out byte splits)
             {
                 splits = default;
                 if (reference == Entity.Null || !esiLookup.Exists(reference))
@@ -296,38 +216,17 @@ namespace Latios.Kinemation.Systems
                     var referenceSplits = info.Chunk.GetChunkComponentRefRO(ref chunkPerCameraSplitsMaskHandle);
                     splits              = referenceSplits.ValueRO.splitMasks[info.IndexInChunk];
                 }
-
-                if (result && needsCopy)
-                {
-                    skinCopier.CopySkin(ref context, in chunk, entityIndex, reference);
-                }
                 return result;
             }
         }
-
-#if UNITY_6000_0_OR_NEWER
-        struct SkinCopier
-        {
-            public struct Context { }
-            public void CopySkin(ref Context context, in ArchetypeChunk chunk, int entityIndex, Entity srcEntity)
-            {
-                // Dummy
-            }
-            public void InitContext()
-            {
-                // Dummy
-            }
-        }
-#endif
     }
 
-#if UNITY_6000_0_OR_NEWER
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
     public partial struct CopyDeformMaterialsSystem : ISystem
     {
-        EntityQuery m_metaQuery;
+        EntityQuery          m_metaQuery;
         LatiosWorldUnmanaged latiosWorld;
 
         public void OnCreate(ref SystemState state)
@@ -399,7 +298,7 @@ namespace Latios.Kinemation.Systems
         struct FindChunksNeedingCopyingJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> perDispatchCullingMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader> chunkHeaderHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                 chunkHeaderHandle;
 
             public NativeList<ArchetypeChunk>.ParallelWriter chunksToProcess;
 
@@ -432,10 +331,10 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public NativeArray<ArchetypeChunk> chunksToProcess;
 
-            [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask> chunkPerFrameMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerFrameCullingMask>    chunkPerFrameMaskHandle;
             [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> chunkPerDispatchMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<CopyDeformFromEntity> referenceHandle;
-            [ReadOnly] public EntityStorageInfoLookup esiLookup;
+            [ReadOnly] public ComponentTypeHandle<CopyDeformFromEntity>        referenceHandle;
+            [ReadOnly] public EntityStorageInfoLookup                          esiLookup;
 
             public SkinCopier skinCopier;
 
@@ -472,7 +371,6 @@ namespace Latios.Kinemation.Systems
             }
         }
     }
-#endif
 
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]

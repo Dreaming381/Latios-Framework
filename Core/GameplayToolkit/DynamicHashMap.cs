@@ -222,10 +222,13 @@ namespace Latios
         /// </summary>
         public struct Pair
         {
-            internal uint   meta;
-            internal TKey   key;
+            internal uint meta;
+            [Unity.Properties.CreateProperty(ReadOnly = true)]
+            internal TKey key;
+            [Unity.Properties.CreateProperty(ReadOnly = true)]
             internal TValue value;
 
+            [Unity.Properties.CreateProperty(ReadOnly = true)]
             internal bool isOccupied
             {
                 get => (meta & 0x80000000) != 0;
@@ -378,7 +381,7 @@ namespace Latios
                     var bucket                  = GetBucket(oldBuckets[i].key);
                     bufferPtr[bucket]           = oldBuckets[i];
                     bufferPtr[bucket].nextIndex = 0;
-                    oldBuckets[i] = default;
+                    oldBuckets[i]               = default;
                 }
             }
 
@@ -401,7 +404,7 @@ namespace Latios
                 }
                 else
                 {
-                    bufferPtr[bucket] = oldOverflow[i];
+                    bufferPtr[bucket]           = oldOverflow[i];
                     bufferPtr[bucket].nextIndex = 0;
                 }
                 oldOverflow[i] = default;
@@ -440,10 +443,10 @@ namespace Latios
                         if (!last.isOccupied)
                         {
                             // Last is likely padding to ensure the capacity can be computed correctly.
-                            last.isOccupied         = true;
-                            last.key                = key;
-                            last.value              = value;
-                            candidate.nextIndex     = m_buffer.Length - 1;
+                            last.isOccupied     = true;
+                            last.key            = key;
+                            last.value          = value;
+                            candidate.nextIndex = m_buffer.Length - 1;
                             IncrementCount();
                             return true;
                         }

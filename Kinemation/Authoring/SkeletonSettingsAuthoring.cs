@@ -10,7 +10,7 @@ namespace Latios.Kinemation.Authoring
     /// Specifies additional customizations to be made for baking a skeleton.
     /// </summary>
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Kinemation/Skeleton Settings (Animated Hierarchy)")]
+    [AddComponentMenu("Latios/Kinemation/Skeleton Settings (Kinemation)")]
     public class SkeletonSettingsAuthoring : MonoBehaviour
     {
         /// <summary>
