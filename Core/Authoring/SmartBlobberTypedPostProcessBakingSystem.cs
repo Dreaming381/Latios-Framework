@@ -1,7 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using GameObject = UnityEngine.GameObject;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -168,7 +165,8 @@ namespace Latios.Authoring.Systems
 
                 if (firstMap.TryGetValue(td.hash, out var replacementBlob))
                 {
-                    blobsToDispose.Add(blobs[i]);
+                    if (!blobs[i].Equals(replacementBlob))
+                        blobsToDispose.Add(blobs[i]);
                     blobs[i] = replacementBlob;
                 }
                 else

@@ -28,6 +28,7 @@ namespace Latios.Kinemation
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_query     = state.Fluent().With<UniqueMeshConfig>(false).Build();
+            m_data      = new CullingComputeDispatchData<CollectState, WriteState>(latiosWorld);
         }
 
         [BurstCompile]

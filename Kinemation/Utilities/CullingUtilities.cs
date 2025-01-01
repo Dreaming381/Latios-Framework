@@ -1,8 +1,11 @@
 using System;
+using Latios.Psyshock;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Rendering;
+
+using FrustumPlanes = Unity.Rendering.FrustumPlanes;
 
 namespace Latios.Kinemation
 {
@@ -62,6 +65,34 @@ namespace Latios.Kinemation
             }
 
             return planes;
+        }
+
+        /// <summary>
+        /// Sets the bounds of the RenderBounds using a Psyshock Aabb
+        /// </summary>
+        public static void Set(this ref RenderBounds bounds, Aabb aabb)
+        {
+            Physics.GetCenterExtents(aabb, out var c, out var e);
+            bounds.Value = new AABB { Center = c, Extents = e };
+        }
+
+        /// <summary>
+        /// Sets the bounds of the RenderBounds using a pair of min and max extents.
+        /// </summary>
+        public static void SetMinMax(this ref RenderBounds bounds, float3 min, float3 max)
+        {
+            bounds.Set(new Aabb(min, max));
+        }
+
+        /// <summary>
+        /// Sets the bounds of the RenderBounds using a center and extents from the center
+        /// </summary>
+        /// <param name="bounds"></param>
+        /// <param name="center"></param>
+        /// <param name="extents"></param>
+        public static void SetCenterExtents(this ref RenderBounds bounds, float3 center, float3 extents)
+        {
+            bounds.Value = new AABB { Center = center, Extents = extents };
         }
     }
 }

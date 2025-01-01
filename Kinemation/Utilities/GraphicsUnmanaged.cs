@@ -118,6 +118,7 @@ namespace Latios.Kinemation
             var context = new RegisterMeshesContext
             {
                 meshes                       = meshes,
+                outputIDs                    = outputIDs,
                 world                        = world,
                 latiosEntitiesGraphicsSystem = TypeManager.GetSystemTypeIndex<LatiosEntitiesGraphicsSystem>(),
                 success                      = false

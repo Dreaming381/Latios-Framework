@@ -172,6 +172,25 @@ namespace Latios.Kinemation.Authoring
     /// </summary>
     public static partial class RenderingBakingTools
     {
+        static Mesh s_uniqueMeshPlaceholder = null;
+
+        /// <summary>
+        /// Gets a Unique Mesh Placeholder
+        /// </summary>
+        public static Mesh uniqueMeshPlaceholder
+        {
+            get
+            {
+                if (s_uniqueMeshPlaceholder == null)
+                {
+#if UNITY_EDITOR
+                    s_uniqueMeshPlaceholder = UnityEditor.AssetDatabase.LoadAssetAtPath<Mesh>("Packages/com.latios.latiosframework/Kinemation/Authoring/UniqueMeshPlaceholder.asset");
+#endif
+                }
+                return s_uniqueMeshPlaceholder;
+            }
+        }
+
         /// <summary>
         /// Extracts the mesh and materials combination into the destination span of MeshMaterialSubmeshSettings
         /// </summary>

@@ -48,9 +48,11 @@ namespace Latios.Kinemation.Systems
             var meshPool        = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
             if (neededMeshes > 0)
             {
-                var newAllocatedMeshes = new NativeArray<UnityObjectRef<UnityEngine.Mesh> >(neededMeshes, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-                var newNames           = new NativeArray<FixedString128Bytes>(neededMeshes, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
-                var newIDs             = new NativeArray<BatchMeshID>(neededMeshes, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+                var newAllocatedMeshes = CollectionHelper.CreateNativeArray<UnityObjectRef<UnityEngine.Mesh> >(neededMeshes,
+                                                                                                               state.WorldUpdateAllocator,
+                                                                                                               NativeArrayOptions.UninitializedMemory);
+                var newNames = CollectionHelper.CreateNativeArray<FixedString128Bytes>(neededMeshes, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
+                var newIDs   = CollectionHelper.CreateNativeArray<BatchMeshID>(neededMeshes, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
                 for (int i = 0; i < neededMeshes; i++)
                 {
