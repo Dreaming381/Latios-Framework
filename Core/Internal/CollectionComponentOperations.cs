@@ -65,11 +65,25 @@ namespace Latios.InternalSourceGen
             functionPtr.Invoke(Wrap(UnsafeUtility.AddressOf(ref context)), (int)OperationType.DisposeCollectionStorage);
         }
 
+        public static void CompleteEveryting(FunctionPointer<StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
+                                             CollectionComponentStorage*                                         storage,
+                                             int storageIndex)
+        {
+            var context = new CompleteEverythingContext
+            {
+                storage      = storage,
+                storageIndex = storageIndex
+            };
+
+            functionPtr.Invoke(Wrap(UnsafeUtility.AddressOf(ref context)), (int)OperationType.CompleteEverything);
+        }
+
         enum OperationType : int
         {
             CreateQueries,
             SyncQueries,
             DisposeCollectionStorage,
+            CompleteEverything
         }
 
         struct CreateQueriesContext
@@ -93,6 +107,12 @@ namespace Latios.InternalSourceGen
             public int                         storageIndex;
         }
 
+        struct CompleteEverythingContext
+        {
+            public CollectionComponentStorage* storage;
+            public int                         storageIndex;
+        }
+
         public static void DispatchCollectionComponentOperation<T>(void* context, int operation) where T : unmanaged, ICollectionComponent,
         StaticAPI.ICollectionComponentSourceGenerated
         {
@@ -107,6 +127,9 @@ namespace Latios.InternalSourceGen
                     break;
                 case OperationType.DisposeCollectionStorage:
                     DisposeCollectionStorage<T>((DisposeCollectionStorageContext*)context);
+                    break;
+                case OperationType.CompleteEverything:
+                    CompleteEveryting<T>((DisposeCollectionStorageContext*)context);
                     break;
             }
         }
@@ -178,6 +201,11 @@ namespace Latios.InternalSourceGen
         static void DisposeCollectionStorage<T>(DisposeCollectionStorageContext* context) where T : unmanaged, ICollectionComponent, StaticAPI.ICollectionComponentSourceGenerated
         {
             context->storage->DisposeTypeUsingSourceGenDispatch<T>(context->storageIndex);
+        }
+
+        static void CompleteEveryting<T>(DisposeCollectionStorageContext* context) where T : unmanaged, ICollectionComponent, StaticAPI.ICollectionComponentSourceGenerated
+        {
+            context->storage->CompleteEverything<T>(context->storageIndex);
         }
     }
 }

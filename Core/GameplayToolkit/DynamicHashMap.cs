@@ -30,8 +30,8 @@ namespace Latios
         public DynamicHashMap(DynamicBuffer<Pair> buffer)
         {
             m_buffer   = buffer;
-            m_count    = (m_buffer.IsEmpty || m_buffer.Length == 0) ? 0 : m_buffer[m_buffer.Length - 1].nextIndex;
-            m_capacity = math.max(2, math.ceilpow2(m_buffer.Capacity));
+            m_count    = m_buffer.IsEmpty ? 0 : m_buffer[m_buffer.Length - 1].nextIndex;
+            m_capacity = math.max(2, math.ceilpow2(m_buffer.Length));
             m_mask     = m_capacity / 2 - 1;
         }
 
@@ -159,7 +159,7 @@ namespace Latios
                     {
                         var     indexToBackfill = candidate.nextIndex;
                         ref var replacement     = ref m_buffer.ElementAt(indexToBackfill);
-                        if (candidate.nextIndex == m_buffer.Length)
+                        if (candidate.nextIndex >= m_buffer.Length - 1)
                             replacement.nextIndex = 0;
                         candidate                 = replacement;
                         Backfill(indexToBackfill);
@@ -181,10 +181,10 @@ namespace Latios
                     ref var previousCandidate = ref candidate;
                     candidate                 = ref m_buffer.ElementAt(candidate.nextIndex);
 
-                    if (candidate.key.Equals(key))
+                    if (candidate.isOccupied && candidate.key.Equals(key))
                     {
                         var indexToBackfill = previousCandidate.nextIndex;
-                        if (previousCandidate.nextIndex == m_buffer.Length)
+                        if (previousCandidate.nextIndex >= m_buffer.Length - 1)
                             previousCandidate.nextIndex = 0;
                         else
                             previousCandidate.nextIndex = candidate.nextIndex;
@@ -291,13 +291,11 @@ namespace Latios
             // We set Capacity directly because with EnsureCapacity Unity will try to at least double the capacity when really we just want
             // to untrim to the next power of two.
             m_buffer.Capacity = m_capacity;
-            m_capacity        = m_buffer.Capacity;
             m_mask            = m_capacity / 2 - 1;
             if (m_buffer.Length == 0)
             {
-                while (m_buffer.Length < m_capacity / 2)
+                for (int i = 0; i <= m_capacity / 2; i++)
                     m_buffer.Add(default);
-                m_buffer.ElementAt(m_buffer.Length - 1).nextIndex = m_count;
             }
         }
 
@@ -335,16 +333,32 @@ namespace Latios
             ref var elementToFill = ref m_buffer.ElementAt(index);
             ref var elementToMove = ref m_buffer.ElementAt(m_buffer.Length - 1);
             // Find the thing pointing to the element we are going to move, so that we can patch it.
-            ref var candidate = ref m_buffer.ElementAt(GetBucket(in elementToMove.key));
+            ref var candidate  = ref m_buffer.ElementAt(GetBucket(in elementToMove.key));
+            bool    reinserted = false;
             for (int i = 0; i < m_buffer.Length; i++)
             {
                 if (candidate.nextIndex == m_buffer.Length - 1)
                 {
-                    candidate.nextIndex     = index;
-                    elementToFill           = elementToMove;
-                    elementToFill.nextIndex = 0;
+                    if (!reinserted)
+                    {
+                        candidate.nextIndex     = index;
+                        elementToFill           = elementToMove;
+                        elementToFill.nextIndex = 0;
+                    }
+                    else
+                    {
+                        candidate.nextIndex = 0;
+                    }
                     Backfill(m_buffer.Length - 1);
                     return;
+                }
+                else if (candidate.nextIndex > index)
+                {
+                    var fillNext            = candidate.nextIndex;
+                    candidate.nextIndex     = index;
+                    elementToFill           = elementToMove;
+                    elementToFill.nextIndex = fillNext;
+                    reinserted              = true;
                 }
                 candidate = ref m_buffer.ElementAt(candidate.nextIndex);
             }
@@ -407,7 +421,6 @@ namespace Latios
                     bufferPtr[bucket]           = oldOverflow[i];
                     bufferPtr[bucket].nextIndex = 0;
                 }
-                oldOverflow[i] = default;
             }
 
             // Clean up
@@ -497,7 +510,7 @@ namespace Latios
                     var previousCandidate = candidate;
                     candidate             = bufferPtr + candidate->nextIndex;
 
-                    if (candidate->key.Equals(key))
+                    if (candidate->isOccupied && candidate->key.Equals(key))
                         return &candidate->value;
 
                     if (candidate->nextIndex == 0 || previousCandidate->nextIndex >= m_buffer.Length - 1)

@@ -511,6 +511,11 @@ namespace Latios
         public void UpdateCollectionComponentMainThreadAccess<T>(Entity entity, bool wasAccessedAsReadOnly) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
+
             m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
             if (wasAccessedAsReadOnly)
                 return;
@@ -535,6 +540,23 @@ namespace Latios
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
             return default(T).CreateCollectionAspect(this, m_impl->m_worldUnmanaged.EntityManager, entity);
+        }
+
+        /// <summary>
+        /// Completes all jobs tracked by collection components. NOT Burst-compatible.
+        /// </summary>
+        public void CompleteAllTrackedJobs()
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
+#endif
+
+            foreach (var dep in m_impl->m_collectionDependencies)
+                if (dep.hasExtraDisposeDependency)
+                    dep.extraDisposeDependency.Complete();
+
+            m_impl->m_collectionComponentStorage.CompleteEverything();
         }
         #endregion
     }

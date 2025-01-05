@@ -87,12 +87,38 @@ namespace Latios
             m_storagePtrs.Dispose();
         }
 
+        public void CompleteEverything()
+        {
+            if (m_cleanupToFunctionLookup == null)
+                m_cleanupToFunctionLookup = new Dictionary<ComponentType, FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> >();
+            foreach (var registeredType in m_registeredTypeLookup.GetValueArray(Allocator.Temp))
+            {
+                if (!m_cleanupToFunctionLookup.TryGetValue(registeredType.cleanupType, out var functionPtr))
+                {
+                    var managedType = registeredType.cleanupType.GetManagedType();
+                    var method      = managedType.GetMethod("GetBurstDispatchFunctionPtr", BindingFlags.Static | BindingFlags.Public);
+                    var invokable   = method.CreateDelegate(typeof(GetFunctionPtrDelegate)) as GetFunctionPtrDelegate;
+                    functionPtr     = invokable();
+                    m_cleanupToFunctionLookup.Add(registeredType.cleanupType, functionPtr);
+                }
+                DispatchCompleteEverythingToSourceGen(functionPtr, (CollectionComponentStorage*)UnsafeUtility.AddressOf(ref this), registeredType.typedStorageIndex);
+            }
+        }
+
         [BurstCompile]
         public static void DispatchDisposeToSourceGen(FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
                                                       CollectionComponentStorage*                                                           thisPtr,
                                                       int storageIndex)
         {
             InternalSourceGen.CollectionComponentOperations.DisposeCollectionStorage(functionPtr, thisPtr, storageIndex);
+        }
+
+        [BurstCompile]
+        public static void DispatchCompleteEverythingToSourceGen(FunctionPointer<InternalSourceGen.StaticAPI.BurstDispatchCollectionComponentDelegate> functionPtr,
+                                                                 CollectionComponentStorage*                                                           thisPtr,
+                                                                 int storageIndex)
+        {
+            InternalSourceGen.CollectionComponentOperations.CompleteEveryting(functionPtr, thisPtr, storageIndex);
         }
 
         public ComponentType GetExistType<T>() where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
@@ -281,6 +307,12 @@ namespace Latios
             AllocatorManager.Free(m_allocator, (TypedCollectionComponentStorage<T>*)m_storagePtrs[storagePtrIndex].ptr);
         }
 
+        public void CompleteEverything<T>(int storagePtrIndex) where T : unmanaged,
+        ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
+        {
+            m_storagePtrs[storagePtrIndex].As<T>().CompleteEverything();
+        }
+
         private ref TypedCollectionComponentStorage<T> GetTypedCollectionStorage<T>(Entity entity, out int indexInTypedStorage) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
@@ -365,6 +397,25 @@ namespace Latios
             writeHandles.Dispose();
             readHandles.Dispose();
             freeStack.Dispose();
+        }
+
+        public void CompleteEverything()
+        {
+            for (int i = 0; i < writeHandles.Length; i++)
+            {
+                writeHandles[i].Complete();
+                writeHandles[i] = default;
+            }
+
+            for (int i = 0; i < readHandles.Length; i++)
+            {
+                var reads = readHandles[i];
+                for (int j = 0; j < reads.Length; j++)
+                {
+                    reads[j].Complete();
+                }
+                readHandles[i] = default;
+            }
         }
     }
 

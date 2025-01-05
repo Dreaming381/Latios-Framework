@@ -2238,7 +2238,7 @@ namespace Latios.Kinemation.Systems
 
             public void Add(int index)
             {
-                m_cachedMax = math.max(index, m_cachedMax);
+                m_cachedMax = math.max(index, Max);
                 m_set.Add(index);
             }
 

@@ -36,8 +36,7 @@ namespace Latios.Kinemation.Systems
             if (cullingContext.cullIndexThisFrame == 0)
                 state.Dependency = new NewFrameJob { meshPool = meshPool }.Schedule(state.Dependency);
 
-            var cullingConfig  = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(false);
-            var changeRequests = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<ChangeRequest>(), 256, cullingConfig.cullingThreadLocalAllocator.GeneralAllocator->ToAllocator);
+            var changeRequests = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<ChangeRequest>(), 256, state.WorldUpdateAllocator);
             state.Dependency   = new CullJob
             {
                 entityHandle   = GetEntityTypeHandle(),
