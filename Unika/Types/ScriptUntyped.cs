@@ -73,7 +73,7 @@ namespace Latios.Unika
         #region Type operations
         public static bool operator==(Script lhs, Script rhs)
         {
-            return lhs.m_entity == rhs.m_entity && lhs.m_headerRO.instanceId == rhs.m_headerRO.instanceId;
+            return lhs.m_entity == rhs.m_entity && (lhs.m_entity == Entity.Null || lhs.m_headerRO.instanceId == rhs.m_headerRO.instanceId);
         }
 
         public static bool operator!=(Script lhs, Script rhs) => !(lhs == rhs);
@@ -129,7 +129,7 @@ namespace Latios.Unika
         #region External Type Operations
         public static bool operator ==(Script lhs, ScriptRef rhs)
         {
-            return lhs.m_entity == rhs.m_entity && lhs.m_headerRO.instanceId == rhs.m_instanceId;
+            return lhs.m_entity == rhs.m_entity && (lhs.m_entity == Entity.Null || lhs.m_headerRO.instanceId == rhs.m_instanceId);
         }
 
         public static bool operator !=(Script lhs, ScriptRef rhs) => !(lhs == rhs);

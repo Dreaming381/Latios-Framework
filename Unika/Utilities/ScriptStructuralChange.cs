@@ -12,18 +12,19 @@ namespace Latios.Unika
     public static class ScriptStructuralChange
     {
         /// <summary>
-        /// Adds a script to the entity
+        /// Adds a script to the entity. The new script will be at the last index in the script collection.
         /// </summary>
         /// <typeparam name="T">The type of script to add</typeparam>
         /// <param name="script">The script initial field values to add</param>
         /// <param name="userByte">The initial userByte value for the script</param>
         /// <param name="userFlagA">The initial userFlagA value for the script</param>
         /// <param name="userFlagB">The initial userFlagB value for the script</param>
-        public static void AddScript<T>(this DynamicBuffer<UnikaScripts> scriptsBuffer,
-                                        in T script,
-                                        byte userByte = 0,
-                                        bool userFlagA = false,
-                                        bool userFlagB = false) where T : unmanaged, IUnikaScript, IUnikaScriptGen
+        /// <returns>The index of the new script in the script collection</returns>
+        public static int AddScript<T>(this DynamicBuffer<UnikaScripts> scriptsBuffer,
+                                       in T script,
+                                       byte userByte = 0,
+                                       bool userFlagA = false,
+                                       bool userFlagB = false) where T : unmanaged, IUnikaScript, IUnikaScriptGen
         {
             var scriptType  = ScriptTypeInfoManager.GetScriptRuntimeIdAndMask<T>().runtimeId;
             var index       = ScriptStructuralChangeInternal.AllocateScript(ref scriptsBuffer, scriptType);
@@ -39,6 +40,8 @@ namespace Latios.Unika
             typedResult.userByte  = userByte;
             typedResult.userFlagA = userFlagA;
             typedResult.userFlagB = userFlagB;
+
+            return index;
         }
 
         /// <summary>

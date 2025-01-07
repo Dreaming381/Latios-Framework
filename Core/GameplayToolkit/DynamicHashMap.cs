@@ -463,6 +463,13 @@ namespace Latios
                             IncrementCount();
                             return true;
                         }
+                        else if (candidate.nextIndex != 0 && last.key.Equals(key))
+                        {
+                            if (replace)
+                                last.value = value;
+                            return false;
+                        }
+
                         if (m_buffer.Length == m_capacity)
                         {
                             ReallocUp(m_capacity * 2);

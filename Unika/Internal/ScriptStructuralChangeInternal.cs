@@ -114,7 +114,7 @@ namespace Latios.Unika
             }
 
             // Look up the last script to find the total bytes used, align it, and allocate the new script's memory
-            var nextFreeByteOffset = scripts[currentScriptCount].byteOffset + ScriptTypeInfoManager.GetSizeAndAlignement((short)scripts[currentScriptCount].scriptType).x;
+            var nextFreeByteOffset = scripts[currentScriptCount - 1].byteOffset + ScriptTypeInfoManager.GetSizeAndAlignement((short)scripts[currentScriptCount - 1].scriptType).x;
             var alignment          = CollectionHelper.Align(nextFreeByteOffset, sizeAndAlignment.y);
             UnityEngine.Assertions.Assert.IsTrue((ulong)(alignment + sizeAndAlignment.x) <= ScriptHeader.kMaxByteOffset + 1);
             var requiredTotalElementSize =
@@ -122,14 +122,14 @@ namespace Latios.Unika
             for (int i = scripts.Length; i < requiredTotalElementSize; i++)
                 scripts.Add(default);
 
-            scripts[currentScriptCount + 1] = new ScriptHeader
+            scripts[currentScriptCount] = new ScriptHeader
             {
                 bloomMask  = mask,
                 scriptType = scriptType,
                 byteOffset = alignment,
                 instanceId = nextIndex
             };
-            return currentScriptCount + 1;
+            return currentScriptCount;
         }
 
         public static void FreeScript(ref DynamicBuffer<UnikaScripts> scriptBuffer, int scriptIndex)

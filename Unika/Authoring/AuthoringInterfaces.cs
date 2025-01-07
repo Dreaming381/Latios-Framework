@@ -10,6 +10,11 @@ namespace Latios.Unika.Authoring
         T GetInterfaceRef(IBaker baker, TransformUsageFlags transformUsageFlags = TransformUsageFlags.None);
     }
 
+    internal interface IUnikaAuthoringScriptCounter
+    {
+        public int CountScripts();
+    }
+
     namespace InternalSourceGen
     {
         public static class StaticAPI

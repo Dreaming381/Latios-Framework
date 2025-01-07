@@ -257,6 +257,10 @@ namespace Latios.Authoring
                 var interfaceType             = typeof(TInterface);
                 foreach (var type in derivingTypes)
                 {
+                    if (type.IsAbstract)
+                        continue;
+                    if (type.ContainsGenericParameters)
+                        continue;
                     if (componentType.IsAssignableFrom(type))
                     {
                         var concrete = componentStateGenericType.MakeGenericType(interfaceType, type);

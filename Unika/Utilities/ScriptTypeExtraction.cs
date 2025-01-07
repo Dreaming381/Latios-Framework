@@ -37,9 +37,39 @@ namespace Latios.Unika
             extractors[script.m_headerRO.scriptType].Extract(script, ref receiver);
         }
 
+        /// <summary>
+        /// An interface which can receive a concrete script type derived from a system type (without the need for reflection)
+        /// </summary>
+        public interface ITypeReceiver
+        {
+            /// <summary>
+            /// Receives the strong type of the script type passed into ScriptTypeExtraction.TryExtractType().
+            /// </summary>
+            /// <typeparam name="T">The type of the Script</typeparam>
+            public void Receive<T>() where T : unmanaged, IUnikaScript, IUnikaScriptGen;
+        }
+
+        /// <summary>
+        /// Attempts to use the script type registry to generate a concrete receiver of the passed in script type, without the need for reflection.
+        /// </summary>
+        /// <typeparam name="T">The type of the receiver</typeparam>
+        /// <param name="scriptType">The reflected type of the script</param>
+        /// <param name="receiver">The receiver instance</param>
+        /// <returns>True if the extraction was successful, false if the passed in type was not a known Unika script type</returns>
+        public static bool TryExtractType<T>(System.Type scriptType, ref T receiver) where T : ITypeReceiver
+        {
+            if (extractorTypeLookup.TryGetValue(scriptType, out var index))
+            {
+                extractors[index].ExtractType<T>(ref receiver);
+                return true;
+            }
+            return false;
+        }
+
         internal abstract class ExtractorBase
         {
-            public abstract void Extract<T>(Script script, ref T receiver) where T : IReceiver;
+            public abstract void Extract<TReceiver>(Script script, ref TReceiver receiver) where TReceiver : IReceiver;
+            public abstract void ExtractType<TTypeReceiver>(ref TTypeReceiver receiver) where TTypeReceiver : ITypeReceiver;
         }
 
         internal class Extractor<T> : ExtractorBase where T : unmanaged, IUnikaScript, IUnikaScriptGen
@@ -49,12 +79,25 @@ namespace Latios.Unika
                 script.TryCastScript<T>(out var casted);
                 receiver.Receive(casted);
             }
+
+            public override void ExtractType<TTypeReceiver>(ref TTypeReceiver receiver)
+            {
+                receiver.Receive<T>();
+            }
         }
 
         internal static List<ExtractorBase> extractors = new List<ExtractorBase>()
         {
             null
         };
+
+        internal static Dictionary<System.Type, int> extractorTypeLookup = new Dictionary<System.Type, int>();
+
+        internal static void AddExtractorType<T>() where T : unmanaged, IUnikaScript, IUnikaScriptGen
+        {
+            extractorTypeLookup.Add(typeof(T), extractors.Count);
+            extractors.Add(new Extractor<T>());
+        }
     }
 }
 

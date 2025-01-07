@@ -82,7 +82,7 @@ namespace Latios.Unika
             var stableHash = TypeHash.CalculateStableTypeHash(typeof(T), s_stableTypeHashCache);
             ScriptStableHashToIdAndMaskMap.s_map.Data.Add(stableHash, idAndMask);
 
-            ScriptTypeExtraction.extractors.Add(new ScriptTypeExtraction.Extractor<T>());
+            ScriptTypeExtraction.AddExtractorType<T>();
             UnityEngine.Assertions.Assert.IsTrue(runtimeScriptCounter == ScriptTypeExtraction.extractors.Count);
 
             s_entityOffsetCache.Clear();

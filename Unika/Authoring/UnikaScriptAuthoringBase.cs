@@ -1,27 +1,27 @@
 using System.Collections.Generic;
+using Latios.Authoring;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.Transforms;
 using UnityEngine;
 
 namespace Latios.Unika.Authoring
 {
     /// <summary>
-    /// A base class for authoring an untyped script. Prefer to use UnikaScriptAuthoring<T> instead.
-    /// However, refer to this base type to understand the methods you need to override.
+    /// A base class for authoring an untyped script. Prefer to use UnikaScriptAuthoring<T> instead unless you need to do something very custom.
+    /// However, you should still refer to this base type to understand the methods you need to override.
     /// </summary>
     [RequireComponent(typeof(UnikaScriptBufferAuthoring))]
-    public abstract class UnikaScriptAuthoringBase : MonoBehaviour
+    public abstract class UnikaScriptAuthoringBase : MonoBehaviour, IUnikaAuthoringScriptCounter
     {
-        private protected static List<UnikaScriptAuthoringBase> m_scriptsCache = new List<UnikaScriptAuthoringBase>();
+        private protected static List<IUnikaAuthoringScriptCounter> m_scriptsCache = new List<IUnikaAuthoringScriptCounter>();
 
         /// <summary>
         /// Implement this method to determine whether this authoring component will produce a valid script.
         /// This method will be called frequently from various points in baking. It is crucial that this method
-        /// returns false if the script baking will be canceled for any reason, as otherwise prewarmed reference caches
-        /// will be incorrect resulting in reduced runtime performance.
+        /// returns false if the script baking will be canceled for any reason, as otherwise ScriptRefs obtained
+        /// from any baked scripts on the target entity at bake time may be corrupted.
         /// </summary>
         /// <returns>True if a script will be baked given the current configuration, false otherwise</returns>
         public abstract bool IsValid();
@@ -51,7 +51,7 @@ namespace Latios.Unika.Authoring
             for (int i = 0, validBefore = 0; i < m_scriptsCache.Count; i++)
             {
                 var s = m_scriptsCache[i];
-                if (s == this)
+                if (ReferenceEquals(s, this))
                 {
                     if (IsValid())
                     {
@@ -59,16 +59,46 @@ namespace Latios.Unika.Authoring
                         {
                             m_entity            = baker.GetEntity(this, transformUsageFlags),
                             m_instanceId        = validBefore + 1,
-                            m_cachedHeaderIndex = i
+                            m_cachedHeaderIndex = validBefore
                         };
                     }
                     else
                         return default;
                 }
-                else if (s.enabled && s.IsValid())
-                    validBefore++;
+                else
+                    validBefore += s.CountScripts();
             }
             return default;
+        }
+
+        /// <summary>
+        /// Assigns the Script and extracts a typed ScriptRef which can be used to assign references to other components being baked
+        /// </summary>
+        /// <typeparam name="T">The type of script to be generated</typeparam>
+        /// <param name="baker">The baker being used to bake this script</param>
+        /// <param name="script">The script field data the script should be initialized with</param>
+        /// <param name="assignment">The assignment object to assign the script data to</param>
+        /// <param name="transformUsageFlags">The transform flags that should be added to the script's entity, if any</param>
+        /// <returns>A typed ScriptRef for the assigned script</returns>
+        protected ScriptRef<T> AssignAndGetTypedRef<T>(IBaker baker,
+                                                       ref T script,
+                                                       ref AuthoredScriptAssignment assignment,
+                                                       TransformUsageFlags transformUsageFlags = TransformUsageFlags.None)
+            where T : unmanaged, IUnikaScript, IUnikaScriptGen
+        {
+            assignment.Assign(ref script);
+            var scriptRef = GetScriptRef(baker, transformUsageFlags);
+            return new ScriptRef<T>
+            {
+                m_entity            = scriptRef.m_entity,
+                m_instanceId        = scriptRef.m_instanceId,
+                m_cachedHeaderIndex = scriptRef.m_cachedHeaderIndex,
+            };
+        }
+
+        int IUnikaAuthoringScriptCounter.CountScripts()
+        {
+            return (enabled && IsValid()) ? 1 : 0;
         }
     }
 
