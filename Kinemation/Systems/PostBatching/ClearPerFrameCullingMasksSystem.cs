@@ -13,26 +13,36 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct ClearPerFrameCullingMasksSystem : ISystem
     {
-        EntityQuery m_metaQuery;
+        EntityQuery m_renderMetaQuery;
+        EntityQuery m_skeletonMetaQuery;
 
         public void OnCreate(ref SystemState state)
         {
-            m_metaQuery = state.Fluent().With<ChunkPerFrameCullingMask>(false).With<ChunkPerCameraCullingMask>(false).With<ChunkHeader>(true).Build();
+            m_renderMetaQuery   = state.Fluent().With<ChunkPerFrameCullingMask>(false).With<ChunkPerCameraCullingMask>(false).With<ChunkHeader>(true).Build();
+            m_skeletonMetaQuery = state.Fluent().With<RenderVisibilityFeedbackFlag>(false).With<SkeletonRootTag>(true).Build();
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            state.Dependency = new ClearJob
+            state.Dependency = new ClearRenderJob
             {
                 frameHandle       = GetComponentTypeHandle<ChunkPerFrameCullingMask>(),
                 dispatchHandle    = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(),
                 lastSystemVersion = state.LastSystemVersion
-            }.ScheduleParallel(m_metaQuery, state.Dependency);
+            }.ScheduleParallel(m_renderMetaQuery, state.Dependency);
+
+            if (!m_skeletonMetaQuery.IsEmptyIgnoreFilter)
+            {
+                state.Dependency = new ClearSkeletonsJob
+                {
+                    flagHandle = GetComponentTypeHandle<RenderVisibilityFeedbackFlag>()
+                }.ScheduleParallel(m_skeletonMetaQuery, state.Dependency);
+            }
         }
 
         [BurstCompile]
-        struct ClearJob : IJobChunk
+        struct ClearRenderJob : IJobChunk
         {
             public ComponentTypeHandle<ChunkPerFrameCullingMask>    frameHandle;
             public ComponentTypeHandle<ChunkPerDispatchCullingMask> dispatchHandle;
@@ -50,6 +60,17 @@ namespace Latios.Kinemation.Systems
                     var ptr = chunk.GetComponentDataPtrRW(ref dispatchHandle);
                     UnsafeUtility.MemClear(ptr, sizeof(ChunkPerDispatchCullingMask) * chunk.Count);
                 }
+            }
+        }
+
+        [BurstCompile]
+        struct ClearSkeletonsJob : IJobChunk
+        {
+            public ComponentTypeHandle<RenderVisibilityFeedbackFlag> flagHandle;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                chunk.SetComponentEnabledForAll(ref flagHandle, false);
             }
         }
     }

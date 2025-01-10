@@ -175,6 +175,7 @@ namespace Latios.Kinemation.Systems
                 groupedSkinningRequestsStartsAndCounts   = groupedSkinningRequestsStartsAndCounts.AsDeferredJobArray(),
                 optimizedBoneBufferHandle                = SystemAPI.GetBufferTypeHandle<OptimizedBoneTransform>(true),
                 perChunkPrefixSums                       = perChunkPrefixSums,
+                renderVisibilityFeedbackFlagHandle       = SystemAPI.GetComponentTypeHandle<RenderVisibilityFeedbackFlag>(false),
                 skeletonEntityToSkinningRequestsGroupMap = skeletonEntityToSkinningRequestsGroupMap,
                 skinnedMeshesBufferHandle                = SystemAPI.GetBufferTypeHandle<DependentSkinnedMesh>(true),
                 skinningStream                           = skinningStream.AsWriter()
@@ -924,6 +925,8 @@ namespace Latios.Kinemation.Systems
 
             PerChunkPrefixSums chunkPrefixSums;
 
+            public ComponentTypeHandle<RenderVisibilityFeedbackFlag> renderVisibilityFeedbackFlagHandle;
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 if (groupedSkinningRequests.Length == 0)
@@ -950,9 +953,11 @@ namespace Latios.Kinemation.Systems
 
             void ProcessExposed(in ArchetypeChunk chunk)
             {
-                var entityArray           = chunk.GetNativeArray(entityHandle);
-                var skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
-                var boneBufferAccessor    = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
+                var  entityArray           = chunk.GetNativeArray(entityHandle);
+                var  skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
+                var  boneBufferAccessor    = chunk.GetBufferAccessor(ref boneReferenceBufferHandle);
+                var  mask                  = chunk.GetEnabledMask(ref renderVisibilityFeedbackFlagHandle);
+                bool hasMask               = mask.EnableBit.IsValid;
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -960,16 +965,20 @@ namespace Latios.Kinemation.Systems
                     //if (mask.IsSet(i % 64))
                     {
                         var boneCount = boneBufferAccessor[i].Length;
-                        ProcessRequests(entityArray[i], skinnedMeshesAccessor[i].AsNativeArray(), i, boneCount);
+                        var hadMeshes = ProcessRequests(entityArray[i], skinnedMeshesAccessor[i].AsNativeArray(), i, boneCount);
+                        if (hasMask && hadMeshes)
+                            mask[i] = true;
                     }
                 }
             }
 
             void ProcessOptimized(in ArchetypeChunk chunk)
             {
-                var entityArray           = chunk.GetNativeArray(entityHandle);
-                var skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
-                var boneBufferAccessor    = chunk.GetBufferAccessor(ref optimizedBoneBufferHandle);
+                var  entityArray           = chunk.GetNativeArray(entityHandle);
+                var  skinnedMeshesAccessor = chunk.GetBufferAccessor(ref skinnedMeshesBufferHandle);
+                var  boneBufferAccessor    = chunk.GetBufferAccessor(ref optimizedBoneBufferHandle);
+                var  mask                  = chunk.GetEnabledMask(ref renderVisibilityFeedbackFlagHandle);
+                bool hasMask               = mask.EnableBit.IsValid;
 
                 for (int i = 0; i < chunk.Count; i++)
                 {
@@ -977,15 +986,17 @@ namespace Latios.Kinemation.Systems
                     //if (mask.IsSet(i % 64))
                     {
                         var boneCount = boneBufferAccessor[i].Length / 6;
-                        ProcessRequests(entityArray[i], skinnedMeshesAccessor[i].AsNativeArray(), i, boneCount);
+                        var hadMeshes = ProcessRequests(entityArray[i], skinnedMeshesAccessor[i].AsNativeArray(), i, boneCount);
+                        if (hasMask && hadMeshes)
+                            mask[i] = true;
                     }
                 }
             }
 
-            void ProcessRequests(Entity skeletonEntity, NativeArray<DependentSkinnedMesh> meshes, int indexInChunk, int skeletonBonesCount)
+            bool ProcessRequests(Entity skeletonEntity, NativeArray<DependentSkinnedMesh> meshes, int indexInChunk, int skeletonBonesCount)
             {
                 if (!skeletonEntityToSkinningRequestsGroupMap.TryGetValue(skeletonEntity, out var startAndCountIndex))
-                    return;
+                    return false;
 
                 var startAndCount = groupedSkinningRequestsStartsAndCounts[startAndCountIndex];
                 var requests      = groupedSkinningRequests.GetSubArray(startAndCount.x, startAndCount.y);
@@ -1031,6 +1042,8 @@ namespace Latios.Kinemation.Systems
                     ProcessChain(requests.GetSubArray(startOfPrevious, startOfTwoAgo), meshes, indexInChunk, skeletonBonesCount);
                 if (startOfTwoAgo >= 0)
                     ProcessChain(requests.GetSubArray(startOfTwoAgo, requests.Length - startOfTwoAgo), meshes, indexInChunk, skeletonBonesCount);
+
+                return true;
             }
 
             void ProcessChain(NativeArray<MeshSkinningRequest> requests, NativeArray<DependentSkinnedMesh> meshes, int indexInChunk, int skeletonBonesCount)

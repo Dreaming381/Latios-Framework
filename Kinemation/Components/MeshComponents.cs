@@ -9,13 +9,6 @@ namespace Latios.Kinemation
 {
     #region All Meshes
     /// <summary>
-    /// An optional component that when present will be enabled for the duration of the frame
-    /// following a frame it was rendered by some view (including shadows), and disabled otherwise.
-    /// Usage: Add, remove, and read the enabled state.
-    /// </summary>
-    public struct RenderVisibilityFeedbackFlag : IComponentData, IEnableableComponent { }
-
-    /// <summary>
     /// QVVS Transforms: An optional matrix that is applied after computing the final WorldTransform.
     /// It can be used for additional squash, stretch, and shear effects on a renderer.
     ///

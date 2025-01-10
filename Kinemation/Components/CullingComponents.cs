@@ -8,6 +8,13 @@ using UnityEngine.Rendering;
 namespace Latios.Kinemation
 {
     /// <summary>
+    /// An optional component that when present will be enabled for the duration of the frame
+    /// following a frame it was rendered by some view (including shadows), and disabled otherwise.
+    /// Usage: Add, remove, and read the enabled state.
+    /// </summary>
+    public struct RenderVisibilityFeedbackFlag : IComponentData, IEnableableComponent { }
+
+    /// <summary>
     /// Add to the WorldBlackboardEntity to enable the custom graphics systems which update before all culling.
     /// This has the negative effect of forcing several jobs to complete prior to engine code updates,
     /// potentially starving worker threads.

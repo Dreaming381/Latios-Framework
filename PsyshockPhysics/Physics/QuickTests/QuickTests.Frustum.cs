@@ -108,7 +108,7 @@ namespace Latios.Psyshock
             float4 radiiA     = ex * frustum.absXa + ey * frustum.absYa + ez * frustum.absZa;
             float4 radiiB     = ex * frustum.absXa + ey * frustum.absYa + ez * frustum.absZa;
 
-            return math.any((distancesA + radiiA <= 0f) | (distancesB + radiiB <= 0f));
+            return !math.any((distancesA + radiiA <= 0f) | (distancesB + radiiB <= 0f));
         }
 
         /// <summary>
