@@ -757,6 +757,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Run the FindPairs operation using multiple worker threads in a single phase, without safe write access to the second layer.
         /// If the CollisionLayers only contains a single cell each (all subdivisions == 1), this falls back to ScheduleSingle().
+        /// This also disables entity aliasing checks for the second layer and across layers.
         /// </summary>
         /// <param name="inputDeps">The input dependencies for any layers or processors used in the FindPairs operation</param>
         /// <returns>A JobHandle for the scheduled job</returns>

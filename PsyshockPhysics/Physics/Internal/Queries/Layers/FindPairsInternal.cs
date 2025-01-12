@@ -563,7 +563,7 @@ namespace Latios.Psyshock
                     {
                         if (index == IndexStrategies.Part1Count(layerA.cellCount))
                         {
-                            EntityAliasCheck(in layerA, in layerB);
+                            EntityAliasCheckLayerA(in layerA);
                             return;
                         }
 
@@ -772,6 +772,22 @@ namespace Latios.Psyshock
                             var entity = layerB.bodies[i].entity;
                             throw new InvalidOperationException(
                                 $"A parallel FindPairs job was scheduled using two layers combined containing more than one instance of Entity {entity}");
+                        }
+                    }
+                }
+
+                [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+                private static void EntityAliasCheckLayerA(in CollisionLayer layerA)
+                {
+                    var hashSet = new NativeParallelHashSet<Entity>(layerA.count, Allocator.Temp);
+                    for (int i = 0; i < layerA.count; i++)
+                    {
+                        if (!hashSet.Add(layerA.bodies[i].entity))
+                        {
+                            //Note: At this point, we know the issue lies exclusively in layerA.
+                            var entity = layerA.bodies[i].entity;
+                            throw new InvalidOperationException(
+                                $"A parallel FindPairs job was scheduled by A using a layer containing more than one instance of Entity {entity}");
                         }
                     }
                 }
