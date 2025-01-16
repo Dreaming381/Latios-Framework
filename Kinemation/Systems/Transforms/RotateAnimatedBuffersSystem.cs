@@ -28,8 +28,6 @@ namespace Latios.Kinemation.Systems
         EntityQuery m_blendShapesQuery;
         EntityQuery m_dynamicMeshesQuery;
 
-        bool ignoreChangeFilters;
-
         public void OnCreate(ref SystemState state)
         {
             m_initSkeletonsQuery = state.Fluent().With<OptimizedSkeletonState>(true).With<OptimizedBoneTransform>(false)
@@ -40,8 +38,6 @@ namespace Latios.Kinemation.Systems
             m_skeletonsQuery     = state.Fluent().With<OptimizedSkeletonState>().With<OptimizedBoneTransform>(true).IncludeDisabledEntities().Build();
             m_blendShapesQuery   = state.Fluent().With<BlendShapeState>().With<BlendShapeWeight>(true).IncludeDisabledEntities().Build();
             m_dynamicMeshesQuery = state.Fluent().With<DynamicMeshState>().With<DynamicMeshVertex>(true).IncludeDisabledEntities().Build();
-
-            ignoreChangeFilters = (state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None;
         }
 
         [BurstCompile]
@@ -52,7 +48,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var lastSystemVersion = math.select(state.LastSystemVersion, 0, ignoreChangeFilters);
+            var lastSystemVersion = state.GetLiveBakeSafeLastSystemVersion();
             var skeletonJh        = new InitSkeletonJob
             {
                 lastSystemVersion = lastSystemVersion,

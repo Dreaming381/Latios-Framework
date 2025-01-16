@@ -24,6 +24,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             EnableSystemSorting = false;
 
+            GetOrCreateAndAddSystem<BindSkinnedMeshesToSkeletonsSystem>();  // async -> sync
             GetOrCreateAndAddSystem<FindExposedBonesBakingSystem>();  // async -> sync
         }
     }
@@ -58,7 +59,7 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddManagedSystem<AssignSocketIndicesSystem>();  // sync
             GetOrCreateAndAddManagedSystem<GatherOptimizedHierarchyFromShadowHierarchySystem>();  // sync -> async
 
-            GetOrCreateAndAddSystem<BindSkinnedMeshesToSkeletonsSystem>();  // async -> sync
+            // Todo: Need new async -> sync
             GetOrCreateAndAddManagedSystem<MeshDeformDataSmartBlobberSystem>();  // sync -> async
 
             GetOrCreateAndAddSystem<MeshPathsSmartBlobberSystem>();  // async

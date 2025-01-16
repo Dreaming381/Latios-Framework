@@ -68,7 +68,7 @@ namespace Latios.Transforms.Systems
             {
                 depthHandle          = depthHandle,
                 depthMaskHandle      = depthMaskHandle,
-                lastSystemVersion    = state.LastSystemVersion,
+                lastSystemVersion    = state.GetLiveBakeSafeLastSystemVersion(),
                 localTransformHandle = localTransformHandle,
                 worldTransformLookup = worldTransformLookup,
                 parentHandle         = parentHandle,
@@ -106,7 +106,7 @@ namespace Latios.Transforms.Systems
                 chunkList                 = finalChunkList.AsDeferredJobArray(),
                 depthHandle               = depthHandle,
                 depthLevel                = kMaxDepthIterations - 1,
-                lastSystemVersion         = state.LastSystemVersion,
+                lastSystemVersion         = state.GetLiveBakeSafeLastSystemVersion(),
                 localTransformLookup      = GetComponentLookup<LocalTransform>(false),
                 worldTransformLookup      = worldTransformLookup,
                 worldTransformHandle      = worldTransformHandle,

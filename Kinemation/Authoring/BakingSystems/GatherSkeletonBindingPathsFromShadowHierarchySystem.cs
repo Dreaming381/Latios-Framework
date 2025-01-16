@@ -17,6 +17,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 m_breadthQueue = new Queue<(UnityEngine.Transform, int)>();
 
             var previousHierarchyCopyMap = new NativeHashMap<UnityObjectRef<UnityEngine.GameObject>, Entity>(128, WorldUpdateAllocator);
+            var copyCache                = new NativeList<SkeletonBoneNameInHierarchy>(128, WorldUpdateAllocator);
 
             CompleteDependency();
             foreach ((var boneNames, var shadowRef, var entity) in SystemAPI.Query<DynamicBuffer<SkeletonBoneNameInHierarchy>, ShadowHierarchyReference>()
@@ -24,8 +25,10 @@ namespace Latios.Kinemation.Authoring.Systems
             {
                 if (previousHierarchyCopyMap.TryGetValue(shadowRef.shadowHierarchyRoot, out var otherEntity))
                 {
+                    copyCache.Clear();
+                    copyCache.AddRange(SystemAPI.GetBuffer<SkeletonBoneNameInHierarchy>(otherEntity).AsNativeArray());
                     boneNames.Clear();
-                    boneNames.AddRange(SystemAPI.GetBuffer<SkeletonBoneNameInHierarchy>(otherEntity).AsNativeArray());
+                    boneNames.AddRange(copyCache.AsArray());
                     continue;
                 }
 

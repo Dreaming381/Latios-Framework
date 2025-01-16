@@ -15,6 +15,7 @@ namespace Latios.Kinemation.Systems
     public partial struct LiveBakingCheckForReinitsSystem : ISystem
     {
         EntityQuery m_reinitMeshesQuery;
+        EntityQuery m_unityTransformsBindSkeletonRootsQuery;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -23,7 +24,8 @@ namespace Latios.Kinemation.Systems
             state.Enabled = false;
             return;
 #endif
-            m_reinitMeshesQuery = state.Fluent().With<MeshDeformDataBlobReference, BoundMesh>(true).Build();
+            m_reinitMeshesQuery                     = state.Fluent().With<MeshDeformDataBlobReference, BoundMesh>(true).Build();
+            m_unityTransformsBindSkeletonRootsQuery = state.Fluent().With<Unity.Transforms.LocalTransform>(false).With<BindSkeletonRoot>(true).Build();
         }
 
         [BurstCompile]
@@ -44,6 +46,15 @@ namespace Latios.Kinemation.Systems
             }.ScheduleParallel(m_reinitMeshesQuery, state.Dependency);
             state.CompleteDependency();
             ecb.Playback(state.EntityManager);
+
+            if (!m_unityTransformsBindSkeletonRootsQuery.IsEmptyIgnoreFilter)
+            {
+                // Clean up Unity local transforms that we parent to skeletons in case we don't rebind but transforms get rebaked and diffed over.
+                state.Dependency = new CleanupUnityLocalTransformsJob
+                {
+                    localTransformHandle = GetComponentTypeHandle<Unity.Transforms.LocalTransform>(false)
+                }.ScheduleParallel(m_unityTransformsBindSkeletonRootsQuery, default);
+            }
         }
 
         [BurstCompile]
@@ -65,6 +76,21 @@ namespace Latios.Kinemation.Systems
                 {
                     if (old[i].meshBlob != target[i].blob)
                         ecb.AddComponent<BoundMeshNeedsReinit>(unfilteredChunkIndex, entities[i]);
+                }
+            }
+        }
+
+        [BurstCompile]
+        struct CleanupUnityLocalTransformsJob : IJobChunk
+        {
+            public ComponentTypeHandle<Unity.Transforms.LocalTransform> localTransformHandle;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var locals = chunk.GetNativeArray(ref localTransformHandle);
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    locals[i] = Unity.Transforms.LocalTransform.Identity;
                 }
             }
         }

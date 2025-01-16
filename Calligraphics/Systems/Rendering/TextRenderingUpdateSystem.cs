@@ -23,7 +23,6 @@ namespace Latios.Calligraphics.Rendering.Systems
         EntityQuery m_singleFontQuery;
         EntityQuery m_multiFontQuery;
         EntityQuery m_gpuResidentQuery;
-        bool        m_skipChangeFilter;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -36,7 +35,6 @@ namespace Latios.Calligraphics.Rendering.Systems
 
             latiosWorld.worldBlackboardEntity.AddComponent<GlyphCountThisFrame>();
             latiosWorld.worldBlackboardEntity.AddComponent<MaskCountThisFrame>();
-            m_skipChangeFilter = (state.WorldUnmanaged.Flags & WorldFlags.Editor) == WorldFlags.Editor;
         }
 
         [BurstCompile]
@@ -57,7 +55,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                 controlHandle          = GetComponentTypeHandle<TextRenderControl>(false),
                 materialMeshInfoHandle = GetComponentTypeHandle<MaterialMeshInfo>(false),
                 gpuResidentHandle      = GetComponentTypeHandle<GpuResidentUpdateFlag>(false),
-                lastSystemVersion      = m_skipChangeFilter ? 0 : state.LastSystemVersion
+                lastSystemVersion      = state.GetLiveBakeSafeLastSystemVersion()
             }.ScheduleParallel(m_singleFontQuery, state.Dependency);
 
             state.Dependency = new MultiFontJob
@@ -69,7 +67,7 @@ namespace Latios.Calligraphics.Rendering.Systems
                 glyphHandle                 = GetBufferTypeHandle<RenderGlyph>(true),
                 glyphMaskLookup             = GetBufferLookup<RenderGlyphMask>(false),
                 gpuResidentAllocationLookup = GetComponentLookup<GpuResidentUpdateFlag>(false),
-                lastSystemVersion           = m_skipChangeFilter ? 0 : state.LastSystemVersion,
+                lastSystemVersion           = state.GetLiveBakeSafeLastSystemVersion(),
                 materialMeshInfoLookup      = GetComponentLookup<MaterialMeshInfo>(false),
                 selectorHandle              = GetBufferTypeHandle<FontMaterialSelectorForGlyph>(true)
             }.ScheduleParallel(m_multiFontQuery, state.Dependency);

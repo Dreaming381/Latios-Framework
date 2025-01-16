@@ -17,8 +17,6 @@ namespace Latios.Calligraphics.Systems
     {
         EntityQuery m_query;
 
-        bool m_skipChangeFilter;
-
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
@@ -29,7 +27,6 @@ namespace Latios.Calligraphics.Systems
                       .With<TextBaseConfiguration>(true)
                       .With<TextRenderControl>(    false)
                       .Build();
-            m_skipChangeFilter = (state.WorldUnmanaged.Flags & WorldFlags.Editor) == WorldFlags.Editor;
         }
 
         [BurstCompile]
@@ -43,7 +40,7 @@ namespace Latios.Calligraphics.Systems
                 fontBlobReferenceLookup     = GetComponentLookup<FontBlobReference>(true),
                 glyphMappingElementHandle   = GetBufferTypeHandle<GlyphMappingElement>(false),
                 glyphMappingMaskHandle      = GetComponentTypeHandle<GlyphMappingMask>(true),
-                lastSystemVersion           = m_skipChangeFilter ? 0 : state.LastSystemVersion,
+                lastSystemVersion           = state.GetLiveBakeSafeLastSystemVersion(),
                 renderGlyphHandle           = GetBufferTypeHandle<RenderGlyph>(false),
                 selectorHandle              = GetBufferTypeHandle<FontMaterialSelectorForGlyph>(false),
                 textBaseConfigurationHandle = GetComponentTypeHandle<TextBaseConfiguration>(true),

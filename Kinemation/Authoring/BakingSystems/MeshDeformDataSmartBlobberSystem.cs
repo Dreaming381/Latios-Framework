@@ -126,6 +126,7 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_graphicsBufferCache == null)
                 m_graphicsBufferCache = new List<GraphicsBuffer>();
 
+            CompleteDependency();
             m_meshCache.Clear();
             int count   = m_query.CalculateEntityCountWithoutFiltering();
             var hashmap = new NativeParallelHashMap<MeshReference, BlobAndFeatures>(count, WorldUpdateAllocator);

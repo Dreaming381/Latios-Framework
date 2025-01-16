@@ -42,7 +42,7 @@ namespace Latios.Transforms.Systems
                 parentToWorldLookup       = GetComponentLookup<ParentToWorldTransform>(false),
                 worldTransformLookup      = GetComponentLookup<WorldTransform>(false),
                 hierarchyUpdateModeLookup = GetComponentLookup<HierarchyUpdateMode>(true),
-                lastSystemVersion         = state.LastSystemVersion
+                lastSystemVersion         = state.GetLiveBakeSafeLastSystemVersion()
             };
             state.Dependency = job.ScheduleParallelByRef(m_query, state.Dependency);
         }

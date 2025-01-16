@@ -85,7 +85,7 @@ namespace Latios.Transforms.Systems
                 changeOpsBlocklist                 = changeOpsBlocklist,
                 childrenWithNullParentsBlocklist   = childrenWithNullParentsBlocklist,
                 parentsWithoutChildBufferBlocklist = parentsWithoutChildBufferBlocklist,
-                lastSystemVersion                  = state.LastSystemVersion
+                lastSystemVersion                  = state.GetLiveBakeSafeLastSystemVersion()
             }.ScheduleParallel(m_allChildrenQuery, state.Dependency);
 
             var parentsWithoutChildBufferList = new NativeList<Entity>(state.WorldUpdateAllocator);

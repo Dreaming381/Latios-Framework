@@ -94,6 +94,15 @@ namespace Latios
             if (!type.IsBuffer)
                 throw new ArgumentException($"Attempted to call EntityManager.CopyDynamicBuffer on {type} which is not an IBufferElementData");
         }
+
+        public static uint GetLiveBakeSafeLastSystemVersion(this ref SystemState state)
+        {
+#if UNITY_EDITOR
+            if ((state.WorldUnmanaged.Flags & WorldFlags.Editor) == WorldFlags.Editor)
+                return 0;
+#endif
+            return state.LastSystemVersion;
+        }
     }
 }
 
