@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Latios.Authoring;
-using Latios.Authoring.Systems;
 using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
-using Unity.Jobs;
-using Unity.Mathematics;
 
 namespace Latios.Kinemation.Authoring
 {
@@ -64,6 +61,67 @@ namespace Latios.Kinemation.Authoring
             baker.DependsOn(animator.avatar);
             return new BoneNamesRequestHandle { boneNamesTempEntity = entity };
         }
+
+        static Queue<(UnityEngine.GameObject, int)> s_breadthQueue = new Queue<(UnityEngine.GameObject, int)>();
+
+        public static void CreateBoneNamesForExposedSkeleton(this IBaker baker, UnityEngine.Animator rootAnimator, NativeList<SkeletonBoneNameInHierarchy> outputBoneNames)
+        {
+            s_breadthQueue.Clear();
+            s_breadthQueue.Enqueue((rootAnimator.gameObject, -1));
+
+            while (s_breadthQueue.Count > 0)
+            {
+                var (bone, parentIndex) = s_breadthQueue.Dequeue();
+                int currentIndex        = outputBoneNames.Length;
+                outputBoneNames.Add(new SkeletonBoneNameInHierarchy
+                {
+                    boneName    = baker.GetName(bone),
+                    parentIndex = parentIndex
+                });
+
+                for (int i = 0; i < baker.GetChildCount(bone); i++)
+                {
+                    var child = baker.GetChild(bone, i);
+                    if (baker.GetComponent<UnityEngine.SkinnedMeshRenderer>(child) == null && baker.GetComponent<ExcludeFromSkeletonAuthoring>(child) == null &&
+                        baker.GetComponentInParent<UnityEngine.Animator>(child) == rootAnimator)
+                        s_breadthQueue.Enqueue((child, currentIndex));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Generates and appends a full reverse path from the bone names for the bone at the specified index.
+        /// </summary>
+        /// <param name="boneNames">The span of bone names typically retrieved from a BoneNamesRequestHandle</param>
+        /// <param name="boneIndex">The bone to generate the path for</param>
+        /// <param name="includeRoot">If true, the root bone name will be included in the path. Otherwise, it will be dropped.
+        /// The root bone is often the object name, including clone identifiers.</param>
+        public static void AppendBoneReversePath(this ref NativeText text, ReadOnlySpan<SkeletonBoneNameInHierarchy> boneNames, int boneIndex, bool includeRoot = true)
+        {
+            var final = includeRoot ? 0 : 1;
+            for (int i = boneIndex; i >= final; i = boneNames[i].parentIndex)
+            {
+                text.Append(boneNames[i].boneName);
+                text.Append('/');
+            }
+        }
+
+        /// <summary>
+        /// Generates and appends a full reverse path from the bone names for the bone at the specified index.
+        /// </summary>
+        /// <param name="boneNames">The span of bone names typically retrieved from a BoneNamesRequestHandle</param>
+        /// <param name="boneIndex">The bone to generate the path for</param>
+        /// <param name="includeRoot">If true, the root bone name will be included in the path. Otherwise, it will be dropped.
+        /// The root bone is often the object name, including clone identifiers.</param>
+        public static void AppendBoneReversePath(this ref UnsafeText text, ReadOnlySpan<SkeletonBoneNameInHierarchy> boneNames, int boneIndex, bool includeRoot = true)
+        {
+            var final = includeRoot ? 0 : 1;
+            for (int i = boneIndex; i >= final; i = boneNames[i].parentIndex)
+            {
+                text.Append(boneNames[i].boneName);
+                text.Append('/');
+            }
+        }
     }
 
     /// <summary>
@@ -80,6 +138,14 @@ namespace Latios.Kinemation.Authoring
         public ReadOnlySpan<SkeletonBoneNameInHierarchy> Resolve(EntityManager entityManager)
         {
             return entityManager.GetBuffer<SkeletonBoneNameInHierarchy>(boneNamesTempEntity, true).AsNativeArray().AsReadOnlySpan();
+        }
+
+        /// <summary>
+        /// Retrieves the optimized skeleton's bone names. Call this in a smart blobber or baking system after KinemationSmartBlobberBakingGroup.
+        /// </summary>
+        public ReadOnlySpan<SkeletonBoneNameInHierarchy> Resolve(ref BufferLookup<SkeletonBoneNameInHierarchy> readOnlyLookup)
+        {
+            return readOnlyLookup[boneNamesTempEntity].AsNativeArray().AsReadOnlySpan();
         }
     }
 
@@ -101,6 +167,7 @@ namespace Latios.Kinemation.Authoring
                     }
                 }
 
+                baker.AddComponent<SkeletonBindingPathsBakeTag>(blobBakingEntity);
                 baker.AddBuffer<SkeletonBoneNameInHierarchy>(blobBakingEntity).AddRange(boneNamesInHierarchy);
                 return true;
             }
@@ -133,11 +200,15 @@ namespace Latios.Kinemation.Authoring
             {
                 animatorToBuildShadowFor = animator
             });
+            baker.AddComponent<SkeletonBindingPathsBakeTag>(blobBakingEntity);
             baker.AddBuffer<SkeletonBoneNameInHierarchy>(blobBakingEntity).Add(new SkeletonBoneNameInHierarchy { boneName = rootName, parentIndex = -1 });
             baker.DependsOn(animator.avatar);
             return true;
         }
     }
+
+    [TemporaryBakingType]
+    internal struct SkeletonBindingPathsBakeTag : IComponentData { }
 }
 
 namespace Latios.Kinemation.Authoring.Systems
@@ -163,6 +234,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
         }
 
+        [WithAll(typeof(SkeletonBindingPathsBakeTag))]
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct Job : IJobEntity

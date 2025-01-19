@@ -110,6 +110,26 @@ namespace Latios.Kinemation
         public BlobAssetReference<SkeletonBindingPathsBlob> blob;
     }
 
+    /// <summary>
+    /// A blob asset which contains a collection of bone masks to perform masked sampling of animation clips.
+    /// </summary>
+    public struct SkeletonBoneMaskSetBlob
+    {
+        /// <summary>
+        /// The raw masks. Each inner blobArray is a single mask.
+        /// </summary>
+        public BlobArray<BlobArray<ulong> > masks;
+        /// <summary>
+        /// The mask names with each index corresponding to a mask index
+        /// </summary>
+        public BlobArray<FixedString128Bytes> maskNames;
+
+        /// <summary>
+        /// Gets the mask at the specified index in the form of a ReadOnlySpan ready for sampling.
+        /// </summary>
+        public ReadOnlySpan<ulong> this[int maskIndex] => masks[maskIndex].AsSpan();
+    }
+
     #endregion
     #region Exposed skeleton
 

@@ -180,6 +180,7 @@ namespace Latios.Kinemation.Authoring
                 if (clip.clip.GetHashCode() == 0)
                 {
                     Debug.LogError($"Kinemation failed to bake clip set on animator {animator.gameObject.name}. Clip at index {i} was null.");
+                    return false;
                 }
                 i++;
             }

@@ -67,6 +67,7 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddSystem<SkeletonHierarchySmartBlobberSystem>();  // async
             GetOrCreateAndAddSystem<ParameterClipSetSmartBlobberSystem>();  // async
 
+            GetOrCreateAndAddSystem<SkeletonBoneMaskSetSmartBlobberSystem>();  // async -> sync -> async
             GetOrCreateAndAddSystem<SetupSocketsSystem>();  // async -> sync
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY

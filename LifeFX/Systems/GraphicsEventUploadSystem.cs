@@ -74,6 +74,7 @@ namespace Latios.LifeFX.Systems
                 latiosWorld.GetCollectionComponent<GraphicsEventPostal>(latiosWorld.worldBlackboardEntity, out var jobsToComplete);
                 jobsToComplete.Complete();
                 m_allocator.Allocator.Rewind();
+                latiosWorld.worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new GraphicsEventPostal(m_allocator.Allocator.Handle));
                 return default;
             }
 

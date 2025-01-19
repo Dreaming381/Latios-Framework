@@ -24,7 +24,7 @@ namespace Latios.Transforms.Authoring
         /// </summary>
         /// <param name="entity">The target entity, which does not have to be from this baker</param>
         /// <param name="flags">The flags to set. Normal results in the component being present but without any flags set.</param>
-        public static void AddHiearchyModeFlags(this IBaker baker, Entity entity, HierarchyUpdateMode.Flags flags)
+        public static void AddHierarchyModeFlags(this IBaker baker, Entity entity, HierarchyUpdateMode.Flags flags)
         {
             var bakingEntity = baker.CreateAdditionalEntity(TransformUsageFlags.None, true);
             baker.AddComponent(bakingEntity, new HierarchyUpdateModeRequestFlags

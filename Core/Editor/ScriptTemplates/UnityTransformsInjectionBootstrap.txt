@@ -16,7 +16,6 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
         //Latios.Authoring.CoreBakingBootstrap.ForceRemoveLinkedEntityGroupsOfLength1(ref context);
         //Latios.Psyshock.Authoring.PsyshockBakingBootstrap.InstallUnityColliderBakers(ref context);
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
-        //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);
         Latios.Unika.Authoring.UnikaBakingBootstrap.InstallUnikaEntitySerialization(ref context);
     }
 }
@@ -54,7 +53,6 @@ public class LatiosBootstrap : ICustomBootstrap
         //Latios.Transforms.TransformsBootstrap.InstallGameObjectEntitySynchronization(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        //Latios.Mimic.MimicBootstrap.InstallMecanimAddon(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
         Latios.Unika.UnikaBootstrap.InstallUnikaEntitySerialization(world);
