@@ -245,8 +245,9 @@ namespace Latios.Kinemation.Systems
                 lodCrossfadeJh = singleJobDependency;
                 finalJh        = chunkDrawCommandOutput.BinCollector.Dispose(singleJobDependency);
             }
+
             state.Dependency = ecsJh;
-            latiosWorld.worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(finalJh, true);
+            latiosWorld.worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(finalJh, false);
             m_lodCrossfadeDependencyQuery.AddDependency(lodCrossfadeJh);
 
             m_profilerOnUpdate.End();

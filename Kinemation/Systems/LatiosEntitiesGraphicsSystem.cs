@@ -711,7 +711,7 @@ namespace Latios.Kinemation.Systems
             {
                 //m_afterCullingMarker.Begin();
                 var worldBlackboardEntity = latiosWorldUnmanaged.worldBlackboardEntity;
-                latiosWorldUnmanaged.GetCollectionComponent<BrgCullingContext>(worldBlackboardEntity, out var finalHandle);
+                latiosWorldUnmanaged.GetCollectionComponent<BrgCullingContext>(worldBlackboardEntity, out finalHandle);
                 worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(finalHandle, false);
                 cullingCallbackFinalJobHandles.Add(finalHandle);
                 //m_afterCullingMarker.End();
