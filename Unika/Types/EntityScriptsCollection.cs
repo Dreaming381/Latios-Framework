@@ -55,7 +55,7 @@ namespace Latios.Unika
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A cascade builder API</returns>
-        public UntypedScriptFilterCascade<TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TNew>(this, filter);
 
         /// <summary>

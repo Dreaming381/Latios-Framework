@@ -216,6 +216,12 @@ namespace Latios.Kinemation
             current.scale    += factors.w;
         }
 
+        /// <summary>
+        /// Returns true if the inertial blend is still in progress given the specified time.
+        /// Returns false if the blend is finished.
+        /// </summary>
+        public bool NeedsBlend(float timeInBlend) => math.any(timeInBlend < durations);
+
         static readonly float4x2 k_CoefficientsAccelerationZero = math.float4x2(
             -3f, -6f,
             8f, 15f,

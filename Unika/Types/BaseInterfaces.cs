@@ -37,7 +37,6 @@ namespace Latios.Unika
     /// </summary>
     public interface IScriptTypedExtensionsApi : IScriptExtensionsApi
     {
-        // Should be explicit implementations only
         public Script ToScript();
 
         bool Is(in Script script);

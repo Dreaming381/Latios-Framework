@@ -5,14 +5,14 @@ using Unity.Mathematics;
 namespace Latios.Unika
 {
     public struct UntypedScriptFilteredEnumerator<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         EntityScriptCollection.Enumerator enumerator;
         TF0                               f0;
@@ -38,8 +38,8 @@ namespace Latios.Unika
             if (!allScripts.isEmpty)
             {
                 var  header    = allScripts.m_buffer.Reinterpret<UnikaScripts>()[0];
-                bool prefilter = this.f0.PreFilterBase(header) && this.f1.PreFilterBase(header) && this.f2.PreFilterBase(header) && this.f3.PreFilterBase(header) &&
-                                 this.f4.PreFilterBase(header) && this.f5.PreFilterBase(header) && this.f6.PreFilterBase(header) && this.f7.PreFilterBase(header);
+                bool prefilter = this.f0.PreFilter(header) && this.f1.PreFilter(header) && this.f2.PreFilter(header) && this.f3.PreFilter(header) &&
+                                 this.f4.PreFilter(header) && this.f5.PreFilter(header) && this.f6.PreFilter(header) && this.f7.PreFilter(header);
                 if (!prefilter)
                 {
                     enumerator = default;
@@ -54,8 +54,8 @@ namespace Latios.Unika
             while (enumerator.MoveNext())
             {
                 var  c      = enumerator.Current;
-                bool filter = f0.FilterBase(c) && f1.FilterBase(c) && f2.FilterBase(c) && f3.FilterBase(c) && f4.FilterBase(c) && f5.FilterBase(c) && f6.FilterBase(c) &&
-                              f7.FilterBase(c);
+                bool filter = f0.Filter(c) && f1.Filter(c) && f2.Filter(c) && f3.Filter(c) && f4.Filter(c) && f5.Filter(c) && f6.Filter(c) &&
+                              f7.Filter(c);
                 if (filter)
                     return true;
             }
@@ -65,14 +65,14 @@ namespace Latios.Unika
 
     public struct TypedScriptFilteredEnumerator<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         TType                             currentCache;
         ScriptTypeInfoManager.IdAndMask   idAndMask;
@@ -103,8 +103,8 @@ namespace Latios.Unika
             {
                 var  header    = allScripts.m_buffer.Reinterpret<UnikaScripts>()[0];
                 bool prefilter = (idAndMask.bloomMask & header.header.bloomMask) == idAndMask.bloomMask;
-                prefilter      = prefilter && this.f0.PreFilterBase(header) && this.f1.PreFilterBase(header) && this.f2.PreFilterBase(header) && this.f3.PreFilterBase(header) &&
-                                 this.f4.PreFilterBase(header) && this.f5.PreFilterBase(header) && this.f6.PreFilterBase(header) && this.f7.PreFilterBase(header);
+                prefilter      = prefilter && this.f0.PreFilter(header) && this.f1.PreFilter(header) && this.f2.PreFilter(header) && this.f3.PreFilter(header) &&
+                                 this.f4.PreFilter(header) && this.f5.PreFilter(header) && this.f6.PreFilter(header) && this.f7.PreFilter(header);
                 if (!prefilter)
                 {
                     enumerator = default;
@@ -120,8 +120,8 @@ namespace Latios.Unika
             {
                 var  c      = enumerator.Current;
                 bool filter = (idAndMask.bloomMask & c.m_headerRO.bloomMask) == idAndMask.bloomMask;
-                filter      = filter && f0.FilterBase(c) && f1.FilterBase(c) && f2.FilterBase(c) && f3.FilterBase(c) && f4.FilterBase(c) && f5.FilterBase(c) && f6.FilterBase(c) &&
-                              f7.FilterBase(c);
+                filter      = filter && f0.Filter(c) && f1.Filter(c) && f2.Filter(c) && f3.Filter(c) && f4.Filter(c) && f5.Filter(c) && f6.Filter(c) &&
+                              f7.Filter(c);
                 if (filter && c.TryCast(out TType casted))
                 {
                     currentCache = casted;

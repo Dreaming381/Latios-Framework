@@ -6,26 +6,10 @@ using static Latios.Unika.ScriptTypeInfoManager;
 
 namespace Latios.Unika
 {
-    public interface IScriptFilterBase
-    {
-        public bool PreFilterBase(UnikaScripts header);
-        public bool FilterBase(Script candidate);
-    }
-    public interface IScriptFilterAnyable
-    {
-        public bool PreFilterBase(UnikaScripts header);
-        public bool FilterBase(Script candidate);
-    }
-    public interface IScriptFilterAllable
-    {
-        public bool PreFilterBase(UnikaScripts header);
-        public bool FilterBase(Script candidate);
-    }
-
     /// <summary>
     /// Defines a filter which can be used to efficiently iterate through scripts.
     /// </summary>
-    public interface IScriptFilter : IScriptFilterBase, IScriptFilterAnyable, IScriptFilterAllable
+    public interface IScriptFilter
     {
         /// <summary>
         /// Defines a prefilter which can be used to rule out the whole collection of scripts.
@@ -45,13 +29,6 @@ namespace Latios.Unika
         /// <param name="candidate">The script to consider</param>
         /// <returns>True if the script passes the filter and should be further evaluated, false if it should be rejected</returns>
         public bool Filter(Script candidate);
-
-        bool IScriptFilterBase.PreFilterBase(UnikaScripts header) => PreFilter(header);
-        bool IScriptFilterBase.FilterBase(Script candidate) => Filter(candidate);
-        bool IScriptFilterAnyable.PreFilterBase(UnikaScripts header) => PreFilter(header);
-        bool IScriptFilterAnyable.FilterBase(Script candidate) => Filter(candidate);
-        bool IScriptFilterAllable.PreFilterBase(UnikaScripts header) => PreFilter(header);
-        bool IScriptFilterAllable.FilterBase(Script candidate) => Filter(candidate);
     }
 
     /// <summary>
@@ -105,84 +82,6 @@ namespace Latios.Unika
         /// </summary>
         /// <typeparam name="T">The type of interfacethe script must not implement</typeparam>
         public static IsNotInterfaceFilter<T> DoesNotHaveInterface<T>() where T : IUnikaInterface, IUnikaInterfaceGen => IsNotInterfaceFilter<T>.Create();
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        public static AnyFilter<TF0, TF1> Any<TF0, TF1>(TF0 filter0, TF1 filter1)
-            where TF0 : unmanaged, IScriptFilterAnyable
-            where TF1 : unmanaged, IScriptFilterAnyable => AnyFilter<TF0, TF1>.Create(filter0, filter1);
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <typeparam name="TF2">The third type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        /// <param name="filter2">The third filter instance</param>
-        public static AnyFilter<TF0, TF1, TF2> Any<TF0, TF1, TF2>(TF0 filter0, TF1 filter1, TF2 filter2)
-            where TF0 : unmanaged, IScriptFilterAnyable
-            where TF1 : unmanaged, IScriptFilterAnyable
-            where TF2 : unmanaged, IScriptFilterAnyable => AnyFilter<TF0, TF1, TF2>.Create(filter0, filter1, filter2);
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <typeparam name="TF2">The third type of filter</typeparam>
-        /// <typeparam name="TF3">The fourth type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        /// <param name="filter2">The third filter instance</param>
-        /// <param name="filter3">The fourth filter instance</param>
-        public static AnyFilter<TF0, TF1, TF2, TF3> Any<TF0, TF1, TF2, TF3>(TF0 filter0, TF1 filter1, TF2 filter2, TF3 filter3)
-            where TF0 : unmanaged, IScriptFilterAnyable
-            where TF1 : unmanaged, IScriptFilterAnyable
-            where TF2 : unmanaged, IScriptFilterAnyable
-            where TF3 : unmanaged, IScriptFilterAnyable => AnyFilter<TF0, TF1, TF2, TF3>.Create(filter0, filter1, filter2, filter3);
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        public static AllFilter<TF0, TF1> All<TF0, TF1>(TF0 filter0, TF1 filter1)
-            where TF0 : unmanaged, IScriptFilterAllable
-            where TF1 : unmanaged, IScriptFilterAllable => AllFilter<TF0, TF1>.Create(filter0, filter1);
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <typeparam name="TF2">The third type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        /// <param name="filter2">The third filter instance</param>
-        public static AllFilter<TF0, TF1, TF2> All<TF0, TF1, TF2>(TF0 filter0, TF1 filter1, TF2 filter2)
-            where TF0 : unmanaged, IScriptFilterAllable
-            where TF1 : unmanaged, IScriptFilterAllable
-            where TF2 : unmanaged, IScriptFilterAllable => AllFilter<TF0, TF1, TF2>.Create(filter0, filter1, filter2);
-        /// <summary>
-        /// Only scripts that pass any of the specified filters will pass this overall filter.
-        /// </summary>
-        /// <typeparam name="TF0">The first type of filter</typeparam>
-        /// <typeparam name="TF1">The second type of filter</typeparam>
-        /// <typeparam name="TF2">The third type of filter</typeparam>
-        /// <typeparam name="TF3">The fourth type of filter</typeparam>
-        /// <param name="filter0">The first filter instance</param>
-        /// <param name="filter1">The second filter instance</param>
-        /// <param name="filter2">The third filter instance</param>
-        /// <param name="filter3">The fourth filter instance</param>
-        public static AllFilter<TF0, TF1, TF2, TF3> All<TF0, TF1, TF2, TF3>(TF0 filter0, TF1 filter1, TF2 filter2, TF3 filter3)
-            where TF0 : unmanaged, IScriptFilterAllable
-            where TF1 : unmanaged, IScriptFilterAllable
-            where TF2 : unmanaged, IScriptFilterAllable
-            where TF3 : unmanaged, IScriptFilterAllable => AllFilter<TF0, TF1, TF2, TF3>.Create(filter0, filter1, filter2, filter3);
     }
 
     public struct PassThroughScriptFilter : IScriptFilter
@@ -190,6 +89,7 @@ namespace Latios.Unika
         public static PassThroughScriptFilter Create() => new PassThroughScriptFilter();
 
         public bool Filter(Script candidate) => true;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserFlagATrueScriptFilter : IScriptFilter
@@ -197,6 +97,7 @@ namespace Latios.Unika
         public static UserFlagATrueScriptFilter Create() => new UserFlagATrueScriptFilter();
 
         public bool Filter(Script candidate) => candidate.userFlagA;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserFlagAFalseScriptFilter : IScriptFilter
@@ -204,6 +105,7 @@ namespace Latios.Unika
         public static UserFlagAFalseScriptFilter Create() => new UserFlagAFalseScriptFilter();
 
         public bool Filter(Script candidate) => !candidate.userFlagA;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserFlagBTrueScriptFilter : IScriptFilter
@@ -211,6 +113,7 @@ namespace Latios.Unika
         public static UserFlagBTrueScriptFilter Create() => new UserFlagBTrueScriptFilter();
 
         public bool Filter(Script candidate) => candidate.userFlagB;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserFlagBFalseScriptFilter : IScriptFilter
@@ -218,6 +121,7 @@ namespace Latios.Unika
         public static UserFlagBFalseScriptFilter Create() => new UserFlagBFalseScriptFilter();
 
         public bool Filter(Script candidate) => !candidate.userFlagB;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserByteEqualsScriptFilter : IScriptFilter
@@ -229,6 +133,7 @@ namespace Latios.Unika
         };
 
         public bool Filter(Script candidate) => candidate.userByte == userByte;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct UserByteNotEqualsScriptFilter : IScriptFilter
@@ -240,6 +145,7 @@ namespace Latios.Unika
         };
 
         public bool Filter(Script candidate) => candidate.userByte != userByte;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct IsTypeScriptFilter<T> : IScriptFilter where T : unmanaged, IUnikaScript, IUnikaScriptGen
@@ -264,6 +170,7 @@ namespace Latios.Unika
         };
 
         public bool Filter(Script candidate) => candidate.m_headerRO.scriptType != meta.runtimeId;
+        public bool PreFilter(UnikaScripts header) => true;
     }
 
     public struct IsInterfaceFilter<T> : IScriptFilter where T : IUnikaInterface, IUnikaInterfaceGen
@@ -291,114 +198,7 @@ namespace Latios.Unika
         public bool Filter(Script candidate) => (candidate.m_headerRO.bloomMask & meta.bloomMask) != meta.bloomMask || !ScriptVTable.Contains(
             (short)candidate.m_headerRO.scriptType,
             meta.runtimeId);
-    }
-
-    public struct AnyFilter<TF0, TF1> : IScriptFilterBase, IScriptFilterAllable
-        where TF0 : IScriptFilterAnyable
-        where TF1 : IScriptFilterAnyable
-    {
-        TF0 f0;
-        TF1 f1;
-
-        public static AnyFilter<TF0, TF1> Create(TF0 f0, TF1 f1) => new AnyFilter<TF0, TF1> {
-            f0 = f0, f1 = f1
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) || f1.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) || f1.PreFilterBase(header);
-    }
-
-    public struct AnyFilter<TF0, TF1, TF2> : IScriptFilterBase, IScriptFilterAllable
-        where TF0 : IScriptFilterAnyable
-        where TF1 : IScriptFilterAnyable
-        where TF2 : IScriptFilterAnyable
-    {
-        TF0 f0;
-        TF1 f1;
-        TF2 f2;
-
-        public static AnyFilter<TF0, TF1, TF2> Create(TF0 f0, TF1 f1, TF2 f2) => new AnyFilter<TF0, TF1, TF2> {
-            f0 = f0, f1 = f1, f2 = f2
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) || f1.FilterBase(candidate) || f2.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) || f1.PreFilterBase(header) || f2.PreFilterBase(header);
-    }
-
-    public struct AnyFilter<TF0, TF1, TF2, TF3> : IScriptFilterBase, IScriptFilterAllable
-        where TF0 : IScriptFilterAnyable
-        where TF1 : IScriptFilterAnyable
-        where TF2 : IScriptFilterAnyable
-        where TF3 : IScriptFilterAnyable
-    {
-        TF0 f0;
-        TF1 f1;
-        TF2 f2;
-        TF3 f3;
-
-        public static AnyFilter<TF0, TF1, TF2, TF3> Create(TF0 f0, TF1 f1, TF2 f2, TF3 f3) => new AnyFilter<TF0, TF1, TF2, TF3> {
-            f0 = f0, f1 = f1, f2 = f2, f3 = f3
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) || f1.FilterBase(candidate) || f2.FilterBase(candidate) || f3.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) || f1.PreFilterBase(header) || f2.PreFilterBase(header) || f3.PreFilterBase(header);
-    }
-
-    public struct AllFilter<TF0, TF1> : IScriptFilterBase, IScriptFilterAnyable
-        where TF0 : IScriptFilterAllable
-        where TF1 : IScriptFilterAllable
-    {
-        TF0 f0;
-        TF1 f1;
-
-        public static AllFilter<TF0, TF1> Create(TF0 f0, TF1 f1) => new AllFilter<TF0, TF1> {
-            f0 = f0, f1 = f1
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) && f1.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) && f1.PreFilterBase(header);
-    }
-
-    public struct AllFilter<TF0, TF1, TF2> : IScriptFilterBase, IScriptFilterAnyable
-        where TF0 : IScriptFilterAllable
-        where TF1 : IScriptFilterAllable
-        where TF2 : IScriptFilterAllable
-    {
-        TF0 f0;
-        TF1 f1;
-        TF2 f2;
-
-        public static AllFilter<TF0, TF1, TF2> Create(TF0 f0, TF1 f1, TF2 f2) => new AllFilter<TF0, TF1, TF2> {
-            f0 = f0, f1 = f1, f2 = f2
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) && f1.FilterBase(candidate) && f2.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) && f1.PreFilterBase(header) && f2.PreFilterBase(header);
-    }
-
-    public struct AllFilter<TF0, TF1, TF2, TF3> : IScriptFilterBase, IScriptFilterAnyable
-        where TF0 : IScriptFilterAllable
-        where TF1 : IScriptFilterAllable
-        where TF2 : IScriptFilterAllable
-        where TF3 : IScriptFilterAllable
-    {
-        TF0 f0;
-        TF1 f1;
-        TF2 f2;
-        TF3 f3;
-
-        public static AllFilter<TF0, TF1, TF2, TF3> Create(TF0 f0, TF1 f1, TF2 f2, TF3 f3) => new AllFilter<TF0, TF1, TF2, TF3> {
-            f0 = f0, f1 = f1, f2 = f2, f3 = f3
-        };
-
-        public bool FilterBase(Script candidate) => f0.FilterBase(candidate) && f1.FilterBase(candidate) && f2.FilterBase(candidate) && f3.FilterBase(candidate);
-
-        public bool PreFilterBase(UnikaScripts header) => f0.PreFilterBase(header) && f1.PreFilterBase(header) && f2.PreFilterBase(header) && f3.PreFilterBase(header);
+        public bool PreFilter(UnikaScripts header) => true;
     }
 }
 

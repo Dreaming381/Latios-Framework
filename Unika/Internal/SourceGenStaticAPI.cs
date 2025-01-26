@@ -4,6 +4,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Mathematics;
 
 namespace Latios.Unika.InternalSourceGen
@@ -19,48 +20,37 @@ namespace Latios.Unika.InternalSourceGen
         {
         }
 
-        public interface IInterfaceData : IScriptTypedExtensionsApi
+        public static bool IsInterface<TInterface>(in Script script) where TInterface : IUnikaInterface, IUnikaInterfaceGen
         {
+            return ScriptCast.IsInterface<TInterface>(in script);
         }
 
-        public interface IInterfaceDataTyped<TInterface, TInterfaceStruct> : IInterfaceData where TInterface : IUnikaInterface
-            where TInterfaceStruct : unmanaged, IInterfaceDataTyped<TInterface, TInterfaceStruct>
+        public static unsafe bool TryCastInitInterface<TInterface>(in Script script, IScriptTypedExtensionsApi.WrappedThisPtr thisPtr) where TInterface : IUnikaInterface
         {
-            TInterfaceStruct assign { set; }
-
-            bool IScriptTypedExtensionsApi.Is(in Script script)
+            var idAndMask = ScriptTypeInfoManager.GetInterfaceRuntimeIdAndMask<TInterface>();
+            if ((script.m_headerRO.bloomMask & idAndMask.bloomMask) == idAndMask.bloomMask)
             {
-                var idAndMask = ScriptTypeInfoManager.GetInterfaceRuntimeIdAndMask<TInterface>();
-                if ((script.m_headerRO.bloomMask & idAndMask.bloomMask) == idAndMask.bloomMask)
+                if (ScriptVTable.TryGet((short)script.m_headerRO.scriptType, idAndMask.runtimeId, out var functionPtr))
                 {
-                    return ScriptVTable.Contains((short)script.m_headerRO.scriptType, idAndMask.runtimeId);
-                }
-                return false;
-            }
-
-            unsafe bool IScriptTypedExtensionsApi.TryCastInit(in Script script, WrappedThisPtr thisPtr)
-            {
-                var idAndMask = ScriptTypeInfoManager.GetInterfaceRuntimeIdAndMask<TInterface>();
-                if ((script.m_headerRO.bloomMask & idAndMask.bloomMask) == idAndMask.bloomMask)
-                {
-                    if (ScriptVTable.TryGet((short)script.m_headerRO.scriptType, idAndMask.runtimeId, out var functionPtr))
+                    var result = new InterfaceData
                     {
-                        var result = new InterfaceData
-                        {
-                            functionPointer = functionPtr,
-                            script          = script
-                        };
-                        UnsafeUtility.CopyStructureToPtr(ref result, thisPtr.ptr);
-                        return true;
-                    }
+                        functionPointer = functionPtr,
+                        script          = script
+                    };
+                    UnsafeUtility.CopyStructureToPtr(ref result, thisPtr.ptr);
+                    return true;
                 }
-                return false;
             }
+            return false;
+        }
 
-            WrappedIdAndMask IScriptTypedExtensionsApi.GetIdAndMask() => new WrappedIdAndMask
-            {
-                idAndMask = ScriptTypeInfoManager.GetInterfaceRuntimeIdAndMask<TInterface>()
-            };
+        public static IScriptTypedExtensionsApi.WrappedIdAndMask GetIdAndMaskInterface<TInterface>() where TInterface : IUnikaInterface
+        {
+            return new IScriptTypedExtensionsApi.WrappedIdAndMask { idAndMask = ScriptTypeInfoManager.GetInterfaceRuntimeIdAndMask<TInterface>() };
+        }
+
+        public interface IInterfaceData : IScriptTypedExtensionsApi
+        {
         }
 
         public struct InterfaceData

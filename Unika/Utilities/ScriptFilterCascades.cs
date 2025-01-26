@@ -7,41 +7,41 @@ using Noop = Latios.Unika.PassThroughScriptFilter;
 namespace Latios.Unika
 {
     public interface IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         public UntypedScriptFilteredEnumerator<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7> GetEnumerator();
     }
 
     public interface ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         public TypedScriptFilteredEnumerator<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7> GetEnumerator();
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7> : IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -71,13 +71,13 @@ namespace Latios.Unika
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6> : IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -107,22 +107,22 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew>(allScripts, f0, f1, f2, f3, f4, f5, f6, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5> : IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -150,21 +150,21 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TF5, TNew>(allScripts, f0, f1, f2, f3, f4, f5, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4> : IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, Noop, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -190,20 +190,20 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TF4, TNew>(allScripts, f0, f1, f2, f3, f4, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2, TF3> : IUntypedScriptFilterCascade<TF0, TF1, TF2, TF3, Noop, Noop, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -227,19 +227,19 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TF2, TF3, TNew>(allScripts, f0, f1, f2, f3, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1, TF2> : IUntypedScriptFilterCascade<TF0, TF1, TF2, Noop, Noop, Noop, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -261,18 +261,18 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TF2, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TF2, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TF2, TNew>(allScripts, f0, f1, f2, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0, TF1> : IUntypedScriptFilterCascade<TF0, TF1, Noop, Noop, Noop, Noop, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -292,17 +292,17 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TF1, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TF1, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TF1, TNew>(allScripts, f0, f1, filter);
     }
 
     public struct UntypedScriptFilterCascade<TF0> : IUntypedScriptFilterCascade<TF0, Noop, Noop, Noop, Noop, Noop, Noop, Noop>
-        where TF0 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -320,25 +320,25 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public UntypedScriptFilterCascade<TF0, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public UntypedScriptFilterCascade<TF0, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new UntypedScriptFilterCascade<TF0, TNew>(allScripts, f0, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TF7>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
-        where TF7 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
+        where TF7 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -369,13 +369,13 @@ namespace Latios.Unika
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
-        where TF6 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
+        where TF6 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -405,24 +405,24 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TF6, TNew>(allScripts, f0, f1, f2, f3, f4, f5, f6, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
-        where TF5 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
+        where TF5 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -450,23 +450,23 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TF5, TNew>(allScripts, f0, f1, f2, f3, f4, f5, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, Noop, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
-        where TF4 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
+        where TF4 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -492,22 +492,22 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TF4, TNew>(allScripts, f0, f1, f2, f3, f4, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, Noop, Noop, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
-        where TF3 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
+        where TF3 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -531,21 +531,21 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TF2, TF3, TNew>(allScripts, f0, f1, f2, f3, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1, TF2> : ITypedScriptFilterCascade<TType, TF0, TF1, TF2, Noop, Noop, Noop, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
-        where TF2 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
+        where TF2 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -567,20 +567,20 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TF2, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TF2, TNew>(allScripts, f0, f1, f2, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0, TF1> : ITypedScriptFilterCascade<TType, TF0, TF1, Noop, Noop, Noop, Noop, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
-        where TF1 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
+        where TF1 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -600,19 +600,19 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TF1, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TF1, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TF1, TNew>(allScripts, f0, f1, filter);
     }
 
     public struct TypedScriptFilterCascade<TType, TF0> : ITypedScriptFilterCascade<TType, TF0, Noop, Noop, Noop, Noop, Noop, Noop, Noop>
         where TType : unmanaged, IScriptTypedExtensionsApi
-        where TF0 : unmanaged, IScriptFilterBase
+        where TF0 : unmanaged, IScriptFilter
     {
         EntityScriptCollection allScripts;
         TF0                    f0;
@@ -631,13 +631,13 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TF0, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TF0, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TF0, TNew>(allScripts, f0, filter);
     }
 
@@ -667,13 +667,13 @@ namespace Latios.Unika
         }
 
         /// <summary>
-        /// Appends an IScriptFilterBase which applies filtering to the scripts in the collection. Filters are applied from first to last.
+        /// Appends an IScriptFilter which applies filtering to the scripts in the collection. Filters are applied from first to last.
         /// Warning: Filters may be applied to scripts of the wrong type, as the final determination of whether the script matches the type is performed last.
         /// </summary>
         /// <typeparam name="TNew">The type of new filter to append</typeparam>
         /// <param name="filter">The new filter instance to append</param>
         /// <returns>A continuation of this cascade builder API</returns>
-        public TypedScriptFilterCascade<TType, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilterBase =>
+        public TypedScriptFilterCascade<TType, TNew> Where<TNew>(TNew filter) where TNew : unmanaged, IScriptFilter =>
         new TypedScriptFilterCascade<TType, TNew>(allScripts, filter);
     }
 }

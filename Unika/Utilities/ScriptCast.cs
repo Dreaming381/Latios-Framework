@@ -37,8 +37,8 @@ namespace Latios.Unika
         /// </summary>
         public static unsafe bool Is<T>(this in Script script) where T : unmanaged, IScriptTypedExtensionsApi
         {
-            T result                                                                                = default;
-            return result.TryCastInit(in script, new IScriptTypedExtensionsApi.WrappedThisPtr { ptr = &result});
+            T result = default;
+            return result.Is(script);
         }
 
         /// <summary>
