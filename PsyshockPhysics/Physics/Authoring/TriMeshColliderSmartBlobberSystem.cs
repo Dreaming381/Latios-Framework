@@ -150,7 +150,7 @@ namespace Latios.Psyshock.Authoring.Systems
             Entities.WithReadOnly(hashmap).ForEach((ref SmartBlobberResult result, in TriMeshColliderBlobBakeData data) =>
             {
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
-            }).ScheduleParallel();
+            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
         }
 
         struct TriMeshBuilder

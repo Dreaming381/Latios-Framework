@@ -29,7 +29,7 @@ namespace Latios.Psyshock
 
         /// <summary>
         /// Finds the closest point on the ellipse perimeter using a rapidly converging numerical method.
-        /// This works reliably for test points outside the perimeter, and is semi-reliably for points inside.
+        /// This works reliably for test points outside the perimeter, and semi-reliably for points inside.
         /// </summary>
         /// <param name="halfExtents">The distance from the ellipse center (0, 0) to the perimeter on each axis</param>
         /// <param name="testPoint">The point relative to the ellipse to find the closest perimeter point to</param>

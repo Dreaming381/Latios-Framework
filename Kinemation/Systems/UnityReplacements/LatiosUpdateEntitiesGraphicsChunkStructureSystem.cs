@@ -29,14 +29,8 @@ namespace Latios.Kinemation.Systems
                                        .With<MaterialMeshInfo>(true).Without<EntitiesGraphicsChunkInfo>(true).Without<DisableRendering>().IncludePrefabs().
                                        IncludeDisabledEntities().Build();
 
-            m_DisabledRenderingQuery = state.GetEntityQuery(new EntityQueryDesc
-            {
-                All = new[]
-                {
-                    ComponentType.ChunkComponentReadOnly<EntitiesGraphicsChunkInfo>(),
-                    ComponentType.ReadOnly<DisableRendering>(),
-                },
-            });
+            m_DisabledRenderingQuery = state.Fluent().With<EntitiesGraphicsChunkInfo>(true, true)
+                                       .WithAnyEnabled<Disabled, Prefab, DisableRendering>(true).IncludeDisabledEntities().IncludePrefabs().Build();
 
             m_destroyedChunkInfoQuery = state.Fluent().With<EntitiesGraphicsChunkInfo>(true, true).Without<MaterialMeshInfo>().Build();
 

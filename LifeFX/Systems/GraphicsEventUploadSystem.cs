@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using AOT;
 using Latios.Kinemation;
 using Latios.Kinemation.Systems;
 using Unity.Burst;
@@ -240,6 +241,7 @@ namespace Latios.LifeFX.Systems
             requestor.Value.PublishInternal(buffer.ToManaged(), start, count);
         }
 
+        [MonoPInvokeCallback(typeof(DispatchDestinationDelegate))]
         static unsafe void DispatchManaged(IntPtr dispatchData)
         {
             ref var data = ref *(DispatchData*)dispatchData;
