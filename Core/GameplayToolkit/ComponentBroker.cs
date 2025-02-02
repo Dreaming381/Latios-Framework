@@ -182,16 +182,35 @@ namespace Latios
         {
             if (chunk != currentChunk)
             {
-                currentChunk  = chunk;
-                currentEntity = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
-                indexInChunk  = currentIndexInChunk;
+                currentChunk        = chunk;
+                currentEntity       = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
+                currentIndexInChunk = indexInChunk;
             }
 
             if (indexInChunk != currentIndexInChunk)
             {
-                indexInChunk  = currentIndexInChunk;
-                currentEntity = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
+                currentIndexInChunk = indexInChunk;
+                currentEntity       = chunk.GetEntityDataPtrRO(entityTypeHandle)[indexInChunk];
             }
+        }
+
+        /// <summary>
+        /// Warning: Only ever call this method inside a job that is scheduled single-threaded!
+        ///
+        /// IJobFor will specify its job range identically when scheduling single-threaded vs scheduling
+        /// parallel with an arrayLength <= innerloopBatchCount, as it always uses parallel scheduling internally.
+        /// Because of this, ComponentBroker has to either treat this scenario either as safe or unsafe. By default,
+        /// it treats it as unsafe, but calling this method will relax it. The result of this method is if you have
+        /// an IJobFor that only touches a single element (a single ArchetypeChunk or a single found pair in Psyshock),
+        /// then no exceptions will be thrown even if the ComponentBroker safety rule is violated.
+        ///
+        /// </summary>
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        public void RelaxSafetyForIJobFor()
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            singleThreadedSafetyChecker.RelaxForIJobFor();
+#endif
         }
 
         /// <summary>
@@ -635,7 +654,7 @@ namespace Latios
             esil = state.GetEntityStorageInfoLookup();
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            singleThreadedSafetyChecker = new NativeReference<int>(allocator);
+            singleThreadedSafetyChecker = new ParallelDetector(allocator);
 #endif
 
             int maxTypeIndex = 0;
@@ -728,6 +747,7 @@ namespace Latios
         public void Dispose()
         {
             handleIndices.Dispose();
+
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             singleThreadedSafetyChecker.Dispose();
 #endif
@@ -759,7 +779,7 @@ namespace Latios
         [ReadOnly] internal NativeArray<DynamicIndex> handleIndices;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-        NativeReference<int> singleThreadedSafetyChecker;
+        ParallelDetector singleThreadedSafetyChecker;
 #endif
 
         [ReadOnly] EntityStorageInfoLookup esil;
@@ -1086,8 +1106,9 @@ namespace Latios
         void CheckSafeAccessForForeignEntity(ref DynamicComponentTypeHandle handle)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!handle.IsReadOnly)
-                singleThreadedSafetyChecker.Value++;
+            if (!handle.IsReadOnly && singleThreadedSafetyChecker.isParallel)
+                throw new System.InvalidOperationException(
+                    "Attempted to access a component from an external entity inside a parallel job. This is not thread-safe. Call SetupEntity() to specify an entity that is safe to access in a parallel job, such as one from an IJobChunk or IJobEntity");
 #endif
         }
         #endregion

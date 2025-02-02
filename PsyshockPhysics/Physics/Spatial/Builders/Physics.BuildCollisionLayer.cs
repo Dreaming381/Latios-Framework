@@ -436,7 +436,7 @@ namespace Latios.Psyshock
                 }.Schedule(config.query, inputDeps);
                 jh = new BuildCollisionLayerInternal.BuildFromFilteredChunkCacheSingleJob
                 {
-                    filteredChunkCache = filteredChunkCache.AsArray(),
+                    filteredChunkCache = filteredChunkCache.AsDeferredJobArray(),
                     handles            = config.typeGroup,
                     layer              = layer
                 }.Schedule(jh);

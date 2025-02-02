@@ -282,6 +282,7 @@ namespace Latios.Psyshock
         /// <returns>The reference to the allocated instance of type T</returns>
         public ref T AddPairFromOtherStreamAndGetRef<T>(in Pair pairFromOtherStream, out Pair pairInThisStream) where T : unmanaged
         {
+            CheckStreamsMatch(pairFromOtherStream);
             return ref AddPairAndGetRef<T>(pairFromOtherStream.entityA,
                                            pairFromOtherStream.index,
                                            pairFromOtherStream.aIsRW,
@@ -301,6 +302,7 @@ namespace Latios.Psyshock
         /// <returns>The pointer to the allocated data</returns>
         public void* AddPairFromOtherStreamRaw(in Pair pairFromOtherStream, int sizeInBytes, int alignInBytes, out Pair pairInThisStream)
         {
+            CheckStreamsMatch(pairFromOtherStream);
             return AddPairRaw(pairFromOtherStream.entityA,
                               pairFromOtherStream.index,
                               pairFromOtherStream.aIsRW,
@@ -649,6 +651,7 @@ namespace Latios.Psyshock
             public ref T AddPairFromOtherStreamAndGetRef<T>(in Pair pairFromOtherStream, out Pair pairInThisStream) where T : unmanaged
             {
                 CheckPairCanBeAddedInParallel(in pairFromOtherStream);
+                CheckStreamsMatch(pairFromOtherStream);
                 var key = new ParallelWriteKey
                 {
                     entityA             = pairFromOtherStream.entityA,
@@ -894,6 +897,14 @@ namespace Latios.Psyshock
                 if (!pairFromOtherStream.isParallelKeySafe)
                     throw new InvalidOperationException(
                         $"The pair cannot be safely added to the ParallelWriter because the pair was created from an immediate operation. Add directly to the PairStream instead of the ParallelWriter.");
+            }
+
+            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+            void CheckStreamsMatch(Pair other)
+            {
+                if (data.cellCount != other.data.cellCount)
+                    throw new InvalidOperationException(
+                        $"The streams do not have matching bucket counts: {IndexStrategies.BucketCountWithoutNaN(data.cellCount)} vs {IndexStrategies.BucketCountWithoutNaN(other.data.cellCount)}.");
             }
         }
 
@@ -1181,6 +1192,14 @@ namespace Latios.Psyshock
                     $"The streams do not have matching bucket counts: {IndexStrategies.BucketCountWithoutNaN(data.cellCount)} vs {IndexStrategies.BucketCountWithoutNaN(other.data.cellCount)}.");
             if (data.allocator != other.data.allocator)
                 throw new InvalidOperationException($"The allocators are not the same. Memory stealing cannot be safely performed.");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckStreamsMatch(Pair other)
+        {
+            if (data.cellCount != other.data.cellCount)
+                throw new InvalidOperationException(
+                    $"The streams do not have matching bucket counts: {IndexStrategies.BucketCountWithoutNaN(data.cellCount)} vs {IndexStrategies.BucketCountWithoutNaN(other.data.cellCount)}.");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
