@@ -19,12 +19,18 @@ namespace Latios.Kinemation.Authoring
         /// <param name="animator">An animator on which to map the mask onto.</param>
         /// <param name="masks">An array of masks which should be baked into the blob asset.
         /// This array can be temp-allocated.</param>
-        public static SmartBlobberHandle<SkeletonBoneMaskSetBlob> RequestCreateBlobAsset(this IBaker baker, Animator animator, NativeArray<UnityObjectRef<AvatarMask> > masks)
+        /// <param name="enableRoots">An optional array to explicitly specify whether the root
+        /// bone with root motion should be enabled in the mask. False by default.</param>
+        public static SmartBlobberHandle<SkeletonBoneMaskSetBlob> RequestCreateBlobAsset(this IBaker baker,
+                                                                                         Animator animator,
+                                                                                         NativeArray<UnityObjectRef<AvatarMask> > masks,
+                                                                                         NativeArray<bool>                        enableRoots = default)
         {
             return baker.RequestCreateBlobAsset<SkeletonBoneMaskSetBlob, SkeletonBoneMaskSetBakeData>(new SkeletonBoneMaskSetBakeData
             {
-                animator = animator,
-                masks    = masks
+                animator    = animator,
+                masks       = masks,
+                enableRoots = enableRoots
             });
         }
     }
@@ -41,6 +47,12 @@ namespace Latios.Kinemation.Authoring
         /// The list of Avatar masks which should be baked into the mask set.
         /// </summary>
         public NativeArray<UnityObjectRef<AvatarMask> > masks;
+        /// <summary>
+        /// AvatarMask does not allow for directly specifying the enabled state of the skeleton root (Animator GameObject)
+        /// via the visual editors. By default, it is assumed disabled, as typically root motion is handled in the base layer.
+        /// This array can be used to override it.
+        /// </summary>
+        public NativeArray<bool> enableRoots;
 
         public bool Filter(IBaker baker, Entity blobBakingEntity)
         {
@@ -53,6 +65,11 @@ namespace Latios.Kinemation.Authoring
             {
                 Debug.LogError($"Kinemation failed to bake mask set on animator {animator.gameObject.name}. The mask array was not allocated.");
                 return false;
+            }
+            if (enableRoots.IsCreated && enableRoots.Length != masks.Length)
+            {
+                Debug.LogWarning(
+                    $"The length of enableRoots {enableRoots.Length} does not match the length of masks {masks.Length} for animator {animator.gameObject.name}. Default will be applied for missing indices.");
             }
 
             int i = 0;
@@ -67,10 +84,16 @@ namespace Latios.Kinemation.Authoring
 
             baker.DependsOn(animator.avatar);
             var masksBuffer = baker.AddBuffer<AvatarMaskToBake>(blobBakingEntity);
+            i               = 0;
             foreach (var mask in masks)
             {
                 baker.DependsOn(mask.Value);
-                masksBuffer.Add(new AvatarMaskToBake { mask = mask });
+                masksBuffer.Add(new AvatarMaskToBake
+                {
+                    mask       = mask,
+                    enableRoot = enableRoots.IsCreated && i < enableRoots.Length && enableRoots[i]
+                });
+                i++;
             }
             var boneNames = baker.AddBuffer<SkeletonBoneNameInHierarchy>(blobBakingEntity);
             if (animator.hasTransformHierarchy)
@@ -95,6 +118,7 @@ namespace Latios.Kinemation.Authoring
     internal struct AvatarMaskToBake : IBufferElementData
     {
         public UnityObjectRef<AvatarMask> mask;
+        public bool                       enableRoot;
     }
 }
 
@@ -202,6 +226,11 @@ namespace Latios.Kinemation.Authoring.Systems
                             temp.Read(ref k);
                     }
 
+                    // AvatarMask omits the root GameObject from paths, instead using an empty string for the root GameObject path.
+                    // This root GameObject is always enabled.
+                    if (nameRange.ElementAt(nameRange.Length - 1).y == 0)
+                        nameRange.ElementAt(nameRange.Length - 1).y = temp.Length;
+
                     var mask = maskList[j];
                     mask.Clear();
                     for (int k = nameRange.Length - 1; k >= 0; k--)
@@ -251,7 +280,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
                     var strings  = maskStrings[index];
                     var boneSpan = bones.AsNativeArray().AsReadOnlySpan();
-                    for (int i = 0; i < bones.Length; i++)
+                    for (int i = math.select(1, 0, mask.enableRoot); i < bones.Length; i++)
                     {
                         temp.Clear();
                         temp.AppendBoneReversePath(boneSpan, i, false);

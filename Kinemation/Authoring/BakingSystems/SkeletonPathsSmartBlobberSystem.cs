@@ -116,6 +116,11 @@ namespace Latios.Kinemation.Authoring
         public static void AppendBoneReversePath(this ref UnsafeText text, ReadOnlySpan<SkeletonBoneNameInHierarchy> boneNames, int boneIndex, bool includeRoot = true)
         {
             var final = includeRoot ? 0 : 1;
+            if (boneIndex < final)
+            {
+                text.Append('/');
+                return;
+            }
             for (int i = boneIndex; i >= final; i = boneNames[i].parentIndex)
             {
                 text.Append(boneNames[i].boneName);
