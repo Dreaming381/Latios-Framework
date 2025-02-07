@@ -552,10 +552,13 @@ namespace Latios
 #endif
 
             System.Type selectedType = null;
+            var         thisAssembly = typeof(BootstrapTools).Assembly;
 
             foreach (var bootType in bootstrapTypes)
             {
                 if (bootType.IsAbstract || bootType.ContainsGenericParameters)
+                    continue;
+                if (bootType.Assembly == thisAssembly)
                     continue;
 
                 if (selectedType == null)

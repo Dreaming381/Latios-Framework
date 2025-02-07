@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Generic;
 using Latios;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -17,10 +19,10 @@ namespace Latios
         /// <summary>
         /// Modify the existing Editor World, or replace it by creating and returning a new one.
         /// </summary>
-        /// <param name="defaultEditorWorld">The default Editor World</param>
+        /// <param name="defaultEditorWorldName">The name for the new default Editor World</param>
         /// <returns>A new World such as a LatiosWorld if one was created,
-        /// otherwise either defaultEditorWorld or null to keep the existing Editor World</returns>
-        World InitializeOrModify(World defaultEditorWorld);
+        /// otherwise null to use a Unity-created default editor world</returns>
+        World Initialize(string defaultEditorWorldName);
     }
 
 #if UNITY_EDITOR
@@ -33,36 +35,49 @@ namespace Latios
             RegisterEditorWorldAction();
         }
 
-        static bool m_isRegistered = false;
+        static bool             m_isRegistered    = false;
+        static ICustomBootstrap m_editorBootstrap = null;
 
         internal static void RegisterEditorWorldAction()
         {
             if (!m_isRegistered)
             {
-                m_isRegistered                                                         = true;
-                Unity.Entities.Exposed.WorldExposedExtensions.DefaultWorldInitialized += InitializeEditorWorld;
+                m_isRegistered                                       = true;
+                EditorWorldInitializationOverride.s_overrideDelegate = CreateBootstrapOverride;
             }
         }
 
-        internal static void InitializeEditorWorld(World defaultEditorWorld)
+        internal static ICustomBootstrap CreateBootstrapOverride(bool isEditorWorld)
         {
-            if (World.DefaultGameObjectInjectionWorld != defaultEditorWorld || !defaultEditorWorld.Flags.HasFlag(WorldFlags.Editor))
-                return;
-
-            ICustomEditorBootstrap bootstrap = BootstrapTools.TryCreateCustomBootstrap<ICustomEditorBootstrap>();
-            if (bootstrap == null)
-                return;
-
-            var newWorld = bootstrap.InitializeOrModify(defaultEditorWorld);
-            if (newWorld != defaultEditorWorld && newWorld != null)
+            if (isEditorWorld)
             {
-                if (defaultEditorWorld.IsCreated)
+                if (m_editorBootstrap == null)
                 {
-                    ScriptBehaviourUpdateOrder.RemoveWorldFromCurrentPlayerLoop(defaultEditorWorld);
-                    defaultEditorWorld.Dispose();
+                    var editorBootstrapType = typeof(GenericEditorBootstrapWrapper<>).MakeGenericType(typeof(int));
+                    m_editorBootstrap       = Activator.CreateInstance(editorBootstrapType) as ICustomBootstrap;
                 }
-                ScriptBehaviourUpdateOrder.AppendWorldToCurrentPlayerLoop(newWorld);
-                World.DefaultGameObjectInjectionWorld = newWorld;
+                return m_editorBootstrap;
+            }
+            else
+                return BootstrapTools.TryCreateCustomBootstrap<ICustomBootstrap>();
+        }
+
+        internal class GenericEditorBootstrapWrapper<T> : ICustomBootstrap
+        {
+            public bool Initialize(string defaultWorldName)
+            {
+                var bootstrap = BootstrapTools.TryCreateCustomBootstrap<ICustomEditorBootstrap>();
+                if (bootstrap == null)
+                    return false;
+
+                var world = bootstrap.Initialize(defaultWorldName);
+                if (world != null)
+                {
+                    ScriptBehaviourUpdateOrder.AppendWorldToCurrentPlayerLoop(world);
+                    World.DefaultGameObjectInjectionWorld = world;
+                    return true;
+                }
+                return false;
             }
         }
     }
@@ -75,49 +90,25 @@ namespace Latios
         {
             var previousEditorWorld = World.DefaultGameObjectInjectionWorld;
             World.DefaultGameObjectInjectionWorld = null;
+            if (previousEditorWorld != null)
+                previousEditorWorld.Dispose();
 
-            if (previousEditorWorld == null)
+            DefaultWorldInitialization.DefaultLazyEditModeInitialize();
+
+            var subscenes = new List<Unity.Scenes.SubScene>();
+            foreach (var subscene in Unity.Scenes.SubScene.AllSubScenes)
             {
-                DefaultWorldInitialization.DefaultLazyEditModeInitialize();
-                previousEditorWorld = World.DefaultGameObjectInjectionWorld;
-            }
-            EditorBootstrapUtilities.InitializeEditorWorld(previousEditorWorld);
-
-            if (World.DefaultGameObjectInjectionWorld == null)
-            {
-                if (World.DefaultGameObjectInjectionWorld == previousEditorWorld && previousEditorWorld != null)
+                if (subscene.enabled)
                 {
-                    if (previousEditorWorld.IsCreated)
-                    {
-                        ScriptBehaviourUpdateOrder.RemoveWorldFromCurrentPlayerLoop(previousEditorWorld);
-                        previousEditorWorld.Dispose();
-                    }
+                    subscenes.Add(subscene);
                 }
-
-                var world = new World("EditorWorld", WorldFlags.Editor);
-
-                World.DefaultGameObjectInjectionWorld = world;
-
-                var systemList = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.Default, true);
-                DefaultWorldInitialization.AddSystemsToRootLevelSystemGroups(world, systemList);
-
-                ScriptBehaviourUpdateOrder.AppendWorldToCurrentPlayerLoop(world);
-
-                var subscenes = new List<Unity.Scenes.SubScene>();
-                foreach (var subscene in Unity.Scenes.SubScene.AllSubScenes)
-                {
-                    if (subscene.enabled)
-                    {
-                        subscenes.Add(subscene);
-                    }
-                }
-
-                foreach (var subscene in subscenes)
-                    subscene.enabled = false;
-
-                foreach (var subscene in subscenes)
-                    subscene.enabled = true;
             }
+
+            foreach (var subscene in subscenes)
+                subscene.enabled = false;
+
+            foreach (var subscene in subscenes)
+                subscene.enabled = true;
         }
     }
 #endif
