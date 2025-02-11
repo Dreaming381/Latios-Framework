@@ -19,6 +19,7 @@ namespace Latios.Kinemation.Systems
 
         EntityQuery m_newMeshesQuery;
         EntityQuery m_deadMeshesQuery;
+        EntityQuery m_liveBakedQuery;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -27,6 +28,11 @@ namespace Latios.Kinemation.Systems
 
             m_newMeshesQuery  = state.Fluent().With<UniqueMeshConfig>(true).Without<TrackedUniqueMesh>().Build();
             m_deadMeshesQuery = state.Fluent().With<TrackedUniqueMesh>(true).Without<UniqueMeshConfig>().Build();
+
+            if ((state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None)
+            {
+                m_liveBakedQuery = state.Fluent().With<TrackedUniqueMesh>(true).With<MaterialMeshInfo>(false).Build();
+            }
 
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new UniqueMeshPool
             {
@@ -89,6 +95,15 @@ namespace Latios.Kinemation.Systems
                     meshPool     = meshPool,
                     mmiHandle    = GetComponentTypeHandle<MaterialMeshInfo>(false)
                 }.Schedule(m_newMeshesQuery, state.Dependency);
+            }
+            if ((state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None)
+            {
+                state.Dependency = new PatchLiveBakedMeshesJob
+                {
+                    meshPool      = meshPool,
+                    mmiHandle     = GetComponentTypeHandle<MaterialMeshInfo>(false),
+                    trackedHandle = GetComponentTypeHandle<TrackedUniqueMesh>(true)
+                }.ScheduleParallel(m_liveBakedQuery, state.Dependency);
             }
         }
 
@@ -154,6 +169,24 @@ namespace Latios.Kinemation.Systems
                     meshPool.invalidMeshesToCull.Add(id);
                     if (mmis != null)
                         mmis[i].MeshID = id;
+                }
+            }
+        }
+
+        [BurstCompile]
+        struct PatchLiveBakedMeshesJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<TrackedUniqueMesh> trackedHandle;
+            public ComponentTypeHandle<MaterialMeshInfo>             mmiHandle;
+            [ReadOnly] public UniqueMeshPool                         meshPool;
+
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var tracked = chunk.GetComponentDataPtrRO(ref trackedHandle);
+                var mmis    = chunk.GetComponentDataPtrRW(ref mmiHandle);
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    mmis[i].MeshID = meshPool.meshToIdMap[tracked[i].mesh];
                 }
             }
         }

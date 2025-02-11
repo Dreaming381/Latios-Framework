@@ -7,7 +7,7 @@ using Unity.Entities.Exposed.Dangerous;
 namespace Latios.Systems
 {
     /// <summary>
-    /// The main sync-point group in initialization that LAtios Framework systems that need to perform structural changes try to update within.
+    /// The main sync-point group in initialization that Latios Framework systems that need to perform structural changes try to update within.
     /// Blackboard entities, collection components, and managed struct components are processed in the OrderFirst bucket.
     /// Add spawning systems to this group in the default bucket to avoid syncrhonizing jobs, as jobs are usually synchronized at this point.
     /// Add reactive systems to this group with OrderLast = true to react to all spawned and destroyed entities from LatiosWorld.syncPoint

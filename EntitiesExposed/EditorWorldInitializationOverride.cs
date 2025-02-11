@@ -39,6 +39,12 @@ namespace Unity.Entities.Exposed
 
             return bootstrap;
         }
+
+        internal static ICustomBootstrap CreateBootstrapFlipped()
+        {
+            s_isEditorWorld = !s_isEditorWorld;
+            return CreateBootstrap();
+        }
     }
 }
 
