@@ -63,12 +63,14 @@ namespace Unity.Entities.Exposed
             var accessor = chunk.GetUntypedBufferAccessor(ref bufferTypeHandle);
             if (accessor.Length == 0)
                 return default;
+
+            ref readonly var info = ref TypeManager.GetTypeInfo(typeIndex);
             // Todo: Super dangerous. It would be much better to get the header pointer some other way.
-            return new BufferAccessor<T>(UnsafeUtility.As<UnsafeUntypedBufferAccessor, BytePtr>(ref accessor).ptr, accessor.Length, accessor.ElementSize,
+            return new BufferAccessor<T>(UnsafeUtility.As<UnsafeUntypedBufferAccessor, BytePtr>(ref accessor).ptr, accessor.Length, info.SizeInChunk,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                                          bufferTypeHandle.IsReadOnly, bufferTypeHandle.m_Safety0, bufferTypeHandle.m_Safety1,
 #endif
-                                         TypeManager.GetTypeInfo(typeIndex).BufferCapacity);
+                                         info.BufferCapacity);
         }
 
         unsafe struct BytePtr
@@ -88,7 +90,8 @@ namespace Unity.Entities.Exposed
         public static unsafe int GetChunkComponentCount(in this EntityArchetype archetype) => archetype.Archetype->NumChunkComponents;
         public static unsafe int GetBufferComponentCount(in this EntityArchetype archetype) => archetype.Archetype->NumBufferComponents;
         public static unsafe TypeIndex GetTypeAtIndex(in this EntityArchetype archetype, int index) => archetype.Archetype->Types[index].TypeIndex;
-        public static unsafe ArchetypeChunk GetChunkAtIndex(in this EntityArchetype archetype, int index) => new ArchetypeChunk(archetype.Archetype->Chunks[index], archetype.Archetype->EntityComponentStore);
+        public static unsafe ArchetypeChunk GetChunkAtIndex(in this EntityArchetype archetype, int index) => new ArchetypeChunk(archetype.Archetype->Chunks[index],
+                                                                                                                                archetype.Archetype->EntityComponentStore);
     }
 }
 

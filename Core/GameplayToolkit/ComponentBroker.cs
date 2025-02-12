@@ -214,6 +214,11 @@ namespace Latios
         }
 
         /// <summary>
+        /// Returns true if the entity exists
+        /// </summary>
+        public bool Exists(Entity entity) => esil.Exists(entity);
+
+        /// <summary>
         /// Checks if the entity has the specific component type. The type does not necessarily need to be a type
         /// in the ComponentBroker, but checking such a type may be slower.
         /// </summary>
