@@ -25,11 +25,22 @@ namespace Latios.Kinemation.Editor
             var proxy = GetCurrentSelectionProxy();
 
             if (!proxy) return;
-            if (proxy.World is not LatiosWorld) return;
+            
+            var w = proxy.World;
+            if (w is not LatiosWorld) return;
+            
+            if (!w.EntityManager.HasComponent(proxy.Entity, QueryExtensions.GetAbstractWorldTransformROComponentType())) 
+                return;
 
-            if (ev.type == EventType.ExecuteCommand) HandleExecuteCommand(proxy, sceneView);
-            if (ev.type == EventType.Repaint && _lockedEntity != default)
-                LookAtEntity(proxy, sceneView);
+            switch (ev.type)
+            {
+                case EventType.ExecuteCommand:
+                    HandleExecuteCommand(proxy, sceneView);
+                    break;
+                case EventType.Repaint when _lockedEntity != default:
+                    LookAtEntity(proxy, sceneView, true);
+                    break;
+            }
         }
 
         private static void SelectionChanged()
@@ -67,25 +78,25 @@ namespace Latios.Kinemation.Editor
 
             if (ev.commandName != "FrameSelected" && !withLock) return;
 
+            var e = selectionProxy.Entity;
+            
             LookAtEntity(selectionProxy, sceneView);
 
             if (withLock)
             {
-                _lockedEntity = selectionProxy.Entity;
+                _lockedEntity = e;
             }
 
             // consume the event
             ev.Use();
             ev.commandName = "";
-        }
+        }   
 
-        private static void LookAtEntity(EntitySelectionProxy selectionProxy, SceneView sceneView)
+        private static void LookAtEntity(EntitySelectionProxy selectionProxy, SceneView sceneView, bool instant = false)
         {
             var entity = selectionProxy.Entity;
             var em     = selectionProxy.World.EntityManager;
-
-            if (!em.HasComponent(entity, QueryExtensions.GetAbstractWorldTransformROComponentType())) return;
-
+            
             Bounds bounds;
             if (em.HasComponent<WorldRenderBounds>(entity))
             {
@@ -98,7 +109,20 @@ namespace Latios.Kinemation.Editor
                 bounds = new Bounds(t.position, Vector3.one);
             }
 
-            sceneView.LookAt(bounds.center, sceneView.rotation, sceneView.size);
+            // Entity is a baked entity, render tools for it
+            if (Selection.activeGameObject != null)
+            {
+                var oldPos      = sceneView.pivot;
+                var oldSize     = sceneView.size;
+                var oldRotation = sceneView.rotation;
+                // FrameSelected allows the scene tools to render, it will move our camera
+                sceneView.FrameSelected(false, true);
+                // Move the camera back to origin, this allow us to set instant to false and get the smooth camera move animation
+                sceneView.LookAt(oldPos, oldRotation, oldSize, sceneView.orthographic, true);
+            }
+
+            // Actually set the camera position to our target
+            sceneView.LookAt(bounds.center, sceneView.rotation, sceneView.size, sceneView.orthographic, instant);
             sceneView.FixNegativeSize();
         }
     }
