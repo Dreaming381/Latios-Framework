@@ -18,6 +18,28 @@ namespace Latios.Kinemation.Editor
             Selection.selectionChanged += SelectionChanged;
         }
 
+        private static void DuringSceneGui(SceneView sceneView)
+        {
+            var ev = Event.current;
+
+            var proxy = GetCurrentSelectionProxy();
+
+            if (!proxy) return;
+            if (proxy.World is not LatiosWorld) return;
+
+            if (ev.type == EventType.ExecuteCommand) HandleExecuteCommand(proxy, sceneView);
+            if (ev.type == EventType.Repaint && _lockedEntity != default)
+                LookAtEntity(proxy, sceneView);
+        }
+
+        private static void SelectionChanged()
+        {
+            if (_lockedEntity == default) return;
+
+            if (GetCurrentSelectionProxy()?.Entity != _lockedEntity)
+                _lockedEntity = default;
+        }
+
         private static EntitySelectionProxy GetCurrentSelectionProxy()
         {
             if (Selection.objects.Length != 1) return null;
@@ -37,12 +59,24 @@ namespace Latios.Kinemation.Editor
             return null;
         }
 
-        private static void SelectionChanged()
+        private static void HandleExecuteCommand(EntitySelectionProxy selectionProxy, SceneView sceneView)
         {
-            if (_lockedEntity == default) return;
+            var ev = Event.current;
 
-            if (GetCurrentSelectionProxy()?.Entity != _lockedEntity)
-                _lockedEntity = default;
+            var withLock = ev.commandName == "FrameSelectedWithLock";
+
+            if (ev.commandName != "FrameSelected" && !withLock) return;
+
+            LookAtEntity(selectionProxy, sceneView);
+
+            if (withLock)
+            {
+                _lockedEntity = selectionProxy.Entity;
+            }
+
+            // consume the event
+            ev.Use();
+            ev.commandName = "";
         }
 
         private static void LookAtEntity(EntitySelectionProxy selectionProxy, SceneView sceneView)
@@ -66,39 +100,6 @@ namespace Latios.Kinemation.Editor
 
             sceneView.LookAt(bounds.center, sceneView.rotation, sceneView.size);
             sceneView.FixNegativeSize();
-        }
-
-        private static void DuringSceneGui(SceneView sceneView)
-        {
-            var ev = Event.current;
-
-            if (ev.type == EventType.ExecuteCommand) HandleExecuteCommand(sceneView);
-            if (ev.type == EventType.Repaint && _lockedEntity != default)
-                LookAtEntity(GetCurrentSelectionProxy(), sceneView);
-        }
-
-        private static void HandleExecuteCommand(SceneView sceneView)
-        {
-            var ev = Event.current;
-
-            var withLock = ev.commandName == "FrameSelectedWithLock";
-
-            if (ev.commandName != "FrameSelected" && !withLock) return;
-
-            EntitySelectionProxy selectionProxy = GetCurrentSelectionProxy();
-
-            if (!selectionProxy) return;
-
-            LookAtEntity(selectionProxy, sceneView);
-
-            if (withLock)
-            {
-                _lockedEntity = selectionProxy.Entity;
-            }
-
-            // consume the event
-            ev.Use();
-            ev.commandName = "";
         }
     }
 }
