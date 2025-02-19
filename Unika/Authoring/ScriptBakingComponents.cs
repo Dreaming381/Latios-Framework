@@ -19,5 +19,8 @@ namespace Latios.Unika.Authoring
         public bool      userFlagA;
         public bool      userFlagB;
     }
+
+    [BakingType]
+    internal struct AuthoredBufferTag : IComponentData { }
 }
 

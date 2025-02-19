@@ -27,6 +27,11 @@ namespace Unity.Entities.Exposed
             access->EndStructuralChanges(ref changes);
         }
 
+        public static void CompleteDependencyBeforeRO(this EntityManager entityManager, TypeIndex typeIndex)
+        {
+            entityManager.GetUncheckedEntityDataAccess()->DependencyManager->CompleteWriteDependency(typeIndex);
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         private static void CheckComponentTypeIsSharedComponent(ComponentType type)
         {

@@ -53,7 +53,7 @@ namespace Latios
             withAnyTypes      = withAny;
             bool anyHasChunk  = false;
             bool anyHasBuffer = false;
-            for (int i = 0; i < with.Length; i++)
+            for (int i = 0; i < withAny.Length; i++)
             {
                 if (withAny.GetTypeIndex(i).IsChunkComponent)
                     anyHasChunk = true;
@@ -127,7 +127,7 @@ namespace Latios
                     if (archetypeType.Value == currentQueryType.Value)
                     {
                         queryTypeIndex++;
-                        if (queryTypeIndex >= archetype.TypesCount)
+                        if (queryTypeIndex >= withTypes.Length)
                         {
                             missingRequired = false;
                             break;
@@ -159,7 +159,7 @@ namespace Latios
                     while (archetypeType.Value > currentQueryType.Value)
                     {
                         queryTypeIndex++;
-                        if (queryTypeIndex >= archetype.TypesCount)
+                        if (queryTypeIndex >= withAnyTypes.Length)
                         {
                             break;
                         }
@@ -186,7 +186,7 @@ namespace Latios
                     while (archetypeType.Value > currentQueryType.Value)
                     {
                         queryTypeIndex++;
-                        if (queryTypeIndex >= archetype.TypesCount)
+                        if (queryTypeIndex >= withoutTypes.Length)
                         {
                             break;
                         }
@@ -300,6 +300,7 @@ namespace Latios
     {
         internal TArchetypeEnumerator archetypeEnumerator;
         internal int                  currentChunkIndexInArchetype;
+        internal int                  chunkCountInArchetype;
 
         public TempMaskedChunkEnumerator<TempChunkEnumerator<TArchetypeEnumerator> > masked => new TempMaskedChunkEnumerator<TempChunkEnumerator<TArchetypeEnumerator> >(this);
 
@@ -307,6 +308,7 @@ namespace Latios
         {
             archetypeEnumerator          = archetypes;
             currentChunkIndexInArchetype = -1;
+            chunkCountInArchetype        = 0;
         }
 
         public TempChunkEnumerator<TArchetypeEnumerator> GetEnumerator() => this;
@@ -326,13 +328,14 @@ namespace Latios
         {
             TempQuery.CheckValid(entityStorageInfoLookup);
             currentChunkIndexInArchetype++;
-            while (currentChunkIndexInArchetype >= archetypeEnumerator.Current.ChunkCount)
+            while (currentChunkIndexInArchetype >= chunkCountInArchetype)
             {
                 currentChunkIndexInArchetype = 0;
                 if (!archetypeEnumerator.MoveNext())
                 {
                     return false;
                 }
+                chunkCountInArchetype = archetypeEnumerator.Current.ChunkCount;
             }
             return true;
         }

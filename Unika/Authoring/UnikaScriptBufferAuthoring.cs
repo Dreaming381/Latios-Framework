@@ -26,6 +26,7 @@ namespace Latios.Unika.Authoring
             types.Add(ComponentType.ReadWrite<UnikaSerializedAssetReference>());
             types.Add(ComponentType.ReadWrite<UnikaSerializedObjectReference>());
             types.Add(ComponentType.ReadWrite<UnikaSerializedTypeIds>());
+            types.Add(ComponentType.ReadWrite<AuthoredBufferTag>());
             AddComponent(entity, new ComponentTypeSet(in types));
         }
     }

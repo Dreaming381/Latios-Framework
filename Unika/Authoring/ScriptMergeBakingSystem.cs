@@ -45,6 +45,7 @@ namespace Latios.Unika.Authoring.Systems
             }
         }
 
+        [WithAll(typeof(AuthoredBufferTag))]
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct MergeJob : IJobEntity

@@ -114,17 +114,19 @@ namespace Latios.Psyshock
         private static bool CapsuleSphereDistance(in CapsuleCollider capsule, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
-            float3 edge                   = capsule.pointB - capsule.pointA;
-            float3 ap                     = sphere.center - capsule.pointA;
-            float  dot                    = math.dot(ap, edge);
-            float  edgeLengthSq           = math.lengthsq(edge);
-            dot                           = math.clamp(dot, 0f, edgeLengthSq);
-            float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
-            SphereCollider sphereA        = new SphereCollider(pointOnSegment, capsule.radius);
-            var            hit            = SphereSphere.SphereSphereDistance(in sphereA, in sphere, maxDistance, out result, out bool degenerate);
-            result.featureCodeA           = 0x4000;
-            result.featureCodeA           = (ushort)math.select(result.featureCodeA, 0, dot == 0f);
-            result.featureCodeA           = (ushort)math.select(result.featureCodeA, 1, dot == edgeLengthSq);
+            float3 edge           = capsule.pointB - capsule.pointA;
+            float3 ap             = sphere.center - capsule.pointA;
+            float  dot            = math.dot(ap, edge);
+            float  edgeLengthSq   = math.lengthsq(edge);
+            dot                   = math.clamp(dot, 0f, edgeLengthSq);
+            float3 pointOnSegment = capsule.pointA;
+            if (dot > 0f)
+                pointOnSegment     += edge * dot / edgeLengthSq;
+            SphereCollider sphereA  = new SphereCollider(pointOnSegment, capsule.radius);
+            var            hit      = SphereSphere.SphereSphereDistance(in sphereA, in sphere, maxDistance, out result, out bool degenerate);
+            result.featureCodeA     = 0x4000;
+            result.featureCodeA     = (ushort)math.select(result.featureCodeA, 0, dot == 0f);
+            result.featureCodeA     = (ushort)math.select(result.featureCodeA, 1, dot == edgeLengthSq);
             if (Hint.Likely(!degenerate))
                 return hit;
 

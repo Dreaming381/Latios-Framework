@@ -26,12 +26,15 @@ namespace Latios.Unika
 
             if (currentScriptCount == 0)
             {
-                scripts.Add(new ScriptHeader
+                if (scriptBuffer.IsEmpty)
                 {
-                    bloomMask          = mask,
-                    instanceCount      = 1,
-                    lastUsedInstanceId = 1
-                });
+                    scripts.Add(new ScriptHeader
+                    {
+                        bloomMask          = mask,
+                        instanceCount      = 1,
+                        lastUsedInstanceId = 1
+                    });
+                }
 
                 var newCapacity = math.ceilpow2(1);
                 scripts.Add(new ScriptHeader
@@ -137,9 +140,10 @@ namespace Latios.Unika
         {
             var currentScriptCount = scriptBuffer.AllScripts(default).length;
             var scripts            = scriptBuffer.Reinterpret<ScriptHeader>();
-            if (scripts.Length == 1)
+            if (currentScriptCount == 1)
             {
-                scripts.Clear();
+                scripts.Length                     = 1;
+                scripts.ElementAt(0).instanceCount = 0;
                 return;
             }
 
@@ -147,7 +151,7 @@ namespace Latios.Unika
             var currentScriptCapacity = math.ceilpow2(currentScriptCount);
             var newScriptCapacity     = math.ceilpow2(currentScriptCount - 1);
             var removedHeader         = scripts[scriptIndex + 1];
-            for (int i = scriptIndex + 1; i < scripts.Length; i++)
+            for (int i = scriptIndex + 1; i < currentScriptCount; i++)
                 scripts[i] = scripts[i + 1];
 
             // If the capacity changes, slide preceeding scripts over to the new script segment base pointer.
@@ -172,7 +176,7 @@ namespace Latios.Unika
             // Accumulate masks for subsequent scripts and move each script one-by-one, as alignment may be different
             for (int i = scriptIndex; i < currentScriptCount - 1; i++)
             {
-                var header           = scripts[i + 1];
+                ref var header       = ref scripts.ElementAt(i + 1);
                 accumulatedMask      = header.bloomMask;
                 var sizeAndAlignment = ScriptTypeInfoManager.GetSizeAndAlignement((short)header.scriptType);
                 var newOffset        = CollectionHelper.Align(usedBytesPreceeding, sizeAndAlignment.y);

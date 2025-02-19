@@ -33,14 +33,16 @@ namespace Latios.Psyshock
         internal static bool PointCapsuleDistance(float3 point, in CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
         {
             //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
-            float3 edge                   = capsule.pointB - capsule.pointA;
-            float3 ap                     = point - capsule.pointA;
-            float  dot                    = math.dot(ap, edge);
-            float  edgeLengthSq           = math.lengthsq(edge);
-            dot                           = math.clamp(dot, 0f, edgeLengthSq);
-            float3         pointOnSegment = capsule.pointA + edge * dot / edgeLengthSq;
-            SphereCollider sphere         = new SphereCollider(pointOnSegment, capsule.radius);
-            var            hit            = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
+            float3 edge           = capsule.pointB - capsule.pointA;
+            float3 ap             = point - capsule.pointA;
+            float  dot            = math.dot(ap, edge);
+            float  edgeLengthSq   = math.lengthsq(edge);
+            dot                   = math.clamp(dot, 0f, edgeLengthSq);
+            float3 pointOnSegment = capsule.pointA;
+            if (dot > 0f)
+                pointOnSegment    += edge * dot / edgeLengthSq;
+            SphereCollider sphere  = new SphereCollider(pointOnSegment, capsule.radius);
+            var            hit     = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
 
             result.featureCode = 0x4000;
             result.featureCode = (ushort)math.select(result.featureCode, 0, dot == 0f);
