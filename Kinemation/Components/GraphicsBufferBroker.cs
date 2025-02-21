@@ -13,13 +13,13 @@ namespace Latios.Kinemation
         #region Public Access
         /// <summary>
         /// Acquires the graphics buffer which contains the skinning transforms for Latios Vertex Skinning.
-        /// The buffer may change with each culling pass, but contains the contents of previous culling passes within the frame.
+        /// The buffer may change with each dispatch pass, but contains the contents of previous dispatch passes within the frame.
         /// It is valid during DispatchRoundRobinLateExtensionsSuperSystem during the Dispatch phase.
         /// </summary>
         public static GraphicsBufferUnmanaged GetSkinningTransformsBuffer(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(s_ids.Data.skinningTransformsID);
         /// <summary>
         /// Acquires the graphics buffer which contains the deformed vertices for Latios Deform.
-        /// The buffer may change with each culling pass, but contains the contents of previous culling passes within the frame.
+        /// The buffer may change with each dispatch pass, but contains the contents of previous dispatch passes within the frame.
         /// It is valid during DispatchRoundRobinLateExtensionsSuperSystem during the Dispatch phase.
         /// </summary>
         public static GraphicsBufferUnmanaged GetDeformedVerticesBuffer(this GraphicsBufferBroker broker) => broker.GetPersistentBufferNoResize(s_ids.Data.deformedVerticesID);

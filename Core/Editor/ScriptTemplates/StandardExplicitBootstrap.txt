@@ -32,7 +32,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
 
-        BootstrapTools.InjectUserSystems(systems, world, world.simulationSystemGroup);
+        BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
         return world;
     }

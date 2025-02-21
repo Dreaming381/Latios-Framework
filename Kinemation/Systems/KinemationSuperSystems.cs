@@ -84,7 +84,6 @@ namespace Latios.Kinemation.Systems
 
             GetOrCreateAndAddUnmanagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
             GetOrCreateAndAddUnmanagedSystem<ClearPerFrameCullingMasksSystem>();
-            GetOrCreateAndAddManagedSystem<KinemationCustomGraphicsSetupSuperSystem>();
             GetOrCreateAndAddUnmanagedSystem<InitializeAndClassifyPerFrameDeformMetadataSystem>();
             GetOrCreateAndAddUnmanagedSystem<PrepareLODsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();

@@ -64,6 +64,11 @@ namespace Latios.Kinemation.Authoring
 
         static Queue<(UnityEngine.GameObject, int)> s_breadthQueue = new Queue<(UnityEngine.GameObject, int)>();
 
+        /// <summary>
+        /// Traverses the bones in the specified Animator in the order Kinemation skeletons are baked and adds each bone to the output list
+        /// </summary>
+        /// <param name="rootAnimator">The animator to bake the bone names and parent indices for</param>
+        /// <param name="outputBoneNames">The bone names and parent indices list this method will append to</param>
         public static void CreateBoneNamesForExposedSkeleton(this IBaker baker, UnityEngine.Animator rootAnimator, NativeList<SkeletonBoneNameInHierarchy> outputBoneNames)
         {
             s_breadthQueue.Clear();
@@ -99,6 +104,11 @@ namespace Latios.Kinemation.Authoring
         public static void AppendBoneReversePath(this ref NativeText text, ReadOnlySpan<SkeletonBoneNameInHierarchy> boneNames, int boneIndex, bool includeRoot = true)
         {
             var final = includeRoot ? 0 : 1;
+            if (boneIndex < final)
+            {
+                text.Append('/');
+                return;
+            }
             for (int i = boneIndex; i >= final; i = boneNames[i].parentIndex)
             {
                 text.Append(boneNames[i].boneName);

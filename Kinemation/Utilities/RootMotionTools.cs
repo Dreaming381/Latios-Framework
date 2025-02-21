@@ -211,6 +211,7 @@ namespace Latios.Kinemation
         /// <summary>
         /// Sequences two delta transforms together. Use this for dealing with discontinuities when sampling deltas in a single clip such as wrapping,
         /// or when the time spans multiple adjacent clips played in sequence. Order matters, and the transforms must be normalized.
+        /// You can also use this method to apply deltas to the root transform. The previous root transform should be passed to deltaFirst.
         /// </summary>
         /// <param name="deltaFirst">The first delta acquired in the sequence</param>
         /// <param name="deltaSecond">The second delta acquired in the sequence</param>

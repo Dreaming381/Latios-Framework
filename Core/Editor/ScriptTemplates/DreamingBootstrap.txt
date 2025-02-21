@@ -23,14 +23,17 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
     public World Initialize(string defaultEditorWorldName)
     {
         var world                        = new LatiosWorld(defaultEditorWorldName, WorldFlags.Editor);
+        world.useExplicitSystemOrdering  = true;
         world.zeroToleranceForExceptions = true;
 
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(WorldSystemFilterFlags.Default, true);
-        BootstrapTools.InjectSystems(systems, world, world.simulationSystemGroup);
+        BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
         Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
+
+        BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
         return world;
     }
