@@ -1,16 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.12.0-beta.10]
-
-**This is a prerelease version of the Latios Framework version 0.12 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, are currently being updated to reflect the new features and
-changes in 0.12.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**This version of the beta uses Unity 6000.0.23 with Entities 1.3.9.**
+# Latios Framework for Unity ECS – [0.12.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -38,26 +28,21 @@ adaptations of top-class solutions in the industry (see [Third Party
 Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
-This version targets Entities 1.3.5 with ENTITY_STORE_V1 and a minimum editor
-version of 2022.3.36f1.
+This version targets Entities 1.3.9 with ENTITY_STORE_V1 and a minimum editor
+version of 6000.0.23f1.
 
-*[0.10.x] users, please read the* [*Upgrade
+*[0.11.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
-
-**If you have any experience with DOTS, please take** [**this
-survey**](https://forms.gle/iQ7Hue7atFZ2GrM16)**!**
 
 ## Modules
 
 The Latios Framework contains multiple **modules**, each of which contain public
-API for your own use. Additionally, each module may contain **addons**. Addons
-are community contributed features, and consequently may have different design
-philosophies or support guarantees as other features. With that said, some addon
-authors are very active and offer support and reliability that surpasses native
-features.
+API for your own use. For even more functionality built on top of these modules,
+check out the [Add-Ons
+package](https://github.com/Dreaming381/Latios-Framework-Add-Ons)!
 
-Modules and addons are disabled by default and are installed via a custom
-bootstrap. Bootstrap templates are provided in the Assets Create menu.
+Modules are disabled by default and are installed via a custom bootstrap.
+Bootstrap templates are provided in the Assets Create menu.
 
 ### Core
 
@@ -76,7 +61,7 @@ tool to address it.
 
 **Common Reasons to Avoid:**
 
--   You move a large amount of entities between worlds in the middle of gameplay
+-   You have your own solutions for everything listed here
 
 ### QVVS Transforms
 
@@ -137,7 +122,7 @@ amounts of sources at once. Playing audio is as simple as instantiating prefabs.
 
 **Common Reasons to Ignore:**
 
--   You can afford FMOD
+-   You can afford and prefer to use FMOD
 
 ### Kinemation
 
@@ -149,9 +134,10 @@ including true frustum culling and LOD crossfade support. It also provides a
 comprehensive API for injecting custom effects into ECS rendering.
 
 On the animation side, Kinemation supports bone entity and optimized bone buffer
-configurations. It includes utilities for inertial blending. And for animation
-clips it leverages ACL, a powerful high quality animation compression solution
-used in AAA titles such as Rise of the Tomb Raider, Fortnite, and Valorant.
+configurations. It includes utilities for masking, inertial blending, and root
+motion. For animation clips, it leverages ACL, a powerful high quality animation
+compression solution used in AAA titles such as Rise of the Tomb Raider,
+Fortnite, and Valorant.
 
 **Common Reasons to Use:**
 
@@ -159,14 +145,16 @@ used in AAA titles such as Rise of the Tomb Raider, Fortnite, and Valorant.
 -   You want better rendering performance and features related to LODs, light
     probes, and deforming meshes
 -   You want to customize and extend ECS rendering with access to the culling
-    logic
+    and dispatch logic
+-   You want an easier API for creating meshes at runtime
 -   You prefer code-driven animation workflows and inertial blending
 -   You wish to build your own animation visual tool tailored to your project
 
 **Common Reasons to Avoid:**
 
 -   You absolutely require a robust out-of-the-box code-free skeletal animation
-    solution for only a small number of entities
+    solution for only a small number of entities right now and are willing to
+    pay money for it
 
 ### Calligraphics
 
@@ -189,25 +177,46 @@ dialog, player names, and damage numbers.
 
 -   TextMeshDOTS works and fully covers your needs
 
-### Mimic
+### LifeFX
 
-[Mimic](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Mimic/README.md)
-provides behavioral replicas of popular solutions within the Unity ecosystem,
-rewritten to leverage the features of the other modules and the performance
-benefits of Unity’s ECS. With Mimic, teams can continue to use familiar and
-proven authoring tools and workflows while simultaneously being fully invested
-into Unity ECS and the Latios Framework.
+[LifeFX](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/LifeFX/README.md)
+provides VFX solutions at ECS scales using an intelligent graphics buffer
+management pipeline. It comes with an out-of-the-box solution for sending ECS
+event payloads to VFX Graph via graphics buffers. This way, a single VFX Graph
+instance can support thousands of entities.
 
--   Addons
-    -   Mecanim by Sovogal – Replication of Unity’s Animator Controller state
-        machine with support for blend trees, interrupts, root motion, and
-        events.
+**Common Reasons to Use:**
+
+-   You use VFX Graph at scale
+-   You want a better way to get ECS graphics data into traditional
+    MonoBehaviours
+
+**Common Reasons to Avoid:**
+
+-   You don’t need VFX Graph or custom graphics
+
+### Unika
+
+[Unika](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Unika/README.md)
+is a C\# scripting solution for ECS with full jobs and Burst support. Scripts
+are packed in dynamic buffers and can be invoked abstractly through interfaces
+using source generators. Scripts are fully referenceable from entities and other
+scripts, providing plenty of flexibility.
+
+**Common Reasons to Use:**
+
+-   You have too many small jobs
+-   You want something that can leverage your OOP experience as a fallback to
+    reduce development costs
+-   You have technical artists who want to write MonoBehaviour-like code
+-   You want a better API for modders
+
+**Common Reasons to Avoid:**
+
+-   You exclusively use idiomatic foreach
 
 ### Future Modules
 
--   Unika – A high-performance scripting solution including support for
-    interfaces and coroutines using source generators
--   Life FX – VFX simulations which add immersion to stylized worlds
 -   Mach-Axle AI – A utility AI evaluator designed for high throughput
 -   Unnamed Networking – Something fast and flexible at scale
 
@@ -227,16 +236,15 @@ technical reasons, it is a “framework”, but the individual APIs act more lik
 toolkit and stay out of the way. A developer using it should always feel in
 control. If not, there’s likely an issue worth bringing to attention.
 
-In addition, the Latios Framework strives to fix multiple fundamental
-performance and behavior issues within Unity’s ECS packages. The results of such
-efforts are best demonstrated in [this video](https://youtu.be/AgcRePkWoFc). For
-a complete breakdown of these changes with each configuration and bootstrap,
-[check out this
+The Latios Framework fixes multiple fundamental performance and behavior issues
+within Unity’s ECS packages. The results of such efforts are best demonstrated
+in [this video](https://youtu.be/AgcRePkWoFc). For a complete breakdown of these
+changes with each configuration and bootstrap, [check out this
 guide](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/What%20Parts%20of%20ECS%20Does%20the%20Latios%20Framework%20Change.md).
 
-0.5 marked the end of Phase II, where focus was placed on enabling technologies
-in Unity ECS such as audio and animation. Current Phase III development focuses
-on modernizing the technology for Entities 1.X and facilitating gameplay design.
+0.12 marks the end of Phase III, which focused on modernizing the framework for
+Entities 1.X and facilitating gameplay design. Phase IV will focus on
+higher-level workflows and advancing existing technologies.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.
@@ -344,19 +352,11 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.11.X) will always preserve backwards compatibility back to the
+Patch releases (0.12.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
 publish patch releases for older versions.
-
-### Free Parking for All of the Above
-
-If you are experimenting with features, vouching for a new feature, wish to
-collaborate, or are trying to hunt down a troublesome issue, the best way to
-ensure success is to make a dev dungeon in Free Parking. This provides an
-easy-to-access collaborative space for fast iteration, and can also serve as a
-regression test for further development.
 
 ## Special Thanks To These Awesome Contributors
 
@@ -364,13 +364,14 @@ If you would like to be added to this list, see
 [Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
 for how to get started.
 
--   Sovogal – Primary author of Mimic’s Mecanim addon and made significant
-    contributions to the Calligraphics module (including the name)
+-   Sovogal – Significant contributions to the Calligraphics module (including
+    the name)
 -   canmom – Android support, Kinemation baking fixes, and build fixes
 -   Fribur – Calligraphics rich text overhaul and shader improvements
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
 -   Anthiese – Mac OS support
+-   germanoeich – F and Shift + F support for runtime entities
 -   Lewis – Improvements to `EntityWith<>` and `EntityWithBuffer<>`
 -   Everyone else who reported bugs and made the Latios Framework more stable
     for everyone

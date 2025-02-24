@@ -1,9 +1,9 @@
 {
   "name": "com.latios.latiosframework",
   "displayName": "Latios Framework for ECS",
-  "version": "0.12.0-beta.10",
+  "version": "0.12.0",
   "unity": "6000.0",
-  "description": "Latios Framework for ECS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following modules:\n\u25aa Core\n\u25aa QVVS Transforms\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\u25aa Kinemation Animation and Rendering\n\u25aa Caligraphics\n\u25aa Mimic\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip \n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos \n\u25aa Free Parking - https://github.com/Dreaming381/Free-Parking",
+  "description": "Latios Framework for ECS is a collection of tools, algorithms, and API extensions developed by a hardcore hobbyist game developer.\n\nThis package includes all of the following modules:\n\u25aa Core\n\u25aa QVVS Transforms\n\u25aa Psyshock Physics\n\u25aa Myri Audio\n\u25aa Kinemation Animation and Rendering\n\u25aa Caligraphics\n\u25aa LifeFX\n\u25aa Unika\n\nExamples: \n\u25aa Latios Space Shooter Sample - https://github.com/Dreaming381/lsss-wip \n\u25aa Mini Demos - https://github.com/Dreaming381/LatiosFrameworkMiniDemos \n\u25aa Free Parking - https://github.com/Dreaming381/Free-Parking",
   "documentationURL": "https://github.com/Dreaming381/Latios-Framework-Documentation",
   "dependencies": {
     "com.unity.entities": "1.3.9",

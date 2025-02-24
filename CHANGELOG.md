@@ -2,9 +2,36 @@
 
 All notable changes to this package will be documented in this file.
 
-The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+and this project adheres to [Semantic
+Versioning](http://semver.org/spec/v2.0.0.html).
 
-You can find changelogs for the individual modules in the [official Latios Framework Documentation repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
+You can find changelogs for the individual modules in the [official Latios
+Framework Documentation
+repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
+
+## [0.12.0] – 2025-2-23
+
+Officially supports Entities [1.3.9]
+
+### Added
+
+-   Added LifeFX
+-   Added Unika
+
+### Changed
+
+-   Updated Core to v0.12.0
+-   Updated QVVS Transforms to v0.12.0
+-   Updated Psyshock to v0.12.0
+-   Updated Myri to v0.12.0
+-   Updated Kinemation to v0.12.0
+-   Updated Calligraphics to v0.12.0
+
+### Removed
+
+-   Removed support for Unity 2022 LTS
+-   Removed Mimic, as all functionality has been migrated to the Add-Ons package
 
 ## [0.11.5] – 2024-11-2
 
@@ -336,7 +363,8 @@ Officially supports Entities [1.0.10]
 
 ### Changed
 
--   Moved Documentation to <https://github.com/Dreaming381/Latios-Framework-Documentation>
+-   Moved Documentation to
+    <https://github.com/Dreaming381/Latios-Framework-Documentation>
 -   Updated Core to v0.7.0
 -   Updated Psyshock to v0.7.0
 -   Updated Myri to v0.7.0
