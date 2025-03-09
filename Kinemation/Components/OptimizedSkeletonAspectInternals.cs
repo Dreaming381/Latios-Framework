@@ -12,6 +12,7 @@ namespace Latios.Kinemation
 {
     public readonly partial struct OptimizedSkeletonAspect
     {
+#if !LATIOS_DISABLE_ACL
         internal bool BeginSampleTrueIfAdditive(out NativeArray<AclUnity.Qvvs> targetLocalTransforms)
         {
             targetLocalTransforms          = m_boneTransforms.Reinterpret<AclUnity.Qvvs>().AsNativeArray().GetSubArray(m_currentBaseRootIndexWrite + boneCount, boneCount);
@@ -20,6 +21,7 @@ namespace Latios.Kinemation
             return (previousState & OptimizedSkeletonState.Flags.NextSampleShouldAdd) ==
                    OptimizedSkeletonState.Flags.NextSampleShouldAdd;
         }
+#endif
 
         int m_currentBaseRootIndexWrite
         {

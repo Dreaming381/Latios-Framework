@@ -1,3 +1,4 @@
+#if !LATIOS_DISABLE_ACL
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -59,4 +60,5 @@ namespace Latios.MachAxle
         }
     }
 }
+#endif
 

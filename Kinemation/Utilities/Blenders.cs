@@ -1,9 +1,7 @@
 using System;
 using Latios.Transforms;
-using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Kinemation
@@ -25,9 +23,13 @@ namespace Latios.Kinemation
     /// </remarks>
     public struct BufferPoseBlender
     {
-        internal NativeArray<AclUnity.Qvvs> bufferAsQvvs;
+        internal NativeArray<TransformQvvs> buffer;
         internal bool                       sampledFirst;
         internal bool                       normalized;
+
+#if !LATIOS_DISABLE_ACL
+        internal NativeArray<AclUnity.Qvvs> bufferAsQvvs => buffer.Reinterpret<AclUnity.Qvvs>();
+#endif
 
         /// <summary>
         /// Creates a blender for blending sampled poses into the buffer. The buffer's Qvvs values are invalidated.
@@ -35,7 +37,7 @@ namespace Latios.Kinemation
         /// <param name="localSpaceBuffer">The buffer used for blending operations.</param>
         public BufferPoseBlender(NativeArray<TransformQvvs> localSpaceBuffer)
         {
-            bufferAsQvvs = localSpaceBuffer.Reinterpret<AclUnity.Qvvs>();
+            buffer       = localSpaceBuffer;
             sampledFirst = false;
             normalized   = false;
         }
@@ -47,15 +49,10 @@ namespace Latios.Kinemation
         /// </summary>
         public unsafe void Normalize()
         {
-            var bufferPtr = (AclUnity.Qvvs*)bufferAsQvvs.GetUnsafePtr();
-            for (int i = 0; i < bufferAsQvvs.Length; i++, bufferPtr++)
+            var bufferPtr = (TransformQvvs*)buffer.GetUnsafePtr();
+            for (int i = 0; i < buffer.Length; i++, bufferPtr++)
             {
-                if (bufferPtr->translation.w == 1f)
-                    continue;
-                var weight               = 1f / bufferPtr->translation.w;
-                bufferPtr->rotation      = math.normalize(bufferPtr->rotation);
-                bufferPtr->translation  *= weight;
-                bufferPtr->stretchScale *= weight;
+                bufferPtr[i].NormalizeBone();
             }
             normalized = true;
         }
@@ -69,7 +66,7 @@ namespace Latios.Kinemation
         /// <param name="rootSpaceBuffer">The buffer to write the destination values. This is allowed to be the same as the local-space buffer.</param>
         public void ComputeRootSpaceTransforms(ReadOnlySpan<short> parentIndices, ref NativeArray<TransformQvvs> rootSpaceBuffer)
         {
-            var localSpaceBuffer = bufferAsQvvs.Reinterpret<TransformQvvs>();
+            var localSpaceBuffer = buffer;
             if (!normalized)
             {
                 var temp = localSpaceBuffer[0];
@@ -107,13 +104,21 @@ namespace Latios.Kinemation
     {
         public static void NormalizeBone(ref this TransformQvvs localTransform)
         {
-            var w            = math.asfloat(localTransform.worldIndex);
-            w                = 1f / w;
+            var w = math.asfloat(localTransform.worldIndex);
+            w     = 1f / w;
+#if LATIOS_DISABLE_ACL
+            localTransform.rotation   = math.normalize(localTransform.rotation);
+            localTransform.position  *= w;
+            localTransform.stretch   *= w;
+            localTransform.scale     *= w;
+            localTransform.worldIndex = math.asint(1f);
+#else
             ref var t        = ref UnsafeUtility.As<TransformQvvs, AclUnity.Qvvs>(ref localTransform);
             t.rotation       = math.normalize(t.rotation);
             t.translation   *= w;
             t.stretchScale  *= w;
             t.translation.w  = 1f;
+#endif
         }
     }
 }

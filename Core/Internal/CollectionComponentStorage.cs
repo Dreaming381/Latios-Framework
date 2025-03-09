@@ -254,6 +254,7 @@ namespace Latios
                 {
                     index = tcs.freeStack[tcs.freeStack.Length - 1];
                     tcs.freeStack.Length--;
+                    tcs.collectionComponents[index] = default;
                 }
 
                 m_twoLevelLookup.Add(new Key { entity = entity, typeHash = BurstRuntime.GetHashCode64<T>() }, new int2(tcs.typeIndex, index));

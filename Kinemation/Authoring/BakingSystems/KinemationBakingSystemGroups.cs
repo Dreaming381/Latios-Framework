@@ -65,11 +65,13 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddSystem<MeshPathsSmartBlobberSystem>();  // async
             GetOrCreateAndAddSystem<SkeletonPathsSmartBlobberSystem>();  // async
             GetOrCreateAndAddSystem<SkeletonHierarchySmartBlobberSystem>();  // async
-            GetOrCreateAndAddSystem<ParameterClipSetSmartBlobberSystem>();  // async
 
             GetOrCreateAndAddSystem<SkeletonBoneMaskSetSmartBlobberSystem>();  // async -> sync -> async
             GetOrCreateAndAddSystem<SetupSocketsSystem>();  // async -> sync
+#if !LATIOS_DISABLE_ACL
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
+            GetOrCreateAndAddSystem<ParameterClipSetSmartBlobberSystem>();  // async
+#endif
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
             GetOrCreateAndAddSystem<Latios.Transforms.Authoring.Systems.TransformHierarchySyncBakingSystem>();  // async | Needed for correcting children of sockets.
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY

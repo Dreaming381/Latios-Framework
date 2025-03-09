@@ -19,7 +19,9 @@ namespace Latios.MachAxle
         public CellConstants            temporaryConstants;
         public BlobArray<InstanceGroup> instanceGroups;
 
+#if !LATIOS_DISABLE_ACL
         public BlobArray<ParameterClip> parameterClips;
+#endif
     }
 
     struct Layer

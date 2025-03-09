@@ -153,7 +153,8 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("PhysicsComponentLookup cannot be used inside a RunImmediate context. Use ComponentLookup instead.");
+                throw new InvalidOperationException(
+                    "The entity is not safe to access by PhysicsComponentLookup within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, use ComponentLookup instead.");
             }
 #endif
         }
@@ -262,7 +263,8 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("PhysicsBufferLookup cannot be used inside a RunImmediate context. Use BufferLookup instead.");
+                throw new InvalidOperationException(
+                    "The entity is not safe to access by PhysicsBufferLookup within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, use BufferLookup instead.");
             }
 #endif
         }
@@ -317,7 +319,8 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("AspectLookup cannot be used inside a RunImmediate context. Use <TAspectType>.Lookup instead.");
+                throw new InvalidOperationException(
+                    "The entity is not safe to access by PhysicsAspectLookup within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, use <TAspectType>.Lookup instead.");
             }
 #endif
         }
@@ -380,7 +383,8 @@ namespace Latios.Psyshock
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             if (safeEntity.m_entity.Index < 0)
             {
-                throw new InvalidOperationException("PhysicsBufferFromEntity cannot be used inside a RunImmediate context. Use BufferFromEntity instead.");
+                throw new InvalidOperationException(
+                    "The entity is not safe to access by PhysicsTransformAspectLookup within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, use TransformAspect.Lookup instead.");
             }
 #endif
         }
@@ -455,6 +459,8 @@ namespace Latios.Psyshock
             if (safeEntity.m_entity.Index < 0)
             {
                 throw new InvalidOperationException("SafeEntity for a ComponentBroker cannot be used inside a RunImmediate context. Use SafeEntity.entity instead.");
+                throw new InvalidOperationException(
+                    "The SafeEntity is not safe to access by ComponentBroker within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, cast the SafeEntity to an Entity first.");
             }
 #endif
         }

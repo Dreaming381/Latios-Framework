@@ -53,6 +53,7 @@ namespace Latios.Kinemation.Authoring
         }
     }
 
+#if !LATIOS_DISABLE_ACL
     internal static class ClipEventsBlobHelpers
     {
         internal static void Convert(ref ClipEvents dstEvents, ref BlobBuilder builder, NativeArray<ClipEvent> srcEvents)
@@ -83,5 +84,6 @@ namespace Latios.Kinemation.Authoring
             }
         }
     }
+#endif
 }
 

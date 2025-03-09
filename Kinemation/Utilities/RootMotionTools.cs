@@ -4,6 +4,7 @@ using Unity.Mathematics;
 
 namespace Latios.Kinemation
 {
+#if !LATIOS_DISABLE_ACL
     /// <summary>
     /// A struct which can accumulate a root motion delta transform during sampling and blending, properly accounting for looping clips.
     /// This must be initialized to default before use.
@@ -27,8 +28,8 @@ namespace Latios.Kinemation
                                float loopCycleTransitions,
                                KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
         {
-            var sampledRoot           = blender.bufferAsQvvs.Reinterpret<TransformQvvs>()[0];
-            blender.bufferAsQvvs[0]   = default;
+            var sampledRoot           = blender.buffer.Reinterpret<TransformQvvs>()[0];
+            blender.buffer[0]         = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
             Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.worldIndex), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
@@ -149,6 +150,7 @@ namespace Latios.Kinemation
             }
         }
     }
+#endif
 
     /// <summary>
     /// Contains methods to apply "mathematical expressions" between bone transforms for working with transform deltas

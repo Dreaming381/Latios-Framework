@@ -160,58 +160,9 @@ namespace Latios.Psyshock.Authoring.Systems
 
             public unsafe void BuildBlob(Mesh.MeshData mesh)
             {
-                var vector3Cache = new NativeList<Vector3>(Allocator.Temp);
-                var indicesCache = new NativeList<int>(Allocator.Temp);
-                var bodies       = new NativeList<ColliderBody>(Allocator.Temp);
-
                 var builder = new BlobBuilder(Allocator.Temp);
 
-                ref var blobRoot = ref builder.ConstructRoot<TriMeshColliderBlob>();
-
-                blobRoot.meshName = meshName;
-
-                vector3Cache.ResizeUninitialized(mesh.vertexCount);
-                mesh.GetVertices(vector3Cache.AsArray());
-
-                for (int i = 0; i < mesh.subMeshCount; i++)
-                {
-                    var descriptor = mesh.GetSubMesh(i);
-                    if (descriptor.topology != MeshTopology.Triangles)
-                        continue;
-                    indicesCache.ResizeUninitialized(descriptor.indexCount);
-                    mesh.GetIndices(indicesCache.AsArray(), i);
-
-                    for (int j = 0; j < indicesCache.Length; j += 3)
-                    {
-                        float3 a = vector3Cache[indicesCache[j]];
-                        float3 b = vector3Cache[indicesCache[j + 1]];
-                        float3 c = vector3Cache[indicesCache[j + 2]];
-
-                        bodies.Add(new ColliderBody { collider = new TriangleCollider(a, b, c), entity = default, transform = TransformQvvs.identity });
-                    }
-                }
-
-                Physics.BuildCollisionLayer(bodies.AsArray()).WithSubdivisions(1).RunImmediate(out var layer, Allocator.Temp);
-
-                builder.ConstructFromNativeArray(ref blobRoot.xmins,         layer.xmins.AsArray());
-                builder.ConstructFromNativeArray(ref blobRoot.xmaxs,         layer.xmaxs.AsArray());
-                builder.ConstructFromNativeArray(ref blobRoot.yzminmaxs,     layer.yzminmaxs.AsArray());
-                builder.ConstructFromNativeArray(ref blobRoot.intervalTree,  layer.intervalTrees.AsArray());
-                builder.ConstructFromNativeArray(ref blobRoot.sourceIndices, layer.srcIndices.AsArray());
-
-                var triangles = builder.Allocate(ref blobRoot.triangles, layer.count);
-                var aabb      = new Aabb(float.MaxValue, float.MinValue);
-                for (int i = 0; i < layer.count; i++)
-                {
-                    TriangleCollider triangle = layer.colliderBodies[i].collider;
-                    aabb.min                  = math.min(math.min(aabb.min, triangle.pointA), math.min(triangle.pointB, triangle.pointC));
-                    aabb.max                  = math.max(math.max(aabb.max, triangle.pointA), math.max(triangle.pointB, triangle.pointC));
-                    triangles[i]              = triangle;
-                }
-
-                blobRoot.localAabb = aabb;
-
-                result = builder.CreateBlobAssetReference<TriMeshColliderBlob>(Allocator.Persistent);
+                result = TriMeshColliderBlob.BuildBlob(ref builder, mesh, meshName, Allocator.Persistent);
             }
         }
 

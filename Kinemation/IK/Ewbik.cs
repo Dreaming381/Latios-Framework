@@ -233,6 +233,7 @@ namespace Latios.Kinemation
                 solveList            = solveList.Slice(0, solveListLength);
                 expandedTargetsCount = runningStart;
             }
+            int         maxPairCount        = 0;
             Span<short> targetIndicesByBone = stackalloc short[expandedTargetsCount];
             {
                 int   currentIndexInSolveList = 0;
@@ -252,6 +253,7 @@ namespace Latios.Kinemation
                         {
                             targetIndicesByBone[solveItem.targetsByBoneStart + solveItem.targetsByBoneCount] = currentTargetIndex;
                             solveItem.targetsByBoneCount++;
+                            maxPairCount = math.max(maxPairCount, solveItem.targetsByBoneCount);
                         }
 
                         var parentIndex = skeleton.bones[boneIndex].parentIndex;
@@ -264,6 +266,7 @@ namespace Latios.Kinemation
                             {
                                 targetIndicesByBone[parentItem.targetsByBoneStart + parentItem.targetsByBoneCount] = targetIndicesByBone[solveItem.targetsByBoneStart + i];
                                 parentItem.targetsByBoneCount++;
+                                maxPairCount = math.max(maxPairCount, parentItem.targetsByBoneCount);
                             }
                         }
                     }
@@ -281,6 +284,7 @@ namespace Latios.Kinemation
                             {
                                 targetIndicesByBone[parentItem.targetsByBoneStart + parentItem.targetsByBoneCount] = currentTargetIndex;
                                 parentItem.targetsByBoneCount++;
+                                maxPairCount = math.max(maxPairCount, parentItem.targetsByBoneCount);
                             }
                         }
                     }
@@ -288,21 +292,20 @@ namespace Latios.Kinemation
             }
 
             // Next step, we can start solving.
-            int skeletonIterations = 0;
+            int          skeletonIterations = 0;
+            Span<float3> currentPoints      = stackalloc float3[maxPairCount * 7];
+            Span<float3> targetPoints       = stackalloc float3[maxPairCount * 7];
+            Span<float>  weights            = stackalloc float[maxPairCount * 7];
             while (constraintSolver.NeedsSkeletonIteration(skeleton, targets, skeletonIterations))
             {
                 for (int solveItemIndex = 0; solveItemIndex < solveList.Length; solveItemIndex++)
                 {
-                    var          solveItem             = solveList[solveItemIndex];
-                    var          bone                  = skeleton.bones[solveItem.boneIndex];
-                    var          boneTargetIndices     = targetIndicesByBone.Slice(solveItem.targetsByBoneStart, solveItem.targetsByBoneCount);
-                    var          conservativePairCount = 7 * solveItem.targetsByBoneCount;
-                    Span<float3> currentPoints         = stackalloc float3[conservativePairCount];
-                    Span<float3> targetPoints          = stackalloc float3[conservativePairCount];
-                    Span<float>  weights               = stackalloc float[conservativePairCount];
-                    int          boneSolveIterations   = 0;
-                    var          boneTransform         = bone.rootTransform;
-                    bool         repeat                = false;
+                    var  solveItem           = solveList[solveItemIndex];
+                    var  bone                = skeleton.bones[solveItem.boneIndex];
+                    var  boneTargetIndices   = targetIndicesByBone.Slice(solveItem.targetsByBoneStart, solveItem.targetsByBoneCount);
+                    int  boneSolveIterations = 0;
+                    var  boneTransform       = bone.rootTransform;
+                    bool repeat              = false;
 
                     do
                     {

@@ -1,10 +1,8 @@
+#if !LATIOS_DISABLE_ACL
 using System;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Latios.Transforms;
-using Unity.Burst.CompilerServices;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -311,7 +309,7 @@ namespace Latios.Kinemation
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         void CheckBlenderIsBigEnoughForClip(in BufferPoseBlender blender, short boneCount)
         {
-            if (blender.bufferAsQvvs.Length < boneCount)
+            if (blender.buffer.Length < boneCount)
                 throw new ArgumentException("The blender does not contain enough elements to store the sampled pose.");
         }
 
@@ -551,4 +549,5 @@ namespace Latios.Kinemation
         }
     }
 }
+#endif
 

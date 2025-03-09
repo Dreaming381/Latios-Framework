@@ -1,9 +1,9 @@
+#if !LATIOS_DISABLE_ACL
 using Latios.Authoring;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -360,4 +360,5 @@ namespace Latios.Kinemation.Authoring.Systems
         }
     }
 }
+#endif
 

@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using Latios.Transforms;
+using Latios.Unsafe;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
 using Unity.Entities;
@@ -137,6 +139,110 @@ namespace Latios.Psyshock
             }
 
             SearchTreeLooped(qyzMinMax, triMeshSpaceAabb.min.x, ref processor);
+        }
+
+        /// <summary>
+        /// Constructs a Blob Asset for the specified mesh triangles. The user is responsible for the lifecycle
+        /// of the resulting blob asset. Calling in a Baker may not result in correct incremental behavior.
+        /// </summary>
+        /// <param name="builder">The initialized BlobBuilder to create the blob asset with</param>
+        /// <param name="vertices">The vertices of the mesh</param>
+        /// <param name="indices">Triangle indices of the mesh</param>
+        /// <param name="name">The name of the mesh which will be stored in the blob</param>
+        /// <param name="allocator">The allocator used for the finally BlobAsset, typically Persistent</param>
+        /// <returns>A reference to the created Blob Asset which is user-owned</returns>
+        public static unsafe BlobAssetReference<TriMeshColliderBlob> BuildBlob(ref BlobBuilder builder,
+                                                                               ReadOnlySpan<float3>             vertices,
+                                                                               ReadOnlySpan<int3>               indices,
+                                                                               in FixedString128Bytes name,
+                                                                               AllocatorManager.AllocatorHandle allocator)
+        {
+            using ThreadStackAllocator tsa = ThreadStackAllocator.GetAllocator();
+
+            var bodiesCachePtr = tsa.Allocate<ColliderBody>(indices.Length / 3);
+            var bodiesCache    = CollectionHelper.ConvertExistingDataToNativeArray<ColliderBody>(bodiesCachePtr, indices.Length / 3, Allocator.None, true);
+            for (int i = 0; i < bodiesCache.Length; i++)
+            {
+                var    tri = indices[i];
+                float3 a   = vertices[tri.x];
+                float3 b   = vertices[tri.y];
+                float3 c   = vertices[tri.z];
+
+                bodiesCache[i] = new ColliderBody { collider = new TriangleCollider(a, b, c), entity = default, transform = TransformQvvs.identity };
+            }
+
+            ref var blobRoot  = ref builder.ConstructRoot<TriMeshColliderBlob>();
+            blobRoot.meshName = name;
+
+            // Todo: Need ThreadStackAllocator to support AllocatorHandle
+            Physics.BuildCollisionLayer(bodiesCache).WithSubdivisions(1).RunImmediate(out var layer, Allocator.Temp);
+
+            builder.ConstructFromNativeArray(ref blobRoot.xmins,         layer.xmins.AsArray());
+            builder.ConstructFromNativeArray(ref blobRoot.xmaxs,         layer.xmaxs.AsArray());
+            builder.ConstructFromNativeArray(ref blobRoot.yzminmaxs,     layer.yzminmaxs.AsArray());
+            builder.ConstructFromNativeArray(ref blobRoot.intervalTree,  layer.intervalTrees.AsArray());
+            builder.ConstructFromNativeArray(ref blobRoot.sourceIndices, layer.srcIndices.AsArray());
+
+            var triangles = builder.Allocate(ref blobRoot.triangles, layer.count);
+            var aabb      = new Aabb(float.MaxValue, float.MinValue);
+            for (int i = 0; i < layer.count; i++)
+            {
+                TriangleCollider triangle = layer.colliderBodies[i].collider;
+                aabb.min                  = math.min(math.min(aabb.min, triangle.pointA), math.min(triangle.pointB, triangle.pointC));
+                aabb.max                  = math.max(math.max(aabb.max, triangle.pointA), math.max(triangle.pointB, triangle.pointC));
+                triangles[i]              = triangle;
+            }
+
+            blobRoot.localAabb = aabb;
+
+            return builder.CreateBlobAssetReference<TriMeshColliderBlob>(allocator);
+        }
+
+        /// <summary>
+        /// Constructs a Blob Asset for the specified MeshData. The user is responsible for the lifecycle
+        /// of the resulting blob asset. Calling in a Baker may not result in correct incremental behavior.
+        /// Submeshes that are not triangles are ignored.
+        /// </summary>
+        /// <param name="builder">The initialized BlobBuilder to create the blob asset with</param>
+        /// <param name="mesh">The input mesh to build the blob from</param>
+        /// <param name="name">The name of the mesh which will be stored in the blob</param>
+        /// <param name="allocator">The allocator used for the finally BlobAsset, typically Persistent</param>
+        /// <returns>A reference to the created Blob Asset which is user-owned</returns>
+        public static unsafe BlobAssetReference<TriMeshColliderBlob> BuildBlob(ref BlobBuilder builder,
+                                                                               UnityEngine.Mesh.MeshData mesh,
+                                                                               in FixedString128Bytes name,
+                                                                               AllocatorManager.AllocatorHandle allocator)
+        {
+            using ThreadStackAllocator tsa = ThreadStackAllocator.GetAllocator();
+
+            int triCount = 0;
+            for (int i = 0; i < mesh.subMeshCount; i++)
+            {
+                var descriptor = mesh.GetSubMesh(i);
+                if (descriptor.topology != UnityEngine.MeshTopology.Triangles)
+                    continue;
+                triCount += descriptor.indexCount / 3;
+            }
+
+            var vector3CachePtr = tsa.Allocate<UnityEngine.Vector3>(mesh.vertexCount);
+            var vector3Cache    = CollectionHelper.ConvertExistingDataToNativeArray<UnityEngine.Vector3>(vector3CachePtr, mesh.vertexCount, Allocator.None, true);
+
+            var indicesCachePtr = tsa.Allocate<int>(triCount * 3);
+            var indicesCache    = CollectionHelper.ConvertExistingDataToNativeArray<int>(indicesCachePtr, triCount * 3, Allocator.None, true);
+
+            mesh.GetVertices(vector3Cache);
+
+            int trisSoFar = 0;
+            for (int i = 0; i < mesh.subMeshCount; i++)
+            {
+                var descriptor = mesh.GetSubMesh(i);
+                if (descriptor.topology != UnityEngine.MeshTopology.Triangles)
+                    continue;
+                mesh.GetIndices(indicesCache.GetSubArray(trisSoFar * 3, descriptor.indexCount), i);
+                trisSoFar += descriptor.indexCount;
+            }
+
+            return BuildBlob(ref builder, vector3Cache.Reinterpret<float3>().AsReadOnlySpan(), indicesCache.Reinterpret<int3>(4).AsReadOnlySpan(), in name, allocator);
         }
 
         // Returns count if nothing is greater or equal

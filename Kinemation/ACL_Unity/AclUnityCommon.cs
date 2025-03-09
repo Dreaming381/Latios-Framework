@@ -1,3 +1,4 @@
+#if !LATIOS_DISABLE_ACL
 using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -121,4 +122,5 @@ namespace AclUnity
         }
     }
 }
+#endif
 

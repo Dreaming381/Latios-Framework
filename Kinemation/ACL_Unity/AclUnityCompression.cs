@@ -1,3 +1,4 @@
+#if !LATIOS_DISABLE_ACL
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -398,4 +399,5 @@ namespace AclUnity
         }
     }
 }
+#endif
 

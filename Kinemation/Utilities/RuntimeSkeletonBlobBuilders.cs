@@ -60,6 +60,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
 
         public string GetNameOfBone(int boneIndex) => taa[boneIndex].gameObject.name;
 
+#if !LATIOS_DISABLE_ACL
         public unsafe SkeletonClipSetSampleData Sample(ReadOnlySpan<SkeletonClipConfig> clips, AllocatorManager.AllocatorHandle allocator)
         {
             shadowHierarchy.SetActive(true);
@@ -115,6 +116,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
 
             return result;
         }
+#endif
 
         public void Dispose() => Dispose(false);
 
@@ -130,6 +132,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
 
         internal Transform GetShadowTransformForBone(int boneIndex) => taa[boneIndex];
 
+#if !LATIOS_DISABLE_ACL
         void SampleClip(ref UnsafeList<TransformQvvs>                          boneTransforms,
                         AnimationClip clip,
                         int startIndex,
@@ -179,6 +182,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
                 animator.applyRootMotion = backupRootMotionSettings;
             clip.wrapMode                = oldWrapMode;
         }
+#endif
 
         [BurstCompile]
         struct CaptureBoneSamplesJob : IJobParallelForTransform
@@ -196,6 +200,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
         }
     }
 
+#if !LATIOS_DISABLE_ACL
     // Job and Burst compatible
     public struct SkeletonClipSetSampleData : IDisposable
     {
@@ -276,5 +281,6 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
             events.Dispose();
         }
     }
+#endif
 }
 
