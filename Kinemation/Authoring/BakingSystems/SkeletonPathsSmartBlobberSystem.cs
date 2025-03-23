@@ -88,6 +88,7 @@ namespace Latios.Kinemation.Authoring
                 {
                     var child = baker.GetChild(bone, i);
                     if (baker.GetComponent<UnityEngine.SkinnedMeshRenderer>(child) == null && baker.GetComponent<ExcludeFromSkeletonAuthoring>(child) == null &&
+                        baker.GetComponent<Unity.Entities.Hybrid.Baking.BakingOnlyEntityAuthoring>(child) == null &&
                         baker.GetComponentInParent<UnityEngine.Animator>(child) == rootAnimator)
                         s_breadthQueue.Enqueue((child, currentIndex));
                 }

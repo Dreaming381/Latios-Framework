@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Entities.Hybrid.Baking;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
@@ -63,7 +64,7 @@ namespace Latios.Kinemation.Authoring
 
                 // If the child has an Animator or SkinnedMeshRenderer, it shouldn't be animated, so delete it.
                 if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null ||
-                    shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
+                    shadowChild.GetComponent<BakingOnlyEntityAuthoring>() != null || shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
                 {
                     s_immediateChildrenToDestroy.Add(shadowChild);
                     continue;
@@ -92,7 +93,8 @@ namespace Latios.Kinemation.Authoring
 
                 // If the child has an Animator or SkinnedMeshRenderer, it shouldn't be animated, so delete it.
                 if (shadowChild.GetComponent<SkinnedMeshRenderer>() != null || shadowChild.GetComponent<Animator>() != null ||
-                    shadowChild.GetComponent<SocketAuthoring>() != null || shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
+                    shadowChild.GetComponent<BakingOnlyEntityAuthoring>() != null || shadowChild.GetComponent<SocketAuthoring>() != null ||
+                    shadowChild.GetComponent<ExcludeFromSkeletonAuthoring>() != null)
                 {
                     RecurseTagSkinnedOrDelete(sourceChild, shadowChild);
                     continue;

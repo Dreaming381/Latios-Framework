@@ -86,6 +86,10 @@ namespace Latios
         /// The list of entities matching the query, which can be used in a foreach expression
         /// </summary>
         public TempEntityEnumerator<TempMaskedChunkEnumerator<TempChunkEnumerator<TempArchetypeEnumerator> > > entities => chunks.masked.entities;
+        /// <summary>
+        /// The EntityStorageInfoLookup the TempQuery was created with
+        /// </summary>
+        public EntityStorageInfoLookup entityStorageInfoLookup => esil;
 
         /// <summary>
         /// Returns true if the archetype is included in this query
@@ -199,6 +203,11 @@ namespace Latios
 
             return true;
         }
+
+        /// <summary>
+        /// Replaces the TempQuery's archetype array with the one specified.
+        /// </summary>
+        public void SetArchetypes(NativeArray<EntityArchetype> archetypes) => archetypesArray = archetypes;
         #endregion
 
         #region Fields

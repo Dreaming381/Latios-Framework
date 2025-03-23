@@ -5,7 +5,6 @@ using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Entities.UniversalDelegates;
 using Unity.Jobs;
 using Unity.Mathematics;
 
@@ -810,7 +809,7 @@ namespace Latios.Psyshock
             {
                 BuildEytzingerIntervalTreeRecurse(0, 0);
 
-                PatchSubtreeMaxResurse(0);
+                PatchSubtreeMax();
             }
 
             private int BuildEytzingerIntervalTreeRecurse(int bucketRelativeIndex, uint treeIndex)
@@ -838,20 +837,16 @@ namespace Latios.Psyshock
             }
 
             // This function is unique to Latios Framework
-            // Todo: There is likely a more cache-friendly way to iterate this tree and do this work
-            private float PatchSubtreeMaxResurse(uint treeIndex)
+            private void PatchSubtreeMax()
             {
-                if (treeIndex >= nodesToPopulate.Length)
-                    return 0f;
-
-                float leftTreeMax  = PatchSubtreeMaxResurse(2 * treeIndex + 1);
-                float rightTreeMax = PatchSubtreeMaxResurse(2 * treeIndex + 2);
-
-                var node                        = nodesToPopulate[(int)treeIndex];
-                node.subtreeXmax                = math.max(math.max(leftTreeMax, rightTreeMax), node.subtreeXmax);
-                nodesToPopulate[(int)treeIndex] = node;
-
-                return node.subtreeXmax;
+                for (int i = nodesToPopulate.Length - 1; i > 0; i--)
+                {
+                    var node                     = nodesToPopulate[i];
+                    var parentIndex              = (i - 1) / 2;
+                    var parent                   = nodesToPopulate[parentIndex];
+                    parent.subtreeXmax           = math.max(parent.subtreeXmax, node.subtreeXmax);
+                    nodesToPopulate[parentIndex] = parent;
+                }
             }
         }
 

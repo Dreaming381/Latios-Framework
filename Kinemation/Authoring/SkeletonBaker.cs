@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Entities.Hybrid.Baking;
 using UnityEngine;
 
 namespace Latios.Kinemation.Authoring
@@ -82,7 +83,7 @@ namespace Latios.Kinemation.Authoring
                     {
                         var child = GetChild(bone, i);
                         if (GetComponent<SkinnedMeshRenderer>(child) == null && GetComponent<ExcludeFromSkeletonAuthoring>(child) == null &&
-                            GetComponentInParent<Animator>(child) == authoring)
+                            GetComponent<BakingOnlyEntityAuthoring>() == null && GetComponentInParent<Animator>(child) == authoring)
                             m_breadthQueue.Enqueue((child, currentIndex));
                     }
                 }
@@ -114,11 +115,12 @@ namespace Latios.Kinemation.Authoring
                 for (int i = 0; i < GetChildCount(); i++)
                 {
                     var child = GetChild(i);
-                    if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<ExcludeFromSkeletonAuthoring>(child) != null || GetComponent<Animator>(child) != null)
+                    if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<ExcludeFromSkeletonAuthoring>(child) != null ||
+                        GetComponent<BakingOnlyEntityAuthoring>(child) != null || GetComponent<Animator>(child) != null)
                         continue;
 
                     boneGoBuffer.Add(new ImportedSocketGameObjectRef { authoringGameObjectForBone = child });
-                    boneEntityBuffer.Add(new ImportedSocket { boneEntity         = GetEntity(child, TransformUsageFlags.Dynamic) });
+                    boneEntityBuffer.Add(new ImportedSocket { boneEntity                          = GetEntity(child, TransformUsageFlags.Dynamic) });
                 }
 
                 AddBuffer<OptimizedBoneInertialBlendState>(entity);

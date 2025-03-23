@@ -171,7 +171,7 @@ namespace Latios.Psyshock
         /// </summary>
         /// <param name="settings">The settings to use for the layer. You typically want to match this with other layers when using FindPairs.</param>
         /// <param name="allocator">The Allocator to use for this layer. Despite being empty, this layer is still allocated and may require disposal.</param>
-        /// <returns>A CollisionLayer with zero bodiesArray, but with the bucket distribution matching the specified settings</returns>
+        /// <returns>A CollisionLayer with zero bodies, but with the bucket distribution matching the specified settings</returns>
         public static CollisionLayer CreateEmptyCollisionLayer(CollisionLayerSettings settings, AllocatorManager.AllocatorHandle allocator)
         {
             var layer = new CollisionLayer(settings, allocator);
@@ -200,10 +200,10 @@ namespace Latios.Psyshock
         /// </summary>
         /// <param name="inputDeps">A JobHandle to wait upon before disposing</param>
         /// <returns>The final jobHandle of the disposed layers</returns>
-        public unsafe JobHandle Dispose(JobHandle inputDeps)
+        public JobHandle Dispose(JobHandle inputDeps)
         {
             worldSubdivisionsPerAxis = 0;
-            JobHandle* deps          = stackalloc JobHandle[7]
+            return CollectionsExtensions.CombineDependencies(stackalloc JobHandle[]
             {
                 bucketStartsAndCounts.Dispose(inputDeps),
                 xmins.Dispose(inputDeps),
@@ -212,8 +212,7 @@ namespace Latios.Psyshock
                 intervalTrees.Dispose(inputDeps),
                 bodies.Dispose(inputDeps),
                 srcIndices.Dispose(inputDeps)
-            };
-            return Unity.Jobs.LowLevel.Unsafe.JobHandleUnsafeUtility.CombineDependencies(deps, 7);
+            });
         }
 
         /// <summary>
