@@ -998,8 +998,9 @@ namespace Latios.Kinemation.Systems
                 if (!skeletonEntityToSkinningRequestsGroupMap.TryGetValue(skeletonEntity, out var startAndCountIndex))
                     return false;
 
-                var startAndCount = groupedSkinningRequestsStartsAndCounts[startAndCountIndex];
-                var requests      = groupedSkinningRequests.GetSubArray(startAndCount.x, startAndCount.y);
+                var startAndCount                        = groupedSkinningRequestsStartsAndCounts[startAndCountIndex];
+                var requests                             = groupedSkinningRequests.GetSubArray(startAndCount.x, startAndCount.y);
+                requests.Sort(new RequestSorter { meshes = meshes });
 
                 int startOfPrevious = -1;
                 int startOfTwoAgo   = -1;
@@ -1029,8 +1030,6 @@ namespace Latios.Kinemation.Systems
                 }
                 if (countToRemove > 0)
                     requests = requests.GetSubArray(0, requests.Length - countToRemove);
-
-                requests.Sort(new RequestSorter { meshes = meshes });
 
                 if (startOfPrevious < 0)
                     ProcessChain(requests, meshes, indexInChunk, skeletonBonesCount);

@@ -10,6 +10,15 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.12.3] – 2025-3-29
+
+Officially supports Entities [1.3.9]
+
+### Changed
+
+-   Updated Core to v0.12.3
+-   Updated Kinemation to v0.12.3
+
 ## [0.12.2] – 2025-3-22
 
 Officially supports Entities [1.3.9]

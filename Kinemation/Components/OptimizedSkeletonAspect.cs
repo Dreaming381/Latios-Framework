@@ -149,6 +149,17 @@ namespace Latios.Kinemation
         }
 
         /// <summary>
+        /// Returns true if inertial blending has finished for all bones after the specified elapsed time.
+        /// </summary>
+        /// <param name="timeSinceStartOfBlend">The time since the start of the blend, which was the sample before
+        /// StartNewInertialBlend was called.</param>
+        /// <returns>True if all bones finished their inertial blend durations, false otherwise</returns>
+        public bool IsFinishedWithInertialBlend(float timeSinceStartOfBlend)
+        {
+            return IsFinishedWithInertialBlendInternal(timeSinceStartOfBlend);
+        }
+
+        /// <summary>
         /// Performs inertial blending for the entire skeleton. You may call this prior to syncing if you wish.
         /// </summary>
         /// <param name="timeSinceStartOfBlend">The time since the start of the blend, which was the sample before

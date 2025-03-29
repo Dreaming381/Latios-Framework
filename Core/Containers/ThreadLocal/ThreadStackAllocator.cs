@@ -42,6 +42,12 @@ namespace Latios.Unsafe
             return (T*)m_statePtr->Allocate((ulong)UnsafeUtility.SizeOf<T>(), (ulong)UnsafeUtility.AlignOf<T>(), (ulong)count);
         }
 
+        public Span<T> AllocateAsSpan<T>(int count) where T : unmanaged
+        {
+            var ptr = Allocate<T>(count);
+            return new Span<T>(ptr, count);
+        }
+
         // Slightly faster than getting the allocator globally.
         public ThreadStackAllocator CreateChildAllocator()
         {

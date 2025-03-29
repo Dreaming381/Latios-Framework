@@ -111,6 +111,19 @@ namespace Latios.Kinemation
             }
         }
 
+        unsafe bool IsFinishedWithInertialBlendInternal(float timesSinceStartOfBlend)
+        {
+            // We go unsafe here to avoid copying as these are large
+            var inertialBlends = (InertialBlendingTransformState*)m_bonesInertialBlendStates.Reinterpret<InertialBlendingTransformState>().GetUnsafePtr();
+            var count          = m_bonesInertialBlendStates.Length;
+            for (int i = 0; i < count; i++)
+            {
+                if (inertialBlends[i].NeedsBlend(timesSinceStartOfBlend))
+                    return false;
+            }
+            return true;
+        }
+
         unsafe void InertialBlendInternal(float timeSinceStartOfBlend)
         {
             var bufferAsArray = m_boneTransforms.Reinterpret<TransformQvvs>().AsNativeArray();

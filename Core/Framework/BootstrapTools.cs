@@ -566,7 +566,7 @@ namespace Latios
                 else if (selectedType.IsAssignableFrom(bootType))
                     selectedType = bootType;
                 else if (!bootType.IsAssignableFrom(selectedType))
-                    UnityEngine.Debug.LogError($"Multiple custom {nameof(T)} exist in the project, ignoring {bootType}");
+                    UnityEngine.Debug.LogError($"Multiple custom {typeof(T)} exist in the project, ignoring {bootType} in favor of {selectedType}");
             }
             if (selectedType == null)
                 return default;

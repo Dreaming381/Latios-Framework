@@ -28,7 +28,7 @@ namespace Latios.Kinemation
                                float loopCycleTransitions,
                                KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
         {
-            var sampledRoot           = blender.buffer.Reinterpret<TransformQvvs>()[0];
+            var sampledRoot           = blender.buffer[0];
             blender.buffer[0]         = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
