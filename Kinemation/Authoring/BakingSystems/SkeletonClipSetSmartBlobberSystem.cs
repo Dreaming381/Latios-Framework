@@ -68,6 +68,7 @@ namespace Latios.Kinemation.Authoring
         /// <summary>
         /// Looping clips must have matching start and end poses.
         /// If the source clip does not have this, setting this value to true can correct clip.
+        /// This setting is typically not compatible with root motion.
         /// </summary>
         public bool copyFirstKeyAtEnd;
 
@@ -318,7 +319,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         bool copyFirstPose,
                         SkeletonClipCompressionSettings.RootMotionOverrideMode rootMotionMode)
         {
-            int requiredSamples    = Mathf.CeilToInt(clip.frameRate * clip.length) + (copyFirstPose ? 1 : 0);
+            int requiredSamples    = Mathf.CeilToInt(clip.frameRate * clip.length + 0.1f) + (copyFirstPose ? 1 : 0);
             int requiredTransforms = requiredSamples * shadowHierarchy.length;
             int startIndex         = appendNewSamplesToThis.Length;
             appendNewSamplesToThis.ResizeUninitialized(requiredTransforms + appendNewSamplesToThis.Length);

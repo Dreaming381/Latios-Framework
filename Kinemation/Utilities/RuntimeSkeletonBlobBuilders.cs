@@ -74,7 +74,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
             {
                 var clipConfig         = clips[i];
                 var clip               = clipConfig.clip.Value;
-                int requiredSamples    = Mathf.CeilToInt(clip.frameRate * clip.length) + (clipConfig.settings.copyFirstKeyAtEnd ? 1 : 0);
+                int requiredSamples    = Mathf.CeilToInt(clip.frameRate * clip.length + 0.1f) + (clipConfig.settings.copyFirstKeyAtEnd ? 1 : 0);
                 var requiredTransforms = requiredSamples * taa.length;
 
                 ref var output = ref result.clips.ElementAt(i);
@@ -139,7 +139,7 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
                         bool copyFirstPose,
                         SkeletonClipCompressionSettings.RootMotionOverrideMode rootMotionMode)
         {
-            int requiredSamples = Mathf.CeilToInt(clip.frameRate * clip.length) + (copyFirstPose ? 1 : 0);
+            int requiredSamples = Mathf.CeilToInt(clip.frameRate * clip.length + 0.1f) + (copyFirstPose ? 1 : 0);
 
             var oldWrapMode                   = clip.wrapMode;
             clip.wrapMode                     = WrapMode.Clamp;

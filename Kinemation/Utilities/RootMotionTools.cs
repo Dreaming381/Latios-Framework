@@ -165,10 +165,11 @@ namespace Latios.Kinemation
         /// <returns>Effectively result = current - previous, using appropriate "difference" metrics for each attribute of the transform</returns>
         public static TransformQvvs DeltaBetween(in TransformQvvs current, in TransformQvvs previous)
         {
+            var previousInverse = math.inverse(previous.rotation);
             return new TransformQvvs
             {
-                position   = current.position - previous.position,
-                rotation   = math.mul(current.rotation, math.inverse(previous.rotation)),
+                position   = math.rotate(previousInverse, current.position - previous.position),
+                rotation   = math.mul(current.rotation, previousInverse),
                 worldIndex = current.worldIndex,
                 scale      = current.scale / previous.scale,
                 stretch    = current.stretch / previous.stretch
@@ -203,7 +204,7 @@ namespace Latios.Kinemation
             return new TransformQvvs
             {
                 position   = deltaA.position + deltaB.position,
-                rotation   = deltaA.rotation.value + deltaB.rotation.value,
+                rotation   = deltaA.rotation.value + math.chgsign(deltaB.rotation.value, math.dot(deltaA.rotation.value, deltaB.rotation.value)),
                 scale      = deltaA.scale + deltaB.scale,
                 stretch    = deltaA.stretch + deltaB.stretch,
                 worldIndex = math.asint(math.asfloat(deltaA.worldIndex) + math.asfloat(deltaB.worldIndex)),
@@ -222,7 +223,7 @@ namespace Latios.Kinemation
         {
             return new TransformQvvs
             {
-                position   = deltaFirst.position + deltaSecond.position,
+                position   = deltaFirst.position + math.rotate(deltaFirst.rotation, deltaSecond.position),
                 rotation   = math.mul(deltaSecond.rotation, deltaFirst.rotation),
                 scale      = deltaFirst.scale * deltaSecond.scale,
                 stretch    = deltaFirst.stretch * deltaSecond.stretch,

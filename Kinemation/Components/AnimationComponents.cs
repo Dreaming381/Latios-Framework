@@ -474,7 +474,7 @@ namespace Latios.Kinemation
         /// <summary>
         /// Finds all events within the time range (previousTime, currentTime] and returns the first index and the count.
         /// If currentTime is less than previousTime, if iterating i = firstEventIndex while i < firstEventIndex + count,
-        /// events should be indexed as [i % times.length] to account for looping behavior.
+        /// events should be indexed as [i % times.length] to account for looping behavior. Time is always searched forward.
         /// </summary>
         /// <param name="previousTime">The previous time to start searching for events. This time value is exclusive.</param>
         /// <param name="currentTime">The current time to end searching for events. This time value is inclusive.</param>
@@ -546,6 +546,106 @@ namespace Latios.Kinemation
 
             eventCount = times.Length - firstEventIndex + onePastLastEventIndex;
             return true;
+        }
+
+        /// <summary>
+        /// Finds all events within the time range of previousTime to currentTime, respecting choices of inclusiveness
+        /// as well as clip wrapping from loops. The result is an iterator which can be used in a foreach expression
+        /// providing event indices for the time range. This method can detect playback in reverse and will output
+        /// indices in reverse accordingly.
+        /// </summary>
+        /// <param name="previousTime">The starting point to start looking for events after calling LoopToClipTime() if necessary</param>
+        /// <param name="previousTimeIsInclusive">True if events whose time values exactly match previousTime should be included in the range and output, false otherwise</param>
+        /// <param name="currentTime">The end point to stop looking for events after calling LoopToClipTime() if necessary</param>
+        /// <param name="currentTimeIsInclusive">True if events whose time values exactly match currentTime should be included in the range and output, false otherwise</param>
+        /// <param name="loopCycleTransitions">The loop cycle transitions count obtained from CountLoopCycleTransitions()</param>
+        /// <returns>An iterator for event indices</returns>
+        public Enumerator GetEventIndicesInRange(float previousTime, bool previousTimeIsInclusive, float currentTime, bool currentTimeIsInclusive, float loopCycleTransitions)
+        {
+            // This implementation is assuming that clips tend to have a very small number of events.
+            // If this assumption breaks, binary searching can be implemented.
+            bool backwards = math.select(loopCycleTransitions < 0f, currentTime < previousTime, loopCycleTransitions == 0f);
+            if (!backwards)
+            {
+                int start = 0;
+                for (; start < times.Length; start++)
+                {
+                    if (times[start] < previousTime || (!previousTimeIsInclusive && times[start] == previousTime))
+                        continue;
+                    else
+                        break;
+                }
+                int end = math.select(start, 0, loopCycleTransitions > 0.5f);
+                for (; end < times.Length; end++)
+                {
+                    if (times[end] < currentTime || (currentTimeIsInclusive && times[end] == currentTime))
+                        continue;
+                    else
+                        break;
+                }
+                // end is one past the last event we want to include.
+                int count  = end - start;
+                count     += (int)loopCycleTransitions * times.Length;
+                return new Enumerator
+                {
+                    currentIndex = start,
+                    countLeft    = count,
+                    modulus      = times.Length,
+                    stride       = 1
+                };
+            }
+            else
+            {
+                int start = times.Length - 1;
+                for (; start >= 0; start--)
+                {
+                    if (times[start] > previousTime || (!previousTimeIsInclusive && times[start] == previousTime))
+                        continue;
+                    else
+                        break;
+                }
+                int end = math.select(start, times.Length - 1, loopCycleTransitions < -0.5f);
+                for (; end >= 0; end--)
+                {
+                    if (times[end] > currentTime || (currentTimeIsInclusive && times[end] == currentTime))
+                        continue;
+                    else
+                        break;
+                }
+                // end is one past the last event we want to include.
+                int count  = start - end;
+                count     += (int)math.abs(loopCycleTransitions) * times.Length;
+                return new Enumerator
+                {
+                    currentIndex = end + count,  // start + (count - (start - end))
+                    countLeft    = count,
+                    modulus      = times.Length,
+                    stride       = -1
+                };
+            }
+        }
+
+        public struct Enumerator
+        {
+            internal int currentIndex;
+            internal int countLeft;
+            internal int modulus;
+            internal int stride;
+
+            public Enumerator GetEnumerator() => this;
+
+            public int Current => currentIndex % modulus;
+
+            public int eventsRemaining => countLeft;
+
+            public bool MoveNext()
+            {
+                if (countLeft == 0)
+                    return false;
+                currentIndex += stride;
+                countLeft--;
+                return true;
+            }
         }
     }
 }

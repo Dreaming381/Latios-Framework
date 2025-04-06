@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -52,6 +53,35 @@ namespace Latios.Unika
         {
             CheckInRange(ref scriptsBuffer, index);
             ScriptStructuralChangeInternal.FreeScript(ref scriptsBuffer, index);
+        }
+
+        /// <summary>
+        /// Adds a script to the entity, copying the script data from the specified source.
+        /// The new script will be at the last index in the script collection.
+        /// Any Script type including the sourceScript may be invalidated and need to be re-resolved.
+        /// </summary>
+        /// <param name="sourceScript">The script to copy all contents and metadata from</param>
+        /// <returns>The index of the new script in the script collection</returns>
+        public static unsafe int CopyScriptFrom(this DynamicBuffer<UnikaScripts> scriptsBuffer, Script sourceScript)
+        {
+            var scriptType = sourceScript.m_headerRO.scriptType;
+            var userByte   = sourceScript.userByte;
+            var userFlagA  = sourceScript.userFlagA;
+            var userFlagB  = sourceScript.userFlagB;
+
+            // Note: Due to how safety handles work, we need to copy the script to a temporary buffer before we invalidate the handle.
+            // We would need to do this anyway if we are replicating the script into the same buffer.
+            var scriptSize = ScriptTypeInfoManager.GetSizeAndAlignement((short)scriptType).x;
+            var tempBuffer = stackalloc byte[scriptSize];
+            UnsafeUtility.MemCpy(tempBuffer,                     sourceScript.GetUnsafeROPtrAsBytePtr(), scriptSize);
+            var index  = ScriptStructuralChangeInternal.AllocateScript(ref scriptsBuffer, scriptType);
+            var result = scriptsBuffer.AllScripts(default)[index];
+            UnsafeUtility.MemCpy(result.GetUnsafePtrAsBytePtr(), tempBuffer,                             scriptSize);
+            result.userByte  = userByte;
+            result.userFlagA = userFlagA;
+            result.userFlagB = userFlagB;
+
+            return index;
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
