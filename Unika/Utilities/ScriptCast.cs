@@ -119,7 +119,7 @@ namespace Latios.Unika
                 return false;
             }
 
-            if (math.clamp(scriptRef.m_cachedHeaderIndex, 0, allScripts.length) == scriptRef.m_cachedHeaderIndex)
+            if (math.clamp(scriptRef.m_cachedHeaderIndex, 0, allScripts.length - 1) == scriptRef.m_cachedHeaderIndex)
             {
                 var candidate = allScripts[scriptRef.m_cachedHeaderIndex];
                 if (candidate.m_headerRO.instanceId == scriptRef.m_instanceId)

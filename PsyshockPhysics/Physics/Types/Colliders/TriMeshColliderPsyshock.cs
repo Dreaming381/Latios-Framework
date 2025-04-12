@@ -159,8 +159,8 @@ namespace Latios.Psyshock
         {
             using ThreadStackAllocator tsa = ThreadStackAllocator.GetAllocator();
 
-            var bodiesCachePtr = tsa.Allocate<ColliderBody>(indices.Length / 3);
-            var bodiesCache    = CollectionHelper.ConvertExistingDataToNativeArray<ColliderBody>(bodiesCachePtr, indices.Length / 3, Allocator.None, true);
+            var bodiesCachePtr = tsa.Allocate<ColliderBody>(indices.Length);
+            var bodiesCache    = CollectionHelper.ConvertExistingDataToNativeArray<ColliderBody>(bodiesCachePtr, indices.Length, Allocator.None, true);
             for (int i = 0; i < bodiesCache.Length; i++)
             {
                 var    tri = indices[i];

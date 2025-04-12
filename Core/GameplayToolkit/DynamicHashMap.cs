@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Latios.Unsafe;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -9,7 +10,9 @@ using Unity.Mathematics;
 namespace Latios
 {
     /// <summary>
-    /// A wrapper type around a DynamicBuffer which provides HashMap capabilities while maintaining full serialization support.
+    /// A wrapper type around a DynamicBuffer which provides HashMap capabilities while maintaining value serialization support.
+    /// Key serialization requires explicit reconstruction for any remappable types (Entity, BlobAssetReference, ect). This can
+    /// be done by calling ReconstructAfterRemap().
     /// </summary>
     /// <remarks>
     /// The general strategy of this map is that for a given power of two capacity, the first half is allocated for buckets,
@@ -204,6 +207,25 @@ namespace Latios
                 return false;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Reorders the hashmap to adjust for entries whose hashcodes may have changed after a remap.
+        /// </summary>
+        public void ReconstructAfterRemap()
+        {
+            var       length    = count;
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            var       pairs     = allocator.AllocateAsSpan<(TKey, TValue)>(length);
+            int       i         = 0;
+            foreach (var p in this)
+            {
+                pairs[i] = p;
+                i++;
+            }
+            Clear();
+            foreach (var p in pairs)
+                TryAdd(p.Item1, p.Item2);
         }
 
         public Enumerator GetEnumerator() => new Enumerator {

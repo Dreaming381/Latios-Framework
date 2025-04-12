@@ -14,6 +14,171 @@ namespace Latios
         AddToNewEntityAndDestroy
     }
 
+    [BurstCompile]
+    public struct AddComponentsCommandBuffer : INativeDisposable
+    {
+        #region Structure
+        private EntityOperationCommandBuffer           m_entityOperationCommandBuffer;
+        private ComponentTypeSet                       m_typesToAdd;
+        private AddComponentsDestroyedEntityResolution m_resolution;
+        private NativeReference<bool>                  m_playedBack;
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an AddComponentsCommandBuffer which can be used to add default components to entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        /// <param name="resolution">What to do when an entity no longer exists</param>
+        public AddComponentsCommandBuffer(AllocatorManager.AllocatorHandle allocator, AddComponentsDestroyedEntityResolution resolution)
+        {
+            m_entityOperationCommandBuffer = new EntityOperationCommandBuffer(allocator);
+            m_typesToAdd                   = default;
+            m_resolution                   = resolution;
+            m_playedBack                   = new NativeReference<bool>(allocator);
+        }
+
+        /// <summary>
+        /// Disposes the AddComponentsCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this AddComponentsCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            var jh0 = m_entityOperationCommandBuffer.Dispose(inputDeps);
+            var jh1 = m_playedBack.Dispose(inputDeps);
+            return JobHandle.CombineDependencies(jh0, jh1);
+        }
+
+        /// <summary>
+        /// Disposes the AddComponentsCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_entityOperationCommandBuffer.Dispose();
+            m_playedBack.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the AddComponentsCommandBuffer which should be have the components added to
+        /// </summary>
+        /// <param name="entity">The entity to add components too</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, int sortKey = int.MaxValue)
+        {
+            CheckDidNotPlayback();
+            m_entityOperationCommandBuffer.Add(entity, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the AddComponentsCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the AddComponentsCommandBuffer</param>
+        public unsafe void Playback(EntityManager entityManager)
+        {
+            CheckDidNotPlayback();
+            Playbacker.Playback((AddComponentsCommandBuffer*)UnsafeUtility.AddressOf(ref this), (EntityManager*)UnsafeUtility.AddressOf(ref entityManager));
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_entityOperationCommandBuffer.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the target entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each target entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_typesToAdd = tags;
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this AddComponentsCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this AddComponentsCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            CheckDidNotPlayback();
+            return new ParallelWriter(m_entityOperationCommandBuffer);
+        }
+        #endregion
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckDidNotPlayback()
+        {
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (m_playedBack.Value == true)
+                throw new System.InvalidOperationException(
+                    "The AddComponentsCommandBuffer has already been played back. You cannot write more commands to it or play it back again.");
+#endif
+        }
+
+        #region PlaybackJobs
+        [BurstCompile]
+        static class Playbacker
+        {
+            [BurstCompile]
+            public static unsafe void Playback(AddComponentsCommandBuffer* accb, EntityManager* em)
+            {
+                var targets = accb->m_entityOperationCommandBuffer.GetEntities(Allocator.Temp);
+                int dst     = 0;
+                for (int src = 0; src < targets.Length; src++)
+                {
+                    var e = targets[src];
+                    if (em->Exists(e))
+                    {
+                        targets[dst] = e;
+                        dst++;
+                    }
+                    else
+                    {
+                        if (accb->m_resolution == AddComponentsDestroyedEntityResolution.ThrowException)
+                            throw new System.InvalidOperationException($"Entity {e.ToFixedString()} in AddComponentsCommandBuffer has been destroyed.");
+                        else if (accb->m_resolution == AddComponentsDestroyedEntityResolution.AddToNewEntityAndDestroy)
+                        {
+                            e = em->CreateEntity();
+                            em->AddComponent(e, accb->m_typesToAdd);
+                        }
+                    }
+                }
+                targets.GetSubArray(0, dst);
+                em->AddComponent(targets, in accb->m_typesToAdd);
+                accb->m_playedBack.Value = true;
+            }
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of AddComponentsCommandBuffer. Use AsParallelWriter to obtain one from an AddComponentsCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private EntityOperationCommandBuffer.ParallelWriter m_entityOperationCommandBuffer;
+
+            internal ParallelWriter(EntityOperationCommandBuffer eocb)
+            {
+                m_entityOperationCommandBuffer = eocb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the AddComponentsCommandBuffer which should have the components added
+            /// </summary>
+            /// <param name="entity">The entity to have the components added to</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, int sortKey)
+            {
+                m_entityOperationCommandBuffer.Add(entity, sortKey);
+            }
+        }
+        #endregion
+    }
+
     /// <summary>
     /// A specialized variant of the EntityCommandBuffer exclusively for adding components to entities.
     /// This variant initializes the specified component type with specified values per instance.
