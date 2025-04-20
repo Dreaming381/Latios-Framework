@@ -48,6 +48,10 @@ namespace Latios.Transforms
             stretch    = 1f;
             worldIndex = 0;
         }
+
+        public float3 forwardDirection => math.rotate(rotation, math.forward());
+        public float3 rightDirection => math.rotate(rotation, math.right());
+        public float3 upDirection => math.rotate(rotation, math.up());
     }
 
     [System.Serializable]

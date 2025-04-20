@@ -73,6 +73,13 @@ namespace Latios.Kinemation.Authoring
     internal struct AuthoredSocket : IComponentData { }
 
     [TemporaryBakingType]
+    internal struct AuthoredSocketString : IComponentData
+    {
+        public EntityWith<Socket>  socket;
+        public FixedString512Bytes reversePathStart;
+    }
+
+    [TemporaryBakingType]
     internal struct PendingMeshBindingPathsBlob : IComponentData
     {
         public SmartBlobberHandle<MeshBindingPathsBlob> blobHandle;

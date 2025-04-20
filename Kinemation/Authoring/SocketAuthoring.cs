@@ -9,7 +9,9 @@ namespace Latios.Kinemation.Authoring
     [AddComponentMenu("Latios/Kinemation/Socket (Kinemation)")]
     public class SocketAuthoring : MonoBehaviour
     {
-        public short boneIndex;
+        public short  boneIndex;
+        public bool   useReversePath;
+        public string reversePathStartsWith;
     }
 
     public class SocketAuthoringBaker : Baker<SocketAuthoring>
@@ -30,9 +32,16 @@ namespace Latios.Kinemation.Authoring
             }
 
             var entity                                                  = GetEntity(TransformUsageFlags.Renderable);
-            AddComponent(                entity, new Socket { boneIndex = authoring.boneIndex });
+            var index                                                   = authoring.useReversePath ? 0 : math.max(0, authoring.boneIndex);
+            AddComponent(                entity, new Socket { boneIndex = (short)index });
             AddComponent<AuthoredSocket>(entity);
             AddComponent(                entity, new BoneOwningSkeletonReference { skeletonRoot = GetEntity(skeleton, TransformUsageFlags.Renderable) });
+
+            if (authoring.useReversePath)
+            {
+                var handle                                                                 = this.RequestBoneNames(skeleton, GetName(skeleton));
+                AddComponent(handle.boneNamesTempEntity, new AuthoredSocketString { socket = entity, reversePathStart = authoring.reversePathStartsWith });
+            }
         }
     }
 }

@@ -35,6 +35,8 @@ namespace Latios.Kinemation.Authoring.Systems
             var componentsToAdd = new ComponentTypeSet(ComponentType.ReadWrite<Socket>(),
                                                        ComponentType.ReadWrite<BoneOwningSkeletonReference>());
 
+            new FindSocketByNameJob { socketLookup = GetComponentLookup<Socket>(false) }.ScheduleParallel();
+
             new ClearJob().ScheduleParallel();
 
             var ecbAdd = new EntityCommandBuffer(state.WorldUpdateAllocator);
@@ -60,6 +62,41 @@ namespace Latios.Kinemation.Authoring.Systems
 
             ecbAdd.Playback(state.EntityManager);
             ecbRemove.Playback(state.EntityManager);
+        }
+
+        [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]
+        [BurstCompile]
+        partial struct FindSocketByNameJob : IJobEntity
+        {
+            [NativeDisableParallelForRestriction] public ComponentLookup<Socket> socketLookup;
+            UnsafeText                                                           cache;
+
+            public void Execute(in AuthoredSocketString s, in DynamicBuffer<SkeletonBoneNameInHierarchy> boneBuffer)
+            {
+                var bones  = boneBuffer.AsNativeArray().AsReadOnlySpan();
+                var search = s.reversePathStart;
+                for (int i = 0; i < bones.Length; i++)
+                {
+                    var bone = bones[i].boneName;
+                    if (search.Length > bone.Length && search.StartsWith(bone))
+                    {
+                        if (!cache.IsCreated)
+                            cache = new UnsafeText(search.Length * 2, Allocator.Temp);
+                        cache.Clear();
+                        cache.AppendBoneReversePath(bones, i);
+                        if (cache.StartsWith(search))
+                        {
+                            socketLookup.GetRefRW(s.socket).ValueRW.boneIndex = (short)i;
+                            return;
+                        }
+                    }
+                    else if (search.Length <= bone.Length && bone.StartsWith(search))
+                    {
+                        socketLookup.GetRefRW(s.socket).ValueRW.boneIndex = (short)i;
+                        return;
+                    }
+                }
+            }
         }
 
         [WithOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab)]

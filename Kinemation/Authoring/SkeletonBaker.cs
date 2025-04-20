@@ -116,7 +116,7 @@ namespace Latios.Kinemation.Authoring
                 {
                     var child = GetChild(i);
                     if (GetComponent<SkinnedMeshRenderer>(child) != null || GetComponent<ExcludeFromSkeletonAuthoring>(child) != null ||
-                        GetComponent<BakingOnlyEntityAuthoring>(child) != null || GetComponent<Animator>(child) != null)
+                        GetComponent<BakingOnlyEntityAuthoring>(child) != null || GetComponent<Animator>(child) != null || GetComponent<SocketAuthoring>(child) != null)
                         continue;
 
                     boneGoBuffer.Add(new ImportedSocketGameObjectRef { authoringGameObjectForBone = child });

@@ -301,6 +301,16 @@ namespace Latios
         }
 
         /// <summary>
+        /// Gets an instance of the Collection Aspect from the blackboard entity.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionAspect</typeparam>
+        /// <returns>The Collection Aspect instance</returns>
+        public T GetCollectionAspect<T>() where T : unmanaged, ICollectionAspect<T>
+        {
+            return latiosWorld.GetCollectionAspect<T>(entity);
+        }
+
+        /// <summary>
         /// Provides a dependency for the collection component attached to the entity.
         /// The collection component will no longer be automatically updated with the final Dependency of the currently executing system.
         /// If the collection component was retrieved, added, or set outside of a tracked system execution, then you must call this method

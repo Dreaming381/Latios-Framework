@@ -50,7 +50,7 @@ namespace Latios.Kinemation
         public unsafe void Normalize()
         {
             var bufferPtr = (TransformQvvs*)buffer.GetUnsafePtr();
-            for (int i = 0; i < buffer.Length; i++, bufferPtr++)
+            for (int i = 0; i < buffer.Length; i++)
             {
                 bufferPtr[i].NormalizeBone();
             }

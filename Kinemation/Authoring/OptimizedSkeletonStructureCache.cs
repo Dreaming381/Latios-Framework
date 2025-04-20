@@ -99,7 +99,12 @@ namespace Latios.Kinemation.Authoring
                 m_bones[i]       = bone;
             }
 
-            shadow.Dispose();
+            // For some reason, Unity treats the shadow hierarchy using this path as an asset.
+            // Is that because it was instantiated while inside the callback?
+            //shadow.Dispose();
+            shadow.taa.Dispose();
+            shadow.parentIndices.Dispose();
+            DestroyImmediate(shadow.shadowHierarchy, true);
         }
     }
 
