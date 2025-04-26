@@ -31,6 +31,21 @@ namespace Latios.Psyshock
             var angularImpulse  = math.cross(point - inertialPoseWorldTransform.pos, impulse);
             velocity.angular   += math.InverseRotateFast(inertialPoseWorldTransform.rot, angularImpulse) * mass.inverseInertia;
         }
+
+        /// <summary>
+        /// Applies an angular impulse (momentary torque) to the body given a world-space axis and an impulse magnitude
+        /// </summary>
+        /// <param name="velocity">The current velocity of the body to modify</param>
+        /// <param name="mass">The mass properties of the body</param>
+        /// <param name="inertialPoseWorldTransform">The world transform of the center of mass and inertia tensor diagonal</param>
+        /// <param name="worldAxis">The world-space axis that the impulse should induce rotation around</param>
+        /// <param name="impulse">The impulse magnitude to apply</param>
+        public static void ApplyAngularImpulse(ref Velocity velocity, in Mass mass, in RigidTransform inertialPoseWorldTransform, float3 worldAxis, float impulse)
+        {
+            var wVec          = worldAxis * impulse;
+            var lVec          = math.InverseRotateFast(inertialPoseWorldTransform.rot, wVec);
+            velocity.angular += lVec * mass.inverseInertia;
+        }
     }
 }
 

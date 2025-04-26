@@ -106,7 +106,7 @@ namespace Latios.Kinemation
                 trackedHandle   = GetComponentTypeHandle<TrackedUniqueMesh>(true),
                 uv0xyHandle     = GetBufferTypeHandle<UniqueMeshUv0xy>(false),
                 uv3xyzHandle    = GetBufferTypeHandle<UniqueMeshUv3xyz>(false),
-            }.ScheduleParallel(meshCount, 1, state.Dependency);
+            }.Schedule(collectState.collectedChunks, 1, state.Dependency);
 
             return new WriteState
             {
@@ -299,7 +299,7 @@ namespace Latios.Kinemation
         }
 
         [BurstCompile]
-        struct WriteMeshesJob : IJobFor
+        struct WriteMeshesJob : IJobParallelForDefer
         {
             [ReadOnly] public NativeArray<CollectedChunk>            collectedChunks;
             [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>  mmiHandle;
