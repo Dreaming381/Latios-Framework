@@ -24,11 +24,6 @@ namespace Latios.Transforms.Systems
         }
 
         [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
-        }
-
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             state.Dependency = new Job
@@ -50,49 +45,27 @@ namespace Latios.Transforms.Systems
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool updatePrevious = chunk.Has(ref twoAgoTransformHandle) && DidChangeLastFrame(chunk.GetChangeVersion(ref previousTransformHandle));
-                bool updateCurrent  = chunk.DidChange(ref worldTransformHandle, lastSystemVersion);
+                bool updateTwoAgo = chunk.Has(ref twoAgoTransformHandle) && DidChangeLastFrame(chunk.GetChangeVersion(ref previousTransformHandle));
 
-                if (updatePrevious && updateCurrent)
+                if (chunk.DidChange(ref worldTransformHandle, lastSystemVersion))
                 {
-                    var currents = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRO(ref worldTransformHandle);
-                    var starts   = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRW(ref previousTransformHandle);
-                    var prevs    = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRW(ref twoAgoTransformHandle);
+                    var currents = chunk.GetNativeArray(ref worldTransformHandle).Reinterpret<TransformQvvs>();
+                    var prevs    = chunk.GetNativeArray(ref previousTransformHandle).Reinterpret<TransformQvvs>();
 
-                    for (int i = 0; i < chunk.Count; i++)
+                    if (updateTwoAgo)
                     {
-                        // Need to compensate for uninitialized baked values
-                        if (starts[i].worldIndex == 0)
-                        {
-                            prevs[i]            = currents[i];
-                            prevs[i].worldIndex = 0;
-                        }
-                        else
-                            prevs[i]         = starts[i];
-                        starts[i]            = currents[i];
-                        starts[i].worldIndex = prevs[i].worldIndex + math.select(1, 2, prevs[i].worldIndex + 1 == 0);
+                        var twoAgos = chunk.GetNativeArray(ref twoAgoTransformHandle).Reinterpret<TransformQvvs>();
+                        twoAgos.CopyFrom(prevs);
                     }
-                }
-                else if (updatePrevious)
-                {
-                    var starts = chunk.GetRequiredComponentDataPtrRO(ref previousTransformHandle);
-                    var prevs  = chunk.GetRequiredComponentDataPtrRW(ref twoAgoTransformHandle);
 
-                    UnsafeUtility.MemCpy(prevs, starts, UnsafeUtility.SizeOf<TransformQvvs>() * chunk.Count);
+                    prevs.CopyFrom(currents);
                 }
-                else if (updateCurrent)
+                else if (updateTwoAgo)
                 {
-                    var currents = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRO(ref worldTransformHandle);
-                    var starts   = (TransformQvvs*)chunk.GetRequiredComponentDataPtrRW(ref previousTransformHandle);
+                    var prevs   = chunk.GetRequiredComponentDataPtrRO(ref previousTransformHandle);
+                    var twoAgos = chunk.GetRequiredComponentDataPtrRW(ref twoAgoTransformHandle);
 
-                    for (int i = 0; i < chunk.Count; i++)
-                    {
-                        int newVersion = starts[i].worldIndex + 1;
-                        if (newVersion == 0)
-                            newVersion++;
-                        starts[i]            = currents[i];
-                        starts[i].worldIndex = newVersion;
-                    }
+                    UnsafeUtility.MemCpy(twoAgos, prevs, UnsafeUtility.SizeOf<TransformQvvs>() * chunk.Count);
                 }
             }
 

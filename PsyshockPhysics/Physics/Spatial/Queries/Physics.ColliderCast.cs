@@ -197,6 +197,82 @@ namespace Latios.Psyshock
             return false;
         }
         #endregion
+
+        #region Collider vs World
+        /// <summary>
+        /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits any other matching
+        /// entity collider in the CollisionWorld. If so, results of the hit in which the casted collider traveled the least
+        /// is reported. It is assumed that rotation, scale, and stretch remain constant throughout the operation. Hits where
+        /// the casted collider starts already overlapping a target in the CollisionWorld are ignored.
+        /// </summary>
+        /// <param name="colliderToCast">The casted collider that should be swept through space</param>
+        /// <param name="castStart">The transform of the casted collider at the start of the cast</param>
+        /// <param name="castEnd">The position of the casted collider at the end of the cast range</param>
+        /// <param name="collisionWorld">The CollisionWorld containing 0 or more colliders the casted collider should
+        /// be tested against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">The resulting information about the least-swept hit if there is one. If there
+        /// is no hit, the contents of the result are undefined.</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if a hit was found, false otherwise</returns>
+        public static bool ColliderCast(in Collider colliderToCast,
+                                        in TransformQvvs castStart,
+                                        float3 castEnd,
+                                        in CollisionWorld collisionWorld,
+                                        in CollisionWorld.Mask mask,
+                                        out ColliderCastResult result,
+                                        out LayerBodyInfo worldBodyInfo)
+        {
+            var scaledCastStart      = new RigidTransform(castStart.rotation, castStart.position);
+            var scaledColliderToCast = colliderToCast;
+            ScaleStretchCollider(ref scaledColliderToCast, castStart.scale, castStart.stretch);
+
+            result        = default;
+            worldBodyInfo = default;
+            var processor = new LayerQueryProcessors.ColliderCastClosestImmediateProcessor(in scaledColliderToCast, in scaledCastStart, castEnd, ref result, ref worldBodyInfo);
+            FindObjects(AabbFrom(in scaledColliderToCast, in scaledCastStart, castEnd), in collisionWorld, in processor).RunImmediate(in mask);
+            var hit                         = result.subColliderIndexOnTarget >= 0;
+            result.subColliderIndexOnTarget = math.max(result.subColliderIndexOnTarget, 0);
+            return hit;
+        }
+
+        /// <summary>
+        /// Sweeps a collider beginning at castStart throught to castEnd and checks if the collider hits any other matching
+        /// entitycollider in the CollisionWorld. If so, results of the first hit the algorithm finds is reported. It is
+        /// assumed that rotation, scale, and stretch remain constant throughout the operation. Hits where the casted collider
+        /// starts already overlapping a target in the CollisionWorld are ignored.
+        /// </summary>
+        /// <param name="colliderToCast">The casted collider that should be swept through space</param>
+        /// <param name="castStart">The transform of the casted collider at the start of the cast</param>
+        /// <param name="castEnd">The position of the casted collider at the end of the cast range</param>
+        /// <param name="collisionWorld">The CollisionWorld containing 0 or more colliders the casted collider should
+        /// be tested against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">The resulting information about the hit if there is one. If there is no hit,
+        /// the contents of the result are undefined.</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if a hit was found, false otherwise</returns>
+        public static bool ColliderCastAny(Collider colliderToCast,
+                                           in TransformQvvs castStart,
+                                           float3 castEnd,
+                                           in CollisionWorld collisionWorld,
+                                           in CollisionWorld.Mask mask,
+                                           out ColliderCastResult result,
+                                           out LayerBodyInfo worldBodyInfo)
+        {
+            var scaledCastStart      = new RigidTransform(castStart.rotation, castStart.position);
+            var scaledColliderToCast = colliderToCast;
+            ScaleStretchCollider(ref scaledColliderToCast, castStart.scale, castStart.stretch);
+
+            result        = default;
+            worldBodyInfo = default;
+            var processor = new LayerQueryProcessors.ColliderCastAnyImmediateProcessor(in scaledColliderToCast, in scaledCastStart, castEnd, ref result, ref worldBodyInfo);
+            FindObjects(AabbFrom(in scaledColliderToCast, in scaledCastStart, castEnd), in collisionWorld, in processor).RunImmediate(in mask);
+            var hit                         = result.subColliderIndexOnTarget >= 0;
+            result.subColliderIndexOnTarget = math.max(result.subColliderIndexOnTarget, 0);
+            return hit;
+        }
+        #endregion
     }
 }
 

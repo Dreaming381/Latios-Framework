@@ -1,39 +1,21 @@
-﻿using System.Collections.Generic;
-using Latios.Authoring;
+﻿using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Unity.Burst;
-using Unity.Burst.Intrinsics;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
-using Unity.Entities.Exposed;
 using Unity.Entities.LowLevel.Unsafe;
-using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.Myri.Authoring
 {
     /// <summary>
-    /// Inherit this class and attach to a Game Object to force the Myri Audio Source to rebake
-    /// whenever this component is added, modified, or removed.
+    /// Inherit this interface on a MonoBehavior and attach to a Game Object to override the clip generated.
+    /// This allows you to procedurally generate the clip at bake time. Return default to disable the existence
+    /// of AudioSourceClip.
     /// </summary>
-    public class AudioClipOverrideBase : UnityEngine.MonoBehaviour
+    public interface IAudioClipOverride
     {
-    }
-
-    /// <summary>
-    /// Add to an entity that will be baked with an audio source to replace the clip with this custom clip.
-    /// It is recommended the authoring component inherit AudioClipOverrideBase so that incremental baking works correctly.
-    /// </summary>
-    [TemporaryBakingType]
-    public struct AudioClipOverrideRequest : IComponentData
-    {
-        public SmartBlobberHandle<AudioClipBlob> clipHandle;
-
-        public AudioClipOverrideRequest(SmartBlobberHandle<AudioClipBlob> clipHandle)
-        {
-            this.clipHandle = clipHandle;
-        }
+        SmartBlobberHandle<AudioClipBlob> BakeClip(IBaker baker, Entity targetEntity);
     }
 
     public static class CustomAudioClipBlobberAPIExtensions
@@ -281,29 +263,6 @@ namespace Latios.Myri.Authoring.Systems
                 root.name       = parameters.name;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent));
-            }
-        }
-    }
-
-    [RequireMatchingQueriesForUpdate]
-    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
-    [UpdateInGroup(typeof(SmartBakerBakingGroup))]
-    [BurstCompile]
-    public partial struct CustomAudioClipOverrideBakingSystem : ISystem
-    {
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
-        {
-            foreach ((var source, var clip) in SystemAPI.Query<RefRW<AudioSourceLooped>, AudioClipOverrideRequest>()
-                     .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities))
-            {
-                source.ValueRW.clip = clip.clipHandle.Resolve(state.EntityManager);
-            }
-
-            foreach ((var source, var clip) in SystemAPI.Query<RefRW<AudioSourceOneShot>, AudioClipOverrideRequest>()
-                     .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities))
-            {
-                source.ValueRW.clip = clip.clipHandle.Resolve(state.EntityManager);
             }
         }
     }

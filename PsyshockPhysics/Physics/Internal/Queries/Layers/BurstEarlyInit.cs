@@ -71,6 +71,7 @@ namespace Latios.Psyshock
         static void InitProcessors(IEnumerable<Type> findPairsTypes, IEnumerable<Type> findObjectsTypes, IEnumerable<Type> foreachTypes)
         {
             RuntimeConstants.InitConstants();
+            PhysicsDebug.Initialize();
 
             var pairIniterType = typeof(FindPairsIniter<>);
 
@@ -135,12 +136,14 @@ namespace Latios.Psyshock
             void Init();
         }
 
-        public struct FindPairsIniter<T> : IIniter where T : struct, IFindPairsProcessor
+        public struct FindPairsIniter<T> : IIniter where T : unmanaged, IFindPairsProcessor
         {
             public void Init()
             {
                 IJobForExtensions.EarlyJobInit<FindPairsLayerSelfConfig<T>.FindPairsInternal.LayerSelfJob>();
                 IJobForExtensions.EarlyJobInit<FindPairsLayerLayerConfig<T>.FindPairsInternal.LayerLayerJob>();
+                IJobForExtensions.EarlyJobInit<FindPairsWorldSelfConfig<T>.FindPairsInternal.WorldSelfJob>();
+                IJobForExtensions.EarlyJobInit<FindPairsWorldWorldConfig<T>.FindPairsInternal.WorldWorldJob>();
             }
         }
 
@@ -149,6 +152,7 @@ namespace Latios.Psyshock
             public void Init()
             {
                 IJobExtensions.EarlyJobInit<FindObjectsConfig<T>.FindObjectsInternal.SingleJob>();
+                IJobExtensions.EarlyJobInit<FindObjectsWorldConfig<T>.FindObjectsInternal.SingleJob>();
             }
         }
 

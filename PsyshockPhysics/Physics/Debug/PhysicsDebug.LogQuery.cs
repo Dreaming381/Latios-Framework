@@ -1,4 +1,8 @@
+using System;
+using System.Runtime.InteropServices;
+using AOT;
 using Latios.Transforms;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -7,8 +11,12 @@ using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    public static partial class PhysicsDebug
+    public static unsafe partial class PhysicsDebug
     {
+        private delegate void ManagedDelegate(IntPtr context, int operation);
+        static ManagedDelegate                                          managedDelegate;
+        static readonly SharedStatic<FunctionPointer<ManagedDelegate> > functionPtr = SharedStatic<FunctionPointer<ManagedDelegate> >.GetOrCreate<StaticTag>();
+
         public static NativeText LogDistanceBetween(in Collider colliderA,
                                                     in TransformQvvs transformA,
                                                     in Collider colliderB,
@@ -16,14 +24,113 @@ namespace Latios.Psyshock
                                                     float maxDistance,
                                                     Allocator allocator = Allocator.Temp)
         {
-            var writer = new HexWriter(allocator);
-            writer.Write((byte)QueryType.DistanceBetweenColliderCollider);
-            writer.WriteCollider(colliderA);
-            writer.WriteTransform(transformA);
-            writer.WriteCollider(colliderB);
-            writer.WriteTransform(transformB);
-            writer.WriteFloat(maxDistance);
-            return writer.content;
+            var context = new LogDistanceBetweenContext
+            {
+                colliderA   = colliderA,
+                transformA  = transformA,
+                colliderB   = colliderB,
+                transformB  = transformB,
+                maxDistance = maxDistance,
+                allocator   = allocator
+            };
+            DoManagedExecute((IntPtr)(&context), 1);
+            return context.result;
+        }
+
+        public static void WriteToFile(NativeText text, FixedString512Bytes filepath)
+        {
+            var context = new WriteToFileContext
+            {
+                text = text,
+                path = filepath
+            };
+            DoManagedExecute((IntPtr)(&context), 2);
+        }
+
+        internal static void LogWarning(NativeText textToLog)
+        {
+            DoManagedExecute((IntPtr)(&textToLog), 3);
+        }
+
+        struct StaticTag { }
+
+        internal static void Initialize()
+        {
+            managedDelegate  = ManagedExecute;
+            functionPtr.Data = new FunctionPointer<ManagedDelegate>(Marshal.GetFunctionPointerForDelegate<ManagedDelegate>(ManagedExecute));
+        }
+
+        static void DoManagedExecute(IntPtr context, int operation)
+        {
+            bool didIt = false;
+            ManagedExecuteFromManaged(context, operation, ref didIt);
+
+            if (!didIt)
+                functionPtr.Data.Invoke(context, operation);
+        }
+
+        [BurstDiscard]
+        static void ManagedExecuteFromManaged(IntPtr context, int operation, ref bool didIt)
+        {
+            didIt = true;
+            ManagedExecute(context, operation);
+        }
+
+        [MonoPInvokeCallback(typeof(ManagedDelegate))]
+        static void ManagedExecute(IntPtr context, int operation)
+        {
+            try
+            {
+                switch (operation)
+                {
+                    case 1:
+                    {
+                        ref var ctx    = ref *(LogDistanceBetweenContext*)context;
+                        var     writer = new HexWriter(ctx.allocator);
+                        writer.Write((byte)QueryType.DistanceBetweenColliderCollider);
+                        writer.WriteCollider(ctx.colliderA);
+                        writer.WriteTransform(ctx.transformA);
+                        writer.WriteCollider(ctx.colliderB);
+                        writer.WriteTransform(ctx.transformB);
+                        writer.WriteFloat(ctx.maxDistance);
+                        ctx.result = writer.content;
+                        break;
+                    }
+                    case 2:
+                    {
+                        ref var ctx = ref *(WriteToFileContext*)context;
+                        System.IO.File.WriteAllText(ctx.path.ToString(), ctx.text.ToString());
+                        break;
+                    }
+                    case 3:
+                    {
+                        ref var text = ref *(NativeText*)context;
+                        UnityEngine.Debug.LogWarning($"{text}");
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                UnityEngine.Debug.LogException(e);
+            }
+        }
+
+        struct LogDistanceBetweenContext
+        {
+            public Collider      colliderA;
+            public TransformQvvs transformA;
+            public Collider      colliderB;
+            public TransformQvvs transformB;
+            public float         maxDistance;
+            public Allocator     allocator;
+            public NativeText    result;
+        }
+
+        struct WriteToFileContext
+        {
+            public NativeText          text;
+            public FixedString512Bytes path;
         }
 
         enum QueryType : byte

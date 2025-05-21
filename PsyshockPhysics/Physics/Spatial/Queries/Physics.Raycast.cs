@@ -51,6 +51,27 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Raycasts against the CollisionWorld using a ray defined by the start and stop points, and returns the closest hit if found
+        /// </summary>
+        /// <param name="start">The start of the ray</param>
+        /// <param name="end">The end of the ray</param>
+        /// <param name="collisionWorld">The CollisionWorld containing the colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">If a ray hits a collider in the CollisionWorld, this is populated with info about the closest hit
+        /// found as the ray traverses the CollisionWorld, otherwise its contents are undefined</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if the ray hit a collider in the CollisionWorld, false otherwise</returns>
+        public static bool Raycast(float3 start,
+                                   float3 end,
+                                   in CollisionWorld collisionWorld,
+                                   in CollisionWorld.Mask mask,
+                                   out RaycastResult result,
+                                   out LayerBodyInfo worldBodyInfo)
+        {
+            return Raycast(new Ray(start, end), in collisionWorld, in mask, out result, out worldBodyInfo);
+        }
+
+        /// <summary>
         /// Raycasts against the CollisionLayer, and returns the closest hit if found
         /// </summary>
         /// <param name="start">The start of the ray</param>
@@ -66,7 +87,7 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
-        /// Raycasts against the CollisionLayer, and returns the closest hit if found
+        /// Raycasts against the CollisionWorld, and returns the closest hit if found
         /// </summary>
         /// <param name="ray">The ray to cast against the CollisionLayer</param>
         /// <param name="layer">The CollisionLayer containing the colliders to test against</param>
@@ -80,6 +101,27 @@ namespace Latios.Psyshock
             layerBodyInfo = default;
             var processor = new LayerQueryProcessors.RaycastClosestImmediateProcessor(ray, ref result, ref layerBodyInfo);
             FindObjects(AabbFrom(ray), in layer, in processor).RunImmediate();
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
+            return hit;
+        }
+
+        /// <summary>
+        /// Raycasts against the CollisionWorld, and returns the closest hit if found
+        /// </summary>
+        /// <param name="ray">The ray to cast against the CollisionWorld</param>
+        /// <param name="collisionWorld">The CollisionWorld containing the colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">If a ray hits a collider in the CollisionWorld, this is populated with info about the closest hit
+        /// found as the ray traverses the CollisionWorld, otherwise its contents are undefined</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if the ray hit a collider in the CollisionWorld, false otherwise</returns>
+        public static bool Raycast(in Ray ray, in CollisionWorld collisionWorld, in CollisionWorld.Mask mask, out RaycastResult result, out LayerBodyInfo worldBodyInfo)
+        {
+            result        = default;
+            worldBodyInfo = default;
+            var processor = new LayerQueryProcessors.RaycastClosestImmediateProcessor(ray, ref result, ref worldBodyInfo);
+            FindObjects(AabbFrom(ray), in collisionWorld, in processor).RunImmediate(in mask);
             var hit                 = result.subColliderIndex >= 0;
             result.subColliderIndex = math.max(result.subColliderIndex, 0);
             return hit;
@@ -134,6 +176,27 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Raycasts against the CollisionWorld using a ray defined by the start and stop points, and returns the first hit the algorithm finds, if any
+        /// </summary>
+        /// <param name="start">The start of the ray</param>
+        /// <param name="end">The end of the ray</param>
+        /// <param name="collisionWorld">The CollisionWorld containing the colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">If a ray hits a collider in the CollisionWorld, this is populated with info about the first hit
+        /// found (which may not necessarily be the closest), otherwise its contents are undefined</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if the ray hit a collider in the CollisionWorld, false otherwise</returns>
+        public static bool RaycastAny(float3 start,
+                                      float3 end,
+                                      in CollisionWorld collisionWorld,
+                                      in CollisionWorld.Mask mask,
+                                      out RaycastResult result,
+                                      out LayerBodyInfo worldBodyInfo)
+        {
+            return RaycastAny(new Ray(start, end), in collisionWorld, in mask, out result, out worldBodyInfo);
+        }
+
+        /// <summary>
         /// Raycasts against the CollisionLayer, and returns the first hit the algorithm finds, if any
         /// </summary>
         /// <param name="ray">The ray to cast against the CollisionLayer</param>
@@ -148,6 +211,27 @@ namespace Latios.Psyshock
             layerBodyInfo = default;
             var processor = new LayerQueryProcessors.RaycastAnyImmediateProcessor(ray, ref result, ref layerBodyInfo);
             FindObjects(AabbFrom(ray), in layer, in processor).RunImmediate();
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
+            return hit;
+        }
+
+        /// <summary>
+        /// Raycasts against the CollisionWorld, and returns the first hit the algorithm finds, if any
+        /// </summary>
+        /// <param name="ray">The ray to cast against the CollisionWorld</param>
+        /// <param name="collisionWorld">The CollisionWorld containing the colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="result">If a ray hits a collider in the CollisionWorld, this is populated with info about the first hit
+        /// found (which may not necessarily be the closest), otherwise its contents are undefined</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>True if the ray hit a collider in the CollisionWorld, false otherwise</returns>
+        public static bool RaycastAny(in Ray ray, in CollisionWorld collisionWorld, in CollisionWorld.Mask mask, out RaycastResult result, out LayerBodyInfo worldBodyInfo)
+        {
+            result        = default;
+            worldBodyInfo = default;
+            var processor = new LayerQueryProcessors.RaycastAnyImmediateProcessor(ray, ref result, ref worldBodyInfo);
+            FindObjects(AabbFrom(ray), in collisionWorld, in processor).RunImmediate(in mask);
             var hit                 = result.subColliderIndex >= 0;
             result.subColliderIndex = math.max(result.subColliderIndex, 0);
             return hit;

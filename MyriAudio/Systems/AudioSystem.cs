@@ -46,15 +46,9 @@ namespace Latios.Myri.Systems
         private JobHandle   m_lastUpdateJobHandle;
         private EntityQuery m_aliveListenersQuery;
         private EntityQuery m_deadListenersQuery;
-        private EntityQuery m_oneshotsToDestroyWhenFinishedQuery;
-        private EntityQuery m_oneshotsQuery;
-        private EntityQuery m_loopedQuery;
+        private EntityQuery m_sourcesQuery;
 
-        ComponentTypeHandle<AudioListener>          m_listenerHandle;
-        ComponentTypeHandle<AudioSourceOneShot>     m_oneshotHandle;
-        ComponentTypeHandle<AudioSourceLooped>      m_loopedHandle;
-        ComponentTypeHandle<AudioSourceEmitterCone> m_coneHandle;
-        WorldTransformReadOnlyAspect.TypeHandle     m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -73,16 +67,10 @@ namespace Latios.Myri.Systems
             });
 
             // Create queries
-            m_aliveListenersQuery                = state.Fluent().With<AudioListener>(true).Build();
-            m_deadListenersQuery                 = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
-            m_oneshotsToDestroyWhenFinishedQuery = state.Fluent().With<AudioSourceOneShot>().With<AudioSourceDestroyOneShotWhenFinished>(true).Build();
-            m_oneshotsQuery                      = state.Fluent().With<AudioSourceOneShot>().Build();
-            m_loopedQuery                        = state.Fluent().With<AudioSourceLooped>().Build();
+            m_aliveListenersQuery = state.Fluent().With<AudioListener>(true).Build();
+            m_deadListenersQuery  = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
+            m_sourcesQuery        = state.Fluent().With<AudioSourceVolume, AudioSourceDistanceFalloff>(true).WithWorldTransformReadOnly().With<AudioSourceClip>(false).Build();
 
-            m_listenerHandle       = state.GetComponentTypeHandle<AudioListener>(true);
-            m_oneshotHandle        = state.GetComponentTypeHandle<AudioSourceOneShot>(false);
-            m_loopedHandle         = state.GetComponentTypeHandle<AudioSourceLooped>(false);
-            m_coneHandle           = state.GetComponentTypeHandle<AudioSourceEmitterCone>(true);
             m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
@@ -94,8 +82,7 @@ namespace Latios.Myri.Systems
                 return true;
             }
 
-            if (m_aliveListenersQuery.IsEmptyIgnoreFilter && m_deadListenersQuery.IsEmptyIgnoreFilter && m_loopedQuery.IsEmptyIgnoreFilter && m_oneshotsQuery.IsEmptyIgnoreFilter &&
-                m_oneshotsToDestroyWhenFinishedQuery.IsEmptyIgnoreFilter)
+            if (m_aliveListenersQuery.IsEmptyIgnoreFilter && m_deadListenersQuery.IsEmptyIgnoreFilter && m_sourcesQuery.IsEmptyIgnoreFilter)
                 return false;
 
             m_initialized = true;
@@ -156,19 +143,15 @@ namespace Latios.Myri.Systems
         }
 
         [BurstCompile]
-        public void OnUpdate(ref SystemState state)
+        public unsafe void OnUpdate(ref SystemState state)
         {
             var ecsJH = state.Dependency;
 
-            //Query arrays
-            var aliveListenerEntities = m_aliveListenersQuery.ToEntityArray(Allocator.TempJob);
-            var deadListenerEntities  = m_deadListenersQuery.ToEntityArray(Allocator.TempJob);
+            // Query arrays
+            var aliveListenerEntities = m_aliveListenersQuery.ToEntityArray(state.WorldUpdateAllocator);
+            var deadListenerEntities  = m_deadListenersQuery.ToEntityArray(state.WorldUpdateAllocator);
 
-            //Type handles
-            m_listenerHandle.Update(ref state);
-            m_oneshotHandle.Update(ref state);
-            m_loopedHandle.Update(ref state);
-            m_coneHandle.Update(ref state);
+            // Type handles
             m_worldTransformHandle.Update(ref state);
 
             var audioSettingsLookup          = GetComponentLookup<AudioSettings>(true);
@@ -176,7 +159,7 @@ namespace Latios.Myri.Systems
             var listenerGraphStateLookup     = GetComponentLookup<ListenerGraphState>(false);
             var entityOutputGraphStateLookup = GetComponentLookup<EntityOutputGraphState>(false);
 
-            //Buffer
+            // Buffer
             m_currentBufferId++;
             var ildBuffer = new OwnedIldBuffer
             {
@@ -185,41 +168,34 @@ namespace Latios.Myri.Systems
                 bufferId = m_currentBufferId
             };
 
-            //Containers
-            var entityCommandBuffer      = latiosWorld.syncPoint.CreateEntityCommandBuffer();
+            // Containers
+            var ecb                      = latiosWorld.syncPoint.CreateEntityCommandBuffer();
             var dspCommandBlock          = m_graph.CreateCommandBlock();
-            var listenersWithTransforms  = new NativeList<ListenerWithTransform>(aliveListenerEntities.Length, Allocator.TempJob);
-            var listenerBufferParameters = new NativeArray<ListenerBufferParameters>(aliveListenerEntities.Length,
-                                                                                     Allocator.TempJob,
-                                                                                     NativeArrayOptions.UninitializedMemory);
-            var forIndexToListenerAndChannelIndices = new NativeList<int2>(Allocator.TempJob);
-            var oneshotEmitters                     = new NativeArray<OneshotEmitter>(m_oneshotsQuery.CalculateEntityCount(),
-                                                                                      Allocator.TempJob,
-                                                                                      NativeArrayOptions.UninitializedMemory);
-            var loopedEmitters                    = new NativeArray<LoopedEmitter>(m_loopedQuery.CalculateEntityCount(), Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-            var oneshotWeightsStream              = new NativeStream(oneshotEmitters.Length / CullingAndWeighting.kBatchSize + 1, Allocator.TempJob);
-            var loopedWeightsStream               = new NativeStream(loopedEmitters.Length / CullingAndWeighting.kBatchSize + 1, Allocator.TempJob);
-            var oneshotListenerEmitterPairsStream = new NativeStream(oneshotEmitters.Length / CullingAndWeighting.kBatchSize + 1, Allocator.TempJob);
-            var loopedListenerEmitterPairsStream  = new NativeStream(loopedEmitters.Length / CullingAndWeighting.kBatchSize + 1, Allocator.TempJob);
-            var oneshotClipFrameLookups           = new NativeList<ClipFrameLookup>(Allocator.TempJob);
-            var loopedClipFrameLookups            = new NativeList<ClipFrameLookup>(Allocator.TempJob);
-            var oneshotBatchedWeights             = new NativeList<Weights>(Allocator.TempJob);
-            var loopedBatchedWeights              = new NativeList<Weights>(Allocator.TempJob);
-            var oneshotTargetListenerIndices      = new NativeList<int>(Allocator.TempJob);
-            var loopedTargetListenerIndices       = new NativeList<int>(Allocator.TempJob);
+            var listenersWithTransforms  = new NativeList<ListenerWithTransform>(aliveListenerEntities.Length, state.WorldUpdateAllocator);
+            var listenerBufferParameters = CollectionHelper.CreateNativeArray<ListenerBufferParameters>(aliveListenerEntities.Length,
+                                                                                                        state.WorldUpdateAllocator,
+                                                                                                        NativeArrayOptions.UninitializedMemory);
+            var sourcesChunkCount     = m_sourcesQuery.CalculateChunkCountWithoutFiltering();
+            var capturedSourcesStream = new NativeStream(sourcesChunkCount, state.WorldUpdateAllocator);
+            var channelCount          = CollectionHelper.CreateNativeArray<int>(1, state.WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+            var chunkChannelCount     = CollectionHelper.CreateNativeArray<int>(1, state.WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+            var channelCountPtr       = (int*)channelCount.GetUnsafeReadOnlyPtr();
 
-            //Jobs
+            // Jobs
             m_lastUpdateJobHandle.Complete();
 
-            //This may lag behind what the job threads will see.
-            //That's fine, as this is only used for disposing memory.
+            // This may lag behind what the job threads will see.
+            // That's fine, as this is only used for disposing memory.
             int lastReadIldBufferFromMainThread = m_lastReadBufferId.Value;
 
             var captureListenersJH = new InitUpdateDestroy.UpdateListenersJob
             {
-                listenerHandle          = m_listenerHandle,
+                listenerHandle          = GetComponentTypeHandle<AudioListener>(true),
                 worldTransformHandle    = m_worldTransformHandle,
-                listenersWithTransforms = listenersWithTransforms
+                listenersWithTransforms = listenersWithTransforms,
+                channelCount            = channelCount,
+                sourceChunkChannelCount = chunkChannelCount,
+                sourceChunkCount        = sourcesChunkCount
             }.Schedule(m_aliveListenersQuery, ecsJH);
 
             var captureFrameJH = new GraphHandling.CaptureIldFrameJob
@@ -233,169 +209,96 @@ namespace Latios.Myri.Systems
                 worldBlackboardEntity      = latiosWorld.worldBlackboardEntity
             }.Schedule();
 
-            var ecsCaptureFrameJH = JobHandle.CombineDependencies(ecsJH, captureFrameJH);
-
             var updateListenersGraphJH = new GraphHandling.UpdateListenersGraphJob
             {
-                listenerEntities                    = aliveListenerEntities,
-                destroyedListenerEntities           = deadListenerEntities,
-                listenerLookup                      = listenerLookup,
-                listenerGraphStateLookup            = listenerGraphStateLookup,
-                listenerOutputGraphStateLookup      = entityOutputGraphStateLookup,
-                ecb                                 = entityCommandBuffer,
-                statesToDisposeThisFrame            = m_listenerGraphStatesToDispose,
-                audioSettingsLookup                 = audioSettingsLookup,
-                worldBlackboardEntity               = latiosWorld.worldBlackboardEntity,
-                audioFrame                          = m_audioFrame,
-                audioFrameHistory                   = m_audioFrameHistory,
-                systemMixNodePortFreelist           = m_mixNodePortFreelist,
-                systemMixNodePortCount              = m_mixNodePortCount,
-                systemMixNode                       = m_mixNode,
-                systemIldNodePortCount              = m_ildNodePortCount,
-                systemIldNode                       = m_ildNode,
-                commandBlock                        = dspCommandBlock,
-                listenerBufferParameters            = listenerBufferParameters,
-                forIndexToListenerAndChannelIndices = forIndexToListenerAndChannelIndices,
-                outputSamplesMegaBuffer             = ildBuffer.buffer,
-                outputSamplesMegaBufferChannels     = ildBuffer.channels,
-                bufferId                            = m_currentBufferId,
-                samplesPerFrame                     = m_samplesPerFrame
+                listenerEntities                = aliveListenerEntities,
+                destroyedListenerEntities       = deadListenerEntities,
+                listenerLookup                  = listenerLookup,
+                listenerGraphStateLookup        = listenerGraphStateLookup,
+                listenerOutputGraphStateLookup  = entityOutputGraphStateLookup,
+                ecb                             = ecb,
+                statesToDisposeThisFrame        = m_listenerGraphStatesToDispose,
+                audioSettingsLookup             = audioSettingsLookup,
+                worldBlackboardEntity           = latiosWorld.worldBlackboardEntity,
+                audioFrame                      = m_audioFrame,
+                audioFrameHistory               = m_audioFrameHistory,
+                systemMixNodePortFreelist       = m_mixNodePortFreelist,
+                systemMixNodePortCount          = m_mixNodePortCount,
+                systemMixNode                   = m_mixNode,
+                systemIldNodePortCount          = m_ildNodePortCount,
+                systemIldNode                   = m_ildNode,
+                commandBlock                    = dspCommandBlock,
+                listenerBufferParameters        = listenerBufferParameters,
+                outputSamplesMegaBuffer         = ildBuffer.buffer,
+                outputSamplesMegaBufferChannels = ildBuffer.channels,
+                bufferId                        = m_currentBufferId,
+                samplesPerFrame                 = m_samplesPerFrame
             }.Schedule(JobHandle.CombineDependencies(captureListenersJH, captureFrameJH));
 
-            var destroyOneshotsJH = new InitUpdateDestroy.DestroyOneshotsWhenFinishedJob
+            var updateSourcesJH = new InitUpdateDestroy.UpdateClipAudioSourcesJob
             {
-                expireHandle          = GetComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished>(false),
-                oneshotHandle         = m_oneshotHandle,
-                audioFrame            = m_audioFrame,
-                lastPlayedAudioFrame  = m_lastPlayedAudioFrame,
-                sampleRate            = m_sampleRate,
-                settingsLookup        = audioSettingsLookup,
-                samplesPerFrame       = m_samplesPerFrame,
-                worldBlackboardEntity = latiosWorld.worldBlackboardEntity
-            }.ScheduleParallel(m_oneshotsToDestroyWhenFinishedQuery, ecsCaptureFrameJH);
+                audioFrame                 = m_audioFrame,
+                lastPlayedAudioFrame       = m_lastPlayedAudioFrame,
+                bufferId                   = m_currentBufferId,
+                clipHandle                 = GetComponentTypeHandle<AudioSourceClip>(false),
+                distanceFalloffHandle      = GetComponentTypeHandle<AudioSourceDistanceFalloff>(true),
+                emitterConeHandle          = GetComponentTypeHandle<AudioSourceEmitterCone>(true),
+                expireHandle               = GetComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished>(false),
+                lastConsumedBufferId       = m_lastReadBufferId,
+                sampleRate                 = m_sampleRate,
+                sampleRateMultiplierHandle = GetComponentTypeHandle<AudioSourceSampleRateMultiplier>(true),
+                samplesPerFrame            = m_samplesPerFrame,
+                stream                     = capturedSourcesStream.AsWriter(),
+                volumeHandle               = GetComponentTypeHandle<AudioSourceVolume>(true),
+                worldTransformHandle       = m_worldTransformHandle
+            }.ScheduleParallel(m_sourcesQuery, JobHandle.CombineDependencies(captureFrameJH, ecsJH));
 
-            var firstEntityInChunkIndices = m_oneshotsQuery.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, destroyOneshotsJH, out var updateOneshotsJH);
+            state.Dependency = JobHandle.CombineDependencies(updateListenersGraphJH, updateSourcesJH);  // updateListenersGraphJH includes captureListener and captureFrame jobs
 
-            updateOneshotsJH = new InitUpdateDestroy.UpdateOneshotsJob
+            // No more ECS
+
+            // If there are no sources, then we should early out. Otherwise NativeStream has a bad time.
+            JobHandle shipItJH = state.Dependency;
+            if (sourcesChunkCount > 0)
             {
-                oneshotHandle             = m_oneshotHandle,
-                worldTransformHandle      = m_worldTransformHandle,
-                coneHandle                = m_coneHandle,
-                audioFrame                = m_audioFrame,
-                lastPlayedAudioFrame      = m_lastPlayedAudioFrame,
-                lastConsumedBufferId      = m_lastReadBufferId,
-                bufferId                  = m_currentBufferId,
-                emitters                  = oneshotEmitters,
-                firstEntityInChunkIndices = firstEntityInChunkIndices
-            }.ScheduleParallel(m_oneshotsQuery, updateOneshotsJH);
+                // Deferred Containers
+                var allocateChunkChannelStreamsJH = NativeStream.ScheduleConstruct(out var chunkChannelStreams, chunkChannelCount, captureListenersJH, state.WorldUpdateAllocator);
+                var allocateChannelStreamsJH      = NativeStream.ScheduleConstruct(out var channelStreams, channelCount, captureListenersJH, state.WorldUpdateAllocator);
 
-            firstEntityInChunkIndices = m_loopedQuery.CalculateBaseEntityIndexArrayAsync(Allocator.TempJob, ecsCaptureFrameJH, out var updateLoopedJH);
+                var cullingWeightingJH = new CullingAndWeighting.CullAndWeightJob
+                {
+                    capturedSources         = capturedSourcesStream.AsReader(),
+                    channelCount            = channelCount,
+                    chunkChannelStreams     = chunkChannelStreams.AsWriter(),
+                    listenersWithTransforms = listenersWithTransforms.AsDeferredJobArray()
+                }.ScheduleParallel(sourcesChunkCount, 1, JobHandle.CombineDependencies(allocateChunkChannelStreamsJH, updateSourcesJH));
 
-            updateLoopedJH = new InitUpdateDestroy.UpdateLoopedJob
-            {
-                loopedHandle              = m_loopedHandle,
-                worldTransformHandle      = m_worldTransformHandle,
-                coneHandle                = m_coneHandle,
-                audioFrame                = m_audioFrame,
-                lastConsumedBufferId      = m_lastReadBufferId,
-                bufferId                  = m_currentBufferId,
-                sampleRate                = m_sampleRate,
-                samplesPerFrame           = m_samplesPerFrame,
-                emitters                  = loopedEmitters,
-                firstEntityInChunkIndices = firstEntityInChunkIndices
-            }.ScheduleParallel(m_loopedQuery, updateLoopedJH);
+                var batchingJH = new Batching.BatchJob
+                {
+                    capturedSources     = capturedSourcesStream.AsReader(),
+                    channelStream       = channelStreams.AsWriter(),
+                    chunkChannelStreams = chunkChannelStreams.AsReader()
+                }.Schedule(channelCountPtr, 1, JobHandle.CombineDependencies(allocateChannelStreamsJH, cullingWeightingJH));
 
-            //No more ECS
-            var oneshotsCullingWeightingJH = new CullingAndWeighting.OneshotsJob
-            {
-                emitters                = oneshotEmitters,
-                listenersWithTransforms = listenersWithTransforms,
-                weights                 = oneshotWeightsStream.AsWriter(),
-                listenerEmitterPairs    = oneshotListenerEmitterPairsStream.AsWriter()
-            }.ScheduleBatch(oneshotEmitters.Length, CullingAndWeighting.kBatchSize, JobHandle.CombineDependencies(captureListenersJH, updateOneshotsJH));
+                var samplingJH = new Sampling.SampleJob
+                {
+                    audioFrame              = m_audioFrame,
+                    capturedSources         = capturedSourcesStream.AsReader(),
+                    channelStreams          = channelStreams.AsReader(),
+                    outputSamplesMegaBuffer = ildBuffer.buffer.AsDeferredJobArray(),
+                    sampleRate              = m_sampleRate,
+                    samplesPerFrame         = m_samplesPerFrame,
+                }.Schedule(channelCountPtr, 1, JobHandle.CombineDependencies(updateListenersGraphJH, batchingJH));
 
-            var loopedCullingWeightingJH = new CullingAndWeighting.LoopedJob
-            {
-                emitters                = loopedEmitters,
-                listenersWithTransforms = listenersWithTransforms,
-                weights                 = loopedWeightsStream.AsWriter(),
-                listenerEmitterPairs    = loopedListenerEmitterPairsStream.AsWriter()
-            }.ScheduleBatch(loopedEmitters.Length, CullingAndWeighting.kBatchSize, JobHandle.CombineDependencies(captureListenersJH, updateLoopedJH));
+                shipItJH = samplingJH;
+            }
 
-            var oneshotsBatchingJH = new Batching.BatchOneshotsJob
-            {
-                emitters              = oneshotEmitters,
-                pairWeights           = oneshotWeightsStream.AsReader(),
-                listenerEmitterPairs  = oneshotListenerEmitterPairsStream.AsReader(),
-                clipFrameLookups      = oneshotClipFrameLookups,
-                batchedWeights        = oneshotBatchedWeights,
-                targetListenerIndices = oneshotTargetListenerIndices
-            }.Schedule(oneshotsCullingWeightingJH);
-
-            var loopedBatchingJH = new Batching.BatchLoopedJob
-            {
-                emitters              = loopedEmitters,
-                pairWeights           = loopedWeightsStream.AsReader(),
-                listenerEmitterPairs  = loopedListenerEmitterPairsStream.AsReader(),
-                clipFrameLookups      = loopedClipFrameLookups,
-                batchedWeights        = loopedBatchedWeights,
-                targetListenerIndices = loopedTargetListenerIndices
-            }.Schedule(loopedCullingWeightingJH);
-
-            var oneshotSamplingJH = new Sampling.SampleOneshotClipsJob
-            {
-                clipFrameLookups                    = oneshotClipFrameLookups.AsDeferredJobArray(),
-                weights                             = oneshotBatchedWeights.AsDeferredJobArray(),
-                targetListenerIndices               = oneshotTargetListenerIndices.AsDeferredJobArray(),
-                listenerBufferParameters            = listenerBufferParameters,
-                forIndexToListenerAndChannelIndices = forIndexToListenerAndChannelIndices.AsDeferredJobArray(),
-                outputSamplesMegaBuffer             = ildBuffer.buffer.AsDeferredJobArray(),
-                sampleRate                          = m_sampleRate,
-                samplesPerFrame                     = m_samplesPerFrame,
-                audioFrame                          = m_audioFrame
-            }.Schedule(forIndexToListenerAndChannelIndices, 1, JobHandle.CombineDependencies(updateListenersGraphJH, oneshotsBatchingJH));
-
-            var loopedSamplingJH = new Sampling.SampleLoopedClipsJob
-            {
-                clipFrameLookups                    = loopedClipFrameLookups.AsDeferredJobArray(),
-                weights                             = loopedBatchedWeights.AsDeferredJobArray(),
-                targetListenerIndices               = loopedTargetListenerIndices.AsDeferredJobArray(),
-                listenerBufferParameters            = listenerBufferParameters,
-                forIndexToListenerAndChannelIndices = forIndexToListenerAndChannelIndices.AsDeferredJobArray(),
-                outputSamplesMegaBuffer             = ildBuffer.buffer.AsDeferredJobArray(),
-                sampleRate                          = m_sampleRate,
-                samplesPerFrame                     = m_samplesPerFrame,
-                audioFrame                          = m_audioFrame
-            }.Schedule(forIndexToListenerAndChannelIndices, 1, JobHandle.CombineDependencies(oneshotSamplingJH, loopedBatchingJH));
-
-            var shipItJH = new GraphHandling.SubmitToDspGraphJob
+            shipItJH = new GraphHandling.SubmitToDspGraphJob
             {
                 commandBlock = dspCommandBlock
-            }.Schedule(loopedSamplingJH);
+            }.Schedule(shipItJH);
 
-            state.Dependency = JobHandle.CombineDependencies(updateListenersGraphJH,  //handles captureListener and captureFrame
-                                                             updateOneshotsJH,  //handles destroyOneshots
-                                                             updateLoopedJH
-                                                             );
-
-            var disposeJobHandles = new NativeList<JobHandle>(Allocator.TempJob);
-            disposeJobHandles.Add(aliveListenerEntities.Dispose(updateListenersGraphJH));
-            disposeJobHandles.Add(deadListenerEntities.Dispose(updateListenersGraphJH));
-            disposeJobHandles.Add(listenersWithTransforms.Dispose(JobHandle.CombineDependencies(oneshotsCullingWeightingJH, loopedCullingWeightingJH)));
-            disposeJobHandles.Add(listenerBufferParameters.Dispose(loopedSamplingJH));
-            disposeJobHandles.Add(forIndexToListenerAndChannelIndices.Dispose(loopedSamplingJH));
-            disposeJobHandles.Add(oneshotEmitters.Dispose(oneshotsBatchingJH));
-            disposeJobHandles.Add(loopedEmitters.Dispose(loopedBatchingJH));
-            disposeJobHandles.Add(oneshotWeightsStream.Dispose(oneshotsBatchingJH));
-            disposeJobHandles.Add(loopedWeightsStream.Dispose(loopedBatchingJH));
-            disposeJobHandles.Add(oneshotListenerEmitterPairsStream.Dispose(oneshotsBatchingJH));
-            disposeJobHandles.Add(loopedListenerEmitterPairsStream.Dispose(loopedBatchingJH));
-            disposeJobHandles.Add(oneshotClipFrameLookups.Dispose(oneshotSamplingJH));
-            disposeJobHandles.Add(loopedClipFrameLookups.Dispose(loopedSamplingJH));
-            disposeJobHandles.Add(oneshotBatchedWeights.Dispose(oneshotSamplingJH));
-            disposeJobHandles.Add(loopedBatchedWeights.Dispose(loopedSamplingJH));
-            disposeJobHandles.Add(oneshotTargetListenerIndices.Dispose(oneshotSamplingJH));
-            disposeJobHandles.Add(loopedTargetListenerIndices.Dispose(loopedSamplingJH));
+            var disposeJobHandles = new NativeList<JobHandle>(Allocator.Temp);
             disposeJobHandles.Add(shipItJH);
 
             for (int i = 0; i < m_buffersInFlight.Length; i++)
@@ -411,7 +314,6 @@ namespace Latios.Myri.Systems
             }
 
             m_lastUpdateJobHandle = JobHandle.CombineDependencies(disposeJobHandles.AsArray());
-            disposeJobHandles.Dispose();
 
             m_buffersInFlight.Add(ildBuffer);
         }

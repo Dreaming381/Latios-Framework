@@ -45,5 +45,42 @@ namespace Latios.Psyshock
             #endregion
         }
     }
+
+    public partial struct FindObjectsWorldConfig<T> where T : struct, IFindObjectsProcessor
+    {
+        internal static class FindObjectsInternal
+        {
+            #region Jobs
+            [BurstCompile]
+            public struct SingleJob : IJob
+            {
+                [ReadOnly] public CollisionWorld world;
+                public EntityQueryMask           queryMask;
+                public T                         processor;
+                public Aabb                      aabb;
+
+                public void Execute()
+                {
+                    var mask = world.CreateMask(queryMask);
+                    WorldQuerySweepMethods.AabbSweep(in aabb, in world, in mask, ref processor);
+                }
+
+                [Preserve]
+                void RequireEarlyJobInit()
+                {
+                    new InitJobsForProcessors.FindObjectsIniter<T>().Init();
+                }
+            }
+            #endregion
+
+            #region ImmediateMethods
+            public static T RunImmediate(in Aabb aabb, in CollisionWorld world, in CollisionWorld.Mask mask, T processor)
+            {
+                WorldQuerySweepMethods.AabbSweep(in aabb, in world, in mask, ref processor);
+                return processor;
+            }
+            #endregion
+        }
+    }
 }
 

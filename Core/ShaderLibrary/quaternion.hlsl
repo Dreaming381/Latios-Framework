@@ -28,8 +28,8 @@ quaternion new_quaternion(float3x3 m)
 
 	uint u_sign = (asuint(u.x) & 0x80000000);
 	float t = v.y + asfloat(asuint(w.z) ^ u_sign);
-	uint4 u_mask = uint4((int) u_sign >> 31);
-	uint4 t_mask = uint4(asint(t) >> 31);
+	uint u_mask = uint((int) u_sign >> 31);
+	uint t_mask = uint(asint(t) >> 31);
 
 	float tr = 1.0f + abs(u.x);
 
@@ -51,8 +51,8 @@ quaternion new_quaternion(float3x4 m)
 
 	uint u_sign = (asuint(u.x) & 0x80000000);
 	float t = v.y + asfloat(asuint(w.z) ^ u_sign);
-	uint4 u_mask = uint4((int) u_sign >> 31);
-	uint4 t_mask = uint4(asint(t) >> 31);
+	uint u_mask = uint((int) u_sign >> 31);
+	uint t_mask = uint(asint(t) >> 31);
 
 	float tr = 1.0f + abs(u.x);
 
@@ -74,8 +74,8 @@ quaternion new_quaternion(float4x4 m)
 
 	uint u_sign = (asuint(u.x) & 0x80000000);
 	float t = v.y + asfloat(asuint(w.z) ^ u_sign);
-	uint4 u_mask = uint4((int) u_sign >> 31);
-	uint4 t_mask = uint4(asint(t) >> 31);
+	uint u_mask = uint((int) u_sign >> 31);
+	uint t_mask = uint(asint(t) >> 31);
 
 	float tr = 1.0f + abs(u.x);
 
@@ -296,14 +296,14 @@ quaternion normalizesafe(quaternion q)
 {
 	float4 x = q.value;
 	float len = dot(x, x);
-	return quaternion(select(quaternion_identity.value, x * rsqrt(len), len > FLT_MIN_NORMAL));
+	return new_quaternion(select(quaternion_identity.value, x * rsqrt(len), len > FLT_MIN_NORMAL));
 }
 
 quaternion normalizesafe(quaternion q, quaternion defaultvalue)
 {
 	float4 x = q.value;
 	float len = dot(x, x);
-	return quaternion(select(defaultvalue.value, x * rsqrt(len), len > FLT_MIN_NORMAL));
+	return new_quaternion(select(defaultvalue.value, x * rsqrt(len), len > FLT_MIN_NORMAL));
 }
 
 quaternion unitexp(quaternion q)
@@ -321,7 +321,7 @@ quaternion exp(quaternion q)
 	float v_len = rcp(v_rcp_len);
 	float sin_v_len, cos_v_len;
 	sincos(v_len, sin_v_len, cos_v_len);
-	return quaternion(float4(q.value.xyz * v_rcp_len * sin_v_len, cos_v_len) * exp(q.value.w));
+	return new_quaternion(float4(q.value.xyz * v_rcp_len * sin_v_len, cos_v_len) * exp(q.value.w));
 }
 
 quaternion unitlog(quaternion q)
@@ -359,7 +359,7 @@ float3 rotate(quaternion q, float3 v)
 
 quaternion nlerp(quaternion q1, quaternion q2, float t)
 {
-	return normalize(q1.value + t * (chgsign(q2.value, dot(q1, q2)) - q1.value));
+	return new_quaternion(normalize(q1.value + t * (chgsign(q2.value, dot(q1, q2)) - q1.value)));
 }
 
 // Todo: acos is pricy

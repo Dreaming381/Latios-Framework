@@ -1,149 +1,170 @@
 ﻿using System;
 using Unity.Burst;
 using Unity.Collections;
-using Unity.Entities;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Myri
 {
     internal static class Batching
     {
-        internal const int INITIAL_ALLOCATION_SIZE = 1024;
-
         [BurstCompile]
-        public struct BatchOneshotsJob : IJob
+        public struct BatchJob : IJobParallelForDefer
         {
-            [ReadOnly] public NativeArray<OneshotEmitter> emitters;
-            [ReadOnly] public NativeStream.Reader         pairWeights;
-            [ReadOnly] public NativeStream.Reader         listenerEmitterPairs;  //int2: listener, emitter
+            [ReadOnly] public NativeStream.Reader capturedSources;
+            [ReadOnly] public NativeStream.Reader chunkChannelStreams;
+            public NativeStream.Writer            channelStream;
 
-            public NativeList<ClipFrameLookup> clipFrameLookups;
-            public NativeList<Weights>         batchedWeights;
-            public NativeList<int>             targetListenerIndices;
+            UnsafeList<HashedSource>         hashedSources;
+            UnsafeHashMap<HashedSource, int> sourceToDeduplicatedIndexMap;
 
-            public void Execute()
+            public void Execute(int channelIndex)
             {
-                var hashmap = new NativeHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
-                if (clipFrameLookups.Capacity < INITIAL_ALLOCATION_SIZE)
-                    clipFrameLookups.Capacity = INITIAL_ALLOCATION_SIZE;
-                if (batchedWeights.Capacity < INITIAL_ALLOCATION_SIZE)
-                    batchedWeights.Capacity = INITIAL_ALLOCATION_SIZE;
-                if (targetListenerIndices.Capacity < INITIAL_ALLOCATION_SIZE)
-                    targetListenerIndices.Capacity = INITIAL_ALLOCATION_SIZE;
+                int channelCount     = channelStream.ForEachCount;
+                int chunkStreamCount = chunkChannelStreams.ForEachCount;
 
-                int streamIndices = listenerEmitterPairs.ForEachCount;
-                for (int streamIndex = 0; streamIndex < streamIndices; streamIndex++)
+                // Sanity check because we are using pointers into this container.
+                capturedSources.BeginForEachIndex(0);
+
+                // Count sources
+                int sourceCount = 0;
+                for (int i = channelIndex; i < chunkStreamCount; i += channelCount)
                 {
-                    int countInStream = listenerEmitterPairs.BeginForEachIndex(streamIndex);
-                    pairWeights.BeginForEachIndex(streamIndex);
-
-                    for (; countInStream > 0; countInStream--)
-                    {
-                        int2 listenerEmitterPairIndices = listenerEmitterPairs.Read<int2>();
-                        var  pairWeight                 = pairWeights.Read<Weights>();
-
-                        var e = emitters[listenerEmitterPairIndices.y];
-                        if (!e.source.clip.IsCreated)
-                            continue;
-
-                        ClipFrameListener cfl = new ClipFrameListener
-                        {
-                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_spawnedAudioFrame },
-                            listenerIndex                                                                  = listenerEmitterPairIndices.x
-                        };
-                        if (hashmap.TryGetValue(cfl, out int foundIndex))
-                        {
-                            ref Weights w  = ref batchedWeights.ElementAt(foundIndex);
-                            w             += pairWeight;
-                        }
-                        else
-                        {
-                            hashmap.Add(cfl, clipFrameLookups.Length);
-                            clipFrameLookups.Add(cfl.lookup);
-                            batchedWeights.Add(pairWeight);
-                            targetListenerIndices.Add(cfl.listenerIndex);
-                        }
-                    }
-                    listenerEmitterPairs.EndForEachIndex();
-                    pairWeights.EndForEachIndex();
+                    sourceCount += chunkChannelStreams.BeginForEachIndex(i);
+                    // EndForEachIndex() is a sanity test to ensure we read all items and all data within each item.
+                    // Since we aren't doing that in this first pass, we need to skip the call.
+                    //chunkChannelStreams.EndForEachIndex();
                 }
-            }
-        }
+                if (sourceCount == 0)
+                    return;
 
-        [BurstCompile]
-        public struct BatchLoopedJob : IJob
-        {
-            [ReadOnly] public NativeArray<LoopedEmitter> emitters;
-            [ReadOnly] public NativeStream.Reader        pairWeights;
-            [ReadOnly] public NativeStream.Reader        listenerEmitterPairs;  //int2: listener, emitter
-
-            public NativeList<ClipFrameLookup> clipFrameLookups;
-            public NativeList<Weights>         batchedWeights;
-            public NativeList<int>             targetListenerIndices;
-
-            public void Execute()
-            {
-                var hashmap = new NativeHashMap<ClipFrameListener, int>(INITIAL_ALLOCATION_SIZE, Allocator.Temp);
-                if (clipFrameLookups.Capacity < INITIAL_ALLOCATION_SIZE)
-                    clipFrameLookups.Capacity = INITIAL_ALLOCATION_SIZE;
-                if (batchedWeights.Capacity < INITIAL_ALLOCATION_SIZE)
-                    batchedWeights.Capacity = INITIAL_ALLOCATION_SIZE;
-                if (targetListenerIndices.Capacity < INITIAL_ALLOCATION_SIZE)
-                    targetListenerIndices.Capacity = INITIAL_ALLOCATION_SIZE;
-
-                int streamIndices = listenerEmitterPairs.ForEachCount;
-                for (int streamIndex = 0; streamIndex < streamIndices; streamIndex++)
+                // Set up allocations for local containers
+                if (!hashedSources.IsCreated)
                 {
-                    int countInStream = listenerEmitterPairs.BeginForEachIndex(streamIndex);
-                    pairWeights.BeginForEachIndex(streamIndex);
-
-                    for (; countInStream > 0; countInStream--)
-                    {
-                        int2 listenerEmitterPairIndices = listenerEmitterPairs.Read<int2>();
-                        var  pairWeight                 = pairWeights.Read<Weights>();
-
-                        var e = emitters[listenerEmitterPairIndices.y];
-                        if (!e.source.clip.IsCreated)
-                            continue;
-                        ClipFrameListener cfl = new ClipFrameListener
-                        {
-                            lookup        = new ClipFrameLookup { clip = e.source.clip, spawnFrameOrOffset = e.source.m_loopOffset },
-                            listenerIndex                                                                  = listenerEmitterPairIndices.x
-                        };
-                        if (hashmap.TryGetValue(cfl, out int foundIndex))
-                        {
-                            ref Weights w  = ref batchedWeights.ElementAt(foundIndex);
-                            w             += pairWeight;
-                        }
-                        else
-                        {
-                            hashmap.Add(cfl, clipFrameLookups.Length);
-                            clipFrameLookups.Add(cfl.lookup);
-                            batchedWeights.Add(pairWeight);
-                            targetListenerIndices.Add(cfl.listenerIndex);
-                        }
-                    }
-                    listenerEmitterPairs.EndForEachIndex();
-                    pairWeights.EndForEachIndex();
+                    hashedSources                = new UnsafeList<HashedSource>(sourceCount * 2, Allocator.Temp);
+                    sourceToDeduplicatedIndexMap = new UnsafeHashMap<HashedSource, int>(sourceCount * 2, Allocator.Temp);
                 }
+                hashedSources.Clear();
+                sourceToDeduplicatedIndexMap.Clear();
+                hashedSources.Capacity                = math.max(hashedSources.Capacity, sourceCount);
+                sourceToDeduplicatedIndexMap.Capacity = hashedSources.Capacity;
+
+                // Build the hashedSources array and identify for each source the first index that shares the same batchable source data.
+                // Mark the original so that we can find it after sorting.
+                for (int streamIndex = channelIndex; streamIndex < chunkStreamCount; streamIndex += channelCount)
+                {
+                    int countInStream = chunkChannelStreams.BeginForEachIndex(streamIndex);
+                    for (int i = 0; i < countInStream; i++)
+                    {
+                        var  hashedSource = new HashedSource(chunkChannelStreams.Read<ChannelStreamSource>());
+                        bool isOriginal   = false;
+                        if (!sourceToDeduplicatedIndexMap.TryGetValue(hashedSource, out var deduplicatedIndex))
+                        {
+                            deduplicatedIndex = hashedSources.Length;
+                            sourceToDeduplicatedIndexMap.Add(hashedSource, deduplicatedIndex);
+                            isOriginal = true;
+                        }
+                        hashedSource.SetDeduplicatedIndexAndOriginality(deduplicatedIndex, isOriginal);
+                        hashedSources.Add(hashedSource);
+                    }
+                }
+
+                // Sort the hashes by deduplicated index and then by ITD.
+                hashedSources.Sort();
+
+                // Generate deduplicated results
+                channelStream.BeginForEachIndex(channelIndex);
+                for (int start = 0; start < hashedSources.Length; )
+                {
+                    // Find the span of matching sources and mark which one is the original.
+                    int originalOffset    = 0;
+                    int deduplicatedIndex = hashedSources[start].deduplicatedIndex;
+                    int count             = 1;
+                    for (; start + count < hashedSources.Length; count++)
+                    {
+                        var source = hashedSources[start + count];
+                        if (source.deduplicatedIndex != deduplicatedIndex)
+                            break;
+
+                        if (source.isOriginal)
+                            originalOffset = count;
+                    }
+
+                    // Use the original as the base of all ITD batches. This means that captured source data
+                    // used in batches are in the original capture stream order, which will hopefully provide
+                    // some extra cache benefits. We still group by differing ITDs together though for added
+                    // sample data cache coherency, which is probably just as big if not a bigger win.
+                    var batchSource = hashedSources[start + originalOffset].source;
+
+                    // Combine sources by matching ITD
+                    var startSource                 = hashedSources[start].source;
+                    batchSource.itdIndex            = startSource.itdIndex;
+                    batchSource.sourceHeader.volume = startSource.sourceHeader.volume;
+                    for (int i = 1; i < count; i++)
+                    {
+                        var iSource = hashedSources[start + i].source;
+                        if (batchSource.itdIndex != iSource.itdIndex)
+                        {
+                            channelStream.Write(batchSource);
+                            batchSource.itdIndex            = iSource.itdIndex;
+                            batchSource.sourceHeader.volume = 0f;
+                        }
+                        batchSource.sourceHeader.volume += iSource.sourceHeader.volume;
+                    }
+                    channelStream.Write(batchSource);
+
+                    start += count;
+                }
+                channelStream.EndForEachIndex();
             }
-        }
 
-        private struct ClipFrameListener : IEquatable<ClipFrameListener>
-        {
-            public ClipFrameLookup lookup;
-            public int             listenerIndex;
-
-            public bool Equals(ClipFrameListener other)
+            unsafe struct HashedSource : IEquatable<HashedSource>, IComparable<HashedSource>
             {
-                return lookup.Equals(other.lookup) && listenerIndex.Equals(other.listenerIndex);
-            }
+                public ChannelStreamSource source;
+                public int                 hashcode;
+                private uint               m_packed;
 
-            public unsafe override int GetHashCode()
-            {
-                return new int3((int)((ulong)lookup.clip.GetUnsafePtr() >> 4), lookup.spawnFrameOrOffset, listenerIndex).GetHashCode();
+                public int deduplicatedIndex => (int)(m_packed & 0x7fffffff);
+                public bool isOriginal => (m_packed & 0x80000000) != 0;
+
+                public void SetDeduplicatedIndexAndOriginality(int newIndex, bool original)
+                {
+                    m_packed = (uint)newIndex | math.select(0, 0x80000000, original);
+                }
+
+                public HashedSource(ChannelStreamSource input)
+                {
+                    source   = input;
+                    hashcode = math.asint(Unity.Core.XXHash.Hash32(source.sourceDataPtr, source.batchingByteCount));
+                    m_packed = 0;
+                }
+
+                public override int GetHashCode() => hashcode;
+
+                public bool Equals(HashedSource other)
+                {
+                    if (hashcode != other.hashcode)
+                        return false;
+
+                    var aFeatures = source.sourceHeader.features & CapturedSourceHeader.Features.BatchingFeatures;
+                    var bFeatures = other.source.sourceHeader.features & CapturedSourceHeader.Features.BatchingFeatures;
+                    if (aFeatures != bFeatures)
+                        return false;
+
+                    if (source.batchingByteCount != other.source.batchingByteCount)
+                        return false;
+
+                    return UnsafeUtility.MemCmp(source.sourceDataPtr, other.source.sourceDataPtr, source.batchingByteCount) == 0;
+                }
+
+                public int CompareTo(HashedSource other)
+                {
+                    var result = deduplicatedIndex.CompareTo(other.deduplicatedIndex);
+                    if (result == 0)
+                        result = source.itdIndex.CompareTo(other.source.itdIndex);
+                    return result;
+                }
             }
         }
     }

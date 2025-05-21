@@ -31,7 +31,7 @@ float3 InverseRotateFast(quaternion normalizedRotation, float3 v)
     return rotate(conjugate(normalizedRotation), v);
 }
 
-float3 InverseRotateFast(quaternion normalizedRotation, quaternion q)
+quaternion InverseRotateFast(quaternion normalizedRotation, quaternion q)
 {
 	return mul(conjugate(normalizedRotation), q);
 }

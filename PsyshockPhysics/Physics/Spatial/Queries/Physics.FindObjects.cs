@@ -1,7 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -138,9 +135,28 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
+        /// Searches the CollisionWorld for all colliders whose Aabbs overlap with the queried Aabb and entity query Mask and runs processor.Execute()
+        /// on each found result. This is the start of a fluent chain.
+        /// </summary>
+        /// <typeparam name="T">An IFindObjectsProcessor which may contain containers, data, and logic used to process each found result.</typeparam>
+        /// <param name="aabb">The queried Aabb</param>
+        /// <param name="collisionWorld">The CollisionWorld to find colliders whose Aabbs overlap the queried Aabb</param>
+        /// <param name="processor">The processor with initialized containers and values to process each found result</param>
+        /// <returns>A config object as part of a fluent chain</returns>
+        public static FindObjectsWorldConfig<T> FindObjects<T>(in Aabb aabb, in CollisionWorld collisionWorld, in T processor) where T : struct, IFindObjectsProcessor
+        {
+            return new FindObjectsWorldConfig<T>
+            {
+                processor                = processor,
+                world                    = collisionWorld,
+                aabb                     = aabb,
+                disableEntityAliasChecks = false
+            };
+        }
+
+        /// <summary>
         /// Searches the CollisionLayer for all colliders whose Aabbs overlap with the queried Aabb and returns each result via Enumerator.
-        /// Use this in a foreach loop expression to iterate all found objects. Note: For better performance, receive each result as a
-        /// ref readonly FindObjectsResult.
+        /// Use this in a foreach loop expression to iterate all found objects.
         /// </summary>
         /// <param name="aabb">The queried Aabb</param>
         /// <param name="layer">The CollisionLayer to find colliders whose Aabbs overlap the queried Aabb</param>
@@ -148,6 +164,19 @@ namespace Latios.Psyshock
         public static FindObjectsEnumerator FindObjects(in Aabb aabb, in CollisionLayer layer)
         {
             return new FindObjectsEnumerator(in aabb, layer);
+        }
+
+        /// <summary>
+        /// Searches the CollisionWorld for all colliders whose Aabbs overlap with the queried Aabb and entity query Mask and returns each result
+        /// via Enumerator. Use this in a foreach loop expression to iterate all found objects.
+        /// </summary>
+        /// <param name="aabb">The queried Aabb</param>
+        /// <param name="collisionWorld">The CollisionWorld to find colliders whose Aabbs overlap the queried Aabb</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <returns>An enumerator that searches for the next result.</returns>
+        public static FindObjectsWorldEnumerator FindObjects(in Aabb aabb, in CollisionWorld collisionWorld, in CollisionWorld.Mask mask)
+        {
+            return new FindObjectsWorldEnumerator(in aabb, in collisionWorld, in mask);
         }
 
         /// <summary>
@@ -169,13 +198,10 @@ namespace Latios.Psyshock
     /// </summary>
     public partial struct FindObjectsConfig<T> where T : struct, IFindObjectsProcessor
     {
-        internal T processor;
-
+        internal T              processor;
         internal CollisionLayer layer;
-
-        internal Aabb aabb;
-
-        internal bool disableEntityAliasChecks;
+        internal Aabb           aabb;
+        internal bool           disableEntityAliasChecks;
 
         #region Settings
         /// <summary>
@@ -227,12 +253,84 @@ namespace Latios.Psyshock
         #endregion Schedulers
     }
 
+    /// <summary>
+    /// A config object for a FindObjects operation which is a fluent API
+    /// </summary>
+    public partial struct FindObjectsWorldConfig<T> where T : struct, IFindObjectsProcessor
+    {
+        internal T              processor;
+        internal CollisionWorld world;
+        internal Aabb           aabb;
+        internal bool           disableEntityAliasChecks;
+
+        #region Settings
+        /// <summary>
+        /// Disables entity aliasing checks on parallel jobs when safety checks are enabled. Use this only when entities can be aliased but body indices must be thread-safe.
+        /// </summary>
+        internal FindObjectsWorldConfig<T> WithoutEntityAliasingChecks()  // Internal until a use case for parallel jobs is created
+        {
+            disableEntityAliasChecks = true;
+            return this;
+        }
+        #endregion
+
+        #region Schedulers
+        /// <summary>
+        /// Runs the operation immediately without creating a job struct. Use this inside a job or another FindObjects or FindPairs processor.
+        /// </summary>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <returns>A modified copy of the processor used to process the results</returns>
+        public T RunImmediate(in CollisionWorld.Mask mask)
+        {
+            return FindObjectsInternal.RunImmediate(in aabb, in world, in mask, processor);
+        }
+
+        /// <summary>
+        /// Runs the operation as a job on the main thread. Call this in a managed context to execute the search using Burst.
+        /// </summary>
+        /// <param name="entityQueryMask">An EntityQueryMask used to prefilter the entities in the CollisionWorld</param>
+        public void Run(EntityQueryMask entityQueryMask)
+        {
+            new FindObjectsInternal.SingleJob
+            {
+                world     = world,
+                queryMask = entityQueryMask,
+                processor = processor,
+                aabb      = aabb
+            }.Run();
+        }
+
+        /// <summary>
+        /// Schedules the search as a single-threaded job using Burst.
+        /// </summary>
+        /// <param name="entityQueryMask">An EntityQueryMask used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="inputDeps">A JobHandle to depend on</param>
+        /// <returns>The JobHandle of the scheduled job</returns>
+        public JobHandle ScheduleSingle(EntityQueryMask entityQueryMask, JobHandle inputDeps = default)
+        {
+            return new FindObjectsInternal.SingleJob
+            {
+                world     = world,
+                queryMask = entityQueryMask,
+                processor = processor,
+                aabb      = aabb
+            }.Schedule(inputDeps);
+        }
+        #endregion Schedulers
+    }
+
     public unsafe partial struct FindObjectsEnumerator
     {
-        // Warning: This is only valid when the enumerator itself is valid.
-        public ref readonly FindObjectsResult Current => ref UnsafeUtility.AsRef<FindObjectsResult>(UnsafeUtility.AddressOf(ref m_result));
+        public FindObjectsResult Current => m_result;
 
         public FindObjectsEnumerator GetEnumerator() => this;
+    }
+
+    public unsafe partial struct FindObjectsWorldEnumerator
+    {
+        public FindObjectsResult Current => m_result;
+
+        public FindObjectsWorldEnumerator GetEnumerator() => this;
     }
 
     public ref struct FindObjectsMultiLayerEnumerator
@@ -242,7 +340,7 @@ namespace Latios.Psyshock
         private FindObjectsEnumerator        enumerator;
         private int                          layerIndex;
 
-        public ref readonly FindObjectsResult Current => ref enumerator.Current;
+        public FindObjectsResult Current => enumerator.Current;
 
         public bool MoveNext()
         {

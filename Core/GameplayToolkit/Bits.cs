@@ -76,7 +76,7 @@ namespace Latios
         public static ulong GetBits(ulong data, int firstBitIndex, int bitCount) => new BitField64(data).GetBits(firstBitIndex, bitCount);
         public static void SetBits(ref ulong data, int firstBitIndex, int bitCount, ulong newValue)
         {
-            var mask = (~0x0u) >> (64 - bitCount);
+            var mask = (~0x0ul) >> (64 - bitCount);
             var newPart = (newValue & mask) << firstBitIndex;
             var oldPart = data & ~(mask << firstBitIndex);
             data = newPart | oldPart;

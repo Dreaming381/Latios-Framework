@@ -31,6 +31,7 @@ namespace Latios.Kinemation.Authoring
                 AnimatorUtility.DeoptimizeTransformHierarchy(shadow);
             }
 
+            shadow.name = source.name;
             return shadow;
         }
 

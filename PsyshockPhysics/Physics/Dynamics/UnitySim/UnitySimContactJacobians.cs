@@ -30,6 +30,20 @@ namespace Latios.Psyshock
             /// depenetrating (positive)
             /// </summary>
             public float velocityToReachContactPlane;
+
+            /// <summary>
+            /// The distance to the contact point. This point is initially identified by the narrowphase and is initialized
+            /// during the Jacobian Build stage. During the solve and integrate stage, this value is updated each substep.
+            /// </summary>
+            public float contactDistance;
+
+            /// <summary>
+            /// A flag used to indicate if an impulse should be applied to the contact point. This flag is set to true by
+            /// default and is only false if: the substepCount > 1, the coefficient of restitution is greater than 0 and
+            /// CalculateRestitution returns false. Needed for brief contacts when substepping so that impulse isn't always
+            /// applied during Solve.
+            /// </summary>
+            public bool applyImpulse;
         }
 
         /// <summary>
@@ -49,10 +63,14 @@ namespace Latios.Psyshock
             public ContactJacobianAngular angularFriction;  // effectiveMass stores friction effective mass matrix element (2, 2)
             public float3                 frictionEffectiveMassOffDiag;  // Effective mass matrix (0, 1), (0, 2), (1, 2) == (1, 0), (2, 0), (2, 1)
 
+            public float3 centerA;
+            public float3 centerB;
+
             public float3 contactNormal;
             public float3 surfaceVelocityDv;
 
             public float coefficientOfFriction;
+            public float coefficientOfRestitution;
 
             public void SetSurfaceVelocity(Velocity surfaceVelocity)
             {
@@ -125,24 +143,24 @@ namespace Latios.Psyshock
         /// <param name="maxDepenetrationVelocity">The amount of velocity to be added to depenetrate bodies that are initially overlapping</param>
         /// <param name="gravityAgainstContactNormal">The maximum amount of gravity being applied opposite to the contact normal.
         /// You can simply use the magnitude of the gravity vector for this.</param>
-        /// <param name="deltaTime">The timestep of this physics step</param>
-        /// <param name="inverseDeltaTime">The inverse of the timestep for this physics step</param>
+        /// <param name="substep">The time substep duration</param>
+        /// <param name="inverseSubstep">The inverse of the substep</param>
+        /// <param name="numSubsteps">The number of substeps used in the full physics step</param>
         public static void BuildJacobian(Span<ContactJacobianContactParameters> perContactParameters, out ContactJacobianBodyParameters bodyParameters,
                                          RigidTransform inertialPoseWorldTransformA, in Velocity velocityA, in Mass massA,
                                          RigidTransform inertialPoseWorldTransformB, in Velocity velocityB, in Mass massB,
                                          float3 contactNormal, ReadOnlySpan<ContactsBetweenResult.ContactOnB> contacts,
                                          float coefficientOfRestitution, float coefficientOfFriction,
                                          float maxDepenetrationVelocity, float gravityAgainstContactNormal,
-                                         float deltaTime, float inverseDeltaTime)
+                                         float substep, float inverseSubstep, int numSubsteps = 1)
         {
             CheckContactAndJacobianSpanLengthsEqual(perContactParameters.Length, contacts.Length);
 
-            var    negContactRestingVelocity = -gravityAgainstContactNormal * deltaTime;
-            var    sumInverseMasses          = massA.inverseMass + massB.inverseMass;
-            var    inverseRotationA          = math.conjugate(inertialPoseWorldTransformA.rot);
-            var    inverseRotationB          = math.conjugate(inertialPoseWorldTransformB.rot);
-            float3 centerA                   = 0f;
-            float3 centerB                   = 0f;
+            var    sumInverseMasses = massA.inverseMass + massB.inverseMass;
+            var    inverseRotationA = math.conjugate(inertialPoseWorldTransformA.rot);
+            var    inverseRotationB = math.conjugate(inertialPoseWorldTransformB.rot);
+            float3 centerA          = 0f;
+            float3 centerB          = 0f;
 
             // Indicator whether restitution will be applied,
             // used to scale down friction on bounce.
@@ -160,13 +178,21 @@ namespace Latios.Psyshock
                 BuildJacobianAngular(inverseRotationA, inverseRotationB, contactNormal, armA, armB, massA.inverseInertia, massB.inverseInertia, sumInverseMasses,
                                      out jacAngular.jacobianAngular.angularA, out jacAngular.jacobianAngular.angularB, out float invEffectiveMass);
                 jacAngular.jacobianAngular.effectiveMass = 1.0f / invEffectiveMass;
+                jacAngular.applyImpulse                  = true;
 
-                float solveDistance = contact.distanceToA;
-                float solveVelocity = solveDistance * inverseDeltaTime;
+                // Collision detection is performed once per frame. Contact.Distance is estimated from narrowphase and
+                // represents the distance between the body and a contact point. solveVelocity represents the velocity
+                // the body needs to have to reach contact.Distance in frame timestep. If we take smaller timesteps with
+                // substepping, we will travel less distance, but velocity should remain constant
+                float solveDistance = contact.distanceToA;  // Distance per frame timestep
+                float solveVelocity = solveDistance * inverseSubstep;  // velocity to reach contact plane by end of frame
 
-                solveVelocity = math.max(-maxDepenetrationVelocity, solveVelocity);
-
+                // how much velocity needs to be applied to depenetrate the body
+                // if solveVelocity = -1 --> VelToReachCp = +1 (is depenetrating), solveDistance < 0, contact.Distance < 0
+                // if solveVelocity = +1 --> VelToReachCp = -1   (is approaching), solveDistance > 0
+                solveVelocity                          = math.max(-maxDepenetrationVelocity, solveVelocity);
                 jacAngular.velocityToReachContactPlane = -solveVelocity;
+                jacAngular.contactDistance             = contact.distanceToA;
 
                 // Calculate average position for friction
                 centerA += armA;
@@ -175,117 +201,147 @@ namespace Latios.Psyshock
                 // Restitution (optional)
                 if (coefficientOfRestitution > 0.0f)
                 {
-                    float relativeVelocity = GetJacVelocity(contactNormal, jacAngular.jacobianAngular,
-                                                            velocityA.linear, velocityA.angular, velocityB.linear, velocityB.angular);
-                    float dv = jacAngular.velocityToReachContactPlane - relativeVelocity;
-                    if (dv > 0.0f && relativeVelocity < negContactRestingVelocity)
+                    var dv = CalculateRelativeVelocityAlongNormal(in velocityA, in velocityB, in jacAngular, contactNormal, out var relativeVelocity);
+
+                    bool applyRestitutionForContact = false;
+                    if (numSubsteps > 1)
                     {
-                        // Note: The following comment comes from Unity Physics. However, gravityAcceleration was renamed to
-                        // gravityAgainstContactNormal.
+                        // Determine if the contact is reached during this substep: if the distance
+                        // travelled by the end of this substep results in a penetration, then we need
+                        // to bounce now.
+                        float distanceTraveled = substep * relativeVelocity;
+                        float newDistanceToCp  = jacAngular.contactDistance + distanceTraveled;
+                        if (newDistanceToCp < 0.0f)
+                        {
+                            applyRestitutionForContact = CalculateRestitution(substep,
+                                                                              gravityAgainstContactNormal, coefficientOfRestitution,
+                                                                              ref jacAngular, relativeVelocity, jacAngular.contactDistance, dv);
+                        }
 
-                        // Restitution impulse is applied as if contact point is on the contact plane.
-                        // However, it can (and will) be slightly away from contact plane at the moment restitution is applied.
-                        // So we have to apply vertical shot equation to make sure we don't gain energy:
-                        // effectiveRestitutionVelocity^2 = restitutionVelocity^2 - 2.0f * gravityAcceleration * distanceToGround
-                        // From this formula we calculate the effective restitution velocity, which is the velocity
-                        // that the contact point needs to reach the same height from current position
-                        // as if it was shot with the restitutionVelocity from the contact plane.
-                        // ------------------------------------------------------------
-                        // This is still an approximation for 2 reasons:
-                        // - We are assuming the contact point will hit the contact plane with its current velocity,
-                        // while actually it would have a portion of gravity applied before the actual hit. However,
-                        // that velocity increase is quite small (less than gravity in one step), so it's safe
-                        // to use current velocity instead.
-                        // - gravityAcceleration is the actual value of gravity applied only when contact plane is
-                        // directly opposite to gravity direction. Otherwise, this value will only be smaller.
-                        // However, since this can only result in smaller bounce than the "correct" one, we can
-                        // safely go with the default gravity value in all cases.
-                        float restitutionVelocity          = (relativeVelocity - negContactRestingVelocity) * coefficientOfRestitution;
-                        float distanceToGround             = math.max(-jacAngular.velocityToReachContactPlane * deltaTime, 0.0f);
-                        float effectiveRestitutionVelocity =
-                            math.sqrt(math.max(restitutionVelocity * restitutionVelocity - 2.0f * gravityAgainstContactNormal * distanceToGround, 0.0f));
-
-                        jacAngular.velocityToReachContactPlane =
-                            math.max(jacAngular.velocityToReachContactPlane - effectiveRestitutionVelocity, 0.0f) +
-                            effectiveRestitutionVelocity;
-
-                        // Remember that restitution should be applied
-                        applyRestitution = true;
+                        // If VelToReachCp was updated in CalculateRestution, update contact distance to 0.
+                        jacAngular.contactDistance  = math.select(newDistanceToCp, 0f, applyRestitutionForContact);
+                        jacAngular.applyImpulse    &= !applyRestitutionForContact;
                     }
+                    else
+                    {
+                        applyRestitutionForContact = CalculateRestitution(substep,
+                                                                          gravityAgainstContactNormal, coefficientOfRestitution,
+                                                                          ref jacAngular, relativeVelocity, jacAngular.contactDistance, dv);
+                    }
+                    applyRestitution |= applyRestitutionForContact;
                 }
             }
 
+            bodyParameters                          = default;
+            bodyParameters.coefficientOfFriction    = coefficientOfFriction;
+            bodyParameters.coefficientOfRestitution = coefficientOfRestitution;
+            bodyParameters.contactNormal            = contactNormal;
+            bodyParameters.centerA                  = centerA;
+            bodyParameters.centerB                  = centerB;
+
             // Build friction jacobians
+            BuildFrictionJacobians(ref bodyParameters,
+                                   ref centerA,
+                                   ref centerB,
+                                   contacts.Length,
+                                   contactNormal,
+                                   inverseRotationA,
+                                   inverseRotationB,
+                                   massA.inverseInertia,
+                                   massB.inverseInertia,
+                                   sumInverseMasses);
+
+            // Reduce friction to 1/4 of the impulse if there will be restitution
+            if (applyRestitution)
             {
-                // Clear accumulated impulse
-                bodyParameters                       = default;
-                bodyParameters.coefficientOfFriction = coefficientOfFriction;
-                bodyParameters.contactNormal         = contactNormal;
+                bodyParameters.friction0.effectiveMass       *= 0.25f;
+                bodyParameters.friction1.effectiveMass       *= 0.25f;
+                bodyParameters.angularFriction.effectiveMass *= 0.25f;
+                bodyParameters.frictionEffectiveMassOffDiag  *= 0.25f;
+            }
+        }
 
-                // Calculate average position
-                float invNumContacts  = math.rcp(contacts.Length);
-                centerA              *= invNumContacts;
-                centerB              *= invNumContacts;
+        /// <summary>
+        /// Updates ContactJacobianBodyParameters for the pair of potentially contacting bodies and ContactJacobianContactParameters per contact point.
+        /// This is used between each substep for a TGS solver.
+        /// </summary>
+        /// <param name="perContactParameters">Parameters per contact that should be generated to avoid recomputation in the solver loop.
+        /// The elements of the span can be uninitialized memory.</param>
+        /// <param name="bodyParameters">Parameters for the pair that should be generated to avoid recomputation in the solver loop</param>
+        /// <param name="perContactImpulses">The perContactImpulses to be sent to the Solve() method. This method simply resets these impulses to 0f.</param>
+        /// <param name="inertialPoseWorldTransformA">The world-space transform of the center of mass and inertia tensor diagonal orientation for the first body.
+        /// Can be identity for a static body.</param>
+        /// <param name="velocityA">The velocity of the first body. Can be default for a static body.</param>
+        /// <param name="massA">The mass of the first body. Can be default for a static body.</param>
+        /// <param name="inertialPoseWorldTransformB">The world-space transform of the center of mass and inertia tensor diagonal orientation for the second body.
+        /// Can be identity for a static body.</param>
+        /// <param name="velocityB">The velocity of the second body. Can be default for a static body.</param>
+        /// <param name="massB">The mass of the second body. Can be default for a static body.</param>
+        /// <param name="substep">The time substep duration</param>
+        /// <param name="gravityAgainstContactNormal">The maximum amount of gravity being applied opposite to the contact normal.
+        /// You can simply use the magnitude of the gravity vector for this.</param>
+        public static void Update(Span<ContactJacobianContactParameters> perContactParameters, ref ContactJacobianBodyParameters bodyParameters,
+                                  Span<float> perContactImpulses,
+                                  RigidTransform inertialPoseWorldTransformA, in Velocity velocityA, in Mass massA,
+                                  RigidTransform inertialPoseWorldTransformB, in Velocity velocityB, in Mass massB,
+                                  float substep, float gravityAgainstContactNormal)
+        {
+            perContactImpulses.Clear();
 
-                // Choose friction axes
-                mathex.GetDualPerpendicularNormalized(contactNormal, out float3 frictionDir0, out float3 frictionDir1);
-                bodyParameters.frictionDirection0 = frictionDir0;
-                bodyParameters.frictionDirection1 = frictionDir1;
+            float sumInvMass       = massA.inverseMass + massB.inverseMass;
+            var   inverseRotationA = math.conjugate(inertialPoseWorldTransformA.rot);
+            var   inverseRotationB = math.conjugate(inertialPoseWorldTransformB.rot);
 
-                // Build linear jacobian
-                float invEffectiveMass0, invEffectiveMass1;
+            bool applyRestitution = false;  // tracks if a bounce has been solved for the current iteration. Used to update friction
+            for (int j = 0; j < perContactParameters.Length; j++)
+            {
+                ref var jacAngular = ref perContactParameters[j];
+
+                float dv = CalculateRelativeVelocityAlongNormal(velocityA, velocityB, in jacAngular, bodyParameters.contactNormal,
+                                                                out float relativeVelocity);
+
+                // Determine if the contact is reached during this substep: if the distance
+                // travelled by the end of this substep results in a penetration, then we need
+                // to bounce now.
+                float distanceTraveled = substep * relativeVelocity;
+                float newDistanceToCp  = jacAngular.contactDistance + distanceTraveled;
+
+                var applyRestitutionForContact = false;
+                if (bodyParameters.coefficientOfRestitution > 0.0f)
                 {
-                    float3 armA = centerA;
-                    float3 armB = centerB;
-                    BuildJacobianAngular(inverseRotationA, inverseRotationB, frictionDir0, armA, armB, massA.inverseInertia, massB.inverseInertia, sumInverseMasses,
-                                         out bodyParameters.friction0.angularA, out bodyParameters.friction0.angularB, out invEffectiveMass0);
-                    BuildJacobianAngular(inverseRotationA, inverseRotationB, frictionDir1, armA, armB, massA.inverseInertia, massB.inverseInertia, sumInverseMasses,
-                                         out bodyParameters.friction1.angularA, out bodyParameters.friction1.angularB, out invEffectiveMass1);
-                }
-
-                // Build angular jacobian
-                float invEffectiveMassAngular;
-                {
-                    bodyParameters.angularFriction.angularA  = math.mul(inverseRotationA, contactNormal);
-                    bodyParameters.angularFriction.angularB  = math.mul(inverseRotationB, -contactNormal);
-                    float3 temp                              = bodyParameters.angularFriction.angularA * bodyParameters.angularFriction.angularA * massA.inverseInertia;
-                    temp                                    += bodyParameters.angularFriction.angularB * bodyParameters.angularFriction.angularB * massB.inverseInertia;
-                    invEffectiveMassAngular                  = math.csum(temp);
-                }
-
-                // Build effective mass
-                {
-                    // Build the inverse effective mass matrix
-                    var invEffectiveMassDiag    = new float3(invEffectiveMass0, invEffectiveMass1, invEffectiveMassAngular);
-                    var invEffectiveMassOffDiag = new float3(  // (0, 1), (0, 2), (1, 2)
-                        CalculateInvEffectiveMassOffDiag(bodyParameters.friction0.angularA, bodyParameters.friction1.angularA,       massA.inverseInertia,
-                                                         bodyParameters.friction0.angularB, bodyParameters.friction1.angularB, massB.inverseInertia),
-                        CalculateInvEffectiveMassOffDiag(bodyParameters.friction0.angularA, bodyParameters.angularFriction.angularA, massA.inverseInertia,
-                                                         bodyParameters.friction0.angularB, bodyParameters.angularFriction.angularB, massB.inverseInertia),
-                        CalculateInvEffectiveMassOffDiag(bodyParameters.friction1.angularA, bodyParameters.angularFriction.angularA, massA.inverseInertia,
-                                                         bodyParameters.friction1.angularB, bodyParameters.angularFriction.angularB, massB.inverseInertia));
-
-                    // Invert the matrix and store it to the jacobians
-                    if (!InvertSymmetricMatrix(invEffectiveMassDiag, invEffectiveMassOffDiag, out float3 effectiveMassDiag, out float3 effectiveMassOffDiag))
+                    if (newDistanceToCp < 0.0f)
                     {
-                        // invEffectiveMass can be singular if the bodies have infinite inertia about the normal.
-                        // In that case angular friction does nothing so we can regularize the matrix, set col2 = row2 = (0, 0, 1)
-                        invEffectiveMassOffDiag.y = 0.0f;
-                        invEffectiveMassOffDiag.z = 0.0f;
-                        invEffectiveMassDiag.z    = 1.0f;
-                        bool success              = InvertSymmetricMatrix(invEffectiveMassDiag,
-                                                                          invEffectiveMassOffDiag,
-                                                                          out effectiveMassDiag,
-                                                                          out effectiveMassOffDiag);
-                        Unity.Assertions.Assert.IsTrue(success);  // it should never fail, if it does then friction will be disabled
+                        applyRestitutionForContact = CalculateRestitution(substep, gravityAgainstContactNormal,
+                                                                          bodyParameters.coefficientOfRestitution, ref jacAngular, relativeVelocity, jacAngular.contactDistance,
+                                                                          dv);
                     }
-                    bodyParameters.friction0.effectiveMass       = effectiveMassDiag.x;
-                    bodyParameters.friction1.effectiveMass       = effectiveMassDiag.y;
-                    bodyParameters.angularFriction.effectiveMass = effectiveMassDiag.z;
-                    bodyParameters.frictionEffectiveMassOffDiag  = effectiveMassOffDiag;
                 }
 
-                // Reduce friction to 1/4 of the impulse if there will be restitution
+                jacAngular.contactDistance  = newDistanceToCp;
+                applyRestitution           |= applyRestitutionForContact;
+                jacAngular.contactDistance  = math.select(jacAngular.contactDistance, 0f, applyRestitutionForContact);  //0f used as a flag during SolveContact to indicate impulses need to be calculated
+                jacAngular.applyImpulse    &= applyRestitutionForContact && newDistanceToCp <= 0f;
+            }
+
+            // TODO: if ApplyImpulse= false for all NumContacts, can skip friction building
+            {
+                // Todo: I think passing centerA and centerB here by ref is a bug in Unity Physics.
+                // When building, local variables are passed in after these members are assigned by those locals.
+                // This means on the first two substeps, the result is the same, but after each additional substep,
+                // the result is modified to get progressively closer to (0, 0, 0) as these values are divided by
+                // the contact count.
+                BuildFrictionJacobians(ref bodyParameters,
+                                       ref bodyParameters.centerA,
+                                       ref bodyParameters.centerB,
+                                       perContactParameters.Length,
+                                       bodyParameters.contactNormal,
+                                       inverseRotationA,
+                                       inverseRotationB,
+                                       massA.inverseInertia,
+                                       massB.inverseInertia,
+                                       sumInvMass);
+
+                // Reduce friction by 1/4 if there was restitution applied on any contact point
                 if (applyRestitution)
                 {
                     bodyParameters.friction0.effectiveMass       *= 0.25f;
@@ -338,17 +394,25 @@ namespace Latios.Psyshock
                 var                                           contactImpulse = perContactImpulses[j];
 
                 // Solve velocity so that predicted contact distance is greater than or equal to zero
-                float relativeVelocity = GetJacVelocity(bodyParameters.contactNormal, jacAngular.jacobianAngular,
-                                                        tempVelocityA.linear, tempVelocityA.angular, tempVelocityB.linear, tempVelocityB.angular);
-                float dv = jacAngular.velocityToReachContactPlane - relativeVelocity;
+                // applyImpulse is required check for substepping because having a contact is not guaranteed. We need to check if the contact point has been reached this step
+                // (when ContactDistance <= 0), otherwise, we need to ensure that no impulse will be applied.
+                var dv = jacAngular.applyImpulse ? CalculateRelativeVelocityAlongNormal(in velocityA, in velocityB, in jacAngular, bodyParameters.contactNormal, out _) : 0f;
+                //var dv = CalculateRelativeVelocityAlongNormal(in velocityA, in velocityB, in jacAngular, bodyParameters.contactNormal, out var relVel);
 
-                float impulse            = dv * jacAngular.jacobianAngular.effectiveMass;
+                float impulse = dv * jacAngular.jacobianAngular.effectiveMass;
+
+                // Accumulation of impulses for each contact point over numSolverIterations. Cannot be negative
                 float accumulatedImpulse = math.max(contactImpulse + impulse, 0.0f);
                 if (accumulatedImpulse != contactImpulse)
                 {
                     float deltaImpulse = accumulatedImpulse - contactImpulse;
                     ApplyImpulse(deltaImpulse, bodyParameters.contactNormal, jacAngular.jacobianAngular, ref tempVelocityA, ref tempVelocityB, in massA, in massB,
                                  motionStabilizationSolverInputA.inverseInertiaScale, motionStabilizationSolverInputB.inverseInertiaScale);
+                    //if (math.abs(tempVelocityA.linear.z) > 0.25f)
+                    //{
+                    //    UnityEngine.Debug.Log(
+                    //        $"Contact is culprit. z = {tempVelocityA.linear.z}, before: {velocityA.linear.z}, contactNormal: {bodyParameters.contactNormal}, relVel: {relVel}, velToContactPlane: {jacAngular.velocityToReachContactPlane}");
+                    //}
                 }
 
                 contactImpulse                               = accumulatedImpulse;
@@ -362,6 +426,9 @@ namespace Latios.Psyshock
 
             // Export collision event
             hasCollisionEvent |= outputImpulses.combinedContactPointsImpulse > 0.0f;
+
+            // Todo: sumImpulses is used to model friction. However, if each contact ends up on a different triangle,
+            // friction is applied before values can cancel out, which creates a biased slide effect.
 
             // Solve friction
             if (sumImpulses > 0.0f)
@@ -379,6 +446,7 @@ namespace Latios.Psyshock
                     float3 frictionAngVelB = tempVelocityB.angular;
                     if (enableFrictionVelocitiesHeuristic)
                     {
+                        // if tempVelocityA.HasInfiniteMass || tempVelocityB.HasInfiniteMass, then GetFrictionVelocities calcs NaN and Inf with no warnings
                         GetFrictionVelocities(motionStabilizationSolverInputA.inputVelocity.linear, motionStabilizationSolverInputA.inputVelocity.angular,
                                               tempVelocityA.linear, tempVelocityA.angular,
                                               math.rcp(massA.inverseInertia), math.rcp(massA.inverseMass),
@@ -413,6 +481,8 @@ namespace Latios.Psyshock
 
                     // Calculate the impulse
                     imp = math.mul(effectiveMass, new float3(dv0, dv1, dva));
+                    //UnityEngine.Debug.Log(
+                    //    $"effectiveMass: {effectiveMass}, dv01a: {new float3(dv0, dv1, dva)}, surfaceVel: {bodyParameters.surfaceVelocityDv}, friction1: {bodyParameters.friction1.angularA}, {bodyParameters.friction1.angularB}, linVels: {frictionLinVelA}, {frictionAngVelA}, {frictionLinVelB}, {frictionAngVelB}");
                 }
 
                 // Clip TODO.ma calculate some contact radius and use it to influence balance between linear and angular friction
@@ -421,12 +491,16 @@ namespace Latios.Psyshock
                 imp                          *= math.min(1.0f, maxImpulse * math.rsqrt(frictionImpulseSquared));
 
                 // Apply impulses
+                var beforeFriction = tempVelocityA.linear.z;
                 ApplyImpulse(imp.x, frictionDir0, bodyParameters.friction0, ref tempVelocityA, ref tempVelocityB,
                              in massA, in massB,
                              motionStabilizationSolverInputA.inverseInertiaScale, motionStabilizationSolverInputB.inverseInertiaScale);
                 ApplyImpulse(imp.y, frictionDir1, bodyParameters.friction1, ref tempVelocityA, ref tempVelocityB,
                              in massA, in massB,
                              motionStabilizationSolverInputA.inverseInertiaScale, motionStabilizationSolverInputB.inverseInertiaScale);
+                //if (math.abs(tempVelocityA.linear.z) > 0.25f)
+                //    UnityEngine.Debug.Log(
+                //        $"Friction is culprit. z = {tempVelocityA.linear.z}, before: {beforeFriction}, beginning: {velocityA.linear.z}, imp: {imp}, frictionDir0: {frictionDir0}, frictionDir1: {frictionDir1}, maxImpulse: {maxImpulse}, frictionImpulseSq: {frictionImpulseSquared}");
 
                 tempVelocityA.angular += imp.z * bodyParameters.angularFriction.angularA * motionStabilizationSolverInputA.inverseInertiaScale * massA.inverseInertia;
                 tempVelocityB.angular += imp.z * bodyParameters.angularFriction.angularB * motionStabilizationSolverInputB.inverseInertiaScale * massB.inverseInertia;
@@ -444,6 +518,90 @@ namespace Latios.Psyshock
             return hasCollisionEvent;
         }
 
+        #region Internal Helpers
+        private static void ApplyImpulse(
+            float impulse, float3 linear, ContactJacobianAngular jacAngular,
+            ref Velocity velocityA, ref Velocity velocityB,
+            in Mass massA, in Mass massB,
+            float inverseInertiaScaleA = 1.0f, float inverseInertiaScaleB = 1.0f)
+        {
+            velocityA.linear += impulse * linear * massA.inverseMass;
+            velocityB.linear -= impulse * linear * massB.inverseMass;
+
+            // Scale the impulse with inverseInertiaScale
+            velocityA.angular += impulse * jacAngular.angularA * inverseInertiaScaleA * massA.inverseInertia;
+            velocityB.angular += impulse * jacAngular.angularB * inverseInertiaScaleB * massB.inverseInertia;
+        }
+
+        static void BuildFrictionJacobians(ref ContactJacobianBodyParameters bodyParameters, ref float3 centerA, ref float3 centerB,
+                                           int numContacts, float3 contactNormal,
+                                           quaternion inverseRotationA, quaternion inverseRotationB,
+                                           float3 inverseInertiaA, float3 inverseInertiaB, float sumInverseMasses)
+        {
+            // Calculate average position
+            float invNumContacts  = math.rcp(numContacts);
+            centerA              *= invNumContacts;
+            centerB              *= invNumContacts;
+
+            // Choose friction axes
+            mathex.GetDualPerpendicularNormalized(contactNormal, out float3 frictionDir0, out float3 frictionDir1);
+            bodyParameters.frictionDirection0 = frictionDir0;
+            bodyParameters.frictionDirection1 = frictionDir1;
+
+            // Build linear jacobian
+            float invEffectiveMass0, invEffectiveMass1;
+            {
+                float3 armA = centerA;
+                float3 armB = centerB;
+                BuildJacobianAngular(inverseRotationA, inverseRotationB, frictionDir0, armA, armB, inverseInertiaA, inverseInertiaB, sumInverseMasses,
+                                     out bodyParameters.friction0.angularA, out bodyParameters.friction0.angularB, out invEffectiveMass0);
+                BuildJacobianAngular(inverseRotationA, inverseRotationB, frictionDir1, armA, armB, inverseInertiaA, inverseInertiaB, sumInverseMasses,
+                                     out bodyParameters.friction1.angularA, out bodyParameters.friction1.angularB, out invEffectiveMass1);
+            }
+
+            // Build angular jacobian
+            float invEffectiveMassAngular;
+            {
+                bodyParameters.angularFriction.angularA  = math.mul(inverseRotationA, contactNormal);
+                bodyParameters.angularFriction.angularB  = math.mul(inverseRotationB, -contactNormal);
+                float3 temp                              = bodyParameters.angularFriction.angularA * bodyParameters.angularFriction.angularA * inverseInertiaA;
+                temp                                    += bodyParameters.angularFriction.angularB * bodyParameters.angularFriction.angularB * inverseInertiaB;
+                invEffectiveMassAngular                  = math.csum(temp);
+            }
+
+            // Build effective mass
+            {
+                // Build the inverse effective mass matrix
+                var invEffectiveMassDiag    = new float3(invEffectiveMass0, invEffectiveMass1, invEffectiveMassAngular);
+                var invEffectiveMassOffDiag = new float3(  // (0, 1), (0, 2), (1, 2)
+                    CalculateInvEffectiveMassOffDiag(bodyParameters.friction0.angularA, bodyParameters.friction1.angularA,       inverseInertiaA,
+                                                     bodyParameters.friction0.angularB, bodyParameters.friction1.angularB, inverseInertiaB),
+                    CalculateInvEffectiveMassOffDiag(bodyParameters.friction0.angularA, bodyParameters.angularFriction.angularA, inverseInertiaA,
+                                                     bodyParameters.friction0.angularB, bodyParameters.angularFriction.angularB, inverseInertiaB),
+                    CalculateInvEffectiveMassOffDiag(bodyParameters.friction1.angularA, bodyParameters.angularFriction.angularA, inverseInertiaA,
+                                                     bodyParameters.friction1.angularB, bodyParameters.angularFriction.angularB, inverseInertiaB));
+
+                // Invert the matrix and store it to the jacobians
+                if (!InvertSymmetricMatrix(invEffectiveMassDiag, invEffectiveMassOffDiag, out float3 effectiveMassDiag, out float3 effectiveMassOffDiag))
+                {
+                    // invEffectiveMass can be singular if the bodies have infinite inertia about the normal.
+                    // In that case angular friction does nothing so we can regularize the matrix, set col2 = row2 = (0, 0, 1)
+                    invEffectiveMassOffDiag.y = 0.0f;
+                    invEffectiveMassOffDiag.z = 0.0f;
+                    invEffectiveMassDiag.z    = 1.0f;
+                    bool success              = InvertSymmetricMatrix(invEffectiveMassDiag,
+                                                                      invEffectiveMassOffDiag,
+                                                                      out effectiveMassDiag,
+                                                                      out effectiveMassOffDiag);
+                    Unity.Assertions.Assert.IsTrue(success);  // it should never fail, if it does then friction will be disabled
+                }
+                bodyParameters.friction0.effectiveMass       = effectiveMassDiag.x;
+                bodyParameters.friction1.effectiveMass       = effectiveMassDiag.y;
+                bodyParameters.angularFriction.effectiveMass = effectiveMassDiag.z;
+                bodyParameters.frictionEffectiveMassOffDiag  = effectiveMassOffDiag;
+            }
+        }
+
         static void BuildJacobianAngular(quaternion inverseRotationA, quaternion inverseRotationB, float3 normal, float3 armA, float3 armB,
                                          float3 invInertiaA, float3 invInertiaB, float sumInvMass, out float3 angularA, out float3 angularB, out float invEffectiveMass)
         {
@@ -457,27 +615,92 @@ namespace Latios.Psyshock
             invEffectiveMass = temp.x + temp.y + temp.z + sumInvMass;
         }
 
-        static float GetJacVelocity(float3 linear, ContactJacobianAngular jacAngular,
-                                    float3 linVelA, float3 angVelA, float3 linVelB, float3 angVelB)
+        // Builds a symmetric 3x3 matrix from diag = (0, 0), (1, 1), (2, 2), offDiag = (0, 1), (0, 2), (1, 2) = (1, 0), (2, 0), (2, 1)
+        static float3x3 BuildSymmetricMatrix(float3 diag, float3 offDiag)
         {
-            float3 temp  = (linVelA - linVelB) * linear;
-            temp        += angVelA * jacAngular.angularA;
-            temp        += angVelB * jacAngular.angularB;
-            return math.csum(temp);
+            return new float3x3(
+                new float3(diag.x, offDiag.x, offDiag.y),
+                new float3(offDiag.x, diag.y, offDiag.z),
+                new float3(offDiag.y, offDiag.z, diag.z)
+                );
         }
 
-        private static void ApplyImpulse(
-            float impulse, float3 linear, ContactJacobianAngular jacAngular,
-            ref Velocity velocityA, ref Velocity velocityB,
-            in Mass massA, in Mass massB,
-            float inverseInertiaScaleA = 1.0f, float inverseInertiaScaleB = 1.0f)
+        // Calculates the relative velocity between two bodies in the normal direction.
+        // Reminder:
+        // (is depenetrating) velocityToReachContactPlane > 0, solveVelocity < 0, solveDistance < 0, contact.Distance < 0.
+        // (is approaching)   velocityToReachContactPlane < 0, solveVelocity > 0, solveDistance > 0, contact.Distance > 0.
+        // Therefore, if velocityToReachContactPlane - relativeVelocity > 0, then velocityToReachContactPlane > relativeVelocity
+        // if velocityToReachContactPlane > 0 and velocityToReachContactPlane > relativeVelocity,
+        //      there is depenetration and the bodies can't move fast enough to resolve the penetration
+        // if velocityToReachContactPlane < 0 and velocityToReachContactPlane < relativeVelocity, then there is nothing to worry about
+        static float CalculateRelativeVelocityAlongNormal(in Velocity velocityA,
+                                                          in Velocity velocityB,
+                                                          in ContactJacobianContactParameters contact,
+                                                          float3 normal,
+                                                          out float relativeVelocity)
         {
-            velocityA.linear += impulse * linear * massA.inverseMass;
-            velocityB.linear -= impulse * linear * massB.inverseMass;
+            relativeVelocity = GetJacVelocity(normal, in contact.jacobianAngular, velocityA.linear, velocityA.angular, velocityB.linear, velocityB.angular);
+            return contact.velocityToReachContactPlane - relativeVelocity;
+        }
 
-            // Scale the impulse with inverseInertiaScale
-            velocityA.angular += impulse * jacAngular.angularA * inverseInertiaScaleA * massA.inverseInertia;
-            velocityB.angular += impulse * jacAngular.angularB * inverseInertiaScaleB * massB.inverseInertia;
+        /// <summary>
+        /// This method calculates the VelToReachCp correction so that the Solve will calculate an accurate impulse to
+        /// redirect motion to apply a restitution effect. This is calculated using two fundamental physics equations:
+        /// 1) v1 = v2 - at         [Remove gravity integration]
+        ///     where v2 = relativeVelocity, at = -length(gravity) * timestep, and
+        ///     v1 is the velocity without gravity applied (velocityBeforeBounce). This is scaled by the coefficient of restitution.
+        ///     We are assuming that this is the maximum velocity of the body and that it is now at the contact point.
+        ///     Gravity integration is removed because it can't fall anymore.
+        /// 2) v2^2 = v1^2 + 2ad    [Calculate restitution velocity as body moves against gravity]
+        ///     where a = acceleration due to gravity (and is negative), and d = delta distance (d2-d1).
+        ///     This equation dictates that v2>v1 if "d<0", which is the case when a body is falling and d2=0. We are
+        ///     however going to let d1=currentDistanceToCp and d2=0, which means that v1 = velocityBeforeBounce (v1 in eq'n1)
+        ///     and v2 = velocityRebound (v1>v2). This rebound velocity is the velocity of the body after the restitution
+        ///     and is used to correct the VelToReachCp.
+        ///
+        /// This method updates jacAngular.VelToReachCp and this updated value will always be positive.
+        ///
+        /// This is an approximation for 2 reasons:
+        /// - The restitution impulse is applied as if contact point is on the contact plane. We are assuming the contact
+        /// point will hit the contact plane with its current velocity, while actually it would have a portion of gravity
+        /// applied before the actual hit. However, that velocity increase is less than gravity in one step.
+        /// - gravityMagnitude is the actual value of gravity applied only when contact plane is directly opposite to
+        /// gravity direction. Otherwise, this value will only be smaller. However, since this can only result in
+        /// smaller bounce than the "correct" one, we can safely go with the default gravity value in all cases.
+        /// </summary>
+        /// <param name="timestep">  The substep timestep. </param>
+        /// <param name="gravityMagnitude">  A float value of the length of the gravity vector.</param>
+        /// <param name="coefficientOfRestitution">  The coefficient of Restitution. </param>
+        /// <param name="jacAngular"></param>
+        /// <param name="relativeVelocity">  The relative velocity between the two bodies at the current point in time. </param>
+        /// <param name="currentDistanceToCp">  The contact point distance. This is equivalent to -jacAngular.VelToReachCp * timestep  </param>
+        /// <param name="dv">  Delta Velocity: The difference between the velocity required to reach the contact point and the actual velocity </param>
+        /// <returns></returns>
+        static bool CalculateRestitution(float timestep, float gravityMagnitude, float coefficientOfRestitution,
+                                         ref ContactJacobianContactParameters jacAngular, float relativeVelocity, float currentDistanceToCp, float dv)
+        {
+            bool applyRestitution = false;
+
+            //TODO: need to account for velocity.GravityFactor (A? B? Both? How combine?)
+            float negContactRestingVelocity = -gravityMagnitude * timestep;
+
+            // Conditions to apply restitution:
+            // 1) dv: The relative velocity is larger than the velocity threshold to reach the contact point
+            // 2) Gravity threshold: The relative velocity must be larger than the 'at rest/gravity only' velocity
+            if (dv > 0.0f && relativeVelocity < negContactRestingVelocity)
+            {
+                // Use equation 1 to calculate v1 (velocityBeforeBounce)
+                float velocityBeforeBounce = (relativeVelocity - negContactRestingVelocity) * coefficientOfRestitution;
+                float distanceToGround     = math.max(currentDistanceToCp, 0.0f);
+
+                // Use equation 2 to calculate rebound velocity (v1) based on v2 (the velocity at the bounce)
+                float velocityRebound = math.sqrt(math.max(velocityBeforeBounce * velocityBeforeBounce - 2.0f * -gravityMagnitude * -distanceToGround, 0.0f));
+
+                jacAngular.velocityToReachContactPlane = math.max(jacAngular.velocityToReachContactPlane - velocityRebound, 0.0f) + velocityRebound;
+                applyRestitution                       = true;
+            }
+
+            return applyRestitution;
         }
 
         static void GetFrictionVelocities(
@@ -516,15 +739,17 @@ namespace Latios.Psyshock
             }
         }
 
-        // Builds a symmetric 3x3 matrix from diag = (0, 0), (1, 1), (2, 2), offDiag = (0, 1), (0, 2), (1, 2) = (1, 0), (2, 0), (2, 1)
-        static float3x3 BuildSymmetricMatrix(float3 diag, float3 offDiag)
+        // Returns the relative velocity between the dispatch pairs involved in the contact that are aligned with the contact normal
+        // linear = contact normal
+        static float GetJacVelocity(float3 linear, in ContactJacobianAngular jacAngular,
+                                    float3 linVelA, float3 angVelA, float3 linVelB, float3 angVelB)
         {
-            return new float3x3(
-                new float3(diag.x, offDiag.x, offDiag.y),
-                new float3(offDiag.x, diag.y, offDiag.z),
-                new float3(offDiag.y, offDiag.z, diag.z)
-                );
+            float3 temp  = (linVelA - linVelB) * linear;
+            temp        += angVelA * jacAngular.angularA;
+            temp        += angVelB * jacAngular.angularB;
+            return math.csum(temp);
         }
+        #endregion
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         static void CheckContactAndJacobianSpanLengthsEqual(int parametersLength, int contactsLength)

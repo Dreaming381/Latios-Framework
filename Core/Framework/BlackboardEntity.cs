@@ -1,4 +1,5 @@
 ﻿using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
 
 namespace Latios
@@ -16,10 +17,21 @@ namespace Latios
         /// Create a blackboard entity
         /// </summary>
         /// <param name="entity">The existing entity to use</param>
-        /// <param name="entityManager">The entity's associated EntityManager</param>
+        /// <param name="latiosWorld">The world the entity belongs to</param>
         public BlackboardEntity(Entity entity, LatiosWorldUnmanaged latiosWorld)
         {
             this.entity      = entity;
+            this.latiosWorld = latiosWorld;
+        }
+
+        /// <summary>
+        /// Create a blackboard entity around the system's entity
+        /// </summary>
+        /// <param name="systemHandle">The system to use</param>
+        /// <param name="latiosWorld">The world the system belongs to</param>
+        public BlackboardEntity(SystemHandle systemHandle, LatiosWorldUnmanaged latiosWorld)
+        {
+            entity           = systemHandle.GetEntity();
             this.latiosWorld = latiosWorld;
         }
 
@@ -87,6 +99,16 @@ namespace Latios
         }
 
         /// <summary>
+        /// Sets the component's enabled state on the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of the component to enable or disable</typeparam>
+        /// <param name="enabled">True to enable, false to disable</param>
+        public void SetEnabled<T>(bool enabled) where T : unmanaged, IEnableableComponent
+        {
+            em.SetComponentEnabled<T>(entity, enabled);
+        }
+
+        /// <summary>
         /// Retrieves the component's value from the blackboard entity
         /// </summary>
         /// <typeparam name="T">The type of component to retrieve</typeparam>
@@ -94,6 +116,16 @@ namespace Latios
         public T GetComponentData<T>() where T : unmanaged, IComponentData
         {
             return em.GetComponentData<T>(entity);
+        }
+
+        /// <summary>
+        /// Retrieves the component's enabled state from the blackboard entity
+        /// </summary>
+        /// <typeparam name="T">The type of the component to retrieve/typeparam>
+        /// <returns>True if enabled, false to disabled</returns>
+        public bool GetEnabled<T>() where T : unmanaged, IEnableableComponent
+        {
+            return em.IsComponentEnabled<T>(entity);
         }
 
         /// <summary>

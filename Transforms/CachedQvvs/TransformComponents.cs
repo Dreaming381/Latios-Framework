@@ -162,8 +162,6 @@ namespace Latios.Transforms
         public float scale => worldTransform.scale;
         public float3 stretch => worldTransform.stretch;
         public float3 nonUniformScale => scale * stretch;
-        public int version => worldTransform.worldIndex;
-        public bool isInitialized => version != 0;
     }
 
     /// <summary>
@@ -178,8 +176,6 @@ namespace Latios.Transforms
         public float scale => worldTransform.scale;
         public float3 stretch => worldTransform.stretch;
         public float3 nonUniformScale => scale * stretch;
-        public int version => worldTransform.worldIndex;
-        public bool isInitialized => version != 0;
     }
 
     /// <summary>

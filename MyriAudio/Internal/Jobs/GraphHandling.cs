@@ -75,7 +75,6 @@ namespace Latios.Myri
             public DSPCommandBlock commandBlock;
 
             public NativeArray<ListenerBufferParameters> listenerBufferParameters;
-            public NativeList<int2>                      forIndexToListenerAndChannelIndices;
             public NativeList<float>                     outputSamplesMegaBuffer;
             public NativeList<IldBufferChannel>          outputSamplesMegaBufferChannels;
 
@@ -186,10 +185,6 @@ namespace Latios.Myri
                             leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
                             samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
-                        for (int j = 0; j < numChannels; j++)
-                        {
-                            forIndexToListenerAndChannelIndices.Add(new int2(i, j));
-                        }
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
                         channelCounts[i]       = numChannels;
                     }
@@ -247,10 +242,6 @@ namespace Latios.Myri
                             leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
                             samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
-                        for (int j = 0; j < numChannels; j++)
-                        {
-                            forIndexToListenerAndChannelIndices.Add(new int2(i, j));
-                        }
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
                         channelCounts[i]       = numChannels;
                     }

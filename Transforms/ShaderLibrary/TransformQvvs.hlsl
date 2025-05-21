@@ -16,7 +16,17 @@ struct TransformQvvs
 	
 	float4x4 ToMatrix4x4()
     {
-        return TRS(position, rotation, scale * stretch);
+        float3x4 m = TRS(position, rotation, scale * stretch);
+		float4x4 result;
+		result._m00_m10_m20 = m._m00_m10_m20;
+		result._m30 = 0;
+		result._m01_m11_m21 = m._m01_m11_m21;
+		result._m31 = 0;
+		result._m02_m12_m22 = m._m02_m12_m22;
+		result._m32 = 0;
+		result._m03_m13_m23 = m._m03_m13_m23;
+		result._m33 = 1;
+		return result;
 	}
 	
 	float3x4 ToInverseMatrix3x4()
@@ -24,7 +34,7 @@ struct TransformQvvs
 		quaternion rotationInverse = conjugate(rotation);
 		float3x3 rotMat = new_float3x3(rotationInverse);
 		float3 positionInverse = rotate(rotationInverse, -position);
-		float4 rcp = rcp(float4(stretch, scale));
+		float4 rcp = 1.0 / float4(stretch, scale);
 		float3 scaleInverse = rcp.xyz * rcp.w;
 		float3x4 result;
 		result._m00_m10_m20 = rotMat._m00_m10_m20 * scaleInverse;
@@ -39,7 +49,7 @@ struct TransformQvvs
 		quaternion rotationInverse = conjugate(rotation);
 		float3x3 rotMat = new_float3x3(rotationInverse);
 		float3 positionInverse = rotate(rotationInverse, -position);
-		float rcp = rcp(scale);
+		float rcp = 1.0 / scale;
 		float3x4 result;
 		result._m00_m10_m20 = rotMat._m00_m10_m20;
 		result._m01_m11_m21 = rotMat._m01_m11_m21;
@@ -190,13 +200,13 @@ float3 InverseTransformDirection(in TransformQvvs qvvs, float3 direction)
 float3 InverseTransformDirectionWithStretch(in TransformQvvs qvvs, float3 direction)
 {
 	float magnitude = length(direction);
-	float3 rcp = rcp(qvvs.stretch);
+	float3 rcp = 1.0 / qvvs.stretch;
 	return normalizesafe(InverseRotateFast(qvvs.rotation, direction) * rcp) * magnitude;
 }
 
 float3 InverseTransformDirectionScaledAndStretched(in TransformQvvs qvvs, float3 direction)
 {
-	float4 rcp = rcp(float4(qvvs.stretch, qvvs.scale));
+	float4 rcp = 1.0 / float4(qvvs.stretch, qvvs.scale);
 	return InverseRotateFast(qvvs.rotation, direction) * rcp.xyz * rcp.w;
 }
 

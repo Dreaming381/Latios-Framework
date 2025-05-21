@@ -245,18 +245,15 @@ namespace Latios.Psyshock
         float  m_qxmin;
         float  m_qxmax;
 
-        int        m_indexInBucket;
-        uint       m_currentFrameIndex;
-        fixed uint m_stackData[64];
-        LayerQuerySweepMethods.StackFrame* m_stack
+        int   m_indexInBucket;
+        uint  m_currentFrameIndex;
+        Stack m_stack;
+
+        struct Stack
         {
-            get
-            {
-                fixed (void* ptr = m_stackData)
-                {
-                    return (LayerQuerySweepMethods.StackFrame*)ptr;
-                }
-            }
+            fixed uint m_stackData[64];
+
+            public ref LayerQuerySweepMethods.StackFrame this[uint i] => ref UnsafeUtility.As<uint, LayerQuerySweepMethods.StackFrame>(ref m_stackData[2 * i]);
         }
 
         public FindObjectsEnumerator(in Aabb aabb, in CollisionLayer layer, int layerIndex = 0)
@@ -332,11 +329,6 @@ namespace Latios.Psyshock
             }
 
             return StepBucket();
-        }
-
-        public void Reset()
-        {
-            throw new NotImplementedException();
         }
 
         bool StepBucket()

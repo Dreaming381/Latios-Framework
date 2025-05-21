@@ -211,6 +211,11 @@ namespace Latios.Psyshock
 
         #region Public API
         /// <summary>
+        /// True if this PairStream has been allocated, false otherwise
+        /// </summary>
+        public bool isCreated => data.pairHeaders.isCreated;
+
+        /// <summary>
         /// The number of buckets in the multibox excluding NaN. This value is the same as CollisionLayer.bucketCount.
         /// </summary>
         public int bucketCount => IndexStrategies.BucketCountWithoutNaN(data.cellCount);

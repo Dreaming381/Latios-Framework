@@ -13,6 +13,50 @@ using static Unity.Entities.SystemAPI;
 namespace Latios.Kinemation.Systems
 {
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
+    [UpdateInGroup(typeof(MotionHistoryInitializeSuperSystem))]
+    [RequireMatchingQueriesForUpdate]
+    [DisableAutoCreation]
+    [BurstCompile]
+    public partial struct InitializeMatrixPreviousSystem : ISystem
+    {
+        EntityQuery m_query;
+
+        public void OnCreate(ref SystemState state)
+        {
+            m_query = state.Fluent().With<PostProcessMatrix>(true).With<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
+            m_query.SetOrderVersionFilter();
+        }
+
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            state.Dependency = new UpdateMatricesJob
+            {
+                postProcessMatrixHandle         = GetComponentTypeHandle<PostProcessMatrix>(true),
+                previousPostProcessMatrixHandle = GetComponentTypeHandle<PreviousPostProcessMatrix>(false),
+            }.ScheduleParallel(m_query, state.Dependency);
+        }
+
+        [BurstCompile]
+        struct UpdateMatricesJob : IJobChunk
+        {
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix> postProcessMatrixHandle;
+            public ComponentTypeHandle<PreviousPostProcessMatrix>    previousPostProcessMatrixHandle;
+
+            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                var current  = chunk.GetNativeArray(ref postProcessMatrixHandle).Reinterpret<float3x4>();
+                var previous = chunk.GetNativeArray(ref previousPostProcessMatrixHandle).Reinterpret<float3x4>();
+                for (int i = 0; i < previous.Length; i++)
+                {
+                    if (previous[i].Equals(float3x4.zero))
+                        previous[i] = current[i];
+                }
+            }
+        }
+    }
+
+    [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
     [UpdateInGroup(typeof(MotionHistoryUpdateSuperSystem))]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
@@ -24,6 +68,7 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             m_query = state.Fluent().With<PostProcessMatrix>(true).With<PreviousPostProcessMatrix>().IncludeDisabledEntities().Build();
+            m_query.AddChangedVersionFilter(ComponentType.ReadOnly<PostProcessMatrix>());
         }
 
         [BurstCompile]
@@ -33,13 +78,7 @@ namespace Latios.Kinemation.Systems
             {
                 postProcessMatrixHandle         = GetComponentTypeHandle<PostProcessMatrix>(true),
                 previousPostProcessMatrixHandle = GetComponentTypeHandle<PreviousPostProcessMatrix>(false),
-                lastSystemVersion               = state.LastSystemVersion
             }.ScheduleParallel(m_query, state.Dependency);
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
         }
 
         [BurstCompile]
@@ -47,13 +86,9 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix> postProcessMatrixHandle;
             public ComponentTypeHandle<PreviousPostProcessMatrix>    previousPostProcessMatrixHandle;
-            public uint                                              lastSystemVersion;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.DidChange(ref postProcessMatrixHandle, lastSystemVersion))
-                    return;
-
                 var current  = chunk.GetNativeArray(ref postProcessMatrixHandle).Reinterpret<float3x4>();
                 var previous = chunk.GetNativeArray(ref previousPostProcessMatrixHandle).Reinterpret<float3x4>();
                 previous.CopyFrom(current);
@@ -99,11 +134,6 @@ namespace Latios.Kinemation.Systems
                 previousPostProcessMatrixHandle = GetComponentTypeHandle<BuiltinMaterialPropertyUnity_MatrixPreviousM>(false),
                 lastSystemVersion               = state.LastSystemVersion
             }.ScheduleParallel(m_query, state.Dependency);
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
         }
 
         [BurstCompile]

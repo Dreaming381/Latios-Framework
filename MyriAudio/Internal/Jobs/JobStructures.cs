@@ -1,43 +1,51 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Myri
 {
-    internal struct ClipFrameLookup : IEquatable<ClipFrameLookup>
+    internal struct CapturedSourceHeader
     {
-        public BlobAssetReference<AudioClipBlob> clip;
-        public int                               spawnFrameOrOffset;
-
-        public unsafe bool Equals(ClipFrameLookup other)
+        public enum Features : uint
         {
-            return ((ulong)clip.GetUnsafePtr()).Equals((ulong)other.clip.GetUnsafePtr()) && spawnFrameOrOffset == other.spawnFrameOrOffset;
+            None = 0x0,
+            Clip = 0x1,
+            SampleRateMultiplier = 0x2,
+            Transform = 0x20000000,
+            DistanceFalloff = 0x40000000,
+            Cone = 0x80000000,
+            BatchingFeatures = Clip | SampleRateMultiplier,
         }
 
-        public unsafe override int GetHashCode()
-        {
-            return new int2((int)((ulong)clip.GetUnsafePtr() >> 4), spawnFrameOrOffset).GetHashCode();
-        }
+        public Features features;
+        public float    volume;
+
+        public bool HasFlag(Features flags) => (features & flags) != Features.None;
     }
 
-    internal struct Weights
+    internal unsafe struct ChannelStreamSource
     {
-        public FixedList512Bytes<float> channelWeights;
-        public FixedList128Bytes<float> itdWeights;
+        public CapturedSourceHeader sourceHeader;
+        public byte*                sourceDataPtr;
+        public int                  batchingByteCount;
+        private uint                packed;
 
-        public static Weights operator + (Weights a, Weights b)
+        public int itdIndex
         {
-            Weights result = a;
-            for (int i = 0; i < a.channelWeights.Length; i++)
-            {
-                result.channelWeights[i] += b.channelWeights[i];
-            }
-            for (int i = 0; i < a.itdWeights.Length; i++)
-            {
-                result.itdWeights[i] += b.itdWeights[i];
-            }
-            return result;
+            get => (int)Bits.GetBits(packed, 0, 15);
+            set => Bits.SetBits(ref packed, 0, 15, (uint)value);
+        }
+        public int itdCount
+        {
+            get => (int)Bits.GetBits(packed, 15, 16);
+            set => Bits.SetBits(ref packed, 15, 16, (uint)value);
+        }
+        public bool isRightChannel
+        {
+            get => Bits.GetBit(packed, 31);
+            set => Bits.SetBit(ref packed, 31, value);
         }
     }
 
@@ -52,22 +60,6 @@ namespace Latios.Myri
     {
         public AudioListener  listener;
         public RigidTransform transform;
-    }
-
-    internal struct OneshotEmitter
-    {
-        public AudioSourceOneShot     source;
-        public RigidTransform         transform;
-        public AudioSourceEmitterCone cone;
-        public bool                   useCone;
-    }
-
-    internal struct LoopedEmitter
-    {
-        public AudioSourceLooped      source;
-        public RigidTransform         transform;
-        public AudioSourceEmitterCone cone;
-        public bool                   useCone;
     }
 
     internal struct AudioFrameBufferHistoryElement

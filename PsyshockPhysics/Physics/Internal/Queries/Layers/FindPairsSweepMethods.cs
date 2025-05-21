@@ -1,4 +1,5 @@
-﻿using Latios.Unsafe;
+﻿using System;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Burst.Intrinsics;
@@ -11,18 +12,17 @@ namespace Latios.Psyshock
     internal static class FindPairsSweepMethods
     {
         #region Dispatchers
-        public static void SelfSweepCell<T>(in CollisionLayer layer,
-                                            in BucketSlices bucket,
-                                            int jobIndex,
-                                            ref T processor,
-                                            bool isAThreadSafe,
-                                            bool isBThreadSafe,
-                                            bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+        public static void SelfSweep<T>(in CollisionLayer layer,
+                                        in BucketSlices bucket,
+                                        int jobIndex,
+                                        ref T processor,
+                                        bool isThreadSafe,
+                                        bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
             if (bucket.count < 2)
                 return;
 
-            var result = new FindPairsResult(in layer, in layer, in bucket, in bucket, jobIndex, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            var result = new FindPairsResult(in layer, in layer, in bucket, in bucket, jobIndex, isThreadSafe, isThreadSafe, isImmediateContext);
 
             if (X86.Avx.IsAvxSupported)
             {
@@ -34,15 +34,78 @@ namespace Latios.Psyshock
             }
         }
 
-        public static void SelfSweepCross<T>(in CollisionLayer layer,
-                                             in BucketSlices bucket,
-                                             int jobIndex,
-                                             ref T processor,
-                                             bool isAThreadSafe,
-                                             bool isBThreadSafe,
-                                             bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+        public static unsafe void SelfSweep<T>(in CollisionLayer layer,
+                                               in WorldBucket bucket,
+                                               in CollisionWorld.Mask mask,
+                                               int jobIndex,
+                                               ref T processor,
+                                               bool isThreadSafe,
+                                               bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
-            SelfSweepCell(in layer, in bucket, jobIndex, ref processor, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            int archetypeCount = 0;
+            int bodyCount      = 0;
+            foreach (var index in mask)
+            {
+                var asac = bucket.archetypeStartsAndCounts[index];
+                if (asac.y == 0)
+                    continue;
+                archetypeCount++;
+                bodyCount += asac.y;
+            }
+
+            if (bodyCount < 2)
+                return;
+
+            var       result    = new FindPairsResult(in layer, in layer, in bucket.slices, in bucket.slices, jobIndex, isThreadSafe, isThreadSafe, isImmediateContext);
+            using var allocator = ThreadStackAllocator.GetAllocator();
+
+            if (archetypeCount == 1)
+            {
+                int2 asac = default;
+                foreach (var index in mask)
+                {
+                    var candidate = bucket.archetypeStartsAndCounts[index];
+                    if (candidate.y != 0)
+                    {
+                        asac = candidate;
+                        break;
+                    }
+                }
+                var archetypeIndices = bucket.archetypeBodyIndices.GetSubArray(asac.x, asac.y).AsReadOnlySpan();
+                SelfSweepIndices(ref result, in bucket.slices, archetypeIndices, ref processor, allocator);
+                return;
+            }
+
+            var asacs      = allocator.AllocateAsSpan<int2>(archetypeCount);
+            archetypeCount = 0;
+            foreach (var index in mask)
+            {
+                var asac = bucket.archetypeStartsAndCounts[index];
+                if (asac.y != 0)
+                {
+                    asacs[archetypeCount] = asac;
+                    archetypeCount++;
+                }
+            }
+            var indices = allocator.AllocateAsSpan<int>(bodyCount);
+            GatherArchetypeIndicesGeneral(indices, asacs, bucket.archetypeBodyIndices);
+            SelfSweepIndices(ref result, in bucket.slices, indices, ref processor, allocator);
+        }
+
+        public static unsafe void SelfSweep<T>(in CollisionLayer layer,
+                                               in WorldBucket bucket,
+                                               in CollisionWorld.Mask maskA,
+                                               in CollisionWorld.Mask maskB,
+                                               int jobIndex,
+                                               ref T processor,
+                                               bool isThreadSafe,
+                                               bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
+        {
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            if (!GatherBothIndicesSets(in bucket, in maskA, out var indicesA, in bucket, in maskB, out var indicesB, allocator))
+                return;
+            var result = new FindPairsResult(in layer, in layer, in bucket.slices, in bucket.slices, jobIndex, isThreadSafe, isThreadSafe, isImmediateContext);
+            SelfSweepDualIndices(ref result, in bucket.slices, indicesA, indicesB, ref processor);
         }
 
         public static void BipartiteSweepCellCell<T>(in CollisionLayer layerA,
@@ -53,7 +116,7 @@ namespace Latios.Psyshock
                                                      ref T processor,
                                                      bool isAThreadSafe,
                                                      bool isBThreadSafe,
-                                                     bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+                                                     bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
             int countA = bucketA.xmins.Length;
             int countB = bucketB.xmins.Length;
@@ -72,6 +135,25 @@ namespace Latios.Psyshock
             }
         }
 
+        public static unsafe void BipartiteSweepCellCell<T>(in CollisionLayer layerA,
+                                                            in CollisionLayer layerB,
+                                                            in WorldBucket bucketA,
+                                                            in WorldBucket bucketB,
+                                                            in CollisionWorld.Mask maskA,
+                                                            in CollisionWorld.Mask maskB,
+                                                            int jobIndex,
+                                                            ref T processor,
+                                                            bool isAThreadSafe,
+                                                            bool isBThreadSafe,
+                                                            bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
+        {
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            if (!GatherBothIndicesSets(in bucketA, in maskA, out var indicesA, in bucketB, in maskB, out var indicesB, allocator))
+                return;
+            var result = new FindPairsResult(in layerA, in layerB, in bucketA.slices, in bucketB.slices, jobIndex, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            BipartiteSweepDualIndices(ref result, in bucketA.slices, indicesA, in bucketB.slices, indicesB, ref processor, allocator);
+        }
+
         public static void BipartiteSweepCellCross<T>(in CollisionLayer layerA,
                                                       in CollisionLayer layerB,
                                                       in BucketSlices bucketA,
@@ -80,7 +162,7 @@ namespace Latios.Psyshock
                                                       ref T processor,
                                                       bool isAThreadSafe,
                                                       bool isBThreadSafe,
-                                                      bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+                                                      bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
             int countA = bucketA.xmins.Length;
             int countB = bucketB.xmins.Length;
@@ -95,6 +177,26 @@ namespace Latios.Psyshock
                 BipartiteSweepBucketVsFilteredCross(ref result, in bucketA, in bucketB, ref processor, new BucketAabb(in layerA, bucketA.bucketIndex));
         }
 
+        public static void BipartiteSweepCellCross<T>(in CollisionLayer layerA,
+                                                      in CollisionLayer layerB,
+                                                      in WorldBucket bucketA,
+                                                      in WorldBucket bucketB,
+                                                      in CollisionWorld.Mask maskA,
+                                                      in CollisionWorld.Mask maskB,
+                                                      int jobIndex,
+                                                      ref T processor,
+                                                      bool isAThreadSafe,
+                                                      bool isBThreadSafe,
+                                                      bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
+        {
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            if (!GatherBothIndicesSets(in bucketA, in maskA, out var indicesA, in bucketB, in maskB, out var indicesB, allocator))
+                return;
+            var result     = new FindPairsResult(in layerA, in layerB, in bucketA.slices, in bucketB.slices, jobIndex, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            var bucketAabb = new BucketAabb(layerA, bucketA.slices.bucketIndex);
+            BipartiteSweepDualIndicesFilteredCross(ref result, in bucketA.slices, indicesA, in bucketB.slices, indicesB, ref processor, in bucketAabb, false, allocator);
+        }
+
         public static void BipartiteSweepCrossCell<T>(in CollisionLayer layerA,
                                                       in CollisionLayer layerB,
                                                       in BucketSlices bucketA,
@@ -103,7 +205,7 @@ namespace Latios.Psyshock
                                                       ref T processor,
                                                       bool isAThreadSafe,
                                                       bool isBThreadSafe,
-                                                      bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+                                                      bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
             int countA = bucketA.xmins.Length;
             int countB = bucketB.xmins.Length;
@@ -118,17 +220,24 @@ namespace Latios.Psyshock
                 BipartiteSweepFilteredCrossVsBucket(ref result, in bucketA, in bucketB, ref processor, new BucketAabb(in layerB, bucketB.bucketIndex));
         }
 
-        public static void BipartiteSweepCrossCross<T>(in CollisionLayer layerA,
-                                                       in CollisionLayer layerB,
-                                                       in BucketSlices bucketA,
-                                                       in BucketSlices bucketB,
-                                                       int jobIndex,
-                                                       ref T processor,
-                                                       bool isAThreadSafe,
-                                                       bool isBThreadSafe,
-                                                       bool isImmediateContext = false) where T : struct, IFindPairsProcessor
+        public static void BipartiteSweepCrossCell<T>(in CollisionLayer layerA,
+                                                      in CollisionLayer layerB,
+                                                      in WorldBucket bucketA,
+                                                      in WorldBucket bucketB,
+                                                      in CollisionWorld.Mask maskA,
+                                                      in CollisionWorld.Mask maskB,
+                                                      int jobIndex,
+                                                      ref T processor,
+                                                      bool isAThreadSafe,
+                                                      bool isBThreadSafe,
+                                                      bool isImmediateContext = false) where T : unmanaged, IFindPairsProcessor
         {
-            BipartiteSweepCellCell(in layerA, in layerB, in bucketA, in bucketB, jobIndex, ref processor, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            if (!GatherBothIndicesSets(in bucketA, in maskA, out var indicesA, in bucketB, in maskB, out var indicesB, allocator))
+                return;
+            var result     = new FindPairsResult(in layerA, in layerB, in bucketA.slices, in bucketB.slices, jobIndex, isAThreadSafe, isBThreadSafe, isImmediateContext);
+            var bucketAabb = new BucketAabb(layerB, bucketB.slices.bucketIndex);
+            BipartiteSweepDualIndicesFilteredCross(ref result, in bucketA.slices, indicesA, in bucketB.slices, indicesB, ref processor, in bucketAabb, true, allocator);
         }
 
         public static int BipartiteSweepPlayCache<T>(UnsafeIndexedBlockList.Enumerator enumerator,
@@ -139,7 +248,7 @@ namespace Latios.Psyshock
                                                      int jobIndex,
                                                      ref T processor,
                                                      bool isAThreadSafe,
-                                                     bool isBThreadSafe) where T : struct, IFindPairsProcessor
+                                                     bool isBThreadSafe) where T : unmanaged, IFindPairsProcessor
         {
             if (!enumerator.MoveNext())
                 return 0;
@@ -189,7 +298,7 @@ namespace Latios.Psyshock
         #endregion
 
         #region Self Sweeps
-        static void SelfSweepWholeBucket<T>(ref FindPairsResult result, in BucketSlices bucket, ref T processor) where T : struct, IFindPairsProcessor
+        static void SelfSweepWholeBucket<T>(ref FindPairsResult result, in BucketSlices bucket, ref T processor) where T : unmanaged, IFindPairsProcessor
         {
             Hint.Assume(bucket.xmins.Length == bucket.xmaxs.Length);
             Hint.Assume(bucket.xmins.Length == bucket.yzminmaxs.Length);
@@ -255,6 +364,112 @@ namespace Latios.Psyshock
                             processor.Execute(in result);
                         }
                     }
+                }
+            }
+        }
+
+        static unsafe void SelfSweepIndices<T>(ref FindPairsResult result, in BucketSlices bucket, ReadOnlySpan<int> indices, ref T processor, ThreadStackAllocator allocator)
+            where T : unmanaged, IFindPairsProcessor
+        {
+            var xmins     = allocator.Allocate<float>(indices.Length + 1);
+            var xmaxs     = allocator.Allocate<float>(indices.Length);
+            var yzminmaxs = allocator.Allocate<float4>(indices.Length);
+
+            for (int i = 0; i < indices.Length; i++)
+            {
+                var index    = indices[i];
+                xmins[i]     = bucket.xmins[index];
+                xmaxs[i]     = bucket.xmaxs[index];
+                yzminmaxs[i] = bucket.yzminmaxs[index];
+            }
+            xmins[indices.Length] = float.NaN;
+
+            for (int i = 0; i < indices.Length; i++)
+            {
+                var current = -yzminmaxs[i].zwxy;
+                var xmax    = xmaxs[i];
+                for (int j = i + 1; xmins[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < bucket.yzminmaxs[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(indices[i], indices[j]);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+        }
+
+        static void SelfSweepDualIndices<T>(ref FindPairsResult result, in BucketSlices bucket, ReadOnlySpan<int> indicesA, ReadOnlySpan<int> indicesB, ref T processor)
+            where T : unmanaged, IFindPairsProcessor
+        {
+            int progressA = 0, progressB = 0;
+            while (true)
+            {
+                var indexA = indicesA[progressA];
+                var indexB = indicesB[progressB];
+                if (indexA < indexB)
+                {
+                    var current = -bucket.yzminmaxs[indexA].zwxy;
+                    var xmax    = bucket.xmaxs[indexA];
+                    for (int j = progressB; j < indicesB.Length && bucket.xmins[indicesB[j]] <= xmax; j++)
+                    {
+                        indexB = indicesB[j];
+                        if (math.bitmask(current < bucket.yzminmaxs[indexB]) == 0)
+                        {
+                            result.SetBucketRelativePairIndices(indexA, indexB);
+                            processor.Execute(in result);
+                        }
+                    }
+                    progressA++;
+                    if (progressA >= indicesA.Length)
+                        return;
+                }
+                else if (indexA > indexB)
+                {
+                    var current = -bucket.yzminmaxs[indexB].zwxy;
+                    var xmax    = bucket.xmaxs[indexB];
+                    for (int j = progressA; j < indicesA.Length && bucket.xmins[indicesA[j]] <= xmax; j++)
+                    {
+                        indexA = indicesA[j];
+                        if (math.bitmask(current < bucket.yzminmaxs[indexA]) == 0)
+                        {
+                            result.SetBucketRelativePairIndices(indexA, indexB);
+                            processor.Execute(in result);
+                        }
+                    }
+                    progressB++;
+                    if (progressB >= indicesB.Length)
+                        return;
+                }
+                else
+                {
+                    // indexA == indexB
+                    // We need to sweep ahead both indices list but exclude indexA/B
+                    var current = -bucket.yzminmaxs[indexA].zwxy;
+                    var xmax    = bucket.xmaxs[indexA];
+                    for (int j = progressB + 1; j < indicesB.Length && bucket.xmins[indicesB[j]] <= xmax; j++)
+                    {
+                        indexB = indicesB[j];
+                        if (math.bitmask(current < bucket.yzminmaxs[indexB]) == 0)
+                        {
+                            result.SetBucketRelativePairIndices(indexA, indexB);
+                            processor.Execute(in result);
+                        }
+                    }
+                    indexB = indexA;
+                    for (int j = progressA + 1; j < indicesA.Length && bucket.xmins[indicesA[j]] <= xmax; j++)
+                    {
+                        indexA = indicesA[j];
+                        if (math.bitmask(current < bucket.yzminmaxs[indexA]) == 0)
+                        {
+                            result.SetBucketRelativePairIndices(indexA, indexB);
+                            processor.Execute(in result);
+                        }
+                    }
+                    progressA++;
+                    progressB++;
+                    if (progressA >= indicesA.Length || progressB >= indicesB.Length)
+                        return;
                 }
             }
         }
@@ -438,7 +653,7 @@ namespace Latios.Psyshock
                                                                   in BucketSlices bucketA,
                                                                   in BucketSlices bucketB,
                                                                   ref T processor,
-                                                                  in BucketAabb bucketAabbForA) where T : struct, IFindPairsProcessor
+                                                                  in BucketAabb bucketAabbForA) where T : unmanaged, IFindPairsProcessor
         {
             Hint.Assume(bucketA.xmins.Length == bucketA.xmaxs.Length);
             Hint.Assume(bucketA.xmins.Length == bucketA.yzminmaxs.Length);
@@ -528,7 +743,7 @@ namespace Latios.Psyshock
                                                                   in BucketSlices bucketA,
                                                                   in BucketSlices bucketB,
                                                                   ref T processor,
-                                                                  in BucketAabb bucketAabbForB) where T : struct, IFindPairsProcessor
+                                                                  in BucketAabb bucketAabbForB) where T : unmanaged, IFindPairsProcessor
         {
             Hint.Assume(bucketA.xmins.Length == bucketA.xmaxs.Length);
             Hint.Assume(bucketA.xmins.Length == bucketA.yzminmaxs.Length);
@@ -611,6 +826,395 @@ namespace Latios.Psyshock
                         processor.Execute(in result);
                     }
                 }
+            }
+        }
+
+        static unsafe void BipartiteSweepDualIndices<T>(ref FindPairsResult result,
+                                                        in BucketSlices bucketA,
+                                                        ReadOnlySpan<int>    indicesA,
+                                                        in BucketSlices bucketB,
+                                                        ReadOnlySpan<int>    indicesB,
+                                                        ref T processor,
+                                                        ThreadStackAllocator allocator)
+            where T : unmanaged, IFindPairsProcessor
+        {
+            var xminsA     = allocator.Allocate<float>(indicesA.Length + 1);
+            var xmaxsA     = allocator.Allocate<float>(indicesA.Length);
+            var yzminmaxsA = allocator.Allocate<float4>(indicesA.Length);
+
+            for (int i = 0; i < indicesA.Length; i++)
+            {
+                var index     = indicesA[i];
+                xminsA[i]     = bucketA.xmins[index];
+                xmaxsA[i]     = bucketA.xmaxs[index];
+                yzminmaxsA[i] = bucketA.yzminmaxs[index];
+            }
+            xminsA[indicesA.Length] = float.NaN;
+
+            var xminsB     = allocator.Allocate<float>(indicesB.Length + 1);
+            var xmaxsB     = allocator.Allocate<float>(indicesB.Length);
+            var yzminmaxsB = allocator.Allocate<float4>(indicesB.Length);
+
+            for (int i = 0; i < indicesB.Length; i++)
+            {
+                var index     = indicesB[i];
+                xminsB[i]     = bucketB.xmins[index];
+                xmaxsB[i]     = bucketB.xmaxs[index];
+                yzminmaxsB[i] = bucketB.yzminmaxs[index];
+            }
+            xminsB[indicesB.Length] = float.NaN;
+
+            // Check for b starting in a's x range
+            int bstart = 0;
+            for (int i = 0; i < indicesA.Length; i++)
+            {
+                // Advance to b.xmin >= a.xmin
+                // Include equals case by stopping when equal
+                while (bstart < indicesB.Length && xminsB[bstart] < xminsA[i])
+                    bstart++;
+                if (bstart >= indicesB.Length)
+                    break;
+
+                var current = -yzminmaxsA[i].zwxy;
+                var xmax    = xmaxsA[i];
+                for (int j = bstart; j < indicesB.Length && xminsB[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < yzminmaxsB[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(indicesA[i], indicesB[j]);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+
+            // Check for a starting in b's x range
+            int astart = 0;
+            for (int i = 0; i < indicesB.Length; i++)
+            {
+                // Advance to a.xmin > b.xmin
+                // Exclude equals case this time by continuing if equal
+                while (astart < indicesA.Length && bucketA.xmins[astart] <= xminsB[i])
+                    astart++;
+                if (astart >= indicesA.Length)
+                    break;
+
+                var current = -yzminmaxsB[i].zwxy;
+                var xmax    = xmaxsB[i];
+                for (int j = astart; j < indicesA.Length && bucketA.xmins[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < bucketA.yzminmaxs[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(indicesA[j], indicesB[i]);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+        }
+
+        static unsafe void BipartiteSweepDualIndicesFilteredCross<T>(ref FindPairsResult result,
+                                                                     in BucketSlices bucketA,
+                                                                     ReadOnlySpan<int>    indicesA,
+                                                                     in BucketSlices bucketB,
+                                                                     ReadOnlySpan<int>    indicesB,
+                                                                     ref T processor,
+                                                                     in BucketAabb cellAabb,
+                                                                     bool cellIsB,
+                                                                     ThreadStackAllocator allocator)
+            where T : unmanaged, IFindPairsProcessor
+        {
+            var xminsA     = allocator.Allocate<float>(indicesA.Length + 1);
+            var xmaxsA     = allocator.Allocate<float>(indicesA.Length);
+            var yzminmaxsA = allocator.Allocate<float4>(indicesA.Length);
+            if (cellIsB)
+            {
+                var newIndices = allocator.Allocate<int>(indicesA.Length);
+                int newCount   = 0;
+                for (int i = 0; i < indicesA.Length; i++)
+                {
+                    var index = indicesA[i];
+                    if (cellAabb.xmax < bucketA.xmins[index])
+                        break;
+                    if (bucketA.xmaxs[i] < cellAabb.xmin)
+                        continue;
+                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketA.yzminmaxs[i]) & cellAabb.finiteMask) == 0)
+                    {
+                        xminsA[newCount]     = bucketA.xmins[index];
+                        xmaxsA[newCount]     = bucketA.xmaxs[index];
+                        yzminmaxsA[newCount] = bucketA.yzminmaxs[index];
+                        newIndices[newCount] = index;
+                        newCount++;
+                    }
+                }
+                indicesA = new ReadOnlySpan<int>(newIndices, newCount);
+            }
+            else
+            {
+                for (int i = 0; i < indicesA.Length; i++)
+                {
+                    var index     = indicesA[i];
+                    xminsA[i]     = bucketA.xmins[index];
+                    xmaxsA[i]     = bucketA.xmaxs[index];
+                    yzminmaxsA[i] = bucketA.yzminmaxs[index];
+                }
+            }
+            xminsA[indicesA.Length] = float.NaN;
+
+            var xminsB     = allocator.Allocate<float>(indicesB.Length + 1);
+            var xmaxsB     = allocator.Allocate<float>(indicesB.Length);
+            var yzminmaxsB = allocator.Allocate<float4>(indicesB.Length);
+            if (!cellIsB)
+            {
+                var newIndices = allocator.Allocate<int>(indicesB.Length);
+                int newCount   = 0;
+                for (int i = 0; i < indicesB.Length; i++)
+                {
+                    var index = indicesB[i];
+                    if (cellAabb.xmax < bucketB.xmins[index])
+                        break;
+                    if (bucketB.xmaxs[i] < cellAabb.xmin)
+                        continue;
+                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketB.yzminmaxs[i]) & cellAabb.finiteMask) == 0)
+                    {
+                        xminsB[newCount]     = bucketB.xmins[index];
+                        xmaxsB[newCount]     = bucketB.xmaxs[index];
+                        yzminmaxsB[newCount] = bucketB.yzminmaxs[index];
+                        newIndices[newCount] = index;
+                        newCount++;
+                    }
+                }
+                indicesB = new ReadOnlySpan<int>(newIndices, newCount);
+            }
+            else
+            {
+                for (int i = 0; i < indicesB.Length; i++)
+                {
+                    var index     = indicesB[i];
+                    xminsB[i]     = bucketB.xmins[index];
+                    xmaxsB[i]     = bucketB.xmaxs[index];
+                    yzminmaxsB[i] = bucketB.yzminmaxs[index];
+                }
+            }
+            xminsB[indicesB.Length] = float.NaN;
+
+            // Check for b starting in a's x range
+            int bstart = 0;
+            for (int i = 0; i < indicesA.Length; i++)
+            {
+                // Advance to b.xmin >= a.xmin
+                // Include equals case by stopping when equal
+                while (bstart < indicesB.Length && xminsB[bstart] < xminsA[i])
+                    bstart++;
+                if (bstart >= indicesB.Length)
+                    break;
+
+                var current = -yzminmaxsA[i].zwxy;
+                var xmax    = xmaxsA[i];
+                for (int j = bstart; j < indicesB.Length && xminsB[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < yzminmaxsB[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(indicesA[i], indicesB[j]);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+
+            // Check for a starting in b's x range
+            int astart = 0;
+            for (int i = 0; i < indicesB.Length; i++)
+            {
+                // Advance to a.xmin > b.xmin
+                // Exclude equals case this time by continuing if equal
+                while (astart < indicesA.Length && bucketA.xmins[astart] <= xminsB[i])
+                    astart++;
+                if (astart >= indicesA.Length)
+                    break;
+
+                var current = -yzminmaxsB[i].zwxy;
+                var xmax    = xmaxsB[i];
+                for (int j = astart; j < indicesA.Length && bucketA.xmins[j] <= xmax; j++)
+                {
+                    if (math.bitmask(current < bucketA.yzminmaxs[j]) == 0)
+                    {
+                        result.SetBucketRelativePairIndices(indicesA[j], indicesB[i]);
+                        processor.Execute(in result);
+                    }
+                }
+            }
+        }
+        #endregion
+
+        #region Archetype Index Merging
+        static unsafe bool GatherBothIndicesSets(in WorldBucket bucketA,
+                                                 in CollisionWorld.Mask maskA,
+                                                 out ReadOnlySpan<int>  indicesA,
+                                                 in WorldBucket bucketB,
+                                                 in CollisionWorld.Mask maskB,
+                                                 out ReadOnlySpan<int>  indicesB,
+                                                 ThreadStackAllocator allocator)
+        {
+            indicesA            = default;
+            indicesB            = default;
+            int archetypeCountA = 0;
+            int bodyCountA      = 0;
+            foreach (var index in maskA)
+            {
+                var asac = bucketA.archetypeStartsAndCounts[index];
+                if (asac.y == 0)
+                    continue;
+                archetypeCountA++;
+                bodyCountA += asac.y;
+            }
+
+            if (bodyCountA == 0)
+                return false;
+
+            int archetypeCountB = 0;
+            int bodyCountB      = 0;
+            foreach (var index in maskB)
+            {
+                var asac = bucketB.archetypeStartsAndCounts[index];
+                if (asac.y == 0)
+                    continue;
+                archetypeCountB++;
+                bodyCountB += asac.y;
+            }
+
+            if (bodyCountB == 0)
+                return false;
+
+            if (archetypeCountA == 1)
+            {
+                int2 asac = default;
+                foreach (var index in maskA)
+                {
+                    var candidate = bucketA.archetypeStartsAndCounts[index];
+                    if (candidate.y != 0)
+                    {
+                        asac = candidate;
+                        break;
+                    }
+                }
+                indicesA = bucketA.archetypeBodyIndices.GetSubArray(asac.x, asac.y).AsReadOnlySpan();
+            }
+            else
+            {
+                var asacs       = allocator.AllocateAsSpan<int2>(archetypeCountA);
+                archetypeCountA = 0;
+                foreach (var index in maskA)
+                {
+                    var asac = bucketA.archetypeStartsAndCounts[index];
+                    if (asac.y != 0)
+                    {
+                        asacs[archetypeCountA] = asac;
+                        archetypeCountA++;
+                    }
+                }
+                var indices = allocator.AllocateAsSpan<int>(bodyCountA);
+                GatherArchetypeIndicesGeneral(indices, asacs, bucketA.archetypeBodyIndices);
+                indicesA = indices;
+            }
+
+            if (archetypeCountB == 1)
+            {
+                int2 asac = default;
+                foreach (var index in maskB)
+                {
+                    var candidate = bucketB.archetypeStartsAndCounts[index];
+                    if (candidate.y != 0)
+                    {
+                        asac = candidate;
+                        break;
+                    }
+                }
+                indicesB = bucketB.archetypeBodyIndices.GetSubArray(asac.x, asac.y).AsReadOnlySpan();
+            }
+            else
+            {
+                var asacs       = allocator.AllocateAsSpan<int2>(archetypeCountB);
+                archetypeCountB = 0;
+                foreach (var index in maskB)
+                {
+                    var asac = bucketB.archetypeStartsAndCounts[index];
+                    if (asac.y != 0)
+                    {
+                        asacs[archetypeCountB] = asac;
+                        archetypeCountB++;
+                    }
+                }
+                var indices = allocator.AllocateAsSpan<int>(bodyCountB);
+                GatherArchetypeIndicesGeneral(indices, asacs, bucketB.archetypeBodyIndices);
+                indicesB = indices;
+            }
+
+            return true;
+        }
+
+        static unsafe void GatherArchetypeIndicesGeneral(Span<int> result, Span<int2> startsAndCounts, ReadOnlySpan<int> archetypeBodyIndices)
+        {
+            // Allocate tournament tree levels and initialize first games
+            var levelCount        = math.ceillog2(startsAndCounts.Length);
+            var levels            = stackalloc ulong*[levelCount];
+            int combatantsInLevel = startsAndCounts.Length;
+            var winnersScratch    = stackalloc ulong[startsAndCounts.Length];
+            for (int i = 0; i < startsAndCounts.Length; i++)
+            {
+                var c               = (ulong)archetypeBodyIndices[startsAndCounts[i].x];
+                c                 <<= 32;
+                c                  |= (uint)i;
+                winnersScratch[i]   = c;
+            }
+
+            // Allocate and play first games for each level
+            for (int i = 0; i < levelCount; i++)
+            {
+                var games   = (combatantsInLevel + 1) / 2;
+                var inLevel = stackalloc ulong[games];
+                levels[i]   = inLevel;
+
+                for (int j = 0; j < games; j++)
+                {
+                    var a             = winnersScratch[2 * j];
+                    var bIndex        = 2 * j + 1;
+                    var b             = bIndex < combatantsInLevel ? winnersScratch[bIndex] : ulong.MaxValue;
+                    inLevel[j]        = math.max(a, b);
+                    winnersScratch[j] = math.min(a, b);
+                }
+                combatantsInLevel = games;
+            }
+
+            // Output first winner
+            var winner = winnersScratch[0];
+            result[0]  = (int)(winner >> 32);
+
+            // Stream all remaining games
+            for (int i = 1; i < result.Length; i++)
+            {
+                var     streamOfPrevious = (int)(winner & 0xffffffff);
+                ref var asac             = ref startsAndCounts[streamOfPrevious];
+                asac.y--;
+                asac.x++;
+                if (asac.y == 0)
+                    winner = ulong.MaxValue;
+                else
+                {
+                    winner   = (ulong)archetypeBodyIndices[asac.x];
+                    winner <<= 32;
+                    winner  |= (uint)streamOfPrevious;
+                }
+
+                var gameIndex = streamOfPrevious;
+                for (int j = 0; j < levelCount; j++)
+                {
+                    gameIndex          >>= 1;
+                    var previousWinner   = winner;
+                    var level            = levels[j];
+                    var otherCombatant   = level[gameIndex];
+                    winner               = math.min(otherCombatant, previousWinner);
+                    level[gameIndex]     = math.max(otherCombatant, previousWinner);
+                }
+
+                result[i] = (int)(winner >> 32);
             }
         }
         #endregion

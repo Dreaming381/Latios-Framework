@@ -1,152 +1,177 @@
-﻿using Unity.Burst;
+﻿using System;
+using Latios.Transforms;
+using Unity.Burst;
 using Unity.Collections;
-using Unity.Entities;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Myri
 {
     internal static class CullingAndWeighting
     {
-        public const int kBatchSize = 128;
-
-        //Parallel
-        //The weighting algorithm is fairly pricey
+        // Parallel
         [BurstCompile]
-        public struct OneshotsJob : IJobParallelForBatch
+        public struct CullAndWeightJob : IJobFor
         {
-            [ReadOnly] public NativeList<ListenerWithTransform>              listenersWithTransforms;
-            [ReadOnly] public NativeArray<OneshotEmitter>                    emitters;
-            [NativeDisableParallelForRestriction] public NativeStream.Writer weights;
-            [NativeDisableParallelForRestriction] public NativeStream.Writer listenerEmitterPairs;  //int2: listener, emitter
+            [ReadOnly] public NativeArray<ListenerWithTransform>             listenersWithTransforms;
+            [ReadOnly] public NativeStream.Reader                            capturedSources;
+            [ReadOnly] public NativeArray<int>                               channelCount;
+            [NativeDisableParallelForRestriction] public NativeStream.Writer chunkChannelStreams;
 
-            public void Execute(int startIndex, int count)
+            UnsafeList<float4>           scratchCache;
+            UnsafeList<ExportableSource> sourcesToExport;
+
+            public unsafe void Execute(int chunkIndex)
             {
-                var scratchCache = new NativeList<float4>(Allocator.Temp);
-
-                var baseWeights = new NativeArray<Weights>(listenersWithTransforms.Length, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                for (int i = 0; i < listenersWithTransforms.Length; i++)
+                if (!scratchCache.IsCreated)
                 {
-                    int c = listenersWithTransforms[i].listener.ildProfile.Value.anglesPerLeftChannel.Length +
-                            listenersWithTransforms[i].listener.ildProfile.Value.anglesPerRightChannel.Length;
-                    Weights w = default;
-                    for (int j = 0; j < c; j++)
-                    {
-                        w.channelWeights.Add(0f);
-                    }
-                    c = listenersWithTransforms[i].listener.itdResolution;
-                    c = 2 * c + 1;
-                    for (int j = 0; j < c; j++)
-                    {
-                        w.itdWeights.Add(0f);
-                    }
-                    baseWeights[i] = w;
+                    scratchCache    = new UnsafeList<float4>(16, Allocator.Temp);
+                    sourcesToExport = new UnsafeList<ExportableSource>(128 * channelCount[0], Allocator.Temp);
                 }
 
-                listenerEmitterPairs.BeginForEachIndex(startIndex / kBatchSize);
-                weights.BeginForEachIndex(startIndex / kBatchSize);
-
-                for (int i = startIndex; i < startIndex + count; i++)
+                sourcesToExport.Clear();
+                int sourceCount = capturedSources.BeginForEachIndex(chunkIndex) / 2;
+                for (int sourceIndex = 0; sourceIndex < sourceCount; sourceIndex++)
                 {
-                    var emitter = emitters[i];
-                    for (int j = 0; j < listenersWithTransforms.Length; j++)
+                    var sourceHeader = capturedSources.Read<CapturedSourceHeader>();
+
+                    // Compute required offsets and total size of source
+                    int sourceSize = 0;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Clip))
+                        sourceSize += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceClip>(), 8);
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.SampleRateMultiplier))
+                        sourceSize              += 8;
+                    var sourceBatchingByteCount  = sourceSize;
+
+                    var transformOffset = sourceSize;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Transform))
+                        sourceSize            += CollectionHelper.Align(UnsafeUtility.SizeOf<TransformQvvs>(), 8);
+                    var distanceFalloffOffset  = sourceSize;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.DistanceFalloff))
+                        sourceSize += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceDistanceFalloff>(), 8);
+                    var coneOffset  = sourceSize;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Cone))
+                        sourceSize += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceEmitterCone>(), 8);
+
+                    var sourceDataPtr = capturedSources.ReadUnsafePtr(sourceSize);
+
+                    // Set up emitter
+                    EmitterParameters e = default;
+                    e.volume            = sourceHeader.volume;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Transform))
                     {
-                        if (math.distancesq(emitter.transform.pos,
-                                            listenersWithTransforms[j].transform.pos) < emitter.source.outerRange * emitter.source.outerRange && emitter.source.clip.IsCreated)
+                        var transform = *(TransformQvvs*)(sourceDataPtr + transformOffset);
+                        e.transform   = new RigidTransform(transform.rotation, transform.position);
+                    }
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.DistanceFalloff))
+                    {
+                        var distanceFalloff = *(AudioSourceDistanceFalloff*)(sourceDataPtr + distanceFalloffOffset);
+                        e.innerRange        = distanceFalloff.innerRange;
+                        e.outerRange        = distanceFalloff.outerRange;
+                        e.rangeFadeMargin   = distanceFalloff.rangeFadeMargin;
+                    }
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Cone))
+                    {
+                        e.useCone = true;
+                        e.cone    = *(AudioSourceEmitterCone*)(sourceDataPtr + coneOffset);
+                    }
+
+                    // Iterate through listeners, and track channels incrementally
+                    int listenerFirstChannelIndex = 0;
+                    int listenerChannelCount      = 1;
+                    for (int listenerIndex = 0; listenerIndex < listenersWithTransforms.Length; listenerIndex++, listenerFirstChannelIndex += listenerChannelCount)
+                    {
+                        var     listener     = listenersWithTransforms[listenerIndex];
+                        ref var blob         = ref listener.listener.ildProfile.Value;
+                        listenerChannelCount = blob.anglesPerLeftChannel.Length + blob.anglesPerRightChannel.Length;
+                        if (listener.listener.volume <= 0f || math.distancesq(e.transform.pos, listener.transform.pos) >= e.outerRange * e.outerRange)
+                            continue;
+
+                        // Todo: Make Weights be based on Spans and indices to optimize the processing below.
+                        Weights w               = default;
+                        w.channelWeights.Length = listenerChannelCount;
+                        w.itdWeights.Length     = 2 * listener.listener.itdResolution + 1;
+
+                        ComputeWeights(ref w, in e, in listener, ref scratchCache);
+
+                        int   itdIndex  = -1;
+                        float itdVolume = 0f;
+                        for (int i = 0; i < w.itdWeights.Length; i++)
                         {
-                            var w = baseWeights[j];
-
-                            EmitterParameters e = new EmitterParameters
+                            if (w.itdWeights[i] > 0f)
                             {
-                                cone            = emitter.cone,
-                                innerRange      = emitter.source.innerRange,
-                                outerRange      = emitter.source.outerRange,
-                                rangeFadeMargin = emitter.source.rangeFadeMargin,
-                                transform       = emitter.transform,
-                                useCone         = emitter.useCone,
-                                volume          = emitter.source.volume
-                            };
-                            //ComputeWeights(ref w, e, in listenersWithTransforms.ElementAt(j), scratchCache);
-                            ComputeWeights(ref w, e, listenersWithTransforms[j], scratchCache);
+                                itdIndex  = i;
+                                itdVolume = w.itdWeights[i];
+                                break;
+                            }
+                        }
 
-                            weights.Write(w);
-                            listenerEmitterPairs.Write(new int2(j, i));
+                        if (itdIndex == -1)
+                            continue;
+
+                        sourceHeader.volume = itdVolume;
+                        var channelSource   = new ChannelStreamSource
+                        {
+                            sourceHeader      = sourceHeader,
+                            sourceDataPtr     = sourceDataPtr,
+                            batchingByteCount = sourceBatchingByteCount,
+                            itdIndex          = itdIndex,
+                            itdCount          = w.itdWeights.Length,
+                            isRightChannel    = false,
+                        };
+                        for (int i = 0; i < w.channelWeights.Length; i++)
+                        {
+                            if (w.channelWeights[i] > 0f)
+                            {
+                                var toAdd = new ExportableSource
+                                {
+                                    source      = channelSource,
+                                    channel     = i,
+                                    stableIndex = sourceIndex
+                                };
+                                toAdd.source.sourceHeader.volume *= w.channelWeights[i];
+                                toAdd.source.isRightChannel       = i >= blob.anglesPerLeftChannel.Length;
+                                sourcesToExport.AddNoResize(toAdd);
+                            }
                         }
                     }
                 }
 
-                listenerEmitterPairs.EndForEachIndex();
-                weights.EndForEachIndex();
+                // Export to NativeSteam. We can only write to one index at a time, which is why we cached
+                // our results to a list. But we still need to reorder them by listener.
+                sourcesToExport.Sort();
+                int previousChannel = -1;
+                foreach (var export in sourcesToExport)
+                {
+                    if (export.channel != previousChannel)
+                    {
+                        if (previousChannel >= 0)
+                            chunkChannelStreams.EndForEachIndex();
+                        chunkChannelStreams.BeginForEachIndex(chunkIndex * channelCount[0] + export.channel);
+                        previousChannel = export.channel;
+                    }
+                    chunkChannelStreams.Write(export.source);
+                }
+                if (previousChannel >= 0)
+                    chunkChannelStreams.EndForEachIndex();
+
+                capturedSources.EndForEachIndex();
             }
-        }
 
-        //Parallel
-        //The weighting algorithm is fairly pricey
-        [BurstCompile]
-        public struct LoopedJob : IJobParallelForBatch
-        {
-            [ReadOnly] public NativeList<ListenerWithTransform>              listenersWithTransforms;
-            [ReadOnly] public NativeArray<LoopedEmitter>                     emitters;
-            [NativeDisableParallelForRestriction] public NativeStream.Writer weights;
-            [NativeDisableParallelForRestriction] public NativeStream.Writer listenerEmitterPairs;  //int2: listener, emitter
-
-            public void Execute(int startIndex, int count)
+            struct ExportableSource : IComparable<ExportableSource>
             {
-                var scratchCache = new NativeList<float4>(Allocator.Temp);
+                public ChannelStreamSource source;
+                public int                 channel;
+                public int                 stableIndex;
 
-                var baseWeights = new NativeArray<Weights>(listenersWithTransforms.Length, Allocator.Temp, NativeArrayOptions.ClearMemory);
-                for (int i = 0; i < listenersWithTransforms.Length; i++)
+                public int CompareTo(ExportableSource other)
                 {
-                    int c = listenersWithTransforms[i].listener.ildProfile.Value.anglesPerLeftChannel.Length +
-                            listenersWithTransforms[i].listener.ildProfile.Value.anglesPerRightChannel.Length;
-                    Weights w = default;
-                    for (int j = 0; j < c; j++)
-                    {
-                        w.channelWeights.Add(0f);
-                    }
-                    c = listenersWithTransforms[i].listener.itdResolution;
-                    c = 2 * c + 1;
-                    for (int j = 0; j < c; j++)
-                    {
-                        w.itdWeights.Add(0f);
-                    }
-                    baseWeights[i] = w;
+                    var result = channel.CompareTo(other.channel);
+                    if (result == 0)
+                        return stableIndex.CompareTo(other.stableIndex);
+                    return result;
                 }
-
-                listenerEmitterPairs.BeginForEachIndex(startIndex / kBatchSize);
-                weights.BeginForEachIndex(startIndex / kBatchSize);
-
-                for (int i = startIndex; i < startIndex + count; i++)
-                {
-                    var emitter = emitters[i];
-                    for (int j = 0; j < listenersWithTransforms.Length; j++)
-                    {
-                        if (math.distancesq(emitter.transform.pos,
-                                            listenersWithTransforms[j].transform.pos) < emitter.source.outerRange * emitter.source.outerRange && emitter.source.clip.IsCreated)
-                        {
-                            var w = baseWeights[j];
-
-                            EmitterParameters e = new EmitterParameters
-                            {
-                                cone            = emitter.cone,
-                                innerRange      = emitter.source.innerRange,
-                                outerRange      = emitter.source.outerRange,
-                                rangeFadeMargin = emitter.source.rangeFadeMargin,
-                                transform       = emitter.transform,
-                                useCone         = emitter.useCone,
-                                volume          = emitter.source.volume
-                            };
-                            ComputeWeights(ref w, e, listenersWithTransforms[j], scratchCache);
-
-                            weights.Write(w);
-                            listenerEmitterPairs.Write(new int2(j, i));
-                        }
-                    }
-                }
-
-                listenerEmitterPairs.EndForEachIndex();
-                weights.EndForEachIndex();
             }
         }
 
@@ -162,7 +187,27 @@ namespace Latios.Myri
             public bool                   useCone;
         }
 
-        private static void ComputeWeights(ref Weights weights, EmitterParameters emitter, ListenerWithTransform listener, NativeList<float4> scratchCache)
+        internal struct Weights
+        {
+            public FixedList512Bytes<float> channelWeights;
+            public FixedList128Bytes<float> itdWeights;
+
+            public static Weights operator +(Weights a, Weights b)
+            {
+                Weights result = a;
+                for (int i = 0; i < a.channelWeights.Length; i++)
+                {
+                    result.channelWeights[i] += b.channelWeights[i];
+                }
+                for (int i = 0; i < a.itdWeights.Length; i++)
+                {
+                    result.itdWeights[i] += b.itdWeights[i];
+                }
+                return result;
+            }
+        }
+
+        private static void ComputeWeights(ref Weights weights, in EmitterParameters emitter, in ListenerWithTransform listener, ref UnsafeList<float4> scratchCache)
         {
             float volume = emitter.volume * listener.listener.volume;
 
@@ -262,7 +307,7 @@ namespace Latios.Myri
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerLeftChannel);
-                    var                      leftChannelDeltas  = scratchCache.AsArray();
+                    var                      leftChannelDeltas  = scratchCache;
                     FixedList512Bytes<bool2> leftChannelInsides = default;
 
                     for (int i = 0; i < leftChannelDeltas.Length; i++)
@@ -447,7 +492,7 @@ namespace Latios.Myri
                     //Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerRightChannel);
-                    var                      rightChannelDeltas  = scratchCache.AsArray();
+                    var                      rightChannelDeltas  = scratchCache;
                     FixedList512Bytes<bool2> rightChannelInsides = default;
 
                     for (int i = 0; i < rightChannelDeltas.Length; i++)

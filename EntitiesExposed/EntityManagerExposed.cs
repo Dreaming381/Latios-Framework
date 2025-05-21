@@ -41,6 +41,8 @@ namespace Unity.Entities.Exposed
 
         // Todo: Find a better home
         public static int InstanceID<T>(this UnityObjectRef<T> unityObjectRef) where T : UnityEngine.Object => unityObjectRef.Id.instanceId;
+
+        public static Entity GetEntity(this SystemHandle systemHandle) => systemHandle.m_Entity;
     }
 }
 

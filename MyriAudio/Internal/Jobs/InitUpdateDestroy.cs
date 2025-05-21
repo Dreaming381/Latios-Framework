@@ -1,7 +1,9 @@
-﻿using Latios.Transforms.Abstract;
+﻿using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -10,48 +12,16 @@ namespace Latios.Myri
 {
     internal static class InitUpdateDestroy
     {
-        //Parallel
-        [BurstCompile]
-        public struct DestroyOneshotsWhenFinishedJob : IJobChunk
-        {
-            public ComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished> expireHandle;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceOneShot>         oneshotHandle;
-            [ReadOnly] public NativeReference<int>                            audioFrame;
-            [ReadOnly] public NativeReference<int>                            lastPlayedAudioFrame;
-            [ReadOnly] public ComponentLookup<AudioSettings>                  settingsLookup;
-            public Entity                                                     worldBlackboardEntity;
-            public int                                                        sampleRate;
-            public int                                                        samplesPerFrame;
-
-            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-            {
-                var oneshots = chunk.GetNativeArray(ref oneshotHandle);
-                var mask     = chunk.GetEnabledMask(ref expireHandle);
-                for (int i = 0; i < oneshots.Length; i++)
-                {
-                    var os = oneshots[i];
-                    if (!os.m_clip.IsCreated)
-                    {
-                        mask[i] = false;
-                        continue;
-                    }
-                    int    playedFrames = lastPlayedAudioFrame.Value - os.m_spawnedAudioFrame;
-                    double resampleRate = os.clip.Value.sampleRate / (double)sampleRate;
-                    if (os.isInitialized && os.clip.Value.samplesLeftOrMono.Length < resampleRate * playedFrames * samplesPerFrame)
-                    {
-                        mask[i] = false;
-                    }
-                }
-            }
-        }
-
-        //Single
+        // Single
         [BurstCompile]
         public struct UpdateListenersJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<AudioListener>      listenerHandle;
             [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
             public NativeList<ListenerWithTransform>                  listenersWithTransforms;
+            public NativeArray<int>                                   channelCount;
+            public NativeArray<int>                                   sourceChunkChannelCount;
+            public int                                                sourceChunkCount;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -67,188 +37,202 @@ namespace Latios.Myri
                         l.itdResolution                                                  = math.clamp(l.itdResolution, 0, 15);
                         var transform                                                    = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position);
                         listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform });
+
+                        var channelsInListener      = l.ildProfile.Value.anglesPerLeftChannel.Length + l.ildProfile.Value.anglesPerRightChannel.Length;
+                        channelCount[0]            += channelsInListener;
+                        sourceChunkChannelCount[0] += channelsInListener * sourceChunkCount;
                     }
                 }
             }
         }
 
-        //Parallel
-        //Todo: It might be worth it to cull here rather than write to the emitters array.
         [BurstCompile]
-        public struct UpdateOneshotsJob : IJobChunk
+        public struct UpdateClipAudioSourcesJob : IJobChunk
         {
-            public ComponentTypeHandle<AudioSourceOneShot>                           oneshotHandle;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>            coneHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                worldTransformHandle;
-            [NativeDisableParallelForRestriction] public NativeArray<OneshotEmitter> emitters;
-            [ReadOnly] public NativeReference<int>                                   audioFrame;
-            [ReadOnly] public NativeReference<int>                                   lastPlayedAudioFrame;
-            [ReadOnly] public NativeReference<int>                                   lastConsumedBufferId;
-            public int                                                               bufferId;
+            public NativeStream.Writer                                             stream;
+            public ComponentTypeHandle<AudioSourceClip>                            clipHandle;
+            public ComponentTypeHandle<AudioSourceDestroyOneShotWhenFinished>      expireHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceVolume>               volumeHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceSampleRateMultiplier> sampleRateMultiplierHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceDistanceFalloff>      distanceFalloffHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>          emitterConeHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle              worldTransformHandle;
+            [ReadOnly] public NativeReference<int>                                 audioFrame;
+            [ReadOnly] public NativeReference<int>                                 lastPlayedAudioFrame;
+            [ReadOnly] public NativeReference<int>                                 lastConsumedBufferId;
+            public int                                                             bufferId;
+            public int                                                             sampleRate;
+            public int                                                             samplesPerFrame;
 
-            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<int> firstEntityInChunkIndices;
-
-            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
-                var oneshots         = chunk.GetNativeArray(ref oneshotHandle);
+                var rng                   = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
+                var volumes               = (AudioSourceVolume*)chunk.GetRequiredComponentDataPtrRO(ref volumeHandle);
+                var clips                 = (AudioSourceClip*)chunk.GetRequiredComponentDataPtrRW(ref clipHandle);
+                var transforms            = worldTransformHandle.Resolve(chunk);
+                var sampleRateMultipliers = chunk.GetComponentDataPtrRO(ref sampleRateMultiplierHandle);
+                var falloffs              = chunk.GetComponentDataPtrRO(ref distanceFalloffHandle);
+                var cones                 = chunk.GetComponentDataPtrRO(ref emitterConeHandle);
+                var expireMask            = chunk.GetEnabledMask(ref expireHandle);
+
+                stream.BeginForEachIndex(unfilteredChunkIndex);
                 for (int i = 0; i < chunk.Count; i++)
                 {
-                    var oneshot = oneshots[i];
-                    //There's a chance the one shot spawned last game frame but the dsp missed the audio frame.
-                    //In such a case, we still want the one shot to start at the beginning rather than skip the first audio frame.
-                    //This is more likely to happen in high framerate scenarios.
-                    //This does not solve the problem where the audio frame ticks during DSP and again before the next AudioSystemUpdate.
-                    if ((!oneshot.isInitialized) || (oneshot.m_spawnedBufferId - lastConsumedBufferId.Value > 0 && (lastPlayedAudioFrame.Value - oneshot.m_spawnedAudioFrame >= 0)))
-                    {
-                        oneshot.m_spawnedBufferId   = bufferId;
-                        oneshot.m_spawnedAudioFrame = audioFrame.Value;
-                        oneshots[i]                 = oneshot;
-                    }
-                }
+                    // Clip
+                    ref var clip = ref clips[i];
 
-                if (chunk.Has(ref coneHandle))
-                {
-                    var worldTransforms = worldTransformHandle.Resolve(chunk);
-                    var cones           = chunk.GetNativeArray(ref coneHandle);
-                    for (int i = 0; i < chunk.Count; i++)
+                    if (!clip.m_clip.IsCreated)
+                        continue;
+
+                    double sampleRateMultiplier = sampleRateMultipliers != null ? sampleRateMultipliers[i].multiplier : 1.0;
+                    if (clip.looping)
                     {
-                        emitters[firstEntityIndex + i] = new OneshotEmitter
+                        if (sampleRateMultiplier <= 0.0)
+                            continue;
+
+                        if (!clip.m_initialized)
                         {
-                            source    = oneshots[i],
-                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
-                            cone      = cones[i],
-                            useCone   = true
-                        };
-                    }
-                }
-                else
-                {
-                    var worldTransforms = worldTransformHandle.Resolve(chunk);
-                    for (int i = 0; i < chunk.Count; i++)
-                    {
-                        emitters[firstEntityIndex + i] = new OneshotEmitter
-                        {
-                            source    = oneshots[i],
-                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
-                            cone      = default,
-                            useCone   = false
-                        };
-                    }
-                }
-            }
-        }
-
-        //Parallel
-        //Todo: It might be worth it to cull here rather than write to the emitters array.
-        [BurstCompile]
-        public struct UpdateLoopedJob : IJobChunk
-        {
-            public ComponentTypeHandle<AudioSourceLooped>                           loopedHandle;
-            [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>           coneHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle               worldTransformHandle;
-            [NativeDisableParallelForRestriction] public NativeArray<LoopedEmitter> emitters;
-            [ReadOnly] public NativeReference<int>                                  audioFrame;
-            [ReadOnly] public NativeReference<int>                                  lastConsumedBufferId;
-            public int                                                              bufferId;
-            public int                                                              sampleRate;
-            public int                                                              samplesPerFrame;
-
-            [ReadOnly, DeallocateOnJobCompletion] public NativeArray<int> firstEntityInChunkIndices;
-
-            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-            {
-                var firstEntityIndex = firstEntityInChunkIndices[unfilteredChunkIndex];
-                var rng              = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
-                var looped           = chunk.GetNativeArray(ref loopedHandle);
-                for (int i = 0; i < chunk.Count; i++)
-                {
-                    var l = looped[i];
-
-                    if (!l.initialized)
-                    {
-                        if (l.offsetIsBasedOnSpawn)
-                        {
-                            ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
-                            if (sampleRate == l.clip.Value.sampleRate)
+                            if (clip.offsetIsBasedOnSpawn)
                             {
-                                int clipStart  = (int)(samplesPlayed % (ulong)l.clip.Value.samplesLeftOrMono.Length);
-                                l.m_loopOffset = l.clip.Value.samplesLeftOrMono.Length - clipStart;
+                                ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                                if (sampleRate == clip.m_clip.Value.sampleRate && sampleRateMultiplier == 1.0)
+                                {
+                                    int clipStart     = (int)(samplesPlayed % (ulong)clip.m_clip.Value.samplesLeftOrMono.Length);
+                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                }
+                                else
+                                {
+                                    double clipSampleStride             = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
+                                    double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
+                                    double clipStart                    = samplesPlayedInSourceSamples % clip.m_clip.Value.samplesLeftOrMono.Length;
+                                    // We can't get exact due to the mismatched rate, so we choose a rounded start point between
+                                    // the last and first sample by chopping off the fractional part
+                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                }
+                                clip.m_spawnedBufferId = bufferId;
                             }
                             else
                             {
-                                double clipSampleStride             = l.clip.Value.sampleRate / (double)sampleRate;
-                                double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
-                                double clipStart                    = samplesPlayedInSourceSamples % l.clip.Value.samplesLeftOrMono.Length;
-                                // We can't get exact due to the mismatched rate, so we choose a rounded start point between
-                                // the last and first sample by chopping off the fractional part
-                                l.m_loopOffset = (int)(l.clip.Value.samplesLeftOrMono.Length - clipStart);
+                                clip.m_loopOffset   = (uint)clip.m_clip.Value.loopedOffsets[rng.NextInt(0, clip.m_clip.Value.loopedOffsets.Length)];
+                                clip.m_offsetLocked = true;
                             }
-                            l.m_spawnBufferLow16 = (short)bufferId;
+                            clip.m_initialized = true;
                         }
-                        else
+                        else if (!clip.m_offsetLocked && clip.offsetIsBasedOnSpawn)
                         {
-                            l.m_loopOffset = l.m_clip.Value.loopedOffsets[rng.NextInt(0, l.m_clip.Value.loopedOffsets.Length)];
-                            l.offsetLocked = true;
-                        }
-                        l.initialized = true;
-                        looped[i]     = l;
-                    }
-                    else if (!l.offsetLocked && l.offsetIsBasedOnSpawn)
-                    {
-                        if ((short)lastConsumedBufferId.Value - l.m_spawnBufferLow16 >= 0)
-                        {
-                            l.offsetLocked = true;
-                        }
-                        else
-                        {
-                            // This check compares if the playhead loop advanced past the target start point in the loop
-                            ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
-                            double clipSampleStride             = l.clip.Value.sampleRate / (double)sampleRate;
-                            double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
-                            double clipStart                    = (samplesPlayedInSourceSamples + l.m_loopOffset) % l.clip.Value.samplesLeftOrMono.Length;
-                            // We add a one sample tolerance in case we are regenerating the same audio frame, in which case the old values are fine.
-                            if (clipStart < l.clip.Value.samplesLeftOrMono.Length / 2 && clipStart > 1)
+                            if (lastConsumedBufferId.Value - clip.m_spawnedBufferId >= 0)
                             {
-                                // We missed the buffer
-                                clipStart            = samplesPlayedInSourceSamples % l.clip.Value.samplesLeftOrMono.Length;
-                                l.m_loopOffset       = (int)(l.clip.Value.samplesLeftOrMono.Length - clipStart);
-                                l.m_spawnBufferLow16 = (short)bufferId;
+                                clip.m_offsetLocked = true;
+                            }
+                            else
+                            {
+                                // This check compares if the playhead loop advanced past the target start point in the loop
+                                ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                                double clipSampleStride             = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
+                                double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
+                                double clipStart                    = (samplesPlayedInSourceSamples + clip.m_loopOffset) % clip.m_clip.Value.samplesLeftOrMono.Length;
+                                // We add a one sample tolerance in case we are regenerating the same audio frame, in which case the old values are fine.
+                                if (clipStart < clip.m_clip.Value.samplesLeftOrMono.Length / 2 && clipStart > 1)
+                                {
+                                    // We missed the buffer
+                                    clipStart              = samplesPlayedInSourceSamples % clip.m_clip.Value.samplesLeftOrMono.Length;
+                                    clip.m_loopOffset      = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                    clip.m_spawnedBufferId = bufferId;
+                                }
                             }
                         }
-                        looped[i] = l;
                     }
-                }
+                    else
+                    {
+                        // If the sample rate is invalid, prefer to just kill this oneshot.
+                        if (sampleRateMultiplier <= 0.0)
+                        {
+                            if (expireMask.EnableBit.IsValid)
+                                expireMask[i] = false;
+                            continue;
+                        }
 
-                if (chunk.Has(ref coneHandle))
-                {
-                    var worldTransforms = worldTransformHandle.Resolve(chunk);
-                    var cones           = chunk.GetNativeArray(ref coneHandle);
-                    for (int i = 0; i < chunk.Count; i++)
-                    {
-                        emitters[firstEntityIndex + i] = new LoopedEmitter
+                        var framesPlayed = lastPlayedAudioFrame.Value - clip.m_spawnedAudioFrame;
+                        // There's a chance the one shot spawned last game frame but the dsp missed the audio frame.
+                        // In such a case, we still want the one shot to start at the beginning rather than skip the first audio frame.
+                        // This is more likely to happen in high framerate scenarios.
+                        // This does not solve the problem where the audio frame ticks during DSP and again before the next AudioSystemUpdate.
+                        if ((!clip.m_initialized) || (clip.m_spawnedBufferId - lastConsumedBufferId.Value > 0 && framesPlayed >= 0))
                         {
-                            source    = looped[i],
-                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
-                            cone      = cones[i],
-                            useCone   = true
-                        };
+                            clip.m_spawnedBufferId   = bufferId;
+                            clip.m_spawnedAudioFrame = audioFrame.Value;
+                            clip.m_initialized       = true;
+                        }
+                        else
+                        {
+                            double resampleRate = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
+                            if (clip.m_initialized && clip.m_clip.Value.samplesLeftOrMono.Length < resampleRate * framesPlayed * samplesPerFrame)
+                            {
+                                if (expireMask.EnableBit.IsValid)
+                                    expireMask[i] = false;
+                                continue;
+                            }
+                        }
+                    }
+
+                    var batchableClip = clip;
+                    if (clip.looping)
+                        batchableClip.FixLoopingForBatching();
+
+                    // Early culling
+                    if (volumes[i].volume <= 0f)
+                        continue;
+
+                    // Write to stream
+                    int byteCount  = 0;
+                    var features   = CapturedSourceHeader.Features.Clip;
+                    byteCount     += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceClip>(), 8);
+                    if (sampleRateMultiplier != 1.0)
+                    {
+                        features  |= CapturedSourceHeader.Features.SampleRateMultiplier;
+                        byteCount += 8;  // double is 8 bytes
+                    }
+                    if (falloffs != null)
+                    {
+                        features  |= CapturedSourceHeader.Features.Transform | CapturedSourceHeader.Features.DistanceFalloff;
+                        byteCount += CollectionHelper.Align(UnsafeUtility.SizeOf<TransformQvvs>(), 8);
+                        byteCount += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceDistanceFalloff>(), 8);
+
+                        if (cones != null)
+                        {
+                            features  |= CapturedSourceHeader.Features.Cone;
+                            byteCount += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceEmitterCone>(), 8);
+                        }
+                    }
+
+                    stream.Write(new CapturedSourceHeader { features = features, volume = volumes[i].volume });
+
+                    var ptr = stream.Allocate(byteCount);
+                    UnsafeUtility.MemClear(ptr, byteCount);
+                    UnsafeUtility.CopyStructureToPtr(ref batchableClip, ptr);
+                    ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceClip>(), 8);
+                    if (sampleRateMultiplier != 1.0)
+                    {
+                        UnsafeUtility.CopyStructureToPtr(ref sampleRateMultiplier, ptr);
+                        ptr += 8;
+                    }
+                    if (falloffs != null)
+                    {
+                        var transform = transforms[i].worldTransformQvvs;
+                        UnsafeUtility.CopyStructureToPtr(ref transform,   ptr);
+                        ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<TransformQvvs>(), 8);
+
+                        UnsafeUtility.CopyStructureToPtr(ref falloffs[i], ptr);
+                        ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceDistanceFalloff>(), 8);
+
+                        if (cones != null)
+                        {
+                            UnsafeUtility.CopyStructureToPtr(ref cones[i], ptr);
+                            ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceEmitterCone>(), 8);
+                        }
                     }
                 }
-                else
-                {
-                    var worldTransforms = worldTransformHandle.Resolve(chunk);
-                    for (int i = 0; i < chunk.Count; i++)
-                    {
-                        emitters[firstEntityIndex + i] = new LoopedEmitter
-                        {
-                            source    = looped[i],
-                            transform = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position),
-                            cone      = default,
-                            useCone   = false
-                        };
-                    }
-                }
+                stream.EndForEachIndex();
             }
         }
     }

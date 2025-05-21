@@ -173,6 +173,82 @@ namespace Latios.Psyshock
         }
         #endregion
 
+        #region Point vs World
+        /// <summary>
+        /// Checks if the closest surface point across all matching entity colliders in the CollisionWorld to the query point is within the signed maxDistance,
+        /// where the sign is positive if the query point is outside the collider, and negative if the point is inside the collider. If the closest surface
+        /// point is within maxDistance, info about the surface point is generated.
+        /// </summary>
+        /// <param name="point">The query point</param>
+        /// <param name="collisionWorld">The collisionWorld containing the colliders to query against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="maxDistance">A signed distance the distance between the surface point and the query point must be less or equal to for a "hit"
+        /// to be registered. A value less than 0 requires that the point be inside the collider.</param>
+        /// <param name="result">Info about the surface point found if it is close enough to the query point</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>Returns true if the closest surface point is within maxDistance of the query point</returns>
+        /// <remarks>In the case of composite colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the composite.
+        /// This can only happen when the query point is inside the collider. This may cause problems for algorithms which intend to place objects on the surface
+        /// of the composite collider. Also, in the case of composites, the closest surface point of each subcollider is found, and the subcollider with the smallest
+        /// signed distance to the query point is reported (most negative if the query point is inside), even if it is technically not the closest surface point across
+        /// all the composites.
+        /// These same rules also apply to colliders in CollisionWorld. A reported surface point may be inside another collider inside the CollisionWorld. And the
+        /// collider with the smallest signed distance to the query point is reported. If you want to find all hits, use FindObjects instead.</remarks>
+        public static bool DistanceBetween(float3 point,
+                                           in CollisionWorld collisionWorld,
+                                           in CollisionWorld.Mask mask,
+                                           float maxDistance,
+                                           out PointDistanceResult result,
+                                           out LayerBodyInfo worldBodyInfo)
+        {
+            result             = default;
+            worldBodyInfo      = default;
+            var processor      = new LayerQueryProcessors.PointDistanceClosestImmediateProcessor(point, maxDistance, ref result, ref worldBodyInfo);
+            var offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), collisionWorld, processor).RunImmediate(in mask);
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
+            return hit;
+        }
+
+        /// <summary>
+        /// Checks if a closest surface point across any of the matching entity colliders in the CollisionWorld to the query point is within the signed maxDistance,
+        /// where the sign is positive if the query point is outside the collider, and negative if the point is inside the collider. If a closest surface
+        /// point is within maxDistance, info about the surface point is generated.
+        /// </summary>
+        /// <param name="point">The query point</param>
+        /// <param name="collisionWorld">The collisionWorld containing the colliders to query against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="maxDistance">A signed distance the distance between the surface point and the query point must be less or equal to for a "hit"
+        /// to be registered. A value less than 0 requires that the point be inside the collider.</param>
+        /// <param name="result">Info about the surface point found if it is close enough to the query point</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>Returns true if the closest surface point is within maxDistance of the query point</returns>
+        /// <remarks>In the case of composite colliders, it is possible that the found surface point may be inside of one of the other subcolliders in the composite.
+        /// This can only happen when the query point is inside the collider. This may cause problems for algorithms which intend to place objects on the surface
+        /// of the composite collider. Also, in the case of composites, the closest surface point of each subcollider is found, and the subcollider with the smallest
+        /// signed distance to the query point is reported (most negative if the query point is inside), even if it is technically not the closest surface point across
+        /// all the composites.
+        /// Similar rules also apply to colliders in CollisionWorld. A reported surface point may be inside another collider inside the CollisionWorld. However, only
+        /// the first surface point within maxDistance found by the algorithm is reported.</remarks>
+        public static bool DistanceBetweenAny(float3 point,
+                                              in CollisionWorld collisionWorld,
+                                              in CollisionWorld.Mask mask,
+                                              float maxDistance,
+                                              out PointDistanceResult result,
+                                              out LayerBodyInfo worldBodyInfo)
+        {
+            result             = default;
+            worldBodyInfo      = default;
+            var processor      = new LayerQueryProcessors.PointDistanceAnyImmediateProcessor(point, maxDistance, ref result, ref worldBodyInfo);
+            var offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), collisionWorld, processor).RunImmediate(in mask);
+            var hit                 = result.subColliderIndex >= 0;
+            result.subColliderIndex = math.max(result.subColliderIndex, 0);
+            return hit;
+        }
+        #endregion
+
         #region Collider vs Collider
         /// <summary>
         /// Checks if the distance between the surfaces of two colliders are within maxDistance. If the colliders are overlapping, the determined distance is negative,
@@ -441,6 +517,106 @@ namespace Latios.Psyshock
                 i++;
             }
             return false;
+        }
+        #endregion
+
+        #region Collider vs World
+        /// <summary>
+        /// Checks if the surface of the collider is within maxDistance of any of the surfaces of the matching entity colliders in the CollisionWorld. If the collider
+        /// is overlapping a collider in the CollisionWorld, the determined distance is negative. If the signed distance is less than maxDistance, info about the pair
+        /// with the smallest (or most negative in the case of overlaps) is generated and reported.
+        /// </summary>
+        /// <param name="collider">The collider to test for distance against the CollisionWorld</param>
+        /// <param name="transform">The transform of the collider to be tested</param>
+        /// <param name="collisionWorld">The CollisionWorld containing colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="maxDistance">The signed distance the surface points must be less than in order for a "hit" to be registered. A value less than 0 requires that
+        /// the colliders be overlapping.</param>
+        /// <param name="result">Info about the surface points found that are within the required distance of each other. Any field suffixed 'A' in the result
+        /// corresponds to the collider, and any field suffixed 'B' in the result corresponds to a collider in the CollisionWorld. If the method returns false, the
+        /// contents of this result are undefined.</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>Returns true if the signed distance of the surface points are less than maxDistance, false otherwise</returns>
+        /// <remarks>If either the test collider or the collider in the CollisionWorld is a composite collider, the distance tests are performed individually across all
+        /// subcolliders, and the subcollider with the smallest (or most negative in the case of overlaps) distance is used for the overall evaluation. The surface points
+        /// reported may be inside other subcolliders. This may cause problems if this algorithm is used for depenetration, as only the individual subcolliders reported
+        /// will be depenetrated, rather than the entire composite.
+        /// The same rule applies for colliders in the CollisionWorld. The surface points reported may be inside other colliders in the CollisionWorld. If you want to
+        /// find all hits, use FindObjects instead.</remarks>
+        public static bool DistanceBetween(in Collider collider,
+                                           in TransformQvvs transform,
+                                           in CollisionWorld collisionWorld,
+                                           in CollisionWorld.Mask mask,
+                                           float maxDistance,
+                                           out ColliderDistanceResult result,
+                                           out LayerBodyInfo worldBodyInfo)
+        {
+            var scaledTransform = new RigidTransform(transform.rotation, transform.position);
+            var scaledCollider  = collider;
+            ScaleStretchCollider(ref scaledCollider, transform.scale, transform.stretch);
+
+            result        = default;
+            worldBodyInfo = default;
+            var processor = new LayerQueryProcessors.ColliderDistanceClosestImmediateProcessor(in scaledCollider,
+                                                                                               in scaledTransform,
+                                                                                               maxDistance,
+                                                                                               ref result,
+                                                                                               ref worldBodyInfo);
+            var aabb            = AabbFrom(in scaledCollider, in scaledTransform);
+            var offsetDistance  = math.max(maxDistance, 0f);
+            aabb.min           -= offsetDistance;
+            aabb.max           += offsetDistance;
+            FindObjects(aabb, in collisionWorld, in processor).RunImmediate(in mask);
+            var hit                  = result.subColliderIndexB >= 0;
+            result.subColliderIndexB = math.max(result.subColliderIndexB, 0);
+            return hit;
+        }
+
+        /// <summary>
+        /// Checks if the surface of the collider is within maxDistance of any of the surfaces of the matching entity colliders in the CollisionWorld. If the collider
+        /// is overlapping a collider in the CollisionWorld, the determined distance is negative. If the signed distance is less than maxDistance, info about the first
+        /// pair found is generated and reported.
+        /// </summary>
+        /// <param name="collider">The collider to test for distance against the CollisionWorld</param>
+        /// <param name="transform">The transform of the collider to be tested</param>
+        /// <param name="collisionWorld">The CollisionWorld containing colliders to test against</param>
+        /// <param name="mask">A mask containing the entity query used to prefilter the entities in the CollisionWorld</param>
+        /// <param name="maxDistance">The signed distance the surface points must be less than in order for a "hit" to be registered. A value less than 0 requires that
+        /// the colliders be overlapping.</param>
+        /// <param name="result">Info about the surface points found that are within the required distance of each other. Any field suffixed 'A' in the result
+        /// corresponds to the collider, and any field suffixed 'B' in the result corresponds to a collider in the CollisionWorld. If the method returns false, the
+        /// contents of this result are undefined.</param>
+        /// <param name="worldBodyInfo">Additional info as to which collider in the CollisionWorld was hit</param>
+        /// <returns>Returns true if the signed distance of the surface points are less than maxDistance, false otherwise</returns>
+        /// <remarks>If either the test collider or the collider in the CollisionWorld is a composite collider, the distance tests are performed individually across all
+        /// subcolliders, and the subcollider with the smallest (or most negative in the case of overlaps) distance is used for the overall evaluation. The surface points
+        /// reported may be inside other subcolliders. This may cause problems if this algorithm is used for depenetration, as only the individual subcolliders reported
+        /// will be depenetrated, rather than the entire composite.
+        /// Similar rules apply for colliders in the CollisionWorld. The surface points reported may be inside other colliders in the CollisionWorld. However, only the
+        /// first result found by the algorithm is reported.</remarks>
+        public static bool DistanceBetweenAny(Collider collider,
+                                              in TransformQvvs transform,
+                                              in CollisionWorld collisionWorld,
+                                              in CollisionWorld.Mask mask,
+                                              float maxDistance,
+                                              out ColliderDistanceResult result,
+                                              out LayerBodyInfo worldBodyInfo)
+        {
+            var scaledTransform = new RigidTransform(transform.rotation, transform.position);
+            var scaledCollider  = collider;
+            ScaleStretchCollider(ref scaledCollider, transform.scale, transform.stretch);
+
+            result              = default;
+            worldBodyInfo       = default;
+            var processor       = new LayerQueryProcessors.ColliderDistanceAnyImmediateProcessor(in scaledCollider, in scaledTransform, maxDistance, ref result, ref worldBodyInfo);
+            var aabb            = AabbFrom(in scaledCollider, in scaledTransform);
+            var offsetDistance  = math.max(maxDistance, 0f);
+            aabb.min           -= offsetDistance;
+            aabb.max           += offsetDistance;
+            FindObjects(aabb, in collisionWorld, in processor).RunImmediate(in mask);
+            var hit                  = result.subColliderIndexB >= 0;
+            result.subColliderIndexB = math.max(result.subColliderIndexB, 0);
+            return hit;
         }
         #endregion
     }

@@ -11,7 +11,10 @@ namespace Latios.Transforms.Systems
 {
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(PostSyncPointGroup))]
+    [UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
+    [UpdateAfter(typeof(BeginSimulationEntityCommandBufferSystem))]
+    [UpdateBefore(typeof(FixedStepSimulationSystemGroup))]
+    [UpdateBefore(typeof(VariableRateSimulationSystemGroup))]
     public partial class MotionHistoryUpdateSuperSystem : SuperSystem
     {
         protected override void CreateSystems()

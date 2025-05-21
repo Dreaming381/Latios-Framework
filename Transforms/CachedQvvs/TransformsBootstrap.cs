@@ -24,6 +24,7 @@ namespace Latios.Transforms
                 world.worldBlackboardEntity.AddComponent<RuntimeFeatureFlags>();
 
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.TransformSuperSystem>(),                 world, defaultComponentSystemGroup);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.TransformInitializeSuperSystem>(),       world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.HybridTransformsSyncPointSuperSystem>(), world);
         }
     }
