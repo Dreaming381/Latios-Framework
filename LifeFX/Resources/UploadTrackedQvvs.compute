@@ -1,0 +1,28 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UploadTrackedQvvs
+
+struct TransformQvvs
+{
+    float4 a;
+    float4 b;
+    float4 c;
+};
+
+struct UploadQvvs
+{
+    TransformQvvs qvvs;
+    int dst;
+};
+
+uniform StructuredBuffer<UploadQvvs> _src;
+uniform RWStructuredBuffer<TransformQvvs> _dst;
+
+uint _start;
+
+[numthreads(64, 1, 1)]
+void UploadTrackedQvvs(uint3 id : SV_DispatchThreadID)
+{
+    int srcIndex = _start + id.x;
+    UploadQvvs upload = _src[srcIndex];
+    _dst[upload.dst] = upload.qvvs;
+}

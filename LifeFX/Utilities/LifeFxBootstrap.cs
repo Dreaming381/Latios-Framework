@@ -21,6 +21,8 @@ namespace Latios.LifeFX
             world.worldBlackboardEntity.AddComponent<Kinemation.EnableCustomGraphicsTag>();
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<GraphicsEventUploadSystem>(),           world);
             BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<GraphicsGlobalBufferBroadcastSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<UpdateTrackedWorldTransformSystem>(),   world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<DispatchTrackedWorldTransformSystem>(), world);
         }
     }
 }

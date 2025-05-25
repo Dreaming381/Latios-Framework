@@ -65,9 +65,6 @@ namespace Latios.LifeFX.Systems
                 return default;
             }
 
-            // Normally, we'd want to use our custom allocator. However, we need some of these arrays to stay valid while we are
-            // dispatching to Mono, because user code could interact with entities and produce new events within that time, which
-            // means we need to rewind before Mono dispatch.
             var allocator    = state.WorldUpdateAllocator;
             var destinations = new NativeList<GraphicsGlobalBufferDestination>(allocator);
 

@@ -73,6 +73,16 @@ namespace Latios.Unsafe
         }
 
         /// <summary>
+        /// Count the number of elements for a specific thread index
+        /// </summary>
+        /// <param name="threadIndex">The thread index to get the count of elements written</param>
+        /// <returns>The number of elements written to the specifed thread index</returns>
+        public int CountForThreadIndex(int threadIndex)
+        {
+            return m_blockList.CountForIndex(threadIndex);
+        }
+
+        /// <summary>
         /// Returns true if the struct is not in a default uninitialized state.
         /// This may report true incorrectly if the memory where this instance
         /// exists was left uninitialized rather than cleared.
