@@ -1,4 +1,5 @@
 ﻿using Unity.Mathematics;
+using UnityEngine.UIElements;
 
 namespace Latios
 {
@@ -21,24 +22,15 @@ namespace Latios
             return new simdFloat3 { m_float3s = new float4x3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x) };
         }
 
-        public static float4 distancesq(simdFloat3 a, float3 b)
-        {
-            var t = a - b;
-            return dot(t, t);
-        }
-        public static float4 distancesq(float3 a, simdFloat3 b)
-        {
-            var t = a - b;
-            return dot(t, t);
-        }
-        public static float4 distancesq(simdFloat3 a, simdFloat3 b)
-        {
-            var t = a - b;
-            return dot(t, t);
-        }
+        public static float4 distancesq(simdFloat3 a, float3 b) => lengthsq(a - b);
+        public static float4 distancesq(float3 a, simdFloat3 b) => lengthsq(a - b);
+        public static float4 distancesq(simdFloat3 a, simdFloat3 b) => lengthsq(a - b);
+
+        public static float4 distance(simdFloat3 a, simdFloat3 b) => length(a - b);
+        public static float4 distance(float3 a, simdFloat3 b) => length(a - b);
+        public static float4 distance(simdFloat3 a, float3 b) => length(a - b);
 
         public static float4 lengthsq(simdFloat3 a) => dot(a, a);
-
         public static float4 length(simdFloat3 a) => math.sqrt(dot(a, a));
 
         public static simdFloat3 normalize(simdFloat3 x) {
@@ -180,6 +172,11 @@ namespace Latios
         public static bool4 isfiniteallxyz(simdFloat3 s)
         {
             return math.isfinite(s.x) & math.isfinite(s.y) & math.isfinite(s.z);
+        }
+
+        public static simdFloat3 clamp(simdFloat3 s, float3 min, float3 max)
+        {
+            return new simdFloat3(math.clamp(s.x, min.x, max.x), math.clamp(s.y, min.y, max.y), math.clamp(s.z, min.z, max.z));
         }
     }
 }

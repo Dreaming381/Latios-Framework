@@ -408,6 +408,7 @@ namespace Latios.Psyshock
                     float deltaImpulse = accumulatedImpulse - contactImpulse;
                     ApplyImpulse(deltaImpulse, bodyParameters.contactNormal, jacAngular.jacobianAngular, ref tempVelocityA, ref tempVelocityB, in massA, in massB,
                                  motionStabilizationSolverInputA.inverseInertiaScale, motionStabilizationSolverInputB.inverseInertiaScale);
+                    //UnityEngine.Debug.Log($"contact: {j} impulse: {deltaImpulse}, new velocity: {tempVelocityA.angular}, old velocity: {velocityA.angular}");
                     //if (math.abs(tempVelocityA.linear.z) > 0.25f)
                     //{
                     //    UnityEngine.Debug.Log(

@@ -385,12 +385,12 @@ namespace Latios.Psyshock
             var    faceIndex           = math.tzcnt(math.bitmask(new bool4(bestAxis, false))) + math.select(0, 3, bestAxisIsNegative);
             float4 ones                = 1f;
             float4 firstComponent      = new float4(-1f, 1f, 1f, -1f);
-            float4 secondCompPos       = new float4(1f, 1f, -1f, -1f);  // CW so that edge X plane_normal => outward
+            float4 secondCompPos       = new float4(1f, 1f, -1f, -1f);  // CCW so that edge X plane_normal => outward
             switch (faceIndex)
             {
                 case 0:  // positive X
                     plane    = new Plane(new float3(1f, 0f, 0f), -box.halfSize.x - box.center.x);
-                    vertices = new simdFloat3(ones, firstComponent, secondCompPos);
+                    vertices = new simdFloat3(ones, secondCompPos, firstComponent);
                     break;
                 case 1:  // positive Y
                     plane    = new Plane(new float3(0f, 1f, 0f), -box.halfSize.y - box.center.y);
@@ -398,11 +398,11 @@ namespace Latios.Psyshock
                     break;
                 case 2:  // positive Z
                     plane    = new Plane(new float3(0f, 0f, 1f), -box.halfSize.z - box.center.z);
-                    vertices = new simdFloat3(firstComponent, secondCompPos, ones);
+                    vertices = new simdFloat3(secondCompPos, firstComponent, ones);
                     break;
                 case 3:  // negative X
                     plane    = new Plane(new float3(-1f, 0f, 0f), -box.halfSize.x + box.center.x);
-                    vertices = new simdFloat3(-ones, firstComponent, -secondCompPos);
+                    vertices = new simdFloat3(-ones, secondCompPos, -firstComponent);
                     break;
                 case 4:  // negative Y
                     plane    = new Plane(new float3(0f, -1f, 0f), -box.halfSize.y + box.center.y);
@@ -410,7 +410,7 @@ namespace Latios.Psyshock
                     break;
                 case 5:  // negative Z
                     plane    = new Plane(new float3(0f, 0f, -1f), -box.halfSize.z + box.center.z);
-                    vertices = new simdFloat3(firstComponent, -secondCompPos, -ones);
+                    vertices = new simdFloat3(secondCompPos, -firstComponent, -ones);
                     break;
                 default:  // Should not happen
                     plane    = default;

@@ -633,6 +633,11 @@ namespace Latios.Kinemation.SparseUpload
         int                           m_CopyKernelIndex;
         int                           m_ReplaceKernelIndex;
 
+        UnityObjectRef<ComputeShader> m_copyBytesShader;
+        int                           m_src;
+        int                           m_dst;
+        int                           m_start;
+
         int m_SrcBufferID;
         int m_DstBufferID;
         int m_OperationsBaseID;
@@ -671,6 +676,11 @@ namespace Latios.Kinemation.SparseUpload
             m_SparseUploaderShader = latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("LatiosSparseUploader");
             m_CopyKernelIndex      = m_SparseUploaderShader.Value.FindKernel("CopyKernel");
             m_ReplaceKernelIndex   = m_SparseUploaderShader.Value.FindKernel("ReplaceKernel");
+
+            m_copyBytesShader = latiosWorld.LoadFromResourcesAndPreserve<ComputeShader>("CopyBytes");
+            m_src             = Shader.PropertyToID("_src");
+            m_dst             = Shader.PropertyToID("_dst");
+            m_start           = Shader.PropertyToID("_start");
 
             m_SrcBufferID          = Shader.PropertyToID("srcBuffer");
             m_DstBufferID          = Shader.PropertyToID("dstBuffer");
@@ -721,11 +731,24 @@ namespace Latios.Kinemation.SparseUpload
                 // Since we have no code such as Graphics.CopyBuffer(dst, src) currently
                 // we have to do this ourselves in a compute shader
                 var srcSize = m_DestinationBuffer.count * m_DestinationBuffer.stride;
-                m_SparseUploaderShader.SetBuffer(m_ReplaceKernelIndex, m_SrcBufferID, m_DestinationBuffer);
-                m_SparseUploaderShader.SetBuffer(m_ReplaceKernelIndex, m_DstBufferID, buffer);
-                m_SparseUploaderShader.SetInt(m_ReplaceOperationSize, srcSize);
+                //m_SparseUploaderShader.SetBuffer(m_ReplaceKernelIndex, m_SrcBufferID, m_DestinationBuffer);
+                //m_SparseUploaderShader.SetBuffer(m_ReplaceKernelIndex, m_DstBufferID, buffer);
+                //m_SparseUploaderShader.SetInt(m_ReplaceOperationSize, srcSize);
+                //
+                //m_SparseUploaderShader.Dispatch(m_ReplaceKernelIndex, 1, 1, 1);
 
-                m_SparseUploaderShader.Dispatch(m_ReplaceKernelIndex, 1, 1, 1);
+                m_copyBytesShader.SetBuffer(0, m_dst, buffer);
+                m_copyBytesShader.SetBuffer(0, m_src, m_DestinationBuffer);
+                uint threadGroupSize = 64;
+                for (uint dispatchesRemaining = ((uint)srcSize / 4 + threadGroupSize - 1) / threadGroupSize, start = 0; dispatchesRemaining > 0;)
+                {
+                    uint dispatchCount = math.min(dispatchesRemaining, 65535);
+                    m_copyBytesShader.SetInt(m_start, (int)(start * threadGroupSize));
+                    m_copyBytesShader.Dispatch(0, (int)dispatchCount, 1, 1);
+                    dispatchesRemaining -= dispatchCount;
+                    start               += dispatchCount;
+                    //UnityEngine.Debug.Log($"Dispatched buffer type: {m_bindingTarget} with dispatchCount: {dispatchCount}");
+                }
             }
 
             m_DestinationBuffer = buffer;
