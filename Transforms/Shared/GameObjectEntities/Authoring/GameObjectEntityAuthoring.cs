@@ -39,6 +39,8 @@ namespace Latios.Transforms
     {
         [SerializeField] GameObjectEntityBindingAuthoring hostEntity;
 
+        public bool enableTransformSyncing = true;
+
         [Tooltip("Applies only when no host is specified.")]
         public bool useUniformScale = false;
 
@@ -66,8 +68,11 @@ namespace Latios.Transforms
             if (guid.Equals(default))
             {
                 // Self-hosted
-                entityManager.AddComponent(entity, Abstract.QueryExtensions.GetAbstractWorldTransformRWComponentType());
-                entityManager.AddComponentData(entity, new CopyTransformToEntity { useUniformScale = useUniformScale });
+                if (enableTransformSyncing)
+                {
+                    entityManager.AddComponent(entity, Abstract.QueryExtensions.GetAbstractWorldTransformRWComponentType());
+                    entityManager.AddComponentData(entity, new CopyTransformToEntity { useUniformScale = useUniformScale });
+                }
 
                 s_initializeCache.Clear();
                 GetComponents(s_initializeCache);

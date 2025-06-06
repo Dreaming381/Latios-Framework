@@ -172,7 +172,7 @@ namespace Latios.Psyshock
                 }
                 case 5:  // A edge and B edge
                 {
-                    var edgeDirectionIndexA = (distanceResult.featureCodeA >> 2) & 0xff;
+                    var edgeDirectionIndexA = (distanceResult.featureCodeA) & 0xff;
                     var edgeDirectionA      = edgeDirectionIndexA switch
                     {
                         0 => math.normalize(triangleInB.pointB - triangleInB.pointA),
@@ -188,7 +188,6 @@ namespace Latios.Psyshock
                         2 => new float3(0f, 0f, 1f),
                         _ => default
                     };
-                    edgeDirectionA      = math.rotate(aInBTransform.rot, edgeDirectionA);
                     aLocalContactNormal = math.normalize(math.cross(edgeDirectionA, edgeDirectionB));
                     aLocalContactNormal = math.select(aLocalContactNormal,
                                                       -aLocalContactNormal,

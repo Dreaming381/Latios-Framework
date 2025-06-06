@@ -78,9 +78,11 @@ namespace Latios.Transforms.Systems
                     var transform = latiosWorldUnmanaged.GetManagedStructComponent<GameObjectEntity>(match.client);
                     latiosWorldUnmanaged.AddManagedStructComponent( match.host, transform);
                     latiosWorldUnmanaged.SetManagedStructComponent<GameObjectEntity>(match.client, default);  // Prevent disposal when entity is destroyed
-                    EntityManager.AddComponent<CopyTransformFromEntityTag>(match.host);
+                    var gameObjectEntity = transform.gameObjectTransform.GetComponent<GameObjectEntityAuthoring>();
+                    if (gameObjectEntity.enableTransformSyncing)
+                        EntityManager.AddComponent<CopyTransformFromEntityTag>(match.host);
 
-                    transform.gameObjectTransform.GetComponent<GameObjectEntityAuthoring>().entity = match.host;
+                    gameObjectEntity.entity = match.host;
                     m_initCache.Clear();
                     transform.gameObjectTransform.GetComponents(m_initCache);
                     foreach (var initializer in m_initCache)
