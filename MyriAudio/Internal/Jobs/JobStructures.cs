@@ -1,8 +1,4 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using Unity.Collections;
-using Unity.Entities;
-using Unity.Mathematics;
+﻿using Unity.Mathematics;
 
 namespace Latios.Myri
 {
@@ -13,6 +9,7 @@ namespace Latios.Myri
             None = 0x0,
             Clip = 0x1,
             SampleRateMultiplier = 0x2,
+            ChannelID = 0x10000000,
             Transform = 0x20000000,
             DistanceFalloff = 0x40000000,
             Cone = 0x80000000,
@@ -60,6 +57,7 @@ namespace Latios.Myri
     {
         public AudioListener  listener;
         public RigidTransform transform;
+        public int2           channelIDsRange;
     }
 
     internal struct AudioFrameBufferHistoryElement

@@ -26,6 +26,10 @@ namespace Latios.Myri.Authoring
         [Tooltip("If enabled, the entity will automatically be destroyed once the clip is finished playing. This option is ignored for looping sources.")]
         public bool autoDestroyOnFinish;
 
+        [Header("Channels")]
+        [Tooltip("Optionally specify the channel asset that listeners can reference to listen to this source.")]
+        public AudioChannelAsset audioChannel;
+
         [Header("Falloff")]
         public bool useFalloff = true;
         [Tooltip("When the listener is within this distance to the source, no falloff attenuation is applied")]
@@ -86,6 +90,11 @@ namespace Latios.Myri.Authoring
             if (!authoring.looping && authoring.autoDestroyOnFinish)
             {
                 baker.AddComponent<AudioSourceDestroyOneShotWhenFinished>(entity);
+            }
+
+            if (authoring.audioChannel != null)
+            {
+                baker.AddComponent(entity, authoring.audioChannel.GetChannelID(baker));
             }
 
             if (authoring.useFalloff)

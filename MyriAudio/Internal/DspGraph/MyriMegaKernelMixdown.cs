@@ -38,33 +38,43 @@ namespace Latios.Myri.DSP
                         continue;
 
                     listener.limiter = new BrickwallLimiter(listenerMeta.limiterSettings.preGain,
-                                                            listenerMeta.limiterSettings.limitDB,
-                                                            listenerMeta.limiterSettings.releaseDBPerSample,
+                                                            listenerMeta.limiterSettings.volume,
+                                                            listenerMeta.limiterSettings.releasePerSampleDB,
                                                             listenerMeta.limiterSettings.lookaheadSampleCount,
                                                             Allocator.AudioKernel);
                 }
                 else
                 {
                     listener.limiter.preGain            = listenerMeta.limiterSettings.preGain;
-                    listener.limiter.limitDB            = listenerMeta.limiterSettings.limitDB;
-                    listener.limiter.releasePerSampleDB = listenerMeta.limiterSettings.releaseDBPerSample;
+                    listener.limiter.volume             = listenerMeta.limiterSettings.volume;
+                    listener.limiter.releasePerSampleDB = listenerMeta.limiterSettings.releasePerSampleDB;
                     listener.limiter.SetLookaheadSampleCount(listenerMeta.limiterSettings.lookaheadSampleCount);
                 }
 
-                listener.limiter.ProcessFrame(ref listener.sampleFrame, true);
+                //listener.limiter.ProcessFrame(ref listener.sampleFrame, true);
                 for (int i = 0; i < finalFrame.length; i++)
                 {
+                    var leftIn  = listener.sampleFrame.left[i];
+                    var rightIn = listener.sampleFrame.right[i];
+                    listener.limiter.ProcessSample(leftIn, rightIn, out var leftOut, out var rightOut);
                     var left   = finalFrame.left;
                     var right  = finalFrame.right;
-                    left[i]   += listener.sampleFrame.left[i];
-                    right[i]  += listener.sampleFrame.right[i];
+                    left[i]   += leftOut;
+                    right[i]  += rightOut;
                 }
             }
 
-            m_masterLimiter.ProcessFrame(ref finalFrame, true);
-            var buffer = context.Outputs.GetSampleBuffer(0);
-            buffer.GetBuffer(0).CopyFrom(finalFrame.left);
-            buffer.GetBuffer(1).CopyFrom(finalFrame.right);
+            var buffer      = context.Outputs.GetSampleBuffer(0);
+            var bufferLeft  = buffer.GetBuffer(0);
+            var bufferRight = buffer.GetBuffer(1);
+            for (int i = 0; i < finalFrame.length; i++)
+            {
+                var leftIn  = finalFrame.left[i];
+                var rightIn = finalFrame.right[i];
+                m_masterLimiter.ProcessSample(leftIn, rightIn, out var leftOut, out var rightOut);
+                bufferLeft[i]  = leftOut;
+                bufferRight[i] = rightOut;
+            }
 
             m_profilingMixdown.End();
         }

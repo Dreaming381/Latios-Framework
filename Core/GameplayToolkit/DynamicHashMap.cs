@@ -103,7 +103,7 @@ namespace Latios
         /// <param name="key">The key to add.</param>
         /// <param name="value">The value to add.</param>
         /// <returns>True if the key-value pair was added.</returns>
-        public bool TryAdd(in TKey key, in TValue value) => TryAdd(in key, in value, false);
+        public bool TryAdd(in TKey key, in TValue value) => TryAdd(in key, in value, false, out _);
 
         /// <summary>
         /// Adds a new key-value pair if the key is not present, or replaces the value in the pair if the key is present.
@@ -111,7 +111,19 @@ namespace Latios
         /// <param name="key">The key to add.</param>
         /// <param name="value">The value to add.</param>
         /// <returns>True if the key-value pair was added.</returns>
-        public bool AddOrSet(in TKey key, in TValue value) => TryAdd(in key, in value, true);
+        public bool AddOrSet(in TKey key, in TValue value) => TryAdd(in key, in value, true, out _);
+
+        /// <summary>
+        /// Adds a new key-value pair using the default value if the key is not present. And then returns the pair with
+        /// the specified key.
+        /// </summary>
+        /// <param name="key">The key to obtain the ref for</param>
+        /// <returns>The pair with the specified key, either newly created, or already existing</returns>
+        public PairRef GetOrAdd(in TKey key)
+        {
+            TryAdd(in key, default, false, out var dst);
+            return new PairRef { pair = m_buffer.AsNativeArray().GetSubArray(dst, 1) };
+        }
 
         /// <summary>
         /// Retrieves the value associated with a key if the key is present.
@@ -128,6 +140,27 @@ namespace Latios
                 return false;
             }
             value = *result;
+            return true;
+        }
+
+        /// <summary>
+        /// Retrieves the key-value pair for the given key if present
+        /// </summary>
+        /// <param name="key">The key to look up</param>
+        /// <param name="pair">Outputs the found pair for the specified key. Outputs a default structure if the key was not present.</param>
+        /// <returns>True if the key was present.</returns>
+        public unsafe bool TryGet(in TKey key, out PairRef pair)
+        {
+            var result = Find(in key, (Pair*)m_buffer.GetUnsafeReadOnlyPtr());
+            if (result == null)
+            {
+                pair = default;
+                return false;
+            }
+            var ptr        = (byte*)result;
+            var byteOffset = ptr - (byte*)m_buffer.GetUnsafeReadOnlyPtr();
+            var index      = (int)(byteOffset / UnsafeUtility.SizeOf<Pair>());
+            pair           = new PairRef { pair = m_buffer.AsNativeArray().GetSubArray(index, 1) };
             return true;
         }
 
@@ -262,6 +295,30 @@ namespace Latios
                 get => (int)(meta & 0x7fffffff);
                 set => meta = (meta & 0x80000000) | (uint)value;
             }
+        }
+
+        /// <summary>
+        /// A type which provides temporary read access to a key and write access to a value within a found key-value pair.
+        /// This instance may be invalidated when the hashmap has an element added to it
+        /// </summary>
+        public unsafe struct PairRef
+        {
+            internal NativeArray<Pair> pair;
+
+            /// <summary>
+            /// The key of this pair
+            /// </summary>
+            public TKey key => pair[0].key;
+            /// <summary>
+            /// Write access to the value of this pair. This is a temporary ref that is unsafe to hold onto when making other
+            /// transactions on the DynamicHashMap. Prefer to retain as a PairRef instead for added safety.
+            /// </summary>
+            public ref TValue valueRW => ref ((Pair*)pair.GetUnsafePtr())->value;
+            /// <summary>
+            /// Read acces to the value of this pair. This is a temporary ref that is unsafe to hold onto when making other
+            /// transactions on the DynamicHashMap. Prefer to retain as a PairRef instead for added safety.
+            /// </summary>
+            public ref readonly TValue valueRO => ref ((Pair*)pair.GetUnsafeReadOnlyPtr())->value;
         }
 
         /// <summary>
@@ -456,11 +513,12 @@ namespace Latios
             m_buffer.Length                = lastIndex + 1;
         }
 
-        bool TryAdd(in TKey key, in TValue value, bool replace)
+        bool TryAdd(in TKey key, in TValue value, bool replace, out int dstIndex)
         {
             Tidy();
             var     bucket    = GetBucket(in key);
             ref var candidate = ref m_buffer.ElementAt(bucket);
+            dstIndex          = bucket;
             if (candidate.isOccupied)
             {
                 for (int safetyBreakout = 0; safetyBreakout < m_buffer.Length; safetyBreakout++)
@@ -475,6 +533,7 @@ namespace Latios
                     if (candidate.nextIndex == 0 || candidate.nextIndex >= m_buffer.Length - 1)
                     {
                         ref var last = ref m_buffer.ElementAt(m_buffer.Length - 1);
+                        dstIndex     = m_buffer.Length - 1;
                         if (!last.isOccupied)
                         {
                             // Last is likely padding to ensure the capacity can be computed correctly.
@@ -497,14 +556,16 @@ namespace Latios
                             ReallocUp(m_capacity * 2);
 
                             // Start over
-                            return TryAdd(in key, in value);
+                            return TryAdd(in key, in value, replace, out dstIndex);
                         }
                         last.nextIndex              = 0;
                         candidate.nextIndex         = m_buffer.Length;
+                        dstIndex                    = m_buffer.Length;
                         m_buffer.Add(new Pair { key = key, value = value, meta = (uint)m_count | 0x80000000 });
                         IncrementCount();
                         return true;
                     }
+                    dstIndex  = candidate.nextIndex;
                     candidate = ref m_buffer.ElementAt(candidate.nextIndex);
                 }
 

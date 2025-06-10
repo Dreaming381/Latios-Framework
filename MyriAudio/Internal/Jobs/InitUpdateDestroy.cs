@@ -16,17 +16,20 @@ namespace Latios.Myri
         [BurstCompile]
         public struct UpdateListenersJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<AudioListener>      listenerHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
-            public NativeList<ListenerWithTransform>                  listenersWithTransforms;
-            public NativeArray<int>                                   channelCount;
-            public NativeArray<int>                                   sourceChunkChannelCount;
-            public int                                                sourceChunkCount;
+            [ReadOnly] public ComponentTypeHandle<AudioListener>       listenerHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle  worldTransformHandle;
+            [ReadOnly] public BufferTypeHandle<AudioListenerChannelID> channelGuidHandle;
+            public NativeList<ListenerWithTransform>                   listenersWithTransforms;
+            public NativeList<AudioSourceChannelID>                    listenersChannelIDs;
+            public NativeArray<int>                                    channelCount;
+            public NativeArray<int>                                    sourceChunkChannelCount;
+            public int                                                 sourceChunkCount;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var listeners       = chunk.GetNativeArray(ref listenerHandle);
                 var worldTransforms = worldTransformHandle.Resolve(chunk);
+                var channelsBuffers = chunk.GetBufferAccessor(ref channelGuidHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var l = listeners[i];
@@ -34,9 +37,20 @@ namespace Latios.Myri
                     //Todo: Figure out how to bring this optimization back.
                     //if (l.volume > 0f)
                     {
-                        l.itdResolution                                                  = math.clamp(l.itdResolution, 0, 15);
+                        int2 range;
+                        if (channelsBuffers.Length > 0)
+                        {
+                            var buffer = channelsBuffers[i];
+                            range      = new int2(listenersChannelIDs.Length, buffer.Length);
+                            listenersChannelIDs.AddRange(buffer.AsNativeArray().Reinterpret<AudioSourceChannelID>());
+                        }
+                        else
+                        {
+                            range = new int2(listenersChannelIDs.Length, 0);
+                        }
+
                         var transform                                                    = new RigidTransform(worldTransforms[i].rotation, worldTransforms[i].position);
-                        listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform });
+                        listenersWithTransforms.Add(new ListenerWithTransform { listener = l, transform = transform, channelIDsRange = range });
 
                         var channelsInListener      = l.ildProfile.Value.anglesPerLeftChannel.Length + l.ildProfile.Value.anglesPerRightChannel.Length;
                         channelCount[0]            += channelsInListener;
@@ -56,6 +70,7 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<AudioSourceSampleRateMultiplier> sampleRateMultiplierHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceDistanceFalloff>      distanceFalloffHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>          emitterConeHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioSourceChannelID>            channelIDHandle;
             [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle              worldTransformHandle;
             [ReadOnly] public NativeReference<int>                                 audioFrame;
             [ReadOnly] public NativeReference<int>                                 lastPlayedAudioFrame;
@@ -73,6 +88,7 @@ namespace Latios.Myri
                 var sampleRateMultipliers = chunk.GetComponentDataPtrRO(ref sampleRateMultiplierHandle);
                 var falloffs              = chunk.GetComponentDataPtrRO(ref distanceFalloffHandle);
                 var cones                 = chunk.GetComponentDataPtrRO(ref emitterConeHandle);
+                var channelGuids          = chunk.GetComponentDataPtrRO(ref channelIDHandle);
                 var expireMask            = chunk.GetEnabledMask(ref expireHandle);
 
                 stream.BeginForEachIndex(unfilteredChunkIndex);
@@ -192,6 +208,11 @@ namespace Latios.Myri
                         features  |= CapturedSourceHeader.Features.SampleRateMultiplier;
                         byteCount += 8;  // double is 8 bytes
                     }
+                    if (channelGuids != null)
+                    {
+                        features  |= CapturedSourceHeader.Features.ChannelID;
+                        byteCount += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceChannelID>(), 8);
+                    }
                     if (falloffs != null)
                     {
                         features  |= CapturedSourceHeader.Features.Transform | CapturedSourceHeader.Features.DistanceFalloff;
@@ -230,6 +251,11 @@ namespace Latios.Myri
                             UnsafeUtility.CopyStructureToPtr(ref cones[i], ptr);
                             ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceEmitterCone>(), 8);
                         }
+                    }
+                    if (channelGuids != null)
+                    {
+                        UnsafeUtility.CopyStructureToPtr(ref channelGuids[i], ptr);
+                        ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceChannelID>(), 8);
                     }
                 }
                 stream.EndForEachIndex();

@@ -1,12 +1,17 @@
-using System;
 using Unity.Collections;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
 {
+    // This is a brickwall limiter with lookahead. The way such filters work is they add a delay to the signal in order to "see ahead".
+    // From this, they can begin gradually attenuating the signal prior to the sample that would have otherwise had a magnitude greater
+    // than 1.0f. The gradual attenuation prevents clicking noises that would otherwise occur from sudden attenuation spikes.
+
+    // This initial implementation is a naive brute-force implementation which searches through all lookahead samples for the extreme
+    // slope for every sample. This costs 1.2 ms on my system. There is definitely room for optimization here.
+
     // Make public on release
-    internal struct BrickwallLimiter : IDisposable
+    internal struct BrickwallLimiter
     {
         /// <summary>
         /// At 48000 Hz, this works out to 7.8 DB per second.
@@ -14,7 +19,7 @@ namespace Latios.Myri.DSP
         /// </summary>
         public const float kDefaultReleaseDBPerSample   = 10f / 60f / 1024f;
         public const float kDefaultPreGain              = 1f;
-        public const float kDefaultLimitDB              = 0f;
+        public const float kDefaultVolume               = 1f;
         public const int   kDefaultLookaheadSampleCount = 256;
 
         SampleQueue                      m_delayQueueL;
@@ -22,16 +27,18 @@ namespace Latios.Myri.DSP
         SampleQueue                      m_delayAmplitudeDB;
         AllocatorManager.AllocatorHandle m_allocator;
         float                            m_preGain;
-        float                            m_limitDB;
+        float                            m_preGainDB;
+        float                            m_volume;
         float                            m_releasePerSampleDB;
         float                            m_currentAttenuationDB;
 
-        public BrickwallLimiter(float preGain, float limitDB, float releaseDBPerSample, int lookaheadSampleCount, AllocatorManager.AllocatorHandle allocator)
+        public BrickwallLimiter(float initialPreGain, float initialVolume, float initialReleaseDBPerSample, int lookaheadSampleCount, AllocatorManager.AllocatorHandle allocator)
         {
             m_allocator            = allocator;
-            m_preGain              = preGain;
-            m_limitDB              = limitDB;
-            m_releasePerSampleDB   = releaseDBPerSample;
+            m_preGain              = initialPreGain;
+            m_preGainDB            = SampleUtilities.ConvertToDB(initialPreGain);
+            m_volume               = initialVolume;
+            m_releasePerSampleDB   = initialReleaseDBPerSample;
             m_currentAttenuationDB = 0f;
             m_delayQueueL          = new SampleQueue(lookaheadSampleCount, allocator);
             m_delayQueueR          = new SampleQueue(lookaheadSampleCount, allocator);
@@ -47,82 +54,20 @@ namespace Latios.Myri.DSP
 
         public bool isCreated => m_delayQueueL.isCreated;
 
-        public void ProcessFrame(ref SampleFrame frame, bool outputConnected)
-        {
-            var left               = frame.left;
-            var right              = frame.right;
-            int currentSampleIndex = 0;
-
-            while (m_delayQueueL.count < m_delayQueueL.capacity && currentSampleIndex < left.Length)
-            {
-                m_delayQueueL.Enqueue(math.select(0f, left[currentSampleIndex] * m_preGain, frame.connected));
-                m_delayQueueR.Enqueue(math.select(0f, right[currentSampleIndex] * m_preGain, frame.connected));
-                float max = math.max(math.abs(left[currentSampleIndex]), math.abs(right[currentSampleIndex])) * m_preGain;
-                m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(math.select(0f, max, frame.connected)));
-                if (outputConnected)
-                {
-                    left[currentSampleIndex]  = 0f;
-                    right[currentSampleIndex] = 0f;
-                }
-                currentSampleIndex++;
-            }
-
-            if (currentSampleIndex >= frame.length)
-            {
-                frame.connected = false;
-                return;
-            }
-
-            while (currentSampleIndex < frame.length)
-            {
-                var leftSample        = m_delayQueueL.Dequeue();
-                var rightSample       = m_delayQueueR.Dequeue();
-                var amplitudeSampleDB = m_delayAmplitudeDB.Dequeue();
-
-                // Clamp the attenuation to whatever the sample needs
-                m_currentAttenuationDB = math.min(m_currentAttenuationDB, m_limitDB - amplitudeSampleDB);
-
-                if (outputConnected)
-                {
-                    var currentAttenuation    = SampleUtilities.ConvertDBToRawAttenuation(m_currentAttenuationDB);
-                    left[currentSampleIndex]  = leftSample * currentAttenuation;
-                    right[currentSampleIndex] = rightSample * currentAttenuation;
-                }
-
-                // Add back to the queue
-                {
-                    m_delayQueueL.Enqueue(math.select(0f, left[currentSampleIndex] * m_preGain, frame.connected));
-                    m_delayQueueR.Enqueue(math.select(0f, right[currentSampleIndex] * m_preGain, frame.connected));
-                    float max = math.max(math.abs(left[currentSampleIndex]), math.abs(right[currentSampleIndex])) * m_preGain;
-                    m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(math.select(0f, max, frame.connected)));
-                }
-
-                // Find the maximally decreasing attenuation slope in the lookahead queue
-                float slope = float.MaxValue;
-                for (int i = 0; i < m_delayAmplitudeDB.count; i++)
-                {
-                    float newSlope = (m_limitDB - m_delayAmplitudeDB[i] - m_currentAttenuationDB) / (i + 1);
-                    slope          = math.min(slope, newSlope);
-                }
-
-                // Update the attenuation for the next sample
-                m_currentAttenuationDB += math.select(slope, m_releasePerSampleDB, slope > 0f);
-                m_currentAttenuationDB  = math.min(m_currentAttenuationDB, 0f);
-            }
-
-            frame.connected = true;
-        }
-
         public float preGain
         {
             get => m_preGain;
-            set => m_preGain = value;
+            set
+            {
+                m_preGain   = value;
+                m_preGainDB = SampleUtilities.ConvertToDB(m_preGain);
+            }
         }
 
-        public float limitDB
+        public float volume
         {
-            get => m_limitDB;
-            set => m_limitDB = value;
+            get => m_volume;
+            set => m_volume = value;
         }
 
         public float releasePerSampleDB
@@ -132,6 +77,60 @@ namespace Latios.Myri.DSP
         }
 
         public int lookaheadSampleCount => m_delayAmplitudeDB.capacity;
+
+        public void ProcessSample(float leftIn, float rightIn, out float leftOut, out float rightOut)
+        {
+            if (m_delayQueueL.count < m_delayQueueL.capacity)
+            {
+                m_delayQueueL.Enqueue(leftIn);
+                m_delayQueueR.Enqueue(rightIn);
+                var max = math.max(math.abs(leftIn), math.abs(rightIn));
+                m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(max));
+                leftOut  = 0f;
+                rightOut = 0f;
+                return;
+            }
+
+            var leftSample        = m_delayQueueL.Dequeue();
+            var rightSample       = m_delayQueueR.Dequeue();
+            var amplitudeSampleDB = m_delayAmplitudeDB.Dequeue();
+
+            // Clamp the attenuation to whatever the sample needs
+            m_currentAttenuationDB = math.min(m_currentAttenuationDB, -(amplitudeSampleDB + m_preGainDB));
+
+            var factor = m_preGain * m_volume * SampleUtilities.ConvertDBToRawAttenuation(m_currentAttenuationDB);
+            leftOut    = leftSample * factor;
+            rightOut   = rightSample * factor;
+
+            // Add back to the queue
+            {
+                m_delayQueueL.Enqueue(leftIn);
+                m_delayQueueR.Enqueue(rightIn);
+                var max = math.max(math.abs(leftIn), math.abs(rightIn));
+                m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(max));
+            }
+
+            // Find the maximally decreasing attenuation slope in the lookahead queue
+            float slope = float.MaxValue;
+            for (int i = 0; i < m_delayAmplitudeDB.count; i++)
+            {
+                float newSlope = (-(m_preGainDB + m_delayAmplitudeDB[i]) - m_currentAttenuationDB) / (i + 1);
+                slope          = math.min(slope, newSlope);
+            }
+
+            // Update the attenuation for the next sample
+            m_currentAttenuationDB += math.select(slope, m_releasePerSampleDB, slope > 0f);
+            m_currentAttenuationDB  = math.min(m_currentAttenuationDB, 0f);
+        }
+
+        public void ResetAttenuation() => m_currentAttenuationDB = 0f;
+
+        public void ClearLookahead()
+        {
+            m_delayQueueL.Clear();
+            m_delayQueueR.Clear();
+            m_delayAmplitudeDB.Clear();
+        }
 
         public void SetLookaheadSampleCount(int lookaheadSampleCount)
         {
@@ -157,15 +156,6 @@ namespace Latios.Myri.DSP
             oldLeft.Dispose();
             oldRight.Dispose();
             oldDb.Dispose();
-        }
-
-        public void ResetAttenuation() => m_currentAttenuationDB = 0f;
-
-        public void ClearLookahead()
-        {
-            m_delayQueueL.Clear();
-            m_delayQueueR.Clear();
-            m_delayAmplitudeDB.Clear();
         }
     }
 }

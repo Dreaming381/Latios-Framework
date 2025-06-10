@@ -298,7 +298,7 @@ namespace Latios.Kinemation
 
                 uint size = math.ceilpow2(requiredSize);
                 if (requiredSize * m_stride > 1024 * 1024 * 1024)
-                    Debug.LogWarning("Attempted to allocate a mesh deformation buffer over 1 GB. Rendering artifacts may occur.");
+                    Debug.LogWarning("Attempted to allocate a persistent graphics buffer over 1 GB. Rendering artifacts may occur.");
                 if (requiredSize * m_stride < 1024 * 1024 * 1024 && size * m_stride > 1024 * 1024 * 1024)
                     size        = 1024 * 1024 * 1024 / m_stride;
                 var prevBuffer  = m_currentBuffer;

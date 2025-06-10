@@ -8,6 +8,24 @@ namespace Latios.Myri
     public struct AudioSettings : IComponentData
     {
         /// <summary>
+        /// The final output volume for everything in Myri, clamped to the range [0, 1].
+        /// </summary>
+        public float masterVolume;
+        /// <summary>
+        /// A gain value that is applied to the mixed audio signal before the final limiter is applied.
+        /// </summary>
+        public float masterGain;
+        /// <summary>
+        ///  How quickly the volume should recover after an audio spike.
+        /// </summary>
+        public float masterLimiterDBRelaxPerSecond;
+        /// <summary>
+        /// The amount of time in advance that the final limiter should examine samples for spikes so
+        /// that it can begin ramping down the volume. Larger values result in smoother transitions
+        /// but add latency to the final output.
+        /// </summary>
+        public float masterLimiterLookaheadTime;
+        /// <summary>
         /// The number of additional audio frames to generate in case the main thread stalls
         /// </summary>
         public int safetyAudioFrames;

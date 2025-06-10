@@ -125,7 +125,7 @@ namespace Latios.Myri.DSP
             ref long location = ref UnsafeUtility.AsRef<long>(m_packedFrameCounterBufferId);
             Interlocked.Exchange(ref location, packed);
 
-            m_profilingReceivedBuffers.Begin();
+            m_profilingReceivedBuffers.End();
         }
 
         #region Effects
@@ -541,8 +541,8 @@ namespace Latios.Myri.DSP
         void ProcessMaster(ref DspUpdateBuffer dspUpdateBuffer)
         {
             m_masterLimiter.preGain            = dspUpdateBuffer.masterLimiterSettings.preGain;
-            m_masterLimiter.limitDB            = dspUpdateBuffer.masterLimiterSettings.limitDB;
-            m_masterLimiter.releasePerSampleDB = dspUpdateBuffer.masterLimiterSettings.releaseDBPerSample;
+            m_masterLimiter.volume             = dspUpdateBuffer.masterLimiterSettings.volume;
+            m_masterLimiter.releasePerSampleDB = dspUpdateBuffer.masterLimiterSettings.releasePerSampleDB;
             m_masterLimiter.SetLookaheadSampleCount(dspUpdateBuffer.masterLimiterSettings.lookaheadSampleCount);
         }
         #endregion

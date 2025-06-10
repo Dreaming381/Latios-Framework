@@ -1,4 +1,5 @@
 ﻿using Latios.Myri.Driver;
+using Latios.Myri.DSP;
 using Latios.Transforms.Abstract;
 using Unity.Audio;
 using Unity.Burst;
@@ -24,13 +25,10 @@ namespace Latios.Myri.Systems
         private int      m_sampleRate;
         private int      m_samplesPerFrame;
 
-        private DSPNode              m_mixNode;
-        private DSPConnection        m_mixToLimiterMasterConnection;
-        private NativeList<int>      m_mixNodePortFreelist;
-        private NativeReference<int> m_mixNodePortCount;
-
-        private DSPNode       m_limiterMasterNode;
-        private DSPConnection m_limiterMasterToOutputConnection;
+        private DSPNode              m_masterMixNode;
+        private DSPConnection        m_masterMixToOutputConnection;
+        private NativeList<int>      m_masterMixNodePortFreelist;
+        private NativeReference<int> m_masterMixNodePortCount;
 
         private DSPNode                                     m_ildNode;
         private NativeReference<int>                        m_ildNodePortCount;
@@ -60,9 +58,13 @@ namespace Latios.Myri.Systems
 
             latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new AudioSettings
             {
+                masterVolume                  = 1f,
+                masterGain                    = 1f,
+                masterLimiterDBRelaxPerSecond = BrickwallLimiter.kDefaultReleaseDBPerSample * 48000f,
+                masterLimiterLookaheadTime    = 255.9f / 48000f,
                 safetyAudioFrames             = 2,
                 audioFramesPerUpdate          = 1,
-                lookaheadAudioFrames          = 0,
+                lookaheadAudioFrames          = 1,
                 logWarningIfBuffersAreStarved = false
             });
 
@@ -88,8 +90,8 @@ namespace Latios.Myri.Systems
             m_initialized = true;
 
             // Initialize containers first
-            m_mixNodePortFreelist          = new NativeList<int>(Allocator.Persistent);
-            m_mixNodePortCount             = new NativeReference<int>(Allocator.Persistent);
+            m_masterMixNodePortFreelist    = new NativeList<int>(Allocator.Persistent);
+            m_masterMixNodePortCount       = new NativeReference<int>(Allocator.Persistent);
             m_ildNodePortCount             = new NativeReference<int>(Allocator.Persistent);
             m_packedFrameCounterBufferId   = new NativeReference<long>(Allocator.Persistent);
             m_audioFrame                   = new NativeReference<int>(Allocator.Persistent);
@@ -108,14 +110,10 @@ namespace Latios.Myri.Systems
             m_driverKey  = DriverManager.RegisterGraph(ref m_graph);
 
             var commandBlock = m_graph.CreateCommandBlock();
-            m_mixNode        = commandBlock.CreateDSPNode<MixStereoPortsNode.Parameters, MixStereoPortsNode.SampleProviders, MixStereoPortsNode>();
-            commandBlock.AddOutletPort(m_mixNode, 2);
-            m_limiterMasterNode = commandBlock.CreateDSPNode<BrickwallLimiterNode.Parameters, BrickwallLimiterNode.SampleProviders, BrickwallLimiterNode>();
-            commandBlock.AddInletPort(m_limiterMasterNode, 2);
-            commandBlock.AddOutletPort(m_limiterMasterNode, 2);
-            m_mixToLimiterMasterConnection    = commandBlock.Connect(m_mixNode, 0, m_limiterMasterNode, 0);
-            m_limiterMasterToOutputConnection = commandBlock.Connect(m_limiterMasterNode, 0, m_graph.RootDSP, 0);
-            m_ildNode                         = commandBlock.CreateDSPNode<ReadIldBuffersNode.Parameters, ReadIldBuffersNode.SampleProviders, ReadIldBuffersNode>();
+            m_masterMixNode  = commandBlock.CreateDSPNode<MasterMixNode.Parameters, MasterMixNode.SampleProviders, MasterMixNode>();
+            commandBlock.AddOutletPort(m_masterMixNode, 2);
+            m_masterMixToOutputConnection = commandBlock.Connect(m_masterMixNode, 0, m_graph.RootDSP, 0);
+            m_ildNode                     = commandBlock.CreateDSPNode<ReadIldBuffersNode.Parameters, ReadIldBuffersNode.SampleProviders, ReadIldBuffersNode>();
             unsafe
             {
                 commandBlock.UpdateAudioKernel<SetReadIldBuffersNodePackedFrameBufferId, ReadIldBuffersNode.Parameters, ReadIldBuffersNode.SampleProviders, ReadIldBuffersNode>(
@@ -126,11 +124,15 @@ namespace Latios.Myri.Systems
 
             // Force initialization of Burst
             commandBlock  = m_graph.CreateCommandBlock();
-            var dummyNode = commandBlock.CreateDSPNode<MixPortsToStereoNode.Parameters, MixPortsToStereoNode.SampleProviders, MixPortsToStereoNode>();
+            var dummyNode = commandBlock.CreateDSPNode<ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>();
             StateVariableFilterNode.Create(commandBlock, StateVariableFilterNode.FilterType.Bandpass, 0f, 0f, 0f, 1);
-            commandBlock.UpdateAudioKernel<MixPortsToStereoNodeUpdate, MixPortsToStereoNode.Parameters, MixPortsToStereoNode.SampleProviders, MixPortsToStereoNode>(
-                new MixPortsToStereoNodeUpdate { leftChannelCount = 0 },
+            commandBlock.UpdateAudioKernel<ListenerMixNodeChannelUpdate, ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>(
+                new ListenerMixNodeChannelUpdate { leftChannelCount = 0 },
                 dummyNode);
+            commandBlock.UpdateAudioKernel<MasterMixNodeUpdate, MasterMixNode.Parameters, MasterMixNode.SampleProviders, MasterMixNode>(new MasterMixNodeUpdate {
+                settings = default
+            },
+                                                                                                                                        m_masterMixNode);
             commandBlock.UpdateAudioKernel<ReadIldBuffersNodeUpdate, ReadIldBuffersNode.Parameters, ReadIldBuffersNode.SampleProviders, ReadIldBuffersNode>(new ReadIldBuffersNodeUpdate
             {
                 ildBuffer = new IldBuffer(),
@@ -172,6 +174,7 @@ namespace Latios.Myri.Systems
             var ecb                      = latiosWorld.syncPoint.CreateEntityCommandBuffer();
             var dspCommandBlock          = m_graph.CreateCommandBlock();
             var listenersWithTransforms  = new NativeList<ListenerWithTransform>(aliveListenerEntities.Length, state.WorldUpdateAllocator);
+            var listenersChannelIDs      = new NativeList<AudioSourceChannelID>(aliveListenerEntities.Length, state.WorldUpdateAllocator);
             var listenerBufferParameters = CollectionHelper.CreateNativeArray<ListenerBufferParameters>(aliveListenerEntities.Length,
                                                                                                         state.WorldUpdateAllocator,
                                                                                                         NativeArrayOptions.UninitializedMemory);
@@ -191,8 +194,10 @@ namespace Latios.Myri.Systems
             var captureListenersJH = new InitUpdateDestroy.UpdateListenersJob
             {
                 listenerHandle          = GetComponentTypeHandle<AudioListener>(true),
+                channelGuidHandle       = GetBufferTypeHandle<AudioListenerChannelID>(true),
                 worldTransformHandle    = m_worldTransformHandle,
                 listenersWithTransforms = listenersWithTransforms,
+                listenersChannelIDs     = listenersChannelIDs,
                 channelCount            = channelCount,
                 sourceChunkChannelCount = chunkChannelCount,
                 sourceChunkCount        = sourcesChunkCount
@@ -222,9 +227,9 @@ namespace Latios.Myri.Systems
                 worldBlackboardEntity           = latiosWorld.worldBlackboardEntity,
                 audioFrame                      = m_audioFrame,
                 audioFrameHistory               = m_audioFrameHistory,
-                systemMixNodePortFreelist       = m_mixNodePortFreelist,
-                systemMixNodePortCount          = m_mixNodePortCount,
-                systemMixNode                   = m_mixNode,
+                systemMasterMixNodePortFreelist = m_masterMixNodePortFreelist,
+                systemMasterMixNodePortCount    = m_masterMixNodePortCount,
+                systemMasterMixNode             = m_masterMixNode,
                 systemIldNodePortCount          = m_ildNodePortCount,
                 systemIldNode                   = m_ildNode,
                 commandBlock                    = dspCommandBlock,
@@ -232,7 +237,8 @@ namespace Latios.Myri.Systems
                 outputSamplesMegaBuffer         = ildBuffer.buffer,
                 outputSamplesMegaBufferChannels = ildBuffer.channels,
                 bufferId                        = m_currentBufferId,
-                samplesPerFrame                 = m_samplesPerFrame
+                samplesPerFrame                 = m_samplesPerFrame,
+                sampleRate                      = m_sampleRate,
             }.Schedule(JobHandle.CombineDependencies(captureListenersJH, captureFrameJH));
 
             var updateSourcesJH = new InitUpdateDestroy.UpdateClipAudioSourcesJob
@@ -240,6 +246,7 @@ namespace Latios.Myri.Systems
                 audioFrame                 = m_audioFrame,
                 lastPlayedAudioFrame       = m_lastPlayedAudioFrame,
                 bufferId                   = m_currentBufferId,
+                channelIDHandle            = GetComponentTypeHandle<AudioSourceChannelID>(true),
                 clipHandle                 = GetComponentTypeHandle<AudioSourceClip>(false),
                 distanceFalloffHandle      = GetComponentTypeHandle<AudioSourceDistanceFalloff>(true),
                 emitterConeHandle          = GetComponentTypeHandle<AudioSourceEmitterCone>(true),
@@ -259,7 +266,7 @@ namespace Latios.Myri.Systems
 
             // If there are no sources, then we should early out. Otherwise NativeStream has a bad time.
             JobHandle shipItJH = state.Dependency;
-            if (sourcesChunkCount > 0)
+            if (sourcesChunkCount > 0 && aliveListenerEntities.Length > 0)
             {
                 // Deferred Containers
                 var allocateChunkChannelStreamsJH = NativeStream.ScheduleConstruct(out var chunkChannelStreams, chunkChannelCount, captureListenersJH, state.WorldUpdateAllocator);
@@ -270,7 +277,8 @@ namespace Latios.Myri.Systems
                     capturedSources         = capturedSourcesStream.AsReader(),
                     channelCount            = channelCount,
                     chunkChannelStreams     = chunkChannelStreams.AsWriter(),
-                    listenersWithTransforms = listenersWithTransforms.AsDeferredJobArray()
+                    listenersWithTransforms = listenersWithTransforms.AsDeferredJobArray(),
+                    listenersChannelIDs     = listenersChannelIDs.AsDeferredJobArray(),
                 }.ScheduleParallel(sourcesChunkCount, 1, JobHandle.CombineDependencies(allocateChunkChannelStreamsJH, updateSourcesJH));
 
                 var batchingJH = new Batching.BatchJob
@@ -339,17 +347,15 @@ namespace Latios.Myri.Systems
                 s.ildConnections.Dispose();
                 s.connections.Dispose();
             }
-            commandBlock.Disconnect(m_mixToLimiterMasterConnection);
-            commandBlock.Disconnect(m_limiterMasterToOutputConnection);
+            commandBlock.Disconnect(m_masterMixToOutputConnection);
             commandBlock.ReleaseDSPNode(m_ildNode);
-            commandBlock.ReleaseDSPNode(m_mixNode);
-            commandBlock.ReleaseDSPNode(m_limiterMasterNode);
+            commandBlock.ReleaseDSPNode(m_masterMixNode);
             commandBlock.Complete();
             DriverManager.DeregisterAndDisposeGraph(m_driverKey);
 
             m_lastUpdateJobHandle.Complete();
-            m_mixNodePortFreelist.Dispose();
-            m_mixNodePortCount.Dispose();
+            m_masterMixNodePortFreelist.Dispose();
+            m_masterMixNodePortCount.Dispose();
             m_ildNodePortCount.Dispose();
             m_packedFrameCounterBufferId.Dispose();
             m_audioFrame.Dispose();

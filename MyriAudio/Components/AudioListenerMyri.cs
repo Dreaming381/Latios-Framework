@@ -16,16 +16,52 @@ namespace Latios.Myri
         /// This value is not in decibels.
         /// </summary>
         public float volume;
+        /// <summary>
+        /// A gain value that is applied to the mixed audio signal before the listener limiter is applied.
+        /// </summary>
+        public float gain;
+        /// <summary>
+        ///  How quickly the volume should recover after an audio spike.
+        /// </summary>
+        public float limiterDBRelaxPerSecond;
+        /// <summary>
+        /// The amount of time in advance that the limiter should examine samples for spikes so
+        /// that it can begin ramping down the volume. Larger values result in smoother transitions
+        /// but add latency to the final output.
+        /// </summary>
+        public float limiterLookaheadTime;
+
+        /// <summary>
+        /// A multiplier that should be applied to all source spatial ranges.
+        /// </summary>
+        public half rangeMultiplier;
+
+        internal ushort packed;
+        internal int    unused;
 
         /// <summary>
         /// The resolution of time-based spatialization to apply between the range of 0 and 15.
         /// Higher values are more expensive but may provide a better sense of direction for the listener.
         /// </summary>
-        public int itdResolution;
+        public int itdResolution
+        {
+            get => Bits.GetBits(packed, 0, 4);
+            set => Bits.SetBits(ref packed, 0, 4, (byte)math.clamp(value, 0, 15));
+        }
         /// <summary>
         /// The profile which specifies volume and frequency-based filtering spatialization.
         /// </summary>
         public BlobAssetReference<ListenerProfileBlob> ildProfile;
+    }
+
+    /// <summary>
+    /// A list of audio source channels represented as GUIDs that this listener can hear.
+    /// A default entry allows it to hear sources without an AudioSourceChannelGuid.
+    /// </summary>
+    [InternalBufferCapacity(3)]  // Make this fill a full cache line, since there aren't many listeners to concern ourselves with chunk occupancy.
+    public struct AudioListenerChannelID : IBufferElementData
+    {
+        public AudioSourceChannelID channel;
     }
 
     /// <summary>

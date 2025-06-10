@@ -25,7 +25,7 @@ namespace Latios.Myri.Driver
         {
             if (!DriverSelection.useManagedDriver)
             {
-                var burstDriver = new MyriBurstDriver { Graph = graph };
+                var burstDriver = new MyriBurstDriver { graph = graph };
 
                 if (!burstDriversFreeList.TryPop(out var freeIndex))
                 {

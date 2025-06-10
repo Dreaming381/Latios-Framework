@@ -84,7 +84,7 @@ namespace Latios.Myri.DSP
             //m_rewindableAllocator.Allocator.Initialize(64 * 1024);
 
             m_masterLimiter = new BrickwallLimiter(BrickwallLimiter.kDefaultPreGain,
-                                                   BrickwallLimiter.kDefaultLimitDB,
+                                                   BrickwallLimiter.kDefaultVolume,
                                                    BrickwallLimiter.kDefaultReleaseDBPerSample,
                                                    BrickwallLimiter.kDefaultLookaheadSampleCount,
                                                    Allocator.AudioKernel);

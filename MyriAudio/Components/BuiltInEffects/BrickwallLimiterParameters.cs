@@ -8,8 +8,8 @@ namespace Latios.Myri
     internal struct BrickwallLimiterSettings
     {
         public float preGain;
-        public float limitDB;
-        public float releaseDBPerSample;
+        public float volume;
+        public float releasePerSampleDB;
         public int   lookaheadSampleCount;
     }
 }

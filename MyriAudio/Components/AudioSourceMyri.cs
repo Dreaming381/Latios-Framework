@@ -2,6 +2,7 @@
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Properties;
 
 namespace Latios.Myri
 {
@@ -142,6 +143,22 @@ namespace Latios.Myri
         /// The amount of attenuation to apply at or outside the outer angle. The value should be between 0 and 1.
         /// </summary>
         public float outerAngleAttenuation;
+    }
+
+    /// <summary>
+    /// An identifier which listeners can use to select only a subset of sources to listen to
+    /// </summary>
+    public struct AudioSourceChannelID : IComponentData, IEquatable<AudioSourceChannelID>
+    {
+        [CreateProperty(ReadOnly = true)]
+        internal Hash128 guid;
+
+        public bool Equals(AudioSourceChannelID other) => guid.Equals(other.guid);
+        public static bool operator ==(AudioSourceChannelID a, AudioSourceChannelID b) => a.guid == b.guid;
+        public static bool operator !=(AudioSourceChannelID a, AudioSourceChannelID b) => a.guid != b.guid;
+        public override int GetHashCode() => guid.GetHashCode();
+
+        public override bool Equals(object obj) => obj is AudioSourceChannelID a && Equals(a);
     }
 
     /// <summary>

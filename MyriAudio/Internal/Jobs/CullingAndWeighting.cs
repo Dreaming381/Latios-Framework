@@ -15,6 +15,7 @@ namespace Latios.Myri
         public struct CullAndWeightJob : IJobFor
         {
             [ReadOnly] public NativeArray<ListenerWithTransform>             listenersWithTransforms;
+            [ReadOnly] public NativeArray<AudioSourceChannelID>              listenersChannelIDs;
             [ReadOnly] public NativeStream.Reader                            capturedSources;
             [ReadOnly] public NativeArray<int>                               channelCount;
             [NativeDisableParallelForRestriction] public NativeStream.Writer chunkChannelStreams;
@@ -44,7 +45,10 @@ namespace Latios.Myri
                         sourceSize              += 8;
                     var sourceBatchingByteCount  = sourceSize;
 
-                    var transformOffset = sourceSize;
+                    var channelIDOffset = sourceSize;
+                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.ChannelID))
+                        sourceSize      += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceChannelID>(), 8);
+                    var transformOffset  = sourceSize;
                     if (sourceHeader.HasFlag(CapturedSourceHeader.Features.Transform))
                         sourceSize            += CollectionHelper.Align(UnsafeUtility.SizeOf<TransformQvvs>(), 8);
                     var distanceFalloffOffset  = sourceSize;
@@ -77,15 +81,25 @@ namespace Latios.Myri
                         e.cone    = *(AudioSourceEmitterCone*)(sourceDataPtr + coneOffset);
                     }
 
+                    var channelID = sourceHeader.HasFlag(CapturedSourceHeader.Features.ChannelID) ? *(AudioSourceChannelID*)(sourceDataPtr + channelIDOffset) : default;
+
                     // Iterate through listeners, and track channels incrementally
                     int listenerFirstChannelIndex = 0;
                     int listenerChannelCount      = 1;
                     for (int listenerIndex = 0; listenerIndex < listenersWithTransforms.Length; listenerIndex++, listenerFirstChannelIndex += listenerChannelCount)
                     {
-                        var     listener     = listenersWithTransforms[listenerIndex];
+                        var listener = listenersWithTransforms[listenerIndex];
+                        if (listener.channelIDsRange.y == 0)
+                            continue;
+
                         ref var blob         = ref listener.listener.ildProfile.Value;
                         listenerChannelCount = blob.anglesPerLeftChannel.Length + blob.anglesPerRightChannel.Length;
-                        if (listener.listener.volume <= 0f || math.distancesq(e.transform.pos, listener.transform.pos) >= e.outerRange * e.outerRange)
+                        var rangeSq          = math.square(e.outerRange * listener.listener.rangeMultiplier);
+                        if (listener.listener.volume <= 0f || math.distancesq(e.transform.pos, listener.transform.pos) >= rangeSq)
+                            continue;
+
+                        var listenerChannelIDs = listenersChannelIDs.GetSubArray(listener.channelIDsRange.x, listener.channelIDsRange.y);
+                        if (!listenerChannelIDs.Contains(channelID))
                             continue;
 
                         // Todo: Make Weights be based on Spans and indices to optimize the processing below.
@@ -209,34 +223,37 @@ namespace Latios.Myri
 
         private static void ComputeWeights(ref Weights weights, in EmitterParameters emitter, in ListenerWithTransform listener, ref UnsafeList<float4> scratchCache)
         {
-            float volume = emitter.volume * listener.listener.volume;
+            float volume = emitter.volume;
 
             var emitterInListenerSpace    = math.mul(math.inverse(listener.transform), emitter.transform);
             var emitterPositionNormalized = math.normalizesafe(emitterInListenerSpace.pos, float3.zero);
 
             //attenuation
             {
-                float d     = math.length(emitterInListenerSpace.pos);
-                float atten = 1f;
-                if (d > emitter.innerRange)
+                float d               = math.length(emitterInListenerSpace.pos);
+                float atten           = 1f;
+                var   innerRange      = emitter.innerRange * listener.listener.rangeMultiplier;
+                var   outerRange      = emitter.outerRange * listener.listener.rangeMultiplier;
+                var   rangeFadeMargin = emitter.rangeFadeMargin * listener.listener.rangeMultiplier;
+                if (d > innerRange)
                 {
-                    if (emitter.innerRange <= 0f)
+                    if (innerRange <= 0f)
                     {
                         //The offset is the distance from the innerRange minus 1 unit clamped between the innerRange and the margin.
                         //The minus one offset ensures the falloff is always 1 or larger, making the transition betweem the innerRange
                         //and the falloff region continuous (by calculus terminology).
-                        float falloff = math.min(d, emitter.outerRange - emitter.rangeFadeMargin) - (emitter.innerRange - 1f);
+                        float falloff = math.min(d, outerRange - rangeFadeMargin) - (innerRange - 1f);
                         atten         = math.saturate(math.rcp(falloff * falloff));
                     }
                     else
                     {
-                        float falloff = math.min(d, emitter.outerRange - emitter.rangeFadeMargin) / emitter.innerRange;
+                        float falloff = math.min(d, outerRange - rangeFadeMargin) / innerRange;
                         atten         = math.saturate(math.rcp(falloff * falloff));
                     }
                 }
-                if (d > emitter.outerRange - emitter.rangeFadeMargin)
+                if (d > outerRange - rangeFadeMargin)
                 {
-                    float factor = (d - (emitter.outerRange - emitter.rangeFadeMargin)) / emitter.rangeFadeMargin;
+                    float factor = (d - (outerRange - rangeFadeMargin)) / rangeFadeMargin;
                     factor       = math.saturate(factor);
                     atten        = math.lerp(atten, 0f, factor);
                 }

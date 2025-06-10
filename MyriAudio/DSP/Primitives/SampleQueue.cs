@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Myri.DSP
@@ -8,14 +9,15 @@ namespace Latios.Myri.DSP
     // Make public on release
     internal struct SampleQueue : IDisposable
     {
-        NativeArray<float> m_buffer;
-        int                m_nextEnqueueIndex;
-        int                m_nextDequeueIndex;
-        int                m_count;
+        UnsafeList<float> m_buffer;
+        int               m_nextEnqueueIndex;
+        int               m_nextDequeueIndex;
+        int               m_count;
 
         public SampleQueue(int capacity, AllocatorManager.AllocatorHandle allocator)
         {
-            m_buffer           = CollectionHelper.CreateNativeArray<float>(capacity, allocator, NativeArrayOptions.UninitializedMemory);
+            m_buffer = new UnsafeList<float>(capacity, allocator);
+            m_buffer.Resize(capacity);
             m_nextEnqueueIndex = 0;
             m_nextDequeueIndex = 0;
             m_count            = 0;
@@ -23,7 +25,7 @@ namespace Latios.Myri.DSP
 
         public void Dispose()
         {
-            CollectionHelper.Dispose(m_buffer);
+            m_buffer.Dispose();  //CollectionHelper.Dispose(m_buffer);
         }
 
         public int count => m_count;
