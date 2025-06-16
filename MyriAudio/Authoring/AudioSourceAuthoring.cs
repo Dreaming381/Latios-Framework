@@ -105,6 +105,16 @@ namespace Latios.Myri.Authoring
                     outerRange      = (half)authoring.outerRange,
                     rangeFadeMargin = (half)authoring.rangeFadeMargin,
                 });
+
+                if (authoring.useCone)
+                {
+                    baker.AddComponent(entity, new AudioSourceEmitterCone
+                    {
+                        cosInnerAngle         = math.cos(math.radians(authoring.innerAngle)),
+                        cosOuterAngle         = math.cos(math.radians(authoring.outerAngle)),
+                        outerAngleAttenuation = authoring.outerAngleVolume
+                    });
+                }
             }
 
             return m_handle.IsValid;

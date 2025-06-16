@@ -17,7 +17,7 @@ namespace Latios.Myri
         public struct UpdateListenersJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<AudioListener>       listenerHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle  worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyTypeHandle         worldTransformHandle;
             [ReadOnly] public BufferTypeHandle<AudioListenerChannelID> channelGuidHandle;
             public NativeList<ListenerWithTransform>                   listenersWithTransforms;
             public NativeList<AudioSourceChannelID>                    listenersChannelIDs;
@@ -71,7 +71,7 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<AudioSourceDistanceFalloff>      distanceFalloffHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>          emitterConeHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceChannelID>            channelIDHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle              worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyTypeHandle                     worldTransformHandle;
             [ReadOnly] public NativeReference<int>                                 audioFrame;
             [ReadOnly] public NativeReference<int>                                 lastPlayedAudioFrame;
             [ReadOnly] public NativeReference<int>                                 lastConsumedBufferId;
@@ -84,6 +84,7 @@ namespace Latios.Myri
                 var rng                   = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
                 var volumes               = (AudioSourceVolume*)chunk.GetRequiredComponentDataPtrRO(ref volumeHandle);
                 var clips                 = (AudioSourceClip*)chunk.GetRequiredComponentDataPtrRW(ref clipHandle);
+                var hasTransforms         = worldTransformHandle.Has(in chunk);
                 var transforms            = worldTransformHandle.Resolve(chunk);
                 var sampleRateMultipliers = chunk.GetComponentDataPtrRO(ref sampleRateMultiplierHandle);
                 var falloffs              = chunk.GetComponentDataPtrRO(ref distanceFalloffHandle);
@@ -197,6 +198,8 @@ namespace Latios.Myri
 
                     // Early culling
                     if (volumes[i].volume <= 0f)
+                        continue;
+                    if (falloffs != null && !hasTransforms)
                         continue;
 
                     // Write to stream

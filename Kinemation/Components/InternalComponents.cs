@@ -469,12 +469,13 @@ namespace Latios.Kinemation
 
     internal partial struct UniqueMeshPool : ICollectionComponent
     {
-        public NativeList<UnityObjectRef<UnityEngine.Mesh> >                 unusedMeshes;
-        public NativeList<UnityObjectRef<UnityEngine.Mesh> >                 allMeshes;
-        public NativeHashSet<BatchMeshID>                                    invalidMeshesToCull;
-        public NativeHashSet<BatchMeshID>                                    meshesPrevalidatedThisFrame;
-        public NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, BatchMeshID>  meshToIdMap;
-        public NativeHashMap<BatchMeshID, UnityObjectRef<UnityEngine.Mesh> > idToMeshMap;
+        public NativeList<UnityObjectRef<UnityEngine.Mesh> > unusedMeshes;
+        public NativeList<UnityObjectRef<UnityEngine.Mesh> > allMeshes;
+        // int = BatchMeshID as int, which is MaterialMeshInfo.Mesh. MaterialMeshInfo.MeshID asserts when using ranges with a mesh override.
+        public NativeHashSet<int>                                    invalidMeshesToCull;
+        public NativeHashSet<int>                                    meshesPrevalidatedThisFrame;
+        public NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, int>  meshToIdMap;
+        public NativeHashMap<int, UnityObjectRef<UnityEngine.Mesh> > idToMeshMap;
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {

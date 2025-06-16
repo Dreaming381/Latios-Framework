@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 
 namespace Unity.Entities.Exposed
 {
@@ -30,6 +31,25 @@ namespace Unity.Entities.Exposed
         public static void CompleteDependencyBeforeRO(this EntityManager entityManager, TypeIndex typeIndex)
         {
             entityManager.GetUncheckedEntityDataAccess()->DependencyManager->CompleteWriteDependency(typeIndex);
+        }
+
+        public struct BlobAssetOwnerPtr : IEquatable<BlobAssetOwnerPtr>
+        {
+            public void* ptr;
+            public bool Equals(BlobAssetOwnerPtr other) => ptr == other.ptr;
+            public override int GetHashCode() => new IntPtr(ptr).GetHashCode();
+        }
+
+        public static ReadOnlySpan<BlobAssetOwnerPtr> GetAllUniqueBlobAssetOwners(this EntityManager entityManager)
+        {
+            entityManager.GetAllUniqueSharedComponents<BlobAssetOwner>(out var owners, Allocator.Temp);
+            return owners.AsArray().Reinterpret<BlobAssetOwnerPtr>().AsReadOnlySpan();
+        }
+
+        public static void AddBlobAssetOwner(this EntityManager entityManager, Entity entity, BlobAssetOwnerPtr owner)
+        {
+            var scd = UnsafeUtility.As<BlobAssetOwnerPtr, BlobAssetOwner>(ref owner);
+            entityManager.AddSharedComponent(entity, scd);
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]

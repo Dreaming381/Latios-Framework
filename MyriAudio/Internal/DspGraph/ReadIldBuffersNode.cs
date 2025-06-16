@@ -3,8 +3,6 @@ using Unity.Audio;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Jobs;
-using Unity.Mathematics;
 
 //Todo: Need to factor in the panFilterRatio
 namespace Latios.Myri

@@ -31,7 +31,7 @@ namespace Latios.Myri.Authoring
     public struct ListenerProfileBuildContext
     {
         /// <summary>
-        /// Adds a channel to the profile. A channel is a 3D radial slice where all audio sources coming from that direction
+        /// Adds a spatial channel to the profile. A spatial channel is a 3D radial slice where all audio sources coming from that direction
         /// are subject to the channels filters. Sources between channels will interpolate between the channels.
         /// </summary>
         /// <param name="minMaxHorizontalAngleInRadiansCounterClockwiseFromRight">
@@ -40,35 +40,55 @@ namespace Latios.Myri.Authoring
         /// <param name="minMaxVerticalAngleInRadians">
         /// The vertical extremes of the slice in radians beginning from horizontal positively rotating upwards.
         /// Values between -2pi and +2pi are allowed.</param>
-        /// <param name="passthroughFraction">The amount of signal which should bypass the filters. Must be between 0 and 1.</param>
-        /// <param name="filterVolume">The raw attenuation or amplification to apply to the input of filtered signal. Not in decibels.</param>
-        /// <param name="passthroughVolume">The raw attenuation of amplification to apply to the signal bypassing the filters. Not in decibels.</param>
+        /// <param name="volume">A volume multiplier for the channel. Useful for channels which don't have any filters but need
+        /// to scale volume relative to other channels.</param>
         /// <param name="isRightEar">If true, this channel uses the right ear. Otherwise, it uses the left ear.</param>
         /// <returns>A handle which can be used to add filters to the channel</returns>
-        public ChannelHandle AddChannel(float2 minMaxHorizontalAngleInRadiansCounterClockwiseFromRight,
-                                        float2 minMaxVerticalAngleInRadians,
-                                        float passthroughFraction,
-                                        float filterVolume,
-                                        float passthroughVolume,
-                                        bool isRightEar)
+        public ChannelHandle AddSpatialChannel(float2 minMaxHorizontalAngleInRadiansCounterClockwiseFromRight,
+                                               float2 minMaxVerticalAngleInRadians,
+                                               float volume,
+                                               bool isRightEar)
         {
             if (m_job.anglesPerLeftChannel.Length + m_job.anglesPerRightChannel.Length >= 127)
-                throw new InvalidOperationException("An ListenrProfile only supports up to 127 channels");
+                throw new InvalidOperationException("An Listener Profile only supports up to 127 channels");
 
             if (isRightEar)
             {
                 m_job.anglesPerRightChannel.Add(new float4(minMaxHorizontalAngleInRadiansCounterClockwiseFromRight, minMaxVerticalAngleInRadians));
-                m_job.passthroughFractionsPerRightChannel.Add(math.saturate(passthroughFraction));
-                m_job.filterVolumesPerRightChannel.Add(math.saturate(filterVolume));
-                m_job.passthroughVolumesPerRightChannel.Add(math.saturate(passthroughVolume));
+                m_job.volumesPerRightChannel.Add(volume);
                 return new ChannelHandle { channelIndex = m_job.anglesPerRightChannel.Length - 1, isRightChannel = true };
             }
             else
             {
                 m_job.anglesPerLeftChannel.Add(new float4(minMaxHorizontalAngleInRadiansCounterClockwiseFromRight, minMaxVerticalAngleInRadians));
-                m_job.passthroughFractionsPerLeftChannel.Add(passthroughFraction);
-                m_job.filterVolumesPerLeftChannel.Add(math.saturate(filterVolume));
-                m_job.passthroughVolumesPerLeftChannel.Add(math.saturate(passthroughVolume));
+                m_job.volumesPerLeftChannel.Add(volume);
+                return new ChannelHandle { channelIndex = m_job.anglesPerLeftChannel.Length - 1, isRightChannel = false };
+            }
+        }
+
+        /// <summary>
+        /// Adds a direct channel to the profile. A direct channel only receives audio sources which do not have any spatial information.
+        /// Direct channels are still subject to the channels filters.
+        /// </summary>
+        /// <param name="volume">A volume multiplier for the channel. Useful for channels which don't have any filters but need
+        /// to scale volume relative to other channels.</param>
+        /// <param name="isRightEar">If true, this channel uses the right ear. Otherwise, it uses the left ear.</param>
+        /// <returns>A handle which can be used to add filters to the channel</returns>
+        public ChannelHandle AddDirectChannel(float volume, bool isRightEar)
+        {
+            if (m_job.anglesPerLeftChannel.Length + m_job.anglesPerRightChannel.Length >= 127)
+                throw new InvalidOperationException("An Listener Profile only supports up to 127 channels");
+
+            if (isRightEar)
+            {
+                m_job.anglesPerRightChannel.Add(float.NaN);
+                m_job.volumesPerRightChannel.Add(volume);
+                return new ChannelHandle { channelIndex = m_job.anglesPerRightChannel.Length - 1, isRightChannel = true };
+            }
+            else
+            {
+                m_job.anglesPerLeftChannel.Add(float.NaN);
+                m_job.volumesPerLeftChannel.Add(volume);
                 return new ChannelHandle { channelIndex = m_job.anglesPerLeftChannel.Length - 1, isRightChannel = false };
             }
         }
@@ -109,19 +129,15 @@ namespace Latios.Myri.Authoring
         {
             m_job = new FinalizeBlobJob
             {
-                filtersLeft                         = new NativeList<FrequencyFilter>(Allocator.TempJob),
-                filtersRight                        = new NativeList<FrequencyFilter>(Allocator.TempJob),
-                channelIndicesLeft                  = new NativeList<int>(Allocator.TempJob),
-                channelIndicesRight                 = new NativeList<int>(Allocator.TempJob),
-                anglesPerLeftChannel                = new NativeList<float4>(Allocator.TempJob),
-                anglesPerRightChannel               = new NativeList<float4>(Allocator.TempJob),
-                passthroughFractionsPerLeftChannel  = new NativeList<float>(Allocator.TempJob),
-                passthroughFractionsPerRightChannel = new NativeList<float>(Allocator.TempJob),
-                filterVolumesPerLeftChannel         = new NativeList<float>(Allocator.TempJob),
-                filterVolumesPerRightChannel        = new NativeList<float>(Allocator.TempJob),
-                passthroughVolumesPerLeftChannel    = new NativeList<float>(Allocator.TempJob),
-                passthroughVolumesPerRightChannel   = new NativeList<float>(Allocator.TempJob),
-                blobNativeReference                 = new NativeReference<BlobAssetReference<ListenerProfileBlob> >(Allocator.TempJob)
+                filtersLeft            = new NativeList<FrequencyFilter>(Allocator.TempJob),
+                filtersRight           = new NativeList<FrequencyFilter>(Allocator.TempJob),
+                channelIndicesLeft     = new NativeList<int>(Allocator.TempJob),
+                channelIndicesRight    = new NativeList<int>(Allocator.TempJob),
+                anglesPerLeftChannel   = new NativeList<float4>(Allocator.TempJob),
+                anglesPerRightChannel  = new NativeList<float4>(Allocator.TempJob),
+                volumesPerLeftChannel  = new NativeList<float>(Allocator.TempJob),
+                volumesPerRightChannel = new NativeList<float>(Allocator.TempJob),
+                blobNativeReference    = new NativeReference<BlobAssetReference<ListenerProfileBlob> >(Allocator.TempJob)
             };
         }
 
@@ -136,19 +152,15 @@ namespace Latios.Myri.Authoring
             m_job.channelIndicesRight.Dispose();
             m_job.anglesPerLeftChannel.Dispose();
             m_job.anglesPerRightChannel.Dispose();
-            m_job.passthroughFractionsPerLeftChannel.Dispose();
-            m_job.passthroughFractionsPerRightChannel.Dispose();
-            m_job.filterVolumesPerLeftChannel.Dispose();
-            m_job.filterVolumesPerRightChannel.Dispose();
-            m_job.passthroughVolumesPerLeftChannel.Dispose();
-            m_job.passthroughVolumesPerRightChannel.Dispose();
+            m_job.volumesPerLeftChannel.Dispose();
+            m_job.volumesPerRightChannel.Dispose();
             m_job.blobNativeReference.Dispose();
 
             return blob;
         }
 
         [BurstCompile]
-        struct FinalizeBlobJob : IJob
+        unsafe struct FinalizeBlobJob : IJob
         {
             public NativeList<FrequencyFilter> filtersLeft;
             public NativeList<int>             channelIndicesLeft;
@@ -157,34 +169,74 @@ namespace Latios.Myri.Authoring
 
             public NativeList<float4> anglesPerLeftChannel;
             public NativeList<float4> anglesPerRightChannel;
-            public NativeList<float>  passthroughFractionsPerLeftChannel;
-            public NativeList<float>  passthroughFractionsPerRightChannel;
-            public NativeList<float>  filterVolumesPerLeftChannel;
-            public NativeList<float>  filterVolumesPerRightChannel;
-            public NativeList<float>  passthroughVolumesPerLeftChannel;
-            public NativeList<float>  passthroughVolumesPerRightChannel;
+            public NativeList<float>  volumesPerLeftChannel;
+            public NativeList<float>  volumesPerRightChannel;
 
             public NativeReference<BlobAssetReference<ListenerProfileBlob> > blobNativeReference;
 
-            public void Execute()
+            public unsafe void Execute()
             {
                 var     builder = new BlobBuilder(Allocator.Temp);
                 ref var root    = ref builder.ConstructRoot<ListenerProfileBlob>();
-                builder.ConstructFromNativeArray(ref root.filtersLeft,                         filtersLeft.AsArray());
-                builder.ConstructFromNativeArray(ref root.channelIndicesLeft,                  channelIndicesLeft.AsArray());
-                builder.ConstructFromNativeArray(ref root.filtersRight,                        filtersRight.AsArray());
-                builder.ConstructFromNativeArray(ref root.channelIndicesRight,                 channelIndicesRight.AsArray());
+                builder.ConstructFromNativeArray(ref root.anglesPerLeftChannel,  anglesPerLeftChannel.AsArray());
+                builder.ConstructFromNativeArray(ref root.anglesPerRightChannel, anglesPerRightChannel.AsArray());
+                var       dspsLeft                   = builder.Allocate(ref root.channelDspsLeft, volumesPerLeftChannel.Length);
+                var       dspsRight                  = builder.Allocate(ref root.channelDspsRight, volumesPerRightChannel.Length);
+                Span<int> leftFilterCountsByChannel  = stackalloc int[dspsLeft.Length];
+                Span<int> rightFilterCountsByChannel = stackalloc int[dspsRight.Length];
+                leftFilterCountsByChannel.Clear();
+                rightFilterCountsByChannel.Clear();
 
-                builder.ConstructFromNativeArray(ref root.anglesPerLeftChannel,                anglesPerLeftChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.anglesPerRightChannel,               anglesPerRightChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerLeftChannel,  passthroughFractionsPerLeftChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.passthroughFractionsPerRightChannel, passthroughFractionsPerRightChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.filterVolumesPerLeftChannel,         filterVolumesPerLeftChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.filterVolumesPerRightChannel,        filterVolumesPerRightChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerLeftChannel,    passthroughVolumesPerLeftChannel.AsArray());
-                builder.ConstructFromNativeArray(ref root.passthroughVolumesPerRightChannel,   passthroughVolumesPerRightChannel.AsArray());
+                foreach (var c in channelIndicesLeft)
+                    leftFilterCountsByChannel[c]++;
+                foreach (var c in channelIndicesRight)
+                    rightFilterCountsByChannel[c]++;
+
+                Span<ChannelDspPtr> leftChannelFilters  = stackalloc ChannelDspPtr[dspsLeft.Length];
+                Span<ChannelDspPtr> rightChannelFilters = stackalloc ChannelDspPtr[dspsRight.Length];
+                leftChannelFilters.Clear();
+                rightChannelFilters.Clear();
+
+                for (int i = 0; i < dspsLeft.Length; i++)
+                {
+                    dspsLeft[i] = new ListenerProfileBlob.ChannelDsp
+                    {
+                        volume = volumesPerLeftChannel[i],
+                    };
+                    leftChannelFilters[i].ptr = (FrequencyFilter*)builder.Allocate(ref dspsLeft[i].filters, leftFilterCountsByChannel[i]).GetUnsafePtr();
+                }
+                for (int i = 0; i < dspsRight.Length; i++)
+                {
+                    dspsRight[i] = new ListenerProfileBlob.ChannelDsp
+                    {
+                        volume = volumesPerLeftChannel[i],
+                    };
+                    rightChannelFilters[i].ptr = (FrequencyFilter*)builder.Allocate(ref dspsRight[i].filters, rightFilterCountsByChannel[i]).GetUnsafePtr();
+                }
+
+                for (int i = 0; i < channelIndicesLeft.Length; i++)
+                {
+                    var channel = channelIndicesLeft[i];
+                    var filter  = filtersLeft[i];
+
+                    *leftChannelFilters[channel].ptr = filtersLeft[i];
+                    leftChannelFilters[channel].ptr++;
+                }
+                for (int i = 0; i < channelIndicesRight.Length; i++)
+                {
+                    var channel = channelIndicesRight[i];
+                    var filter  = filtersRight[i];
+
+                    *rightChannelFilters[channel].ptr = filtersRight[i];
+                    rightChannelFilters[channel].ptr++;
+                }
 
                 blobNativeReference.Value = builder.CreateBlobAssetReference<ListenerProfileBlob>(Allocator.Persistent);
+            }
+
+            struct ChannelDspPtr
+            {
+                public FrequencyFilter* ptr;
             }
         }
         #endregion

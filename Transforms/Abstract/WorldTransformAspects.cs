@@ -37,6 +37,8 @@ namespace Latios.Transforms.Abstract
             return chunk.DidChange(ref worldTransformHandle, version);
         }
 
+        public bool Has(in ArchetypeChunk chunk) => chunk.Has(ref worldTransformHandle);
+
         public bool isNativeQvvs => true;
 
         public WorldTransformReadOnlyAspect.ResolvedChunk Resolve(in ArchetypeChunk chunk)
@@ -94,6 +96,8 @@ namespace Latios.Transforms.Abstract
         {
             return chunk.DidChange(ref ltwHandle, version);
         }
+
+        public bool Has(in ArchetypeChunk chunk) => chunk.Has(ref ltwHandle);
 
         public bool isNativeQvvs => false;
 

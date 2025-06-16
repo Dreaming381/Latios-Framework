@@ -38,10 +38,10 @@ namespace Latios.Kinemation.Systems
             {
                 allMeshes                   = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
                 unusedMeshes                = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
-                invalidMeshesToCull         = new NativeHashSet<BatchMeshID>(64, Allocator.Persistent),
-                meshesPrevalidatedThisFrame = new NativeHashSet<BatchMeshID>(64, Allocator.Persistent),
-                meshToIdMap                 = new NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, BatchMeshID>(64, Allocator.Persistent),
-                idToMeshMap                 = new NativeHashMap<BatchMeshID, UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent)
+                invalidMeshesToCull         = new NativeHashSet<int>(64, Allocator.Persistent),
+                meshesPrevalidatedThisFrame = new NativeHashSet<int>(64, Allocator.Persistent),
+                meshToIdMap                 = new NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, int>(64, Allocator.Persistent),
+                idToMeshMap                 = new NativeHashMap<int, UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent)
             });
         }
 
@@ -120,8 +120,10 @@ namespace Latios.Kinemation.Systems
                 meshPool.unusedMeshes.AddRange(meshes);
                 for (int i = 0; i < meshes.Length; i++)
                 {
-                    meshPool.meshToIdMap.Add(meshes[i], ids[i]);
-                    meshPool.idToMeshMap.Add(ids[i], meshes[i]);
+                    MaterialMeshInfo mmi = default;
+                    mmi.MeshID           = ids[i];
+                    meshPool.meshToIdMap.Add(meshes[i], mmi.Mesh);
+                    meshPool.idToMeshMap.Add(mmi.Mesh, meshes[i]);
                 }
             }
         }
@@ -168,7 +170,7 @@ namespace Latios.Kinemation.Systems
                     var id                                             = meshPool.meshToIdMap[mesh];
                     meshPool.invalidMeshesToCull.Add(id);
                     if (mmis != null)
-                        mmis[i].MeshID = id;
+                        mmis[i].Mesh = id;
                 }
             }
         }
@@ -186,7 +188,7 @@ namespace Latios.Kinemation.Systems
                 var mmis    = chunk.GetComponentDataPtrRW(ref mmiHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
-                    mmis[i].MeshID = meshPool.meshToIdMap[tracked[i].mesh];
+                    mmis[i].Mesh = meshPool.meshToIdMap[tracked[i].mesh];
                 }
             }
         }

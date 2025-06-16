@@ -54,10 +54,9 @@ namespace Latios.Myri
             [ReadOnly] public NativeArray<Entity>            destroyedListenerEntities;
             [ReadOnly] public ComponentLookup<AudioListener> listenerLookup;
             public ComponentLookup<ListenerGraphState>       listenerGraphStateLookup;
-            public ComponentLookup<EntityOutputGraphState>   listenerOutputGraphStateLookup;
             public EntityCommandBuffer                       ecb;
 
-            public NativeList<ListenerGraphState> statesToDisposeThisFrame;
+            public NativeList<ListenerGraphState> listenerStatesToDisposeOnShutdown;
 
             [ReadOnly] public ComponentLookup<AudioSettings> audioSettingsLookup;
             public Entity                                    worldBlackboardEntity;
@@ -87,7 +86,6 @@ namespace Latios.Myri
                 bool dirty                  = false;
                 var  existingEntities       = new NativeList<Entity>(Allocator.Temp);
                 var  newEntities            = new NativeList<Entity>(Allocator.Temp);
-                var  newOutputGraphStates   = new NativeList<EntityOutputGraphState>(Allocator.Temp);
                 var  newListenerGraphStates = new NativeList<ListenerGraphState>(Allocator.Temp);
                 int  megaBufferSampleCount  = 0;
                 var  channelCounts          = new NativeArray<int>(listenerBufferParameters.Length, Allocator.Temp);
@@ -97,65 +95,48 @@ namespace Latios.Myri
                 audioSettings.safetyAudioFrames    = math.max(audioSettings.safetyAudioFrames, 0);
                 audioSettings.lookaheadAudioFrames = math.max(audioSettings.lookaheadAudioFrames, 0);
 
-                //Destroy graph state and components of old entities
+                // Destroy graph state and components of old entities
                 for (int i = 0; i < destroyedListenerEntities.Length; i++)
                 {
-                    var entity                   = destroyedListenerEntities[i];
-                    dirty                        = true;
-                    var listenerOutputGraphState = listenerOutputGraphStateLookup[entity];
-                    commandBlock.Disconnect(listenerOutputGraphState.connection);
-                    systemMasterMixNodePortFreelist.Add(listenerOutputGraphState.portIndex);
-
+                    var entity             = destroyedListenerEntities[i];
+                    dirty                  = true;
                     var listenerGraphState = listenerGraphStateLookup[entity];
-                    for (int j = 0; j < listenerGraphState.connections.Length; j++)
-                    {
-                        commandBlock.Disconnect(listenerGraphState.connections[j]);
-                    }
+                    commandBlock.Disconnect(listenerGraphState.masterOutputConnection);
+                    systemMasterMixNodePortFreelist.Add(listenerGraphState.masterPortIndex);
+
                     for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
                     {
-                        commandBlock.Disconnect(listenerGraphState.ildConnections[j].connection);
+                        commandBlock.Disconnect(listenerGraphState.ildConnections[j]);
                     }
-                    for (int j = 0; j < listenerGraphState.nodes.Length; j++)
-                    {
-                        commandBlock.ReleaseDSPNode(listenerGraphState.nodes[j]);
-                    }
+                    commandBlock.ReleaseDSPNode(listenerGraphState.listenerMixNode);
 
-                    listenerGraphState.connections.Dispose();
-                    listenerGraphState.nodes.Dispose();
                     listenerGraphState.ildConnections.Dispose();
-                    ecb.RemoveComponent<ListenerGraphState>(    entity);
-                    ecb.RemoveComponent<EntityOutputGraphState>(entity);
+                    // Clear it in case shutdown happens before playback.
+                    listenerGraphStateLookup[entity] = default;
+                    ecb.RemoveComponent<ListenerGraphState>(entity);
                 }
 
-                statesToDisposeThisFrame.Clear();
-
-                //Process new and changed listeners
+                // Process new and changed listeners
                 for (int i = 0; i < listenerEntities.Length; i++)
                 {
                     var entity = listenerEntities[i];
 
                     if (!listenerGraphStateLookup.HasComponent(entity))
                     {
-                        dirty                  = true;
-                        var listener           = listenerLookup[entity];
-                        var listenerGraphState = new ListenerGraphState
-                        {
-                            connections     = new UnsafeList<DSPConnection>(8, Allocator.Persistent),
-                            nodes           = new UnsafeList<DSPNode>(8, Allocator.Persistent),
-                            ildConnections  = new UnsafeList<IldOutputConnection>(8, Allocator.Persistent),
-                            lastUsedProfile = listener.ildProfile
-                        };
+                        // New listener
+                        dirty        = true;
+                        var listener = listenerLookup[entity];
 
-                        //Create the output MixPortsToStereoNode and tie it to the final mix
-                        int mixNodePortIndex;
+                        // Create the output ListenerMixNode and tie it to the final mix
+                        int masterPortIndex;
                         if (systemMasterMixNodePortFreelist.Length > 0)
                         {
-                            mixNodePortIndex = systemMasterMixNodePortFreelist[systemMasterMixNodePortFreelist.Length - 1];
+                            masterPortIndex = systemMasterMixNodePortFreelist[systemMasterMixNodePortFreelist.Length - 1];
                             systemMasterMixNodePortFreelist.RemoveAt(systemMasterMixNodePortFreelist.Length - 1);
                         }
                         else
                         {
-                            mixNodePortIndex = systemMasterMixNodePortCount.Value;
+                            masterPortIndex = systemMasterMixNodePortCount.Value;
                             commandBlock.AddInletPort(systemMasterMixNode, 2);
                             systemMasterMixNodePortCount.Value++;
                         }
@@ -172,29 +153,34 @@ namespace Latios.Myri
                                 lookaheadSampleCount = (int)math.ceil(listener.limiterLookaheadTime * sampleRate)
                             }
                         }, listenerMixNode);
-
-                        listenerGraphState.nodes.Add(listenerMixNode);
-                        var listenerOutputGraphState = new EntityOutputGraphState
+                        commandBlock.UpdateAudioKernel<ListenerMixNodeChannelUpdate, ListenerMixNode.Parameters,
+                                                       ListenerMixNode.SampleProviders, ListenerMixNode>(new ListenerMixNodeChannelUpdate
                         {
-                            connection = commandBlock.Connect(listenerMixNode, 0, systemMasterMixNode, mixNodePortIndex),
-                            portIndex  = mixNodePortIndex
+                            blob       = listener.ildProfile,
+                            sampleRate = sampleRate
+                        }, listenerMixNode);
+
+                        var listenerGraphState = new ListenerGraphState
+                        {
+                            listenerMixNode        = listenerMixNode,
+                            masterPortIndex        = masterPortIndex,
+                            masterOutputConnection = commandBlock.Connect(listenerMixNode, 0, systemMasterMixNode, masterPortIndex),
+                            ildConnections         = new UnsafeList<DSPConnection>(8, Allocator.Persistent),
+                            lastUsedProfile        = listener.ildProfile
                         };
 
                         ref var profile = ref listener.ildProfile.Value;
 
-                        BuildChannelGraph(ref profile, commandBlock, listenerMixNode, ref listenerGraphState);
-
-                        //Write out entity data
+                        // Write out entity data
                         newEntities.Add(entity);
-                        newOutputGraphStates.Add(listenerOutputGraphState);
                         newListenerGraphStates.Add(listenerGraphState);
 
-                        //Compute parameters and megabuffer allocation
-                        int numChannels             = profile.passthroughFractionsPerLeftChannel.Length + profile.passthroughFractionsPerRightChannel.Length;
+                        // Compute parameters and megabuffer allocation
+                        int numChannels             = profile.channelDspsLeft.Length + profile.channelDspsRight.Length;
                         listenerBufferParameters[i] = new ListenerBufferParameters
                         {
                             bufferStart       = megaBufferSampleCount,
-                            leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
+                            leftChannelsCount = profile.channelDspsLeft.Length,
                             samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
@@ -208,40 +194,14 @@ namespace Latios.Myri
                         if (listener.ildProfile != listenerGraphState.lastUsedProfile)
                         {
                             dirty = true;
-                            //Swap the old MixPortsToStereoNode with a new one
-                            var listenerOutputGraphState = listenerOutputGraphStateLookup[entity];
-                            var listenerMixNode          =
-                                commandBlock.CreateDSPNode<ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>();
-                            commandBlock.AddOutletPort(listenerMixNode, 2);
-                            commandBlock.Disconnect(listenerOutputGraphState.connection);
-                            listenerOutputGraphState.connection = commandBlock.Connect(listenerMixNode, 0, systemMasterMixNode, listenerOutputGraphState.portIndex);
-
-                            //Destroy the old graph
-                            for (int j = 0; j < listenerGraphState.connections.Length; j++)
+                            commandBlock.UpdateAudioKernel<ListenerMixNodeChannelUpdate, ListenerMixNode.Parameters,
+                                                           ListenerMixNode.SampleProviders, ListenerMixNode>(new ListenerMixNodeChannelUpdate
                             {
-                                commandBlock.Disconnect(listenerGraphState.connections[j]);
-                            }
-                            for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
-                            {
-                                commandBlock.Disconnect(listenerGraphState.ildConnections[j].connection);
-                            }
-                            for (int j = 0; j < listenerGraphState.nodes.Length; j++)
-                            {
-                                commandBlock.ReleaseDSPNode(listenerGraphState.nodes[j]);
-                            }
-                            listenerGraphState.connections.Clear();
-                            listenerGraphState.nodes.Clear();
-                            listenerGraphState.ildConnections.Clear();
-
-                            //Set up the new graph
+                                blob       = listener.ildProfile,
+                                sampleRate = sampleRate
+                            }, listenerGraphState.listenerMixNode);
                             listenerGraphState.lastUsedProfile = listener.ildProfile;
-                            listenerGraphState.nodes.Add(listenerMixNode);
-
-                            BuildChannelGraph(ref profile, commandBlock, listenerMixNode, ref listenerGraphState);
-
-                            //Write out entity data
-                            listenerGraphStateLookup[entity]       = listenerGraphState;
-                            listenerOutputGraphStateLookup[entity] = listenerOutputGraphState;
+                            listenerGraphStateLookup[entity]   = listenerGraphState;
                         }
                         commandBlock.UpdateAudioKernel<ListenerMixNodeVolumeUpdate, ListenerMixNode.Parameters,
                                                        ListenerMixNode.SampleProviders, ListenerMixNode>(new ListenerMixNodeVolumeUpdate
@@ -253,16 +213,15 @@ namespace Latios.Myri
                                 releasePerSampleDB   = listener.limiterDBRelaxPerSecond / sampleRate,
                                 lookaheadSampleCount = (int)math.ceil(listener.limiterLookaheadTime * sampleRate)
                             }
-                        }, listenerGraphState.nodes[0]);
+                        }, listenerGraphState.listenerMixNode);
                         existingEntities.Add(entity);
-                        statesToDisposeThisFrame.Add(in listenerGraphState);
 
                         //Compute parameters and megabuffer allocation
-                        int numChannels             = profile.passthroughFractionsPerLeftChannel.Length + profile.passthroughFractionsPerRightChannel.Length;
+                        int numChannels             = profile.channelDspsLeft.Length + profile.channelDspsRight.Length;
                         listenerBufferParameters[i] = new ListenerBufferParameters
                         {
                             bufferStart       = megaBufferSampleCount,
-                            leftChannelsCount = profile.passthroughFractionsPerLeftChannel.Length,
+                            leftChannelsCount = profile.channelDspsLeft.Length,
                             samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
                         };
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
@@ -270,101 +229,79 @@ namespace Latios.Myri
                     }
                 }
 
-                //Rebuild ildConnections
+                // Rebuild ildConnections
                 if (dirty)
                 {
-                    //Reset connections for existing entities
-                    for (int i = 0; i < existingEntities.Length; i++)
+                    // Reset connections for existing entities
+                    foreach (var entity in existingEntities)
                     {
-                        var entity             = existingEntities[i];
                         var listenerGraphState = listenerGraphStateLookup[entity];
-                        for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
-                        {
-                            var ildConnection = listenerGraphState.ildConnections[j];
-                            if (ildConnection.ildOutputPort >= 0)
-                            {
-                                commandBlock.Disconnect(ildConnection.connection);
-                                ildConnection.ildOutputPort          = -ildConnection.ildOutputPort - 1;
-                                listenerGraphState.ildConnections[j] = ildConnection;
-                            }
-                        }
-                        listenerGraphStateLookup[entity] = listenerGraphState;
+                        foreach (var connection in listenerGraphState.ildConnections)
+                            commandBlock.Disconnect(connection);
                     }
+                    listenerStatesToDisposeOnShutdown.Clear();
 
-                    var fakePortRealPortHashmap = new NativeHashMap<int, int>(8, Allocator.Temp);
-                    int ildPortsUsed            = 0;
-                    //Build connections for existing entities
-                    for (int i = 0; i < existingEntities.Length; i++)
+                    int newEntityIndex  = 0;
+                    int outputPortIndex = 0;
+                    foreach (var entity in listenerEntities)
                     {
-                        var entity             = existingEntities[i];
-                        var listenerGraphState = listenerGraphStateLookup[entity];
-                        fakePortRealPortHashmap.Clear();
-                        for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
+                        if (listenerGraphStateLookup.TryGetComponent(entity, out var listenerGraphState))
                         {
-                            var ildConnection = listenerGraphState.ildConnections[j];
-                            if (fakePortRealPortHashmap.TryGetValue(ildConnection.ildOutputPort, out int realPort))
+                            listenerGraphState.ildConnections.Clear();
+                            ref var blob         = ref listenerGraphState.lastUsedProfile.Value;
+                            var     channelCount = blob.channelDspsLeft.Length + blob.channelDspsRight.Length;
+                            for (int i = listenerGraphState.inletPortCount; i < channelCount; i++)
                             {
-                                ildConnection.ildOutputPort = realPort;
+                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 1);
+                                listenerGraphState.inletPortCount++;
                             }
-                            else
+                            for (int i = systemIldNodePortCount.Value; i < outputPortIndex + channelCount; i++)
                             {
-                                if (ildPortsUsed >= systemIldNodePortCount.Value)
-                                {
-                                    commandBlock.AddOutletPort(systemIldNode, 1);
-                                    systemIldNodePortCount.Value++;
-                                }
-                                fakePortRealPortHashmap.Add(ildConnection.ildOutputPort, ildPortsUsed);
-                                ildConnection.ildOutputPort = ildPortsUsed;
-                                ildPortsUsed++;
+                                commandBlock.AddOutletPort(systemIldNode, 1);
+                                systemMasterMixNodePortCount.Value++;
                             }
-                            ildConnection.connection = commandBlock.Connect(systemIldNode, ildConnection.ildOutputPort, ildConnection.node, ildConnection.nodeInputPort);
-                            if (ildConnection.attenuation != 1f)
-                                commandBlock.SetAttenuation(ildConnection.connection, ildConnection.attenuation);
-                            listenerGraphState.ildConnections[j] = ildConnection;
+                            for (int i = 0; i < channelCount; i++)
+                            {
+                                listenerGraphState.ildConnections.Add(commandBlock.Connect(systemIldNode, outputPortIndex, listenerGraphState.listenerMixNode, i));
+                                outputPortIndex++;
+                            }
+                            listenerGraphStateLookup[entity] = listenerGraphState;
+                            listenerStatesToDisposeOnShutdown.Add(listenerGraphState);
                         }
-                        listenerGraphStateLookup[entity] = listenerGraphState;
-                    }
-                    //Build connections fo new entities
-                    for (int i = 0; i < newEntities.Length; i++)
-                    {
-                        var listenerGraphState = newListenerGraphStates[i];
-                        fakePortRealPortHashmap.Clear();
-                        for (int j = 0; j < listenerGraphState.ildConnections.Length; j++)
+                        else
                         {
-                            var ildConnection = listenerGraphState.ildConnections[j];
-                            if (fakePortRealPortHashmap.TryGetValue(ildConnection.ildOutputPort, out int realPort))
+                            listenerGraphState   = newListenerGraphStates[newEntityIndex];
+                            ref var blob         = ref listenerGraphState.lastUsedProfile.Value;
+                            var     channelCount = blob.channelDspsLeft.Length + blob.channelDspsRight.Length;
+                            for (int i = listenerGraphState.inletPortCount; i < channelCount; i++)
                             {
-                                ildConnection.ildOutputPort = realPort;
+                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 1);
+                                listenerGraphState.inletPortCount++;
                             }
-                            else
+                            for (int i = systemIldNodePortCount.Value; i < outputPortIndex + channelCount; i++)
                             {
-                                if (ildPortsUsed >= systemIldNodePortCount.Value)
-                                {
-                                    commandBlock.AddOutletPort(systemIldNode, 1);
-                                    systemIldNodePortCount.Value++;
-                                }
-                                fakePortRealPortHashmap.Add(ildConnection.ildOutputPort, ildPortsUsed);
-                                ildConnection.ildOutputPort = ildPortsUsed;
-                                ildPortsUsed++;
+                                commandBlock.AddOutletPort(systemIldNode, 1);
+                                systemMasterMixNodePortCount.Value++;
                             }
-                            ildConnection.connection = commandBlock.Connect(systemIldNode, ildConnection.ildOutputPort, ildConnection.node, ildConnection.nodeInputPort);
-                            if (ildConnection.attenuation != 1f)
-                                commandBlock.SetAttenuation(ildConnection.connection, ildConnection.attenuation);
-                            listenerGraphState.ildConnections[j] = ildConnection;
+                            for (int i = 0; i < channelCount; i++)
+                            {
+                                listenerGraphState.ildConnections.Add(commandBlock.Connect(systemIldNode, outputPortIndex, listenerGraphState.listenerMixNode, i));
+                                outputPortIndex++;
+                            }
+                            newListenerGraphStates[newEntityIndex] = listenerGraphState;
+                            newEntityIndex++;
+                            listenerStatesToDisposeOnShutdown.Add(listenerGraphState);
                         }
-                        newListenerGraphStates[i] = listenerGraphState;
                     }
                 }
 
-                //Add components to new entities
+                // Add components to new entities
                 for (int i = 0; i < newEntities.Length; i++)
                 {
                     ecb.AddComponent(newEntities[i], newListenerGraphStates[i]);
-                    ecb.AddComponent(newEntities[i], newOutputGraphStates[i]);
                 }
-                statesToDisposeThisFrame.AddRange(newListenerGraphStates.AsArray());
 
-                //Resize megaBuffer and populate offsets
+                // Resize megaBuffer and populate offsets
                 outputSamplesMegaBuffer.Resize(megaBufferSampleCount, NativeArrayOptions.ClearMemory);
                 var megaBuffer = outputSamplesMegaBuffer.AsArray();
                 for (int i = 0; i < listenerBufferParameters.Length; i++)
@@ -425,154 +362,6 @@ namespace Latios.Myri
             public void Execute()
             {
                 commandBlock.Complete();
-            }
-        }
-
-        public static StateVariableFilterNode.FilterType ToDspFilterType(this FrequencyFilterType type)
-        {
-            switch(type)
-            {
-                case FrequencyFilterType.Lowpass: return StateVariableFilterNode.FilterType.Lowpass;
-                case FrequencyFilterType.Highpass: return StateVariableFilterNode.FilterType.Highpass;
-                case FrequencyFilterType.Bandpass: return StateVariableFilterNode.FilterType.Bandpass;
-                case FrequencyFilterType.Bell: return StateVariableFilterNode.FilterType.Bell;
-                case FrequencyFilterType.Notch: return StateVariableFilterNode.FilterType.Notch;
-                case FrequencyFilterType.Lowshelf: return StateVariableFilterNode.FilterType.Lowshelf;
-                case FrequencyFilterType.Highshelf: return StateVariableFilterNode.FilterType.Highshelf;
-            }
-            return StateVariableFilterNode.FilterType.Lowpass;
-        }
-
-        public static void BuildChannelGraph(ref ListenerProfileBlob profile, DSPCommandBlock commandBlock, DSPNode listenerMixNode, ref ListenerGraphState listenerGraphState)
-        {
-            //Create the channel nodes and connections but leave the ild outputs disconnected
-            int listenerMixPortCount = 0;
-            for (int i = 0; i < profile.passthroughFractionsPerLeftChannel.Length; i++)
-            {
-                bool    filterAdded        = false;
-                DSPNode previousFilterNode = listenerMixNode;
-                int     previousFilterPort = listenerMixPortCount;
-                float   filterVolume       = profile.filterVolumesPerLeftChannel[i] * (1f - profile.passthroughFractionsPerLeftChannel[i]);
-                float   passthroughVolume  = profile.passthroughVolumesPerLeftChannel[i] * profile.passthroughFractionsPerLeftChannel[i];
-                commandBlock.AddInletPort(listenerMixNode, 1);
-                listenerMixPortCount++;
-
-                if (filterVolume > 0f)
-                {
-                    //We have to walk backwards to build the filter connections correctly since the ild outputs must remain disconnected
-                    for (int j = profile.channelIndicesLeft.Length - 1; j >= 0; j--)
-                    {
-                        if (i == profile.channelIndicesLeft[j])
-                        {
-                            var filter     = profile.filtersLeft[j];
-                            var filterNode = StateVariableFilterNode.Create(commandBlock,
-                                                                            filter.type.ToDspFilterType(),
-                                                                            filter.cutoff,
-                                                                            filter.q,
-                                                                            filter.gainInDecibels,
-                                                                            1);
-                            listenerGraphState.nodes.Add(filterNode);
-                            var filterConnection = commandBlock.Connect(filterNode, 0, previousFilterNode, previousFilterPort);
-                            listenerGraphState.connections.Add(filterConnection);
-                            previousFilterNode = filterNode;
-                            previousFilterPort = 0;
-                            if (!filterAdded && filterVolume < 1f)
-                                commandBlock.SetAttenuation(filterConnection, filterVolume);
-                            filterAdded = true;
-                        }
-                    }
-                    if (filterAdded)
-                    {
-                        listenerGraphState.ildConnections.Add(new IldOutputConnection
-                        {
-                            ildOutputPort = -i - 1,  //The negative value stores the intended channel in a disconnected state
-                            nodeInputPort = previousFilterPort,
-                            node          = previousFilterNode,
-                            attenuation   = 1f
-                        });
-                    }
-                }
-                if (passthroughVolume > 0f)
-                {
-                    if (filterAdded)
-                    {
-                        previousFilterPort = listenerMixPortCount;
-                        commandBlock.AddInletPort(listenerMixNode, 1);
-                        listenerMixPortCount++;
-                    }
-                    listenerGraphState.ildConnections.Add(new IldOutputConnection
-                    {
-                        ildOutputPort = -i - 1,
-                        nodeInputPort = previousFilterPort,
-                        node          = listenerMixNode,
-                        attenuation   = passthroughVolume
-                    });
-                }
-            }
-            commandBlock.UpdateAudioKernel<ListenerMixNodeChannelUpdate, ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>(
-                new ListenerMixNodeChannelUpdate { leftChannelCount = listenerMixPortCount },
-                listenerMixNode);
-            for (int i = 0; i < profile.passthroughFractionsPerRightChannel.Length; i++)
-            {
-                bool    filterAdded        = false;
-                DSPNode previousFilterNode = listenerMixNode;
-                int     previousFilterPort = listenerMixPortCount;
-                float   filterVolume       = profile.filterVolumesPerRightChannel[i] * (1f - profile.passthroughFractionsPerRightChannel[i]);
-                float   passthroughVolume  = profile.passthroughVolumesPerRightChannel[i] * profile.passthroughFractionsPerRightChannel[i];
-                commandBlock.AddInletPort(listenerMixNode, 1);
-                listenerMixPortCount++;
-
-                if (filterVolume > 0f)
-                {
-                    //We have to walk backwards to build the filter connections correctly since the ild outputs must remain disconnected
-                    for (int j = profile.channelIndicesRight.Length - 1; j >= 0; j--)
-                    {
-                        if (i == profile.channelIndicesRight[j])
-                        {
-                            var filter     = profile.filtersRight[j];
-                            var filterNode = StateVariableFilterNode.Create(commandBlock,
-                                                                            filter.type.ToDspFilterType(),
-                                                                            filter.cutoff,
-                                                                            filter.q,
-                                                                            filter.gainInDecibels,
-                                                                            1);
-                            listenerGraphState.nodes.Add(filterNode);
-                            var filterConnection = commandBlock.Connect(filterNode, 0, previousFilterNode, previousFilterPort);
-                            listenerGraphState.connections.Add(filterConnection);
-                            previousFilterNode = filterNode;
-                            previousFilterPort = 0;
-                            if (!filterAdded && filterVolume < 1f)
-                                commandBlock.SetAttenuation(filterConnection, filterVolume);
-                            filterAdded = true;
-                        }
-                    }
-                    if (filterAdded)
-                    {
-                        listenerGraphState.ildConnections.Add(new IldOutputConnection
-                        {
-                            ildOutputPort = -i - 1 - profile.passthroughFractionsPerLeftChannel.Length,  //The negative value stores the intended channel in a disconnected state
-                            nodeInputPort = previousFilterPort,
-                            node          = previousFilterNode,
-                            attenuation   = 1f
-                        });
-                    }
-                }
-                if (passthroughVolume > 0f)
-                {
-                    if (filterAdded)
-                    {
-                        previousFilterPort = listenerMixPortCount;
-                        commandBlock.AddInletPort(listenerMixNode, 1);
-                        listenerMixPortCount++;
-                    }
-                    listenerGraphState.ildConnections.Add(new IldOutputConnection
-                    {
-                        ildOutputPort = -i - 1 - profile.passthroughFractionsPerLeftChannel.Length,
-                        nodeInputPort = previousFilterPort,
-                        node          = listenerMixNode,
-                        attenuation   = passthroughVolume
-                    });
-                }
             }
         }
     }

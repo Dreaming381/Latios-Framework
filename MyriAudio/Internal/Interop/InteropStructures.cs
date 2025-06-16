@@ -189,7 +189,7 @@ namespace Latios.Myri.Interop
     {
         public TransformQvvs                             worldTransform;
         public BrickwallLimiterSettings                  limiterSettings;
-        public BlobAssetReference<ListenerProfileBlobV2> listenerProfileBlob;
+        public BlobAssetReference<ListenerProfileBlob> listenerProfileBlob;
         public Entity                                    listenerEntity;
         public EffectIDInStack*                          effectIDs;
         public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
@@ -209,7 +209,7 @@ namespace Latios.Myri.Interop
     internal unsafe struct ListenerStackUpdate
     {
         public BrickwallLimiterSettings                  limiterSettings;
-        public BlobAssetReference<ListenerProfileBlobV2> listenerProfileBlob;
+        public BlobAssetReference<ListenerProfileBlob> listenerProfileBlob;
         public EffectIDInStack*                          effectIDs;
         public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
         public int                                       listenerId;

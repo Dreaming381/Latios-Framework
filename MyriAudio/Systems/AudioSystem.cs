@@ -39,14 +39,16 @@ namespace Latios.Myri.Systems
         private int                                         m_currentBufferId;
         private NativeList<OwnedIldBuffer>                  m_buffersInFlight;
         private NativeQueue<AudioFrameBufferHistoryElement> m_audioFrameHistory;
-        private NativeList<ListenerGraphState>              m_listenerGraphStatesToDispose;
+        private NativeList<ListenerGraphState>              m_listenerStatesToDisposeOnShutdown;
 
         private JobHandle   m_lastUpdateJobHandle;
         private EntityQuery m_aliveListenersQuery;
         private EntityQuery m_deadListenersQuery;
         private EntityQuery m_sourcesQuery;
 
-        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
+        BlobRetainer m_blobRetainer;
+
+        WorldTransformReadOnlyTypeHandle m_worldTransformHandle;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -71,9 +73,9 @@ namespace Latios.Myri.Systems
             // Create queries
             m_aliveListenersQuery = state.Fluent().With<AudioListener>(true).Build();
             m_deadListenersQuery  = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
-            m_sourcesQuery        = state.Fluent().With<AudioSourceVolume, AudioSourceDistanceFalloff>(true).WithWorldTransformReadOnly().With<AudioSourceClip>(false).Build();
+            m_sourcesQuery        = state.Fluent().With<AudioSourceVolume, AudioSourceDistanceFalloff>(true).With<AudioSourceClip>(false).Build();
 
-            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
+            m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
         }
 
         public bool ShouldUpdateSystem(ref SystemState state)
@@ -90,16 +92,18 @@ namespace Latios.Myri.Systems
             m_initialized = true;
 
             // Initialize containers first
-            m_masterMixNodePortFreelist    = new NativeList<int>(Allocator.Persistent);
-            m_masterMixNodePortCount       = new NativeReference<int>(Allocator.Persistent);
-            m_ildNodePortCount             = new NativeReference<int>(Allocator.Persistent);
-            m_packedFrameCounterBufferId   = new NativeReference<long>(Allocator.Persistent);
-            m_audioFrame                   = new NativeReference<int>(Allocator.Persistent);
-            m_lastPlayedAudioFrame         = new NativeReference<int>(Allocator.Persistent);
-            m_lastReadBufferId             = new NativeReference<int>(Allocator.Persistent);
-            m_buffersInFlight              = new NativeList<OwnedIldBuffer>(Allocator.Persistent);
-            m_audioFrameHistory            = new NativeQueue<AudioFrameBufferHistoryElement>(Allocator.Persistent);
-            m_listenerGraphStatesToDispose = new NativeList<ListenerGraphState>(Allocator.Persistent);
+            m_masterMixNodePortFreelist         = new NativeList<int>(Allocator.Persistent);
+            m_masterMixNodePortCount            = new NativeReference<int>(Allocator.Persistent);
+            m_ildNodePortCount                  = new NativeReference<int>(Allocator.Persistent);
+            m_packedFrameCounterBufferId        = new NativeReference<long>(Allocator.Persistent);
+            m_audioFrame                        = new NativeReference<int>(Allocator.Persistent);
+            m_lastPlayedAudioFrame              = new NativeReference<int>(Allocator.Persistent);
+            m_lastReadBufferId                  = new NativeReference<int>(Allocator.Persistent);
+            m_buffersInFlight                   = new NativeList<OwnedIldBuffer>(Allocator.Persistent);
+            m_audioFrameHistory                 = new NativeQueue<AudioFrameBufferHistoryElement>(Allocator.Persistent);
+            m_listenerStatesToDisposeOnShutdown = new NativeList<ListenerGraphState>(Allocator.Persistent);
+
+            m_blobRetainer.Init();
 
             // Create graph and driver
             var format   = ChannelEnumConverter.GetSoundFormatFromSpeakerMode(UnityEngine.AudioSettings.speakerMode);
@@ -125,9 +129,8 @@ namespace Latios.Myri.Systems
             // Force initialization of Burst
             commandBlock  = m_graph.CreateCommandBlock();
             var dummyNode = commandBlock.CreateDSPNode<ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>();
-            StateVariableFilterNode.Create(commandBlock, StateVariableFilterNode.FilterType.Bandpass, 0f, 0f, 0f, 1);
             commandBlock.UpdateAudioKernel<ListenerMixNodeChannelUpdate, ListenerMixNode.Parameters, ListenerMixNode.SampleProviders, ListenerMixNode>(
-                new ListenerMixNodeChannelUpdate { leftChannelCount = 0 },
+                new ListenerMixNodeChannelUpdate { blob = default, sampleRate = 1024 },
                 dummyNode);
             commandBlock.UpdateAudioKernel<MasterMixNodeUpdate, MasterMixNode.Parameters, MasterMixNode.SampleProviders, MasterMixNode>(new MasterMixNodeUpdate {
                 settings = default
@@ -156,10 +159,9 @@ namespace Latios.Myri.Systems
             // Type handles
             m_worldTransformHandle.Update(ref state);
 
-            var audioSettingsLookup          = GetComponentLookup<AudioSettings>(true);
-            var listenerLookup               = GetComponentLookup<AudioListener>(true);
-            var listenerGraphStateLookup     = GetComponentLookup<ListenerGraphState>(false);
-            var entityOutputGraphStateLookup = GetComponentLookup<EntityOutputGraphState>(false);
+            var audioSettingsLookup      = GetComponentLookup<AudioSettings>(true);
+            var listenerLookup           = GetComponentLookup<AudioListener>(true);
+            var listenerGraphStateLookup = GetComponentLookup<ListenerGraphState>(false);
 
             // Buffer
             m_currentBufferId++;
@@ -216,29 +218,28 @@ namespace Latios.Myri.Systems
 
             var updateListenersGraphJH = new GraphHandling.UpdateListenersGraphJob
             {
-                listenerEntities                = aliveListenerEntities,
-                destroyedListenerEntities       = deadListenerEntities,
-                listenerLookup                  = listenerLookup,
-                listenerGraphStateLookup        = listenerGraphStateLookup,
-                listenerOutputGraphStateLookup  = entityOutputGraphStateLookup,
-                ecb                             = ecb,
-                statesToDisposeThisFrame        = m_listenerGraphStatesToDispose,
-                audioSettingsLookup             = audioSettingsLookup,
-                worldBlackboardEntity           = latiosWorld.worldBlackboardEntity,
-                audioFrame                      = m_audioFrame,
-                audioFrameHistory               = m_audioFrameHistory,
-                systemMasterMixNodePortFreelist = m_masterMixNodePortFreelist,
-                systemMasterMixNodePortCount    = m_masterMixNodePortCount,
-                systemMasterMixNode             = m_masterMixNode,
-                systemIldNodePortCount          = m_ildNodePortCount,
-                systemIldNode                   = m_ildNode,
-                commandBlock                    = dspCommandBlock,
-                listenerBufferParameters        = listenerBufferParameters,
-                outputSamplesMegaBuffer         = ildBuffer.buffer,
-                outputSamplesMegaBufferChannels = ildBuffer.channels,
-                bufferId                        = m_currentBufferId,
-                samplesPerFrame                 = m_samplesPerFrame,
-                sampleRate                      = m_sampleRate,
+                listenerEntities                  = aliveListenerEntities,
+                destroyedListenerEntities         = deadListenerEntities,
+                listenerLookup                    = listenerLookup,
+                listenerGraphStateLookup          = listenerGraphStateLookup,
+                ecb                               = ecb,
+                listenerStatesToDisposeOnShutdown = m_listenerStatesToDisposeOnShutdown,
+                audioSettingsLookup               = audioSettingsLookup,
+                worldBlackboardEntity             = latiosWorld.worldBlackboardEntity,
+                audioFrame                        = m_audioFrame,
+                audioFrameHistory                 = m_audioFrameHistory,
+                systemMasterMixNodePortFreelist   = m_masterMixNodePortFreelist,
+                systemMasterMixNodePortCount      = m_masterMixNodePortCount,
+                systemMasterMixNode               = m_masterMixNode,
+                systemIldNodePortCount            = m_ildNodePortCount,
+                systemIldNode                     = m_ildNode,
+                commandBlock                      = dspCommandBlock,
+                listenerBufferParameters          = listenerBufferParameters,
+                outputSamplesMegaBuffer           = ildBuffer.buffer,
+                outputSamplesMegaBufferChannels   = ildBuffer.channels,
+                bufferId                          = m_currentBufferId,
+                samplesPerFrame                   = m_samplesPerFrame,
+                sampleRate                        = m_sampleRate,
             }.Schedule(JobHandle.CombineDependencies(captureListenersJH, captureFrameJH));
 
             var updateSourcesJH = new InitUpdateDestroy.UpdateClipAudioSourcesJob
@@ -324,9 +325,11 @@ namespace Latios.Myri.Systems
             m_lastUpdateJobHandle = JobHandle.CombineDependencies(disposeJobHandles.AsArray());
 
             m_buffersInFlight.Add(ildBuffer);
+
+            m_blobRetainer.Update(state.EntityManager, ildBuffer.bufferId, lastReadIldBufferFromMainThread);
         }
 
-        public void OnDestroy(ref SystemState state)
+        public unsafe void OnDestroy(ref SystemState state)
         {
             if (!m_initialized)
                 return;
@@ -335,17 +338,17 @@ namespace Latios.Myri.Systems
             m_lastUpdateJobHandle.Complete();
             state.CompleteDependency();
             var commandBlock = m_graph.CreateCommandBlock();
-            foreach (var s in m_listenerGraphStatesToDispose)
+            foreach (var s in m_listenerStatesToDisposeOnShutdown)
             {
+                if (!s.ildConnections.IsCreated)
+                {
+                    continue;
+                }
                 foreach (var c in s.ildConnections)
-                    commandBlock.Disconnect(c.connection);
-                foreach (var c in s.connections)
                     commandBlock.Disconnect(c);
-                foreach (var n in s.nodes)
-                    commandBlock.ReleaseDSPNode(n);
-                s.nodes.Dispose();
+                commandBlock.Disconnect(s.masterOutputConnection);
+                commandBlock.ReleaseDSPNode(s.listenerMixNode);
                 s.ildConnections.Dispose();
-                s.connections.Dispose();
             }
             commandBlock.Disconnect(m_masterMixToOutputConnection);
             commandBlock.ReleaseDSPNode(m_ildNode);
@@ -362,7 +365,7 @@ namespace Latios.Myri.Systems
             m_lastPlayedAudioFrame.Dispose();
             m_lastReadBufferId.Dispose();
             m_audioFrameHistory.Dispose();
-            m_listenerGraphStatesToDispose.Dispose();
+            m_listenerStatesToDisposeOnShutdown.Dispose();
 
             foreach (var buffer in m_buffersInFlight)
             {
@@ -370,6 +373,8 @@ namespace Latios.Myri.Systems
                 buffer.channels.Dispose();
             }
             m_buffersInFlight.Dispose();
+
+            m_blobRetainer.Dispose();
         }
 
         private struct OwnedIldBuffer

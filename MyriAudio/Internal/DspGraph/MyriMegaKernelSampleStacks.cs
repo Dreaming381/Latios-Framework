@@ -281,32 +281,32 @@ namespace Latios.Myri.DSP
                 }
 
                 ref var blob        = ref listener.listenerMetadataPtr->listenerProfileBlob.Value;
-                ref var blobChannel = ref presampledChannel.channelIndex >= blob.rightChannelsOffset ?
-                                      ref blob.channelDspsRight[presampledChannel.channelIndex - blob.rightChannelsOffset] :
+                ref var blobChannel = ref presampledChannel.channelIndex >= blob.channelDspsLeft.Length ?
+                                      ref blob.channelDspsRight[presampledChannel.channelIndex - blob.channelDspsLeft.Length] :
                                       ref blob.channelDspsLeft[presampledChannel.channelIndex];
-                var output     = presampledChannel.channelIndex >= blob.rightChannelsOffset ? listener.sampleFrame.right : listener.sampleFrame.left;
-                var filtersPtr = listener.listenerMetadataPtr->listenerProfileFilters + math.select(0,
-                                                                                                    blob.totalFiltersInLeftChannels,
-                                                                                                    presampledChannel.channelIndex >= blob.rightChannelsOffset);
-
-                for (int sampleIndex = 0; sampleIndex < m_frameSize; sampleIndex++)
-                {
-                    float inSample    = presampledChannel.samples[sampleIndex + inputSamplesOffset];
-                    float outSample   = 0f;
-                    int   filterIndex = 0;
-                    for (int sequenceIndex = 0; sequenceIndex < blobChannel.filterSequences.Length; sequenceIndex++)
-                    {
-                        ref var coefficientsArray = ref blobChannel.filterSequences[sequenceIndex];
-                        var     sample            = inSample;
-
-                        for (int coeffIndex = 0; coeffIndex < coefficientsArray.Length; coeffIndex++)
-                        {
-                            sample = StateVariableFilter.ProcessSample(ref filtersPtr[filterIndex], coefficientsArray[coeffIndex], sample);
-                        }
-                        outSample += sample;
-                    }
-                    output[sampleIndex] += outSample;
-                }
+                var output = presampledChannel.channelIndex >= blob.channelDspsLeft.Length ? listener.sampleFrame.right : listener.sampleFrame.left;
+                //var filtersPtr = listener.listenerMetadataPtr->listenerProfileFilters + math.select(0,
+                //                                                                                    blob.totalFiltersInLeftChannels,
+                //                                                                                    presampledChannel.channelIndex >= blob.rightChannelsOffset);
+                //
+                //for (int sampleIndex = 0; sampleIndex < m_frameSize; sampleIndex++)
+                //{
+                //    float inSample    = presampledChannel.samples[sampleIndex + inputSamplesOffset];
+                //    float outSample   = 0f;
+                //    int   filterIndex = 0;
+                //    for (int sequenceIndex = 0; sequenceIndex < blobChannel.filterSequences.Length; sequenceIndex++)
+                //    {
+                //        ref var coefficientsArray = ref blobChannel.filterSequences[sequenceIndex];
+                //        var     sample            = inSample;
+                //
+                //        for (int coeffIndex = 0; coeffIndex < coefficientsArray.Length; coeffIndex++)
+                //        {
+                //            sample = StateVariableFilter.ProcessSample(ref filtersPtr[filterIndex], coefficientsArray[coeffIndex], sample);
+                //        }
+                //        outSample += sample;
+                //    }
+                //    output[sampleIndex] += outSample;
+                //}
             }
 
             m_profilingSpatializers.End();

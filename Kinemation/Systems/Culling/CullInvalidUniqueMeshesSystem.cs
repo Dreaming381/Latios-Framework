@@ -64,8 +64,8 @@ namespace Latios.Kinemation.Systems
 
         struct ChangeRequest
         {
-            public BatchMeshID id;
-            public bool        isInvalid;
+            public int  meshID;
+            public bool isInvalid;
         }
 
         [BurstCompile]
@@ -110,7 +110,7 @@ namespace Latios.Kinemation.Systems
                 {
                     if (configuredBits[entityIndex])
                     {
-                        if (!configurations[entityIndex].disableEmptyAndInvalidMeshCulling && !meshPool.meshesPrevalidatedThisFrame.Contains(mmis[entityIndex].MeshID))
+                        if (!configurations[entityIndex].disableEmptyAndInvalidMeshCulling && !meshPool.meshesPrevalidatedThisFrame.Contains(mmis[entityIndex].Mesh))
                         {
                             if (entityIndex < 64)
                                 furtherEvaluateLower.SetBits(entityIndex, true);
@@ -118,7 +118,7 @@ namespace Latios.Kinemation.Systems
                                 furtherEvaluateUpper.SetBits(entityIndex - 64, true);
                         }
                     }
-                    else if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].MeshID))
+                    else if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].Mesh))
                     {
                         chunkMask.ClearBitAtIndex(entityIndex);
                     }
@@ -150,11 +150,11 @@ namespace Latios.Kinemation.Systems
                         // Mark the entity as configured now so that we don't try to process it again until the user fixes the problem.
                         configuredBits[entityIndex] = false;
                         // Mark the entity as invalid so that we can cull it in future updates, but only if the status changed.
-                        if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].MeshID))
+                        if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].Mesh))
                         {
                             changeRequests.Write(new ChangeRequest
                             {
-                                id        = mmis[entityIndex].MeshID,
+                                meshID    = mmis[entityIndex].Mesh,
                                 isInvalid = true
                             }, threadIndex);
                         }
@@ -166,7 +166,7 @@ namespace Latios.Kinemation.Systems
                         // The mesh is now valid. Report it so that we don't cull it in the future. We must always report to add to the per-frame validation list.
                         changeRequests.Write(new ChangeRequest
                         {
-                            id        = mmis[entityIndex].MeshID,
+                            meshID    = mmis[entityIndex].Mesh,
                             isInvalid = false
                         }, threadIndex);
                     }
@@ -188,12 +188,12 @@ namespace Latios.Kinemation.Systems
                     var request = enumerator.GetCurrent<ChangeRequest>();
                     if (request.isInvalid)
                     {
-                        meshPool.invalidMeshesToCull.Add(request.id);
+                        meshPool.invalidMeshesToCull.Add(request.meshID);
                     }
                     else
                     {
-                        meshPool.invalidMeshesToCull.Remove(request.id);
-                        meshPool.meshesPrevalidatedThisFrame.Add(request.id);
+                        meshPool.invalidMeshesToCull.Remove(request.meshID);
+                        meshPool.meshesPrevalidatedThisFrame.Add(request.meshID);
                     }
                 }
             }

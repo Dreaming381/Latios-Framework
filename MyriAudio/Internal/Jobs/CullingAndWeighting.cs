@@ -68,7 +68,8 @@ namespace Latios.Myri
                         var transform = *(TransformQvvs*)(sourceDataPtr + transformOffset);
                         e.transform   = new RigidTransform(transform.rotation, transform.position);
                     }
-                    if (sourceHeader.HasFlag(CapturedSourceHeader.Features.DistanceFalloff))
+                    bool isSpatial = sourceHeader.HasFlag(CapturedSourceHeader.Features.DistanceFalloff);
+                    if (isSpatial)
                     {
                         var distanceFalloff = *(AudioSourceDistanceFalloff*)(sourceDataPtr + distanceFalloffOffset);
                         e.innerRange        = distanceFalloff.innerRange;
@@ -89,13 +90,14 @@ namespace Latios.Myri
                     for (int listenerIndex = 0; listenerIndex < listenersWithTransforms.Length; listenerIndex++, listenerFirstChannelIndex += listenerChannelCount)
                     {
                         var listener = listenersWithTransforms[listenerIndex];
-                        if (listener.channelIDsRange.y == 0)
+                        if (listener.channelIDsRange.y == 0 || listener.listener.volume <= 0f)
                             continue;
 
                         ref var blob         = ref listener.listener.ildProfile.Value;
                         listenerChannelCount = blob.anglesPerLeftChannel.Length + blob.anglesPerRightChannel.Length;
-                        var rangeSq          = math.square(e.outerRange * listener.listener.rangeMultiplier);
-                        if (listener.listener.volume <= 0f || math.distancesq(e.transform.pos, listener.transform.pos) >= rangeSq)
+
+                        var rangeSq = math.square(e.outerRange * listener.listener.rangeMultiplier);
+                        if (isSpatial && math.distancesq(e.transform.pos, listener.transform.pos) >= rangeSq)
                             continue;
 
                         var listenerChannelIDs = listenersChannelIDs.GetSubArray(listener.channelIDsRange.x, listener.channelIDsRange.y);
@@ -107,7 +109,22 @@ namespace Latios.Myri
                         w.channelWeights.Length = listenerChannelCount;
                         w.itdWeights.Length     = 2 * listener.listener.itdResolution + 1;
 
-                        ComputeWeights(ref w, in e, in listener, ref scratchCache);
+                        if (isSpatial)
+                            ComputeWeights(ref w, in e, in listener, ref scratchCache);
+                        else
+                        {
+                            w.itdWeights[w.itdWeights.Length / 2] = e.volume;
+                            for (int i = 0; i < blob.anglesPerLeftChannel.Length; i++)
+                            {
+                                if (math.all(math.isnan(blob.anglesPerLeftChannel[i])))
+                                    w.channelWeights[i] = 1f;
+                            }
+                            for (int i = 0; i < blob.anglesPerRightChannel.Length; i++)
+                            {
+                                if (math.all(math.isnan(blob.anglesPerRightChannel[i])))
+                                    w.channelWeights[i + blob.anglesPerLeftChannel.Length] = 1f;
+                            }
+                        }
 
                         int   itdIndex  = -1;
                         float itdVolume = 0f;
@@ -315,13 +332,13 @@ namespace Latios.Myri
 
                 if (!perfectMatch)
                 {
-                    //No perfect match.
+                    // No perfect match.
                     int4                     bestMinMaxXYIndices = default;  //This should always be overwritten
                     float4                   bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
                     FixedList128Bytes<int>   candidateChannels   = default;
                     FixedList128Bytes<float> candidateDistances  = default;
 
-                    //Find our limits
+                    // Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerLeftChannel);
                     var                      leftChannelDeltas  = scratchCache;
@@ -340,9 +357,9 @@ namespace Latios.Myri
                         leftChannelDeltas[i]  = delta;
                         leftChannelInsides.Add(inside);
                     }
-                    //By this point, any delta should be (positive, negative, positive, negative)
+                    // By this point, any delta should be (positive, negative, positive, negative)
 
-                    //Find our search region
+                    // Find our search region
                     for (int i = 0; i < leftChannelDeltas.Length; i++)
                     {
                         bool2 inside = leftChannelInsides[i];
@@ -379,7 +396,7 @@ namespace Latios.Myri
                         }
                     }
 
-                    //Add our constraining indices to the pot
+                    // Add our constraining indices to the pot
                     var bestAngleDistances = math.abs(bestAngleDeltas);
                     candidateChannels.Add(bestMinMaxXYIndices.x);
                     candidateDistances.Add(bestAngleDistances.x);
@@ -413,7 +430,7 @@ namespace Latios.Myri
                     else
                         candidateDistances[candidateDistances.Length - 1] = math.min(candidateDistances[candidateDistances.Length - 1], bestAngleDistances.w);
 
-                    //Add additional candidates
+                    // Add additional candidates
                     for (int i = 0; i < leftChannelDeltas.Length; i++)
                     {
                         if (math.any(i == bestMinMaxXYIndices))
@@ -468,7 +485,7 @@ namespace Latios.Myri
                         }
                     }
 
-                    //Compute weights
+                    // Compute weights
                     float sum = 0f;
                     for (int i = 0; i < candidateDistances.Length; i++)
                     {
@@ -481,8 +498,8 @@ namespace Latios.Myri
                     }
                 }
 
-                //Right
-                //First, find if there is a perfect match
+                // Right
+                // First, find if there is a perfect match
                 perfectMatch = false;
                 for (int i = 0; i < profile.anglesPerRightChannel.Length; i++)
                 {
@@ -500,13 +517,13 @@ namespace Latios.Myri
 
                 if (!perfectMatch)
                 {
-                    //No perfect match.
+                    // No perfect match.
                     int4                     bestMinMaxXYIndices = default;  //This should always be overwritten
                     float4                   bestAngleDeltas     = new float4(2f * math.PI, -2f * math.PI, 2f * math.PI, -2f * math.PI);
                     FixedList128Bytes<int>   candidateChannels   = default;
                     FixedList128Bytes<float> candidateDistances  = default;
 
-                    //Find our limits
+                    // Find our limits
                     scratchCache.Clear();
                     scratchCache.AddRangeFromBlob(ref profile.anglesPerRightChannel);
                     var                      rightChannelDeltas  = scratchCache;
@@ -525,22 +542,22 @@ namespace Latios.Myri
                         rightChannelDeltas[i]  = delta;
                         rightChannelInsides.Add(inside);
                     }
-                    //By this point, any delta should be (positive, negative, positive, negative)
+                    // By this point, any delta should be (positive, negative, positive, negative)
 
-                    //Find our search region
+                    // Find our search region
                     for (int i = 0; i < rightChannelDeltas.Length; i++)
                     {
                         bool2 inside = rightChannelInsides[i];
                         var   delta  = rightChannelDeltas[i];
                         if (inside.x)
                         {
-                            //above
+                            // above
                             if (delta.z <= bestAngleDeltas.z)
                             {
                                 bestAngleDeltas.z     = delta.z;
                                 bestMinMaxXYIndices.z = i;
                             }
-                            //below
+                            // below
                             if (delta.w >= bestAngleDeltas.w)
                             {
                                 bestAngleDeltas.w     = delta.w;
@@ -549,13 +566,13 @@ namespace Latios.Myri
                         }
                         if (inside.y)
                         {
-                            //right
+                            // right
                             if (delta.x <= bestAngleDeltas.x)
                             {
                                 bestAngleDeltas.x     = delta.x;
                                 bestMinMaxXYIndices.x = i;
                             }
-                            //left
+                            // left
                             if (delta.y >= bestAngleDeltas.y)
                             {
                                 bestAngleDeltas.y     = delta.y;
@@ -564,7 +581,7 @@ namespace Latios.Myri
                         }
                     }
 
-                    //Add our constraining indices to the pot
+                    // Add our constraining indices to the pot
                     var bestAngleDistances = math.abs(bestAngleDeltas);
                     candidateChannels.Add(bestMinMaxXYIndices.x);
                     candidateDistances.Add(bestAngleDistances.x);
@@ -598,7 +615,7 @@ namespace Latios.Myri
                     else
                         candidateDistances[candidateDistances.Length - 1] = math.min(candidateDistances[candidateDistances.Length - 1], bestAngleDistances.w);
 
-                    //Add additional candidates
+                    // Add additional candidates
                     for (int i = 0; i < rightChannelDeltas.Length; i++)
                     {
                         if (math.any(i == bestMinMaxXYIndices))
@@ -653,7 +670,7 @@ namespace Latios.Myri
                         }
                     }
 
-                    //Compute weights
+                    // Compute weights
                     float sum = 0f;
                     for (int i = 0; i < candidateDistances.Length; i++)
                     {
@@ -666,18 +683,14 @@ namespace Latios.Myri
                     }
                 }
 
-                // Filter out zero-weights
-                // Todo: Pre-compute and cache
                 for (int i = 0; i < profile.anglesPerLeftChannel.Length; i++)
                 {
-                    if (profile.filterVolumesPerLeftChannel[i] * (1f - profile.passthroughFractionsPerLeftChannel[i]) +
-                        profile.passthroughVolumesPerLeftChannel[i] * profile.passthroughFractionsPerLeftChannel[i] <= 0f)
+                    if (profile.channelDspsLeft[i].volume <= 0f)
                         weights.channelWeights[i] = 0f;
                 }
                 for (int i = 0; i < profile.anglesPerRightChannel.Length; i++)
                 {
-                    if (profile.filterVolumesPerRightChannel[i] * (1f - profile.passthroughFractionsPerRightChannel[i]) +
-                        profile.passthroughVolumesPerRightChannel[i] * profile.passthroughFractionsPerRightChannel[i] <= 0f)
+                    if (profile.channelDspsRight[i].volume <= 0f)
                         weights.channelWeights[i + profile.anglesPerLeftChannel.Length] = 0f;
                 }
             }

@@ -178,14 +178,24 @@ namespace Latios.Kinemation
 
                 var configurations = (UniqueMeshConfig*)chunk.GetRequiredComponentDataPtrRO(ref configHandle);
 
-                // 2) Only consider visible meshes or meshes with forced uploads
+                // 2) Only consider dirty visible meshes or meshes with forced uploads
                 ChunkPerDispatchCullingMask maskToProcess = default;
                 if (chunk.HasChunkComponent(ref maskHandle))
-                    maskToProcess = chunk.GetChunkComponentData(ref maskHandle);
+                    maskToProcess  = chunk.GetChunkComponentData(ref maskHandle);
+                var configuredBits = chunk.GetEnabledMask(ref configHandle);
 
                 var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 while (enumerator.NextEntityIndex(out var entityIndex))
                 {
+                    if (!configuredBits[entityIndex])
+                    {
+                        if (entityIndex < 64)
+                            maskToProcess.lower.SetBits(entityIndex, false);
+                        else
+                            maskToProcess.upper.SetBits(entityIndex - 64, false);
+                        continue;
+                    }
+
                     if (configurations[entityIndex].forceUpload)
                     {
                         if (entityIndex < 64)
@@ -203,7 +213,7 @@ namespace Latios.Kinemation
                 enumerator               = new ChunkEntityEnumerator(true, new v128(maskToProcess.lower.Value, maskToProcess.upper.Value), chunk.Count);
                 while (enumerator.NextEntityIndex(out var entityIndex))
                 {
-                    if (!meshPool.meshesPrevalidatedThisFrame.Contains(mmis[entityIndex].MeshID))
+                    if (!meshPool.meshesPrevalidatedThisFrame.Contains(mmis[entityIndex].Mesh))
                     {
                         if (entityIndex < 64)
                             validateLower.SetBits(entityIndex, true);
@@ -211,9 +221,6 @@ namespace Latios.Kinemation
                             validateUpper.SetBits(entityIndex - 64, true);
                     }
                 }
-
-                // New configurations to validate
-                var configuredBits = chunk.GetEnabledMask(ref configHandle);
 
                 // 4) Validate meshes still needing validation if necessary
                 if ((validateLower.Value | validateUpper.Value) != 0)
@@ -241,9 +248,9 @@ namespace Latios.Kinemation
                             // Mark the entity as configured now so that we don't try to process it again until the user fixes the problem.
                             configuredBits[entityIndex] = false;
                             // Mark the entity as invalid so that we can cull it in future updates, but only if the status changed.
-                            if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].MeshID))
+                            if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].Mesh))
                             {
-                                meshIDsToInvalidate.Write(mmis[entityIndex].MeshID, threadIndex);
+                                meshIDsToInvalidate.Write(mmis[entityIndex].Mesh, threadIndex);
                             }
                             // Mark the entity as non-processable
                             maskToProcess.ClearBitAtIndex(entityIndex);
@@ -276,7 +283,7 @@ namespace Latios.Kinemation
                 var enumerator = meshIDsToInvalidate.GetEnumerator();
                 while (enumerator.MoveNext())
                 {
-                    var id = enumerator.GetCurrent<BatchMeshID>();
+                    var id = enumerator.GetCurrent<int>();
                     meshPool.invalidMeshesToCull.Add(id);
                 }
 
@@ -352,7 +359,7 @@ namespace Latios.Kinemation
                     while (e.NextEntityIndex(out var entityIndex))
                     {
                         mask[entityIndex]        = false;
-                        meshesToUpload[dstIndex] = meshPool.idToMeshMap[mmis[entityIndex].MeshID];
+                        meshesToUpload[dstIndex] = meshPool.idToMeshMap[mmis[entityIndex].Mesh];
                         dstIndex++;
                     }
                 }
@@ -367,9 +374,8 @@ namespace Latios.Kinemation
                 var indexBuffers    = chunk.chunk.GetBufferAccessor(ref indexHandle);
                 var submeshBuffers  = chunk.chunk.GetBufferAccessor(ref submeshHandle);
 
-                int meshIndex  = chunk.prefixSum;
                 var enumerator = new ChunkEntityEnumerator(true, new v128(chunk.lower.Value, chunk.upper.Value), chunk.chunk.Count);
-                while (enumerator.NextEntityIndex(out var entityIndex))
+                for (int meshIndex = chunk.prefixSum; enumerator.NextEntityIndex(out var entityIndex); meshIndex++)
                 {
                     var config = configurations[entityIndex];
 

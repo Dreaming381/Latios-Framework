@@ -4,21 +4,10 @@ using Unity.Mathematics;
 namespace Latios.Myri.DSP
 {
     // Make public on release
-    internal struct StateVariableFilter
+    public struct StateVariableFilter
     {
-        public enum FilterType
-        {
-            Lowpass,
-            Highpass,
-            Bandpass,
-            Bell,
-            Notch,
-            Lowshelf,
-            Highshelf
-        }
-
         #region Instance API
-        public StateVariableFilter(FilterType filterType, float cutoff, float Q, float gainInDBs, int sampleRate)
+        public StateVariableFilter(FrequencyFilterType filterType, float cutoff, float Q, float gainInDBs, int sampleRate)
         {
             m_leftChannel  = default;
             m_rightChannel = default;
@@ -28,7 +17,7 @@ namespace Latios.Myri.DSP
             SetFilter(filterType, cutoff, Q, gainInDBs);
         }
 
-        public void SetFilter(FilterType filterType, float cutoff, float Q, float gainInDBs)
+        public void SetFilter(FrequencyFilterType filterType, float cutoff, float Q, float gainInDBs)
         {
             m_coefficients = Design(filterType, cutoff, Q, gainInDBs, m_sampleRate);
         }
@@ -53,7 +42,7 @@ namespace Latios.Myri.DSP
             return m_coefficients.A * (m_coefficients.m0 * rightSample + m_coefficients.m1 * v1 + m_coefficients.m2 * v2);
         }
 
-        public void ProcessFrame(ref SampleFrame frame, bool outputConnected)
+        internal void ProcessFrame(ref SampleFrame frame, bool outputConnected)
         {
             if (!outputConnected || !frame.connected)
             {
@@ -93,7 +82,7 @@ namespace Latios.Myri.DSP
             public void Reset() => this = default;
         }
 
-        public static Coefficients CreateFilterCoefficients(FilterType filterType, float cutoff, float Q, float gainInDBs, int sampleRate)
+        public static Coefficients CreateFilterCoefficients(FrequencyFilterType filterType, float cutoff, float Q, float gainInDBs, int sampleRate)
         {
             return Design(filterType, cutoff, Q, gainInDBs, sampleRate);
         }
@@ -144,7 +133,7 @@ namespace Latios.Myri.DSP
 
         static Coefficients DesignBandpass(float normalizedFrequency, float Q, float linearGain)
         {
-            var coefficients = Design(FilterType.Lowpass, normalizedFrequency, Q, linearGain);
+            var coefficients = Design(FrequencyFilterType.Lowpass, normalizedFrequency, Q, linearGain);
             coefficients.m1  = 1;
             coefficients.m2  = 0;
             return coefficients;
@@ -152,7 +141,7 @@ namespace Latios.Myri.DSP
 
         static Coefficients DesignHighpass(float normalizedFrequency, float Q, float linearGain)
         {
-            var coefficients = Design(FilterType.Lowpass, normalizedFrequency, Q, linearGain);
+            var coefficients = Design(FrequencyFilterType.Lowpass, normalizedFrequency, Q, linearGain);
             coefficients.m0  = 1;
             coefficients.m1  = -coefficients.k;
             coefficients.m2  = -1;
@@ -196,40 +185,40 @@ namespace Latios.Myri.DSP
             return new Coefficients { A = A, g = g, k = k, a1 = a1, a2 = a2, a3 = a3, m0 = m0, m1 = m1, m2 = m2 };
         }
 
-        static Coefficients Design(FilterType type, float normalizedFrequency, float Q, float linearGain)
+        static Coefficients Design(FrequencyFilterType type, float normalizedFrequency, float Q, float linearGain)
         {
             switch (type)
             {
-                case FilterType.Lowpass: return DesignLowpass(normalizedFrequency, Q, linearGain);
-                case FilterType.Highpass: return DesignHighpass(normalizedFrequency, Q, linearGain);
-                case FilterType.Bandpass: return DesignBandpass(normalizedFrequency, Q, linearGain);
-                case FilterType.Bell: return DesignBell(normalizedFrequency, Q, linearGain);
-                case FilterType.Notch: return DesignNotch(normalizedFrequency, Q, linearGain);
-                case FilterType.Lowshelf: return DesignLowshelf(normalizedFrequency, Q, linearGain);
-                case FilterType.Highshelf: return DesignHighshelf(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Lowpass: return DesignLowpass(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Highpass: return DesignHighpass(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Bandpass: return DesignBandpass(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Bell: return DesignBell(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Notch: return DesignNotch(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Lowshelf: return DesignLowshelf(normalizedFrequency, Q, linearGain);
+                case FrequencyFilterType.Highshelf: return DesignHighshelf(normalizedFrequency, Q, linearGain);
                 default:
                     throw new System.ArgumentException("Unknown filter type", nameof(type));
             }
         }
 
-        static Coefficients Design(FilterType filterType, float cutoff, float Q, float gainInDBs, float sampleRate)
+        static Coefficients Design(FrequencyFilterType filterType, float cutoff, float Q, float gainInDBs, float sampleRate)
         {
             var linearGain = math.pow(10, gainInDBs / 20);
             switch (filterType)
             {
-                case FilterType.Lowpass:
+                case FrequencyFilterType.Lowpass:
                     return DesignLowpass(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Highpass:
+                case FrequencyFilterType.Highpass:
                     return DesignHighpass(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Bandpass:
+                case FrequencyFilterType.Bandpass:
                     return DesignBandpass(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Bell:
+                case FrequencyFilterType.Bell:
                     return DesignBell(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Notch:
+                case FrequencyFilterType.Notch:
                     return DesignNotch(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Lowshelf:
+                case FrequencyFilterType.Lowshelf:
                     return DesignLowshelf(cutoff / sampleRate, Q, linearGain);
-                case FilterType.Highshelf:
+                case FrequencyFilterType.Highshelf:
                     return DesignHighshelf(cutoff / sampleRate, Q, linearGain);
                 default:
                     throw new System.ArgumentException("Unknown filter type", nameof(filterType));

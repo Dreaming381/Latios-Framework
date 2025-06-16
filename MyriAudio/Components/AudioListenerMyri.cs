@@ -66,40 +66,22 @@ namespace Latios.Myri
 
     /// <summary>
     /// A volume and frequency-based filtering spatialization profile.
-    /// A custom variant can be constructed by overriding AudioIldProfileBuilder.
+    /// A custom variant can be constructed by implementing IListenerProfileBuilder.
     /// </summary>
     public struct ListenerProfileBlob
     {
-        internal BlobArray<FrequencyFilter> filtersLeft;
-        internal BlobArray<int>             channelIndicesLeft;
-        internal BlobArray<FrequencyFilter> filtersRight;
-        internal BlobArray<int>             channelIndicesRight;
-
-        internal BlobArray<float4> anglesPerLeftChannel;
-        internal BlobArray<float4> anglesPerRightChannel;
-        internal BlobArray<float>  passthroughFractionsPerLeftChannel;
-        internal BlobArray<float>  passthroughFractionsPerRightChannel;
-        internal BlobArray<float>  filterVolumesPerLeftChannel;
-        internal BlobArray<float>  filterVolumesPerRightChannel;
-        internal BlobArray<float>  passthroughVolumesPerLeftChannel;
-        internal BlobArray<float>  passthroughVolumesPerRightChannel;
-    }
-
-    // Todo: Rename this once the new design is ready.
-    internal struct ListenerProfileBlobV2
-    {
         internal struct ChannelDsp
         {
-            public BlobArray<BlobArray<DSP.StateVariableFilter.Coefficients> > filterSequences;
-            public BlobArray<float>                                            sequenceVolumes;
+            public BlobArray<FrequencyFilter> filters;
+            // volume needed in the case that we want to amplify a channel without applying any filters.
+            public float volume;
         }
 
         internal BlobArray<ChannelDsp> channelDspsLeft;
         internal BlobArray<ChannelDsp> channelDspsRight;
-        internal BlobArray<float4>     anglesPerLeftChannel;
-        internal BlobArray<float4>     anglesPerRightChannel;
-        internal int                   rightChannelsOffset;
-        internal int                   totalFiltersInLeftChannels;
+        // NaN = unspatialized
+        internal BlobArray<float4> anglesPerLeftChannel;
+        internal BlobArray<float4> anglesPerRightChannel;
     }
 
     /// <summary>
