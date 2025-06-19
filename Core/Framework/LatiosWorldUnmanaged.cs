@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Latios;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -7,7 +6,6 @@ using Unity.Entities;
 using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios
 {
@@ -311,8 +309,15 @@ namespace Latios
             if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
                 throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
 #endif
-
-            bool hasAssociated = m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.componentType);
+            var  em              = m_impl->m_worldUnmanaged.EntityManager;
+            bool addedAssociated = em.HasComponent(entity, collectionComponent.componentType);
+            if (addedAssociated)
+            {
+                if (!em.HasComponent(entity, collectionComponent.cleanupType))
+                    em.AddComponent(entity, collectionComponent.cleanupType);
+            }
+            else
+                em.AddComponent(entity, new ComponentTypeSet(collectionComponent.componentType, collectionComponent.cleanupType));
             m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.cleanupType);
             var replaced = m_impl->m_collectionComponentStorage.AddOrSetCollectionComponentAndDisposeOld(entity, collectionComponent, out var disposeHandle, out var newRef);
             m_impl->m_collectionDependencies.Add(new LatiosWorldUnmanagedImpl.CollectionDependency
@@ -322,7 +327,7 @@ namespace Latios
                 hasExtraDisposeDependency = replaced,
                 wasReadOnly               = false
             });
-            return hasAssociated;
+            return !addedAssociated;
         }
 
         /// <summary>

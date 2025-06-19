@@ -184,8 +184,19 @@ namespace Latios.Psyshock
                     var clippedSegmentB                  = rayStart + fractionB * rayDisplacement;
                     var aDistance                        = mathex.SignedDistance(plane, clippedSegmentA) * distanceScalarAlongContactNormal;
                     var bDistance                        = mathex.SignedDistance(plane, clippedSegmentB) * distanceScalarAlongContactNormal;
-                    result.Add(math.transform(triangleTransform, clippedSegmentA), aDistance - capsule.radius);
-                    result.Add(math.transform(triangleTransform, clippedSegmentB), bDistance - capsule.radius);
+
+                    // Unity Physics puts the contact points inside the capsule if the contact is close to the segment endpoint.
+                    // Our version corrects this by finding the surface point along the contact vector.
+                    var contactOnTrianglePlusRadiusA = clippedSegmentA + (aDistance + capsule.radius) * distanceResult.normalB;
+                    var contactOnTrianglePlusRadiusB = clippedSegmentB + (bDistance + capsule.radius) * distanceResult.normalB;
+                    var capsuleInTriangle            = new CapsuleCollider(rayStart, rayStart + rayDisplacement, capsule.radius);
+                    PointRayCapsule.RaycastCapsule(new Ray(contactOnTrianglePlusRadiusA, clippedSegmentA), in capsuleInTriangle, out var contactFractionA, out _);
+                    PointRayCapsule.RaycastCapsule(new Ray(contactOnTrianglePlusRadiusB, clippedSegmentB), in capsuleInTriangle, out var contactFractionB, out _);
+                    clippedSegmentA = math.lerp(contactOnTrianglePlusRadiusA, clippedSegmentA, contactFractionA);
+                    clippedSegmentB = math.lerp(contactOnTrianglePlusRadiusB, clippedSegmentB, contactFractionB);
+
+                    result.Add(math.transform(triangleTransform, clippedSegmentA), math.distance(clippedSegmentA, contactOnTrianglePlusRadiusA));
+                    result.Add(math.transform(triangleTransform, clippedSegmentB), math.distance(clippedSegmentB, contactOnTrianglePlusRadiusB));
                     needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
                 }
             }

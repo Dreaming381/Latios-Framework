@@ -290,8 +290,19 @@ namespace Latios.Psyshock
                 var clippedSegmentB                  = rayStart + fractionB * rayDisplacement;
                 var aDistance                        = mathex.SignedDistance(plane, clippedSegmentA) * distanceScalarAlongContactNormal;
                 var bDistance                        = mathex.SignedDistance(plane, clippedSegmentB) * distanceScalarAlongContactNormal;
-                result.Add(math.transform(boxTransform, clippedSegmentA), aDistance - capsule.radius);
-                result.Add(math.transform(boxTransform, clippedSegmentB), bDistance - capsule.radius);
+
+                // Unity Physics puts the contact points inside the capsule if the contact is close to the segment endpoint.
+                // Our version corrects this by finding the surface point along the contact vector.
+                var contactOnBoxPlusRadiusA = clippedSegmentA + (aDistance + capsule.radius) * distanceResult.normalB;
+                var contactOnBoxPlusRadiusB = clippedSegmentB + (bDistance + capsule.radius) * distanceResult.normalB;
+                var capsuleInBox            = new CapsuleCollider(rayStart, rayStart + rayDisplacement, capsule.radius);
+                PointRayCapsule.RaycastCapsule(new Ray(contactOnBoxPlusRadiusA, clippedSegmentA), in capsuleInBox, out var contactFractionA, out _);
+                PointRayCapsule.RaycastCapsule(new Ray(contactOnBoxPlusRadiusB, clippedSegmentB), in capsuleInBox, out var contactFractionB, out _);
+                clippedSegmentA = math.lerp(contactOnBoxPlusRadiusA, clippedSegmentA, contactFractionA);
+                clippedSegmentB = math.lerp(contactOnBoxPlusRadiusB, clippedSegmentB, contactFractionB);
+
+                result.Add(math.transform(boxTransform, clippedSegmentA), math.distance(clippedSegmentA, contactOnBoxPlusRadiusA));
+                result.Add(math.transform(boxTransform, clippedSegmentB), math.distance(clippedSegmentB, contactOnBoxPlusRadiusB));
                 needsClosestPoint = math.min(aDistance, bDistance) > distanceResult.distance + 1e-4f;  // Magic constant comes from Unity Physics
             }
 

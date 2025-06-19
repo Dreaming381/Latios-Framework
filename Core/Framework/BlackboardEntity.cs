@@ -89,6 +89,18 @@ namespace Latios
         }
 
         /// <summary>
+        /// Adds a set of components to the blackboard entity
+        /// </summary>
+        /// <param name="componentTypes">The component types to add</param>
+        public void AddComponent(in ComponentTypeSet componentTypes) => em.AddComponent(entity, in componentTypes);
+
+        /// <summary>
+        /// Removes a set of components from the blackboard entity
+        /// </summary>
+        /// <param name="componentTypes">The component types to remove</param>
+        public void RemoveComponent(in ComponentTypeSet componentTypes) => em.RemoveComponent(entity, in componentTypes);
+
+        /// <summary>
         /// Sets the component's value on the blackboard entity
         /// </summary>
         /// <typeparam name="T">The type of component to set</typeparam>
