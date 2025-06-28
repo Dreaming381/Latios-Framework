@@ -17,7 +17,7 @@ namespace Latios.Psyshock.Authoring
     public static class TriMeshColliderSmartBlobberAPIExtensions
     {
         /// <summary>
-        /// Requests the creation of a BlobAssetReference<TriMeshColliderBlob> that is a triMesh hull of the passed in mesh
+        /// Requests the creation of a BlobAssetReference<TriMeshColliderBlob> that is a triMesh of the passed in mesh
         /// </summary>
         public static SmartBlobberHandle<TriMeshColliderBlob> RequestCreateTriMeshBlobAsset(this IBaker baker, Mesh mesh)
         {

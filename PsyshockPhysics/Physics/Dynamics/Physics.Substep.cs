@@ -1,5 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using Unity.Collections;
+using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -118,6 +120,72 @@ namespace Latios.Psyshock
             IEnumerator<SubstepWithIndex> IEnumerable<SubstepWithIndex>.GetEnumerator() => this;
 
             IEnumerator IEnumerable.GetEnumerator() => this;
+        }
+    }
+
+    /// <summary>
+    /// A rate manager for ComponentSystemGroup (and SuperSystem) which subdivides the current deltaTime to smaller timesteps if necessary
+    /// such that each smaller timestep is less than a specified value. This is useful when large timesteps induce unwanted behaviors.
+    /// Substep times are distributed evenly to sum up to the deltaTime.
+    /// </summary>
+    public unsafe class SubstepRateManager : IRateManager
+    {
+        Physics.SubstepEnumerator   m_enumerator         = default;
+        DoubleRewindableAllocators* m_previousAllocators = null;
+        float                       m_maxSubstepTime;
+        int                         m_maxSubsteps;
+        int                         m_currentSubstepIndex = -1;
+
+        public float Timestep
+        {
+            get => m_enumerator.Current;
+            set => throw new System.InvalidOperationException("You cannot explicitly set the timestep of a SubstepRateManager.");
+        }
+
+        /// <summary>
+        /// Creates a SubstepRateManager.
+        /// </summary>
+        /// <param name="maxSubstepTime">The max time allowed in a single substep.</param>
+        /// <param name="maxSubsteps">The max number of substeps allowed before quitting early. This is used to avoid death spiraling.</param>
+        public SubstepRateManager(float maxSubstepTime, int maxSubsteps)
+        {
+            m_maxSubstepTime      = maxSubstepTime;
+            m_maxSubsteps         = maxSubsteps;
+            m_currentSubstepIndex = -1;
+        }
+
+        /// <inheritdoc cref="IRateManager.ShouldGroupUpdate"/>
+        public bool ShouldGroupUpdate(ComponentSystemGroup group)
+        {
+            var world = group.World;
+            if (m_currentSubstepIndex < 0)
+            {
+                // This is the first time in this loop.
+                var time = world.Time;
+                world.PushTime(new Unity.Core.TimeData(time.ElapsedTime - time.DeltaTime, time.DeltaTime));
+                var deltaTime         = time.DeltaTime;
+                deltaTime             = math.min(deltaTime, m_maxSubsteps * m_maxSubstepTime);
+                m_enumerator          = Physics.Substep(time.DeltaTime, (int)math.ceil(deltaTime / m_maxSubstepTime));
+                m_currentSubstepIndex = 0;
+                m_previousAllocators  = world.CurrentGroupAllocators;
+                world.SetGroupAllocator(group.RateGroupAllocators);
+            }
+
+            if (m_currentSubstepIndex < m_maxSubsteps && m_enumerator.MoveNext())
+            {
+                var elapsed   = world.Time.ElapsedTime;
+                var deltaTime = m_enumerator.Current;
+                world.SetTime(new Unity.Core.TimeData(elapsed + deltaTime, deltaTime));
+                m_currentSubstepIndex++;
+                return true;
+            }
+
+            group.World.RestoreGroupAllocator(m_previousAllocators);
+            m_previousAllocators  = null;
+            m_currentSubstepIndex = -1;
+
+            world.PopTime();
+            return false;
         }
     }
 }

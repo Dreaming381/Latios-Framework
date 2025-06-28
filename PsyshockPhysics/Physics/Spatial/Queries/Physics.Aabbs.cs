@@ -57,6 +57,8 @@ namespace Latios.Psyshock
                     return AabbFrom(collider.m_triMesh(), in transform);
                 case ColliderType.Compound:
                     return AabbFrom(collider.m_compound(), in transform);
+                case ColliderType.Terrain:
+                    return AabbFrom(collider.m_terrain(), in transform);
                 default:
                     ThrowUnsupportedType(collider.type);
                     return new Aabb();
@@ -96,6 +98,8 @@ namespace Latios.Psyshock
                     return AabbFrom(colliderToCast.m_triMesh(), in castStart, castEnd);
                 case ColliderType.Compound:
                     return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
+                case ColliderType.Terrain:
+                    return AabbFrom(colliderToCast.m_terrain(), in castStart, castEnd);
                 default:
                     ThrowUnsupportedType(colliderToCast.type);
                     return new Aabb();
@@ -120,6 +124,8 @@ namespace Latios.Psyshock
                     return AabbFrom(collider.m_triMesh(), in transform);
                 case ColliderType.Compound:
                     return AabbFrom(collider.m_compound(), in transform);
+                case ColliderType.Terrain:
+                    return AabbFrom(collider.m_terrain(), in transform);
                 default:
                     ThrowUnsupportedType(collider.type);
                     return new Aabb();
@@ -142,6 +148,8 @@ namespace Latios.Psyshock
                     return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
                 case ColliderType.Compound:
                     return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
+                case ColliderType.Terrain:
+                    return AabbFrom(colliderToCast.m_terrain(), in castStart, castEnd);
                 default:
                     ThrowUnsupportedType(colliderToCast.type);
                     return new Aabb();
@@ -238,7 +246,7 @@ namespace Latios.Psyshock
 
         private static Aabb AabbFrom(in TerrainCollider terrain, in RigidTransform transform)
         {
-            int  halfDimInt   = terrain.terrainColliderBlob.Value.quadsPerAxis / 2;
+            int  halfDimInt   = terrain.terrainColliderBlob.Value.quadsPerRow / 2;
             int  minHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.minHeight;
             int  maxHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.maxHeight;
             int3 minInt       = new int3(-halfDimInt, minHeightInt, halfDimInt);
@@ -352,6 +360,20 @@ namespace Latios.Psyshock
         {
             ScaleStretchCollider(ref triMesh, castStart.scale, castStart.stretch);
             return AabbFrom(in triMesh, new RigidTransform(castStart.rotation, castStart.position), castEnd);
+        }
+
+        private static Aabb AabbFrom(in TerrainCollider terrainToCast, in RigidTransform castStart, float3 castEnd)
+        {
+            var aabbStart = AabbFrom(terrainToCast, castStart);
+            var diff      = castEnd - castStart.pos;
+            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
+            return CombineAabb(aabbStart, aabbEnd);
+        }
+
+        private static Aabb AabbFrom(TerrainCollider terrain, in TransformQvvs castStart, float3 castEnd)
+        {
+            ScaleStretchCollider(ref terrain, castStart.scale, castStart.stretch);
+            return AabbFrom(in terrain, new RigidTransform(castStart.rotation, castStart.position), castEnd);
         }
 
         private static Aabb AabbFrom(in CompoundCollider compoundToCast, in RigidTransform castStart, float3 castEnd)

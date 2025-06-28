@@ -112,8 +112,8 @@ namespace Latios.Psyshock
                     // For A edge, this can only happen due to some bizarre precision issues.
                     // But we'll handle it anyways by just using the face normal of B.
                     aLocalContactNormal = math.normalize(math.cross(triangleBinA.pointB - triangleBinA.pointA, triangleBinA.pointC - triangleBinA.pointA));
-                    aLocalContactNormal = math.select(-aLocalContactNormal,
-                                                      aLocalContactNormal,
+                    aLocalContactNormal = math.select(aLocalContactNormal,
+                                                      -aLocalContactNormal,
                                                       math.dot(math.rotate(aTransform.rot, aLocalContactNormal), distanceResult.normalB) > 0f);
                     break;
                 }
@@ -137,7 +137,7 @@ namespace Latios.Psyshock
             {
                 result.contactNormal = math.rotate(aTransform, -aLocalContactNormal);
 
-                var bLocalContactNormal = math.InverseRotateFast(bInATransform.rot, -aLocalContactNormal);
+                var bLocalContactNormal = -aLocalContactNormal;
                 PointRayTriangle.BestFacePlanesAndVertices(in triangleA,
                                                            aLocalContactNormal,
                                                            out var aEdgePlaneNormals,

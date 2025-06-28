@@ -39,6 +39,10 @@ namespace Latios.Psyshock
                     var compound = collider.m_compound();
                     Physics.ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
                     return PointRayCompound.DistanceBetween(point, in compound, in rigidTransform, maxDistance, out result);
+                case ColliderType.Terrain:
+                    var terrain = collider.m_terrain();
+                    Physics.ScaleStretchCollider(ref terrain, transform.scale, transform.stretch);
+                    return PointRayTerrain.DistanceBetween(point, in terrain, in rigidTransform, maxDistance, out result);
                 default:
                     result = default;
                     return false;
@@ -78,6 +82,10 @@ namespace Latios.Psyshock
                     var compound = collider.m_compound();
                     Physics.ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
                     return PointRayCompound.Raycast(in ray, in compound, in rigidTransform, out result);
+                case ColliderType.Terrain:
+                    var terrain = collider.m_terrain();
+                    Physics.ScaleStretchCollider(ref terrain, transform.scale, transform.stretch);
+                    return PointRayTerrain.Raycast(in ray, in terrain, in rigidTransform, out result);
                 default:
                     result = default;
                     return false;

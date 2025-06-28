@@ -34,7 +34,7 @@ namespace Latios.Psyshock
         // Complex Concave types
         TriMesh = 160,
         Compound = 161,
-        //Terrain = 162,
+        Terrain = 162,
         // Layer embeds
         //LayerCompound = 192;
     }
@@ -211,6 +211,20 @@ namespace Latios.Psyshock
             return collider.m_compound();
         }
 
+        public static implicit operator Collider(TerrainCollider terrainCollider)
+        {
+            Collider collider      = default;
+            collider.m_type        = ColliderType.Terrain;
+            collider.m_terrainRW() = terrainCollider;
+            return collider;
+        }
+
+        public static implicit operator TerrainCollider(Collider collider)
+        {
+            CheckColliderIsCastTargetType(in collider, ColliderType.Terrain);
+            return collider.m_terrain();
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         internal static void CheckColliderIsCastTargetType(in Collider c, ColliderType targetType)
         {
@@ -227,6 +241,7 @@ namespace Latios.Psyshock
                             "Collider is not a ConvexCollider but is being casted to one. Unlike Unity.Physics, ConvexColliders do not aggregate Spheres, Capsules, Boxes, or Triangles.");
                     case ColliderType.TriMesh: throw new InvalidCastException("Collider is not a TriMeshCollider but is being casted to one.");
                     case ColliderType.Compound: throw new InvalidOperationException("Collider is not a CompoundCollider but is being casted to one.");
+                    case ColliderType.Terrain: throw new InvalidOperationException("Collider is not a TerrainCollider but is being casted to one.");
                 }
             }
         }
@@ -237,10 +252,13 @@ namespace Latios.Psyshock
     {
         public static ref TriMeshCollider m_triMeshRW(ref this Collider collider) => ref UnsafeUtility.As<ConvexCollider, TriMeshCollider>(ref collider.m_convex);
         public static ref CompoundCollider m_compoundRW(ref this Collider collider) => ref UnsafeUtility.As<ConvexCollider, CompoundCollider>(ref collider.m_convex);
+        public static ref TerrainCollider m_terrainRW(ref this Collider collider) => ref UnsafeUtility.As<ConvexCollider, TerrainCollider>(ref collider.m_convex);
         public static ref TriMeshCollider m_triMesh(in this Collider collider) => ref UnsafeUtility.As<ConvexCollider,
                                                                                                        TriMeshCollider>(ref UnsafeUtilityExtensions.AsRef(in collider.m_convex));
         public static ref CompoundCollider m_compound(in this Collider collider) => ref UnsafeUtility.As<ConvexCollider,
                                                                                                          CompoundCollider>(ref UnsafeUtilityExtensions.AsRef(in collider.m_convex));
+        public static ref TerrainCollider m_terrain(in this Collider collider) => ref UnsafeUtility.As<ConvexCollider,
+                                                                                                       TerrainCollider>(ref UnsafeUtilityExtensions.AsRef(in collider.m_convex));
     }
 }
 

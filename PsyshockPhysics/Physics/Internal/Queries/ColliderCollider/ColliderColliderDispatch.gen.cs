@@ -53,6 +53,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                {
+                    var r = SphereTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.Capsule, ColliderType.Sphere):
                     return SphereCapsule.DistanceBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Capsule, ColliderType.Capsule):
@@ -87,6 +93,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                {
+                    var r = CapsuleTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.Box, ColliderType.Sphere):
                     return SphereBox.DistanceBetween(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Box, ColliderType.Capsule):
@@ -117,6 +129,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.Box, ColliderType.Terrain):
+                {
+                    var r = BoxTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_box, in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.Triangle, ColliderType.Sphere):
                     return SphereTriangle.DistanceBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Triangle, ColliderType.Capsule):
@@ -143,6 +161,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                {
+                    var r = TriangleTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.Convex, ColliderType.Sphere):
                     return SphereConvex.DistanceBetween(in colliderA.m_convex, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Convex, ColliderType.Capsule):
@@ -165,6 +189,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.Convex, ColliderType.Terrain):
+                {
+                    var r = ConvexTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.TriMesh, ColliderType.Sphere):
                     return SphereTriMesh.DistanceBetween(in colliderA.m_triMesh(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.TriMesh, ColliderType.Capsule):
@@ -183,6 +213,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return r;
                 }
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                {
+                    var r = TriMeshTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_triMesh(), in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
                 case (ColliderType.Compound, ColliderType.Sphere):
                     return SphereCompound.DistanceBetween(in colliderA.m_compound(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
                 case (ColliderType.Compound, ColliderType.Capsule):
@@ -197,6 +233,28 @@ namespace Latios.Psyshock
                     return TriMeshCompound.DistanceBetween(in colliderA.m_compound(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance, out result);
                 case (ColliderType.Compound, ColliderType.Compound):
                     return CompoundCompound.DistanceBetween(in colliderA.m_compound(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance, out result);
+                case (ColliderType.Compound, ColliderType.Terrain):
+                {
+                    var r = CompoundTerrain.DistanceBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_compound(), in aTransform, maxDistance, out result);
+                    result.FlipInPlace();
+                    return r;
+                }
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    return SphereTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    return CapsuleTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_capsule, in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Box):
+                    return BoxTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_box, in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    return TriangleTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_triangle, in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    return ConvexTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_convex, in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    return TriMeshTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    return CompoundTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance, out result);
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    return TerrainTerrain.DistanceBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_terrain(), in bTransform, maxDistance, out result);
                 default:
                     result = default;
                     return false;
@@ -221,7 +279,8 @@ namespace Latios.Psyshock
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
             var                    flipper = new DistanceAllResultFlipper<T> { processor = (T*)UnsafeUtility.AddressOf(ref processor) };
-            ColliderDistanceResult result;
+            ColliderDistanceResult result                                                = default;
+
             switch ((colliderA.type, colliderB.type))
             {
                 case (ColliderType.Sphere, ColliderType.Sphere):
@@ -272,6 +331,9 @@ namespace Latios.Psyshock
                 case (ColliderType.Sphere, ColliderType.Compound):
                     SphereCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                    SphereTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.Capsule, ColliderType.Sphere):
                 {
                     if (SphereCapsule.DistanceBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result))
@@ -317,6 +379,9 @@ namespace Latios.Psyshock
                 case (ColliderType.Capsule, ColliderType.Compound):
                     CapsuleCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                    CapsuleTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.Box, ColliderType.Sphere):
                 {
                     if (SphereBox.DistanceBetween(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result))
@@ -359,6 +424,9 @@ namespace Latios.Psyshock
                 case (ColliderType.Box, ColliderType.Compound):
                     BoxCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_box, in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.Box, ColliderType.Terrain):
+                    BoxTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_box, in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.Triangle, ColliderType.Sphere):
                 {
                     if (SphereTriangle.DistanceBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result))
@@ -398,6 +466,9 @@ namespace Latios.Psyshock
                 case (ColliderType.Triangle, ColliderType.Compound):
                     TriangleCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                    TriangleTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.Convex, ColliderType.Sphere):
                 {
                     if (SphereConvex.DistanceBetween(in colliderA.m_convex, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, out result))
@@ -434,6 +505,9 @@ namespace Latios.Psyshock
                 case (ColliderType.Convex, ColliderType.Compound):
                     ConvexCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.Convex, ColliderType.Terrain):
+                    ConvexTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.TriMesh, ColliderType.Sphere):
                     SphereTriMesh.DistanceBetweenAll(in colliderA.m_triMesh(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, ref processor);
                     break;
@@ -455,6 +529,9 @@ namespace Latios.Psyshock
                 case (ColliderType.TriMesh, ColliderType.Compound):
                     TriMeshCompound.DistanceBetweenAll(in colliderB.m_compound(), in bTransform, in colliderA.m_triMesh(), in aTransform, maxDistance, ref flipper);
                     break;
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                    TriMeshTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_triMesh(), in aTransform, maxDistance, ref flipper);
+                    break;
                 case (ColliderType.Compound, ColliderType.Sphere):
                     SphereCompound.DistanceBetweenAll(in colliderA.m_compound(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, ref processor);
                     break;
@@ -475,6 +552,33 @@ namespace Latios.Psyshock
                     break;
                 case (ColliderType.Compound, ColliderType.Compound):
                     CompoundCompound.DistanceBetweenAll(in colliderA.m_compound(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Compound, ColliderType.Terrain):
+                    CompoundTerrain.DistanceBetweenAll(in colliderB.m_terrain(), in bTransform, in colliderA.m_compound(), in aTransform, maxDistance, ref flipper);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    SphereTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    CapsuleTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_capsule, in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Box):
+                    BoxTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_box, in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    TriangleTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_triangle, in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    ConvexTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_convex, in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    TriMeshTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    CompoundTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance, ref processor);
+                    break;
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    TerrainTerrain.DistanceBetweenAll(in colliderA.m_terrain(), in aTransform, in colliderB.m_terrain(), in bTransform, maxDistance, ref processor);
                     break;
             }
         }
@@ -502,6 +606,8 @@ namespace Latios.Psyshock
                     return SphereTriMesh.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Sphere, ColliderType.Compound):
                     return SphereCompound.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                    return SphereTerrain.ColliderCast(in colliderToCast.m_sphere, in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Sphere):
                     return SphereCapsule.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Capsule):
@@ -516,6 +622,8 @@ namespace Latios.Psyshock
                     return CapsuleTriMesh.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Capsule, ColliderType.Compound):
                     return CapsuleCompound.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                    return CapsuleTerrain.ColliderCast(in colliderToCast.m_capsule, in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Sphere):
                     return SphereBox.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Capsule):
@@ -530,6 +638,8 @@ namespace Latios.Psyshock
                     return BoxTriMesh.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Box, ColliderType.Compound):
                     return BoxCompound.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Box, ColliderType.Terrain):
+                    return BoxTerrain.ColliderCast(in colliderToCast.m_box, in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Sphere):
                     return SphereTriangle.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Capsule):
@@ -544,6 +654,8 @@ namespace Latios.Psyshock
                     return TriangleTriMesh.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Triangle, ColliderType.Compound):
                     return TriangleCompound.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                    return TriangleTerrain.ColliderCast(in colliderToCast.m_triangle, in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Sphere):
                     return SphereConvex.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Capsule):
@@ -558,6 +670,8 @@ namespace Latios.Psyshock
                     return ConvexTriMesh.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Convex, ColliderType.Compound):
                     return ConvexCompound.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Convex, ColliderType.Terrain):
+                    return ConvexTerrain.ColliderCast(in colliderToCast.m_convex, in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.TriMesh, ColliderType.Sphere):
                     return SphereTriMesh.ColliderCast(in colliderToCast.m_triMesh(), in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.TriMesh, ColliderType.Capsule):
@@ -572,6 +686,8 @@ namespace Latios.Psyshock
                     return TriMeshTriMesh.ColliderCast(in colliderToCast.m_triMesh(), in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.TriMesh, ColliderType.Compound):
                     return TriMeshCompound.ColliderCast(in colliderToCast.m_triMesh(), in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                    return TriMeshTerrain.ColliderCast(in colliderToCast.m_triMesh(), in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Sphere):
                     return SphereCompound.ColliderCast(in colliderToCast.m_compound(), in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Capsule):
@@ -586,6 +702,24 @@ namespace Latios.Psyshock
                     return TriMeshCompound.ColliderCast(in colliderToCast.m_compound(), in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
                 case (ColliderType.Compound, ColliderType.Compound):
                     return CompoundCompound.ColliderCast(in colliderToCast.m_compound(), in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Compound, ColliderType.Terrain):
+                    return CompoundTerrain.ColliderCast(in colliderToCast.m_compound(), in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    return SphereTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_sphere, in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    return CapsuleTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_capsule, in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Box):
+                    return BoxTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_box, in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    return TriangleTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_triangle, in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    return ConvexTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_convex, in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    return TriMeshTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_triMesh(), in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    return CompoundTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_compound(), in targetTransform, out result);
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    return TerrainTerrain.ColliderCast(in colliderToCast.m_terrain(), in castStart, castEnd, in target.m_terrain(), in targetTransform, out result);
                 default:
                     result = default;
                     return false;
@@ -638,6 +772,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return result;
                 }
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                {
+                    var result = SphereTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_sphere, in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
                 case (ColliderType.Capsule, ColliderType.Sphere):
                     return SphereCapsule.UnityContactsBetween(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
                 case (ColliderType.Capsule, ColliderType.Capsule):
@@ -672,6 +812,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return result;
                 }
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                {
+                    var result = CapsuleTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_capsule, in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
                 case (ColliderType.Box, ColliderType.Sphere):
                     return SphereBox.UnityContactsBetween(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
                 case (ColliderType.Box, ColliderType.Capsule):
@@ -702,6 +848,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return result;
                 }
+                case (ColliderType.Box, ColliderType.Terrain):
+                {
+                    var result = BoxTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_box, in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
                 case (ColliderType.Triangle, ColliderType.Sphere):
                     return SphereTriangle.UnityContactsBetween(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
                 case (ColliderType.Triangle, ColliderType.Capsule):
@@ -724,7 +876,14 @@ namespace Latios.Psyshock
                 }
                 case (ColliderType.Triangle, ColliderType.Compound):
                 {
-                    var result = TriangleCompound.UnityContactsBetween(in colliderB.m_compound(), in bTransform, in colliderA.m_triangle, in aTransform, distanceResult.ToFlipped());
+                    var result =
+                        TriangleCompound.UnityContactsBetween(in colliderB.m_compound(), in bTransform, in colliderA.m_triangle, in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                {
+                    var result = TriangleTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_triangle, in aTransform, distanceResult.ToFlipped());
                     result.FlipInPlace();
                     return result;
                 }
@@ -750,6 +909,12 @@ namespace Latios.Psyshock
                     result.FlipInPlace();
                     return result;
                 }
+                case (ColliderType.Convex, ColliderType.Terrain):
+                {
+                    var result = ConvexTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_convex, in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
                 case (ColliderType.TriMesh, ColliderType.Sphere):
                     return SphereTriMesh.UnityContactsBetween(in colliderA.m_triMesh(), in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
                 case (ColliderType.TriMesh, ColliderType.Capsule):
@@ -764,7 +929,14 @@ namespace Latios.Psyshock
                     return TriMeshTriMesh.UnityContactsBetween(in colliderA.m_triMesh(), in aTransform, in colliderB.m_triMesh(), in bTransform, in distanceResult);
                 case (ColliderType.TriMesh, ColliderType.Compound):
                 {
-                    var result = TriMeshCompound.UnityContactsBetween(in colliderB.m_compound(), in bTransform, in colliderA.m_triMesh(), in aTransform, distanceResult.ToFlipped());
+                    var result =
+                        TriMeshCompound.UnityContactsBetween(in colliderB.m_compound(), in bTransform, in colliderA.m_triMesh(), in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                {
+                    var result = TriMeshTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_triMesh(), in aTransform, distanceResult.ToFlipped());
                     result.FlipInPlace();
                     return result;
                 }
@@ -782,6 +954,29 @@ namespace Latios.Psyshock
                     return TriMeshCompound.UnityContactsBetween(in colliderA.m_compound(), in aTransform, in colliderB.m_triMesh(), in bTransform, in distanceResult);
                 case (ColliderType.Compound, ColliderType.Compound):
                     return CompoundCompound.UnityContactsBetween(in colliderA.m_compound(), in aTransform, in colliderB.m_compound(), in bTransform, in distanceResult);
+                case (ColliderType.Compound, ColliderType.Terrain):
+                {
+                    var result =
+                        CompoundTerrain.UnityContactsBetween(in colliderB.m_terrain(), in bTransform, in colliderA.m_compound(), in aTransform, distanceResult.ToFlipped());
+                    result.FlipInPlace();
+                    return result;
+                }
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    return SphereTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_sphere, in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    return CapsuleTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_capsule, in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Box):
+                    return BoxTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_box, in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    return TriangleTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_triangle, in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    return ConvexTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_convex, in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    return TriMeshTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_triMesh(), in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    return CompoundTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_compound(), in bTransform, in distanceResult);
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    return TerrainTerrain.UnityContactsBetween(in colliderA.m_terrain(), in aTransform, in colliderB.m_terrain(), in bTransform, in distanceResult);
                 default:
                     return default;
             }

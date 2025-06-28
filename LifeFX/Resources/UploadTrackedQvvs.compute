@@ -18,11 +18,15 @@ uniform StructuredBuffer<UploadQvvs> _src;
 uniform RWStructuredBuffer<TransformQvvs> _dst;
 
 uint _start;
+uint _count;
 
 [numthreads(64, 1, 1)]
 void UploadTrackedQvvs(uint3 id : SV_DispatchThreadID)
 {
-    int srcIndex = _start + id.x;
+    uint srcIndex = _start + id.x;
+    if (srcIndex >= _count)
+        return;
+
     UploadQvvs upload = _src[srcIndex];
     _dst[upload.dst] = upload.qvvs;
 }

@@ -13,7 +13,8 @@ string[] colliderTypeNames =
 	"Triangle",
 	"Convex",
 	"TriMesh",
-	"Compound"
+	"Compound",
+	"Terrain",
 };
 
 Dictionary<string, string> colliderLowerNames = new Dictionary<string, string>()
@@ -24,7 +25,8 @@ Dictionary<string, string> colliderLowerNames = new Dictionary<string, string>()
 	{"Triangle" , "triangle" },
 	{"Convex"   , "convex" },
 	{"TriMesh"  , "triMesh" },
-	{"Compound" , "compound" }
+	{"Compound" , "compound" },
+	{"Terrain"  , "terrain"}
 };
 
 Dictionary<string, string> colliderPropertyNames = new Dictionary<string, string>()
@@ -35,7 +37,8 @@ Dictionary<string, string> colliderPropertyNames = new Dictionary<string, string
 	{"Triangle" , "triangle" },
 	{"Convex"   , "convex" },
 	{"TriMesh"  , "triMesh()" },
-	{"Compound" , "compound()" }
+	{"Compound" , "compound()" },
+	{"Terrain"  , "terrain() "}
 };
 
 int firstComposite = 5;

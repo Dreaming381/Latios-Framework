@@ -34,6 +34,7 @@ namespace Latios.LifeFX.Systems
         int _src;
         int _dst;
         int _start;
+        int _count;
         int _latiosTrackedWorldTransforms;
 
         public void OnCreate(ref SystemState state)
@@ -49,6 +50,7 @@ namespace Latios.LifeFX.Systems
             _src                          = UnityEngine.Shader.PropertyToID("_src");
             _dst                          = UnityEngine.Shader.PropertyToID("_dst");
             _start                        = UnityEngine.Shader.PropertyToID("_start");
+            _count                        = UnityEngine.Shader.PropertyToID("_count");
             _latiosTrackedWorldTransforms = UnityEngine.Shader.PropertyToID("_latiosTrackedWorldTransforms");
 
             var broker = latiosWorld.worldBlackboardEntity.GetComponentData<GraphicsBufferBroker>();
@@ -65,6 +67,9 @@ namespace Latios.LifeFX.Systems
 
         public CollectState Collect(ref SystemState state)
         {
+            if (latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>().dispatchIndexThisFrame != 0)
+                return default;
+
             var uploadList   = latiosWorld.worldBlackboardEntity.GetCollectionComponent<TrackedTransformUploadList>(true);
             var threadRanges = CollectionHelper.CreateNativeArray<int2>(JobsUtility.ThreadIndexCount, state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
@@ -83,6 +88,9 @@ namespace Latios.LifeFX.Systems
 
         public WriteState Write(ref SystemState state, ref CollectState collected)
         {
+            if (!collected.threadRanges.IsCreated)
+                return default;
+
             var last       = collected.threadRanges[collected.threadRanges.Length - 1];
             var writeCount = last.x + last.y;
             if (writeCount == 0)
@@ -119,12 +127,15 @@ namespace Latios.LifeFX.Systems
             m_uploadShader.SetBuffer(0, _dst, persistentBuffer);
             m_uploadShader.SetBuffer(0, _src, written.uploadBuffer);
             uint copySize = (uint)written.writeCount;
-            for (uint dispatchesRemaining = (copySize + 64 - 1) / 64, start = 0; dispatchesRemaining > 0;)
+            for (uint countRemaining = copySize, dispatchesRemaining = (copySize + 64 - 1) / 64, start = 0; dispatchesRemaining > 0;)
             {
                 uint dispatchCount = math.min(dispatchesRemaining, 65535);
+                uint elementCount  = math.min(countRemaining, 65535 * 64);
                 m_uploadShader.SetInt(_start, (int)(start * 64));
+                m_uploadShader.SetInt(_count, (int)countRemaining);
                 m_uploadShader.Dispatch(0, (int)dispatchCount, 1, 1);
                 dispatchesRemaining -= dispatchCount;
+                countRemaining      -= elementCount;
                 start               += dispatchCount;
             }
             latiosWorld.worldBlackboardEntity.GetCollectionComponent<ShaderPropertyToGlobalBufferMap>(true).AddOrReplace(_latiosTrackedWorldTransforms, persistentBuffer);

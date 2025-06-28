@@ -251,6 +251,9 @@ namespace Latios.LifeFX.Systems
                         continue;
 
                     var dead = startIndex + i;
+                    if (trackedEntities[dead] == default)
+                        continue;
+
                     reaped.AddNoResize(dead);
                     uploadIndices.Write(dead, threadIndex);
                     trackedEntities[dead]    = default;

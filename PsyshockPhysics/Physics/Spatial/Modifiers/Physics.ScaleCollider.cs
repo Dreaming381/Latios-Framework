@@ -42,6 +42,9 @@ namespace Latios.Psyshock
                 case ColliderType.Compound:
                     ScaleStretchCollider(ref collider.m_compoundRW(), scale, stretch);
                     break;
+                case ColliderType.Terrain:
+                    ScaleStretchCollider(ref collider.m_terrainRW(),  scale, stretch);
+                    break;
                 default:
                     ThrowUnsupportedType(collider.type);
                     break;

@@ -533,6 +533,9 @@ namespace Latios.Kinemation.Systems
 
         private unsafe JobHandle OnPerformCulling(BatchRendererGroup rendererGroup, BatchCullingContext batchCullingContext, BatchCullingOutput cullingOutput, IntPtr userContext)
         {
+            if (m_FirstFrameAfterInit)
+                return default;
+
             using var callbackMarker = m_latiosPerformCullingMarker.Auto();
 
             cullingOutput.customCullingResult[0] = (IntPtr)m_cullPassIndexThisFrame;
@@ -583,7 +586,7 @@ namespace Latios.Kinemation.Systems
         {
             //UnityEngine.Debug.Log($"OnFinishedCulling pass {(int)customCullingResult}");
 
-            if (m_cullPassIndexThisFrame == m_cullPassIndexForLastDispatch)
+            if (m_FirstFrameAfterInit || m_cullPassIndexThisFrame == m_cullPassIndexForLastDispatch)
                 return;
 
             m_cullingDispatchSuperSystem.Update();

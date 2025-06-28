@@ -31,13 +31,8 @@ namespace Latios.Psyshock
             triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref processor, triMesh.scale);
             if (processor.found)
             {
-                var hitTriangle = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[processor.bestIndex], 1f, triMesh.scale);
-                var hit         = TriangleConvex.DistanceBetween(in convex,
-                                                                 in convexTransform,
-                                                                 in hitTriangle,
-                                                                 in triMeshTransform,
-                                                                 maxDistance,
-                                                                 out result);
+                var hitTriangle                      = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[processor.bestIndex], 1f, triMesh.scale);
+                var hit                              = TriangleConvex.DistanceBetween(in convex, in convexTransform, in hitTriangle, in triMeshTransform, maxDistance, out result);
                 (result.hitpointA, result.hitpointB) = (result.hitpointB, result.hitpointA);
                 (result.normalA, result.normalB)     = (result.normalB, result.normalA);
                 result.subColliderIndexB             = result.subColliderIndexA;
