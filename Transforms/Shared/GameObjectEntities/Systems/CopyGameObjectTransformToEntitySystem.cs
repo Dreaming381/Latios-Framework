@@ -79,7 +79,7 @@ namespace Latios.Transforms.Systems
                     entityTransform.worldTransform = new TransformQvvs(position, rotation, entityTransform.worldScale, transform.localScale, entityTransform.worldIndex);
             }
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-            public ComponentLookup<LocalToWorld> ltwLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<LocalToWorld> ltwLookup;
 
             public void Execute(int index, TransformAccess transform)
             {

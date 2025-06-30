@@ -217,8 +217,8 @@ namespace Latios.Psyshock
         /// <summary>
         /// Draws a wireframe of a TriMesh using UnityEngine.Debug.DrawLine calls
         /// </summary>
-        /// <param name="triMesh">The convex mesh to draw</param>
-        /// <param name="transform">The transform of the convex mesh in world space</param>
+        /// <param name="triMesh">The mesh to draw</param>
+        /// <param name="transform">The transform of the mesh in world space</param>
         /// <param name="color">The color of the wireframe</param>
         public static void DrawCollider(in TriMeshCollider triMesh, in RigidTransform transform, Color color)
         {
@@ -247,6 +247,24 @@ namespace Latios.Psyshock
                 compound.GetScaledStretchedSubCollider(i, out var c, out var localTransform);
                 var t = math.mul(transform, localTransform);
                 DrawCollider(c, t, color, segmentsPerPi);
+            }
+        }
+
+        /// <summary>
+        /// Draws a wireframe of a Terrain using UnityEngine.Debug.DrawLine calls
+        /// </summary>
+        /// <param name="terrain">The terrain to draw</param>
+        /// <param name="transform">The transform of the terrain in world space</param>
+        /// <param name="color">The color of the wireframe</param>
+        public static void DrawCollider(in TerrainCollider terrain, in RigidTransform transform, Color color)
+        {
+            ref var blob          = ref terrain.terrainColliderBlob.Value;
+            int     triangleCount = blob.quadRows * blob.quadsPerRow * 2;
+
+            for (int i = 0; i < triangleCount; i++)
+            {
+                var triangle = PointRayTerrain.CreateLocalTriangle(ref blob, blob.GetTriangle(i), terrain.baseHeightOffset, terrain.scale);
+                DrawCollider(in triangle, in transform, color);
             }
         }
 
@@ -281,6 +299,9 @@ namespace Latios.Psyshock
                     break;
                 case ColliderType.Compound:
                     DrawCollider(in collider.m_compound(), transform, color, segmentsPerPi);
+                    break;
+                case ColliderType.Terrain:
+                    DrawCollider(in collider.m_terrain(),  transform, color);
                     break;
             }
         }

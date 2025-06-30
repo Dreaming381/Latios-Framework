@@ -1,5 +1,6 @@
 using System;
 using Latios.Authoring;
+using Latios.Authoring.Systems;
 using Latios.Transforms;
 using Unity.Burst;
 using Unity.Collections;
@@ -116,6 +117,9 @@ namespace Latios.Psyshock.Authoring
 
 namespace Latios.Psyshock.Authoring.Systems
 {
+    [RequireMatchingQueriesForUpdate]
+    [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
+    [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
     [BurstCompile]
     public partial struct TerrainColliderSmartBlobberSystem : ISystem
     {

@@ -102,7 +102,7 @@ namespace Latios.Psyshock
                 [BurstDiscard]
                 static void GetProcessorNameNoBurst(ref FixedString128Bytes name)
                 {
-                    name = nameof(T);
+                    name = typeof(T).FullName;
                 }
 
                 public unsafe void Execute(int jobIndex)
