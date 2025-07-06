@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Mathematics;
 
@@ -11,7 +12,7 @@ namespace Latios.Myri.DSP
     // slope for every sample. This costs 1.2 ms on my system. There is definitely room for optimization here.
 
     // Make public on release
-    internal struct BrickwallLimiter
+    internal struct BrickwallLimiter : IDisposable
     {
         /// <summary>
         /// At 48000 Hz, this works out to 7.8 DB per second.

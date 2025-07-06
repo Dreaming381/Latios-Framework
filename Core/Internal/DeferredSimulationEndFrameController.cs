@@ -1,6 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
-using Latios.Systems;
 using Unity.Entities;
 using UnityEngine;
 
@@ -25,7 +23,7 @@ namespace Latios
 
     [UpdateInGroup(typeof(PresentationSystemGroup))]
     [DisableAutoCreation]
-    internal partial class DeferredSimulationEndFrameControllerSystem : ComponentSystemGroup
+    internal partial class DeferredSimulationEndFrameControllerSystem : SystemBase
     {
         GameObject            m_controllerObject      = null;
         SimulationSystemGroup m_simulationSystemGroup = null;
@@ -34,7 +32,6 @@ namespace Latios
         {
             base.OnCreate();
             m_simulationSystemGroup = World.GetExistingSystemManaged<SimulationSystemGroup>();
-            AddSystemToUpdateList(m_simulationSystemGroup);
         }
 
         protected override void OnUpdate()

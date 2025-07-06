@@ -1,16 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.13.0-beta.2]
-
-**This is a prerelease version of the Latios Framework version 0.13 which is
-still being finalized. Changelogs and Documentation, including the remainder of
-this README, are currently being updated to reflect the new features and changes
-in 0.13.**
-
-**You are still welcome to submit bug reports and PRs for this and future
-prerelease versions!**
-
-**This version of the beta uses Unity 6000.0.23f1 with Entities 1.3.14.**
+# Latios Framework for Unity ECS – [0.13.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -41,7 +31,7 @@ towards Unity’s ECS.
 This version targets Entities 1.3.14 with ENTITY_STORE_V1 and a minimum editor
 version of 6000.0.23f1.
 
-*[0.11.x] users, please read the* [*Upgrade
+*[0.12.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 ## Modules
@@ -93,7 +83,7 @@ features in the other modules will be disabled when you do this.
 
 **Common Reasons to Use Unity Transforms:**
 
--   You use Unity Physics, Unity Character Controller, or Unity NetCode.
+-   You use Unity Physics, Unity Character Controller, or Unity NetCode
 
 ### Psyshock
 
@@ -103,8 +93,9 @@ is a physics and spatial query module focused on user control. While most
 physics engines provide out-of-the-box simulation, Psyshock instead provides
 direct access to the underlying algorithms so that you can craft the perfect
 physics simulation for your game and not waste any computation on things you
-don’t need. Psyshock’s Collision Layers can be built directly from Entity
-Queries, removing all the archetype guesswork out of collisions and triggers.
+don’t need. Psyshock’s `CollisionWorld` allows performing ECS-spatial
+combination queries, allowing you to express game logic efficiently and
+concisely.
 
 **Common Reasons to Use Psyshock:**
 
@@ -115,7 +106,8 @@ Queries, removing all the archetype guesswork out of collisions and triggers.
 
 **Common Reasons to Use Unity Physics:**
 
--   You want an out-of-the-box full simulator with zero code
+-   You want an out-of-the-box full-featured simulator with zero code compatible
+    with Unity Transforms
 
 ### Myri
 
@@ -162,9 +154,7 @@ Fortnite, and Valorant.
 
 **Common Reasons to Avoid:**
 
--   You absolutely require a robust out-of-the-box code-free skeletal animation
-    solution for only a small number of entities right now and are willing to
-    pay money for it
+-   You’d rather pay money than use this framework
 
 ### Calligraphics
 
@@ -192,8 +182,9 @@ dialog, player names, and damage numbers.
 [LifeFX](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/LifeFX/README.md)
 provides VFX solutions at ECS scales using an intelligent graphics buffer
 management pipeline. It comes with an out-of-the-box solution for sending ECS
-event payloads to VFX Graph via graphics buffers. This way, a single VFX Graph
-instance can support thousands of entities.
+event payloads to VFX Graph via graphics buffers, as well as synchronizing
+entity transforms with the GPU. This way, a single VFX Graph instance can
+support thousands of entities.
 
 **Common Reasons to Use:**
 
@@ -252,9 +243,8 @@ in [this video](https://youtu.be/AgcRePkWoFc). For a complete breakdown of these
 changes with each configuration and bootstrap, [check out this
 guide](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/What%20Parts%20of%20ECS%20Does%20the%20Latios%20Framework%20Change.md).
 
-0.12 marks the end of Phase III, which focused on modernizing the framework for
-Entities 1.X and facilitating gameplay design. Phase IV will focus on
-higher-level workflows and advancing existing technologies.
+0.13 marks the beginning of Phase IV, which focuses on higher-level workflows
+and advancing existing technologies for real productions.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.
@@ -362,7 +352,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.12.X) will always preserve backwards compatibility back to the
+Patch releases (0.13.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
