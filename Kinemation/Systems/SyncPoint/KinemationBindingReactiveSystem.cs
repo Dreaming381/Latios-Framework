@@ -840,18 +840,20 @@ namespace Latios.Kinemation.Systems
                         if (!found)
                         {
                             UnityEngine.Debug.LogError(
-                                $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is not a skeleton nor references one.");
+                                $"Skinned Mesh Entity {entity.ToFixedString()} attempted to bind to entity {root.entity.ToFixedString()}, but the latter is not a skeleton nor references one.");
                             continue;
                         }
 
                         if (disabledLookup.HasComponent(root))
                         {
-                            UnityEngine.Debug.LogError($"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is disabled.");
+                            UnityEngine.Debug.LogError(
+                                $"Skinned Mesh Entity {entity.ToFixedString()} attempted to bind to entity {root.entity.ToFixedString()}, but the latter is disabled.");
                             continue;
                         }
                         if (prefabLookup.HasComponent(root))
                         {
-                            UnityEngine.Debug.LogError($"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter is a prefab.");
+                            UnityEngine.Debug.LogError(
+                                $"Skinned Mesh Entity {entity.ToFixedString()} attempted to bind to entity {root.entity.ToFixedString()}, but the latter is a prefab.");
                             continue;
                         }
 
@@ -876,7 +878,7 @@ namespace Latios.Kinemation.Systems
                                 if (numPaths != numPoses)
                                 {
                                     UnityEngine.Debug.LogError(
-                                        $"Skinned Mesh Entity {entity} has incompatible MeshSkinningBlob and MeshBindingPathsBlob. The following should be equal: Bindposes: {numPoses}, Paths: {numPaths}");
+                                        $"Skinned Mesh Entity {entity.ToFixedString()} has incompatible MeshSkinningBlob and MeshBindingPathsBlob. The following should be equal: Bindposes: {numPoses}, Paths: {numPaths}");
                                     continue;
                                 }
 
@@ -886,14 +888,14 @@ namespace Latios.Kinemation.Systems
                                     if (skeletonPathsBlob == BlobAssetReference<SkeletonBindingPathsBlob>.Null)
                                     {
                                         UnityEngine.Debug.LogError(
-                                            $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter has a null SkeletonBindingPathsBlob and the skinned mesh entity does not have OverrideSkinningBoneIndex.");
+                                            $"Skinned Mesh Entity {entity.ToFixedString()} attempted to bind to entity {root.entity.ToFixedString()}, but the latter has a null SkeletonBindingPathsBlob and the skinned mesh entity does not have OverrideSkinningBoneIndex.");
                                         continue;
                                     }
                                 }
                                 else
                                 {
                                     UnityEngine.Debug.LogError(
-                                        $"Skinned Mesh Entity {entity} attempted to bind to entity {root.entity}, but the latter does not have a SkeletonBindingPathsBlob and the skinned mesh entity does not have OverrideSkinningBoneIndex.");
+                                        $"Skinned Mesh Entity {entity.ToFixedString()} attempted to bind to entity {root.entity.ToFixedString()}, but the latter does not have a SkeletonBindingPathsBlob and the skinned mesh entity does not have OverrideSkinningBoneIndex.");
                                 }
                             }
                             else if (!hasOverrideBones)
@@ -1358,7 +1360,7 @@ namespace Latios.Kinemation.Systems
                                 if (op.meshBindingPathsBlob == BlobAssetReference<MeshBindingPathsBlob>.Null)
                                 {
                                     UnityEngine.Debug.LogError(
-                                        $"Cannot bind entity {op.meshEntity} to {op.root.entity}. MeshBindingPathsBlob was null.");
+                                        $"Cannot bind entity {op.meshEntity.ToFixedString()} to {op.root.entity.ToFixedString()}. MeshBindingPathsBlob was null.");
 
                                     outputSkinnedWriteOps.Add(new SkinnedMeshWriteStateOperation { meshEntity = op.meshEntity, skinnedState = default });
                                     continue;
@@ -1366,7 +1368,7 @@ namespace Latios.Kinemation.Systems
                                 else if (op.skeletonBindingPathsBlob == BlobAssetReference<SkeletonBindingPathsBlob>.Null)
                                 {
                                     UnityEngine.Debug.LogError(
-                                        $"Cannot bind entity {op.meshEntity} to {op.root.entity}. SkeletonBindingPathsBlob was null.");
+                                        $"Cannot bind entity {op.meshEntity.ToFixedString()} to {op.root.entity.ToFixedString()}. SkeletonBindingPathsBlob was null.");
 
                                     outputSkinnedWriteOps.Add(new SkinnedMeshWriteStateOperation { meshEntity = op.meshEntity, skinnedState = default });
                                     continue;
@@ -1377,7 +1379,7 @@ namespace Latios.Kinemation.Systems
                                     failedPath.Append((byte*)op.meshBindingPathsBlob.Value.pathsInReversedNotation[failedMeshIndex].GetUnsafePtr(),
                                                       op.meshBindingPathsBlob.Value.pathsInReversedNotation[failedMeshIndex].Length);
                                     UnityEngine.Debug.LogError(
-                                        $"Cannot bind entity {op.meshEntity} to {op.root.entity}. No match for index {failedMeshIndex} requesting path: {failedPath}");
+                                        $"Cannot bind entity {op.meshEntity.ToFixedString()} to {op.root.entity.ToFixedString()}. No match for index {failedMeshIndex} requesting path: {failedPath}");
 
                                     outputSkinnedWriteOps.Add(new SkinnedMeshWriteStateOperation { meshEntity = op.meshEntity, skinnedState = default });
                                     continue;
@@ -1793,7 +1795,7 @@ namespace Latios.Kinemation.Systems
                         {
                             if (j >= boundsArray.Length)
                                 UnityEngine.Debug.LogError(
-                                    $"Skinned Mesh Entity {ops[i].meshEntity} specifies a boneSkinningIndex of {j} but OptimizedBoneTransform buffer on Entity {skeletonEntity} only has {boundsArray.Length} elements.");
+                                    $"Skinned Mesh Entity {ops[i].meshEntity.ToFixedString()} specifies a boneSkinningIndex of {j} but OptimizedBoneTransform buffer on Entity {skeletonEntity.ToFixedString()} only has {boundsArray.Length} elements.");
                             else
                                 boundsArray[j] = math.max(boundsArray[j], blobBounds[k]);
                             k++;
@@ -1826,7 +1828,7 @@ namespace Latios.Kinemation.Systems
                         {
                             if (j >= boundsArray.Length)
                                 UnityEngine.Debug.LogError(
-                                    $"Skinned Mesh Entity {ops[i].meshEntity} specifies a boneSkinningIndex of {j} but BoneReference buffer on Entity {skeletonEntity} only has {boundsArray.Length} elements.");
+                                    $"Skinned Mesh Entity {ops[i].meshEntity.ToFixedString()} specifies a boneSkinningIndex of {j} but BoneReference buffer on Entity {skeletonEntity.ToFixedString()} only has {boundsArray.Length} elements.");
                             else
                                 boundsArray[j] = math.max(boundsArray[j], blobBounds[k]);
                             k++;
@@ -1873,7 +1875,7 @@ namespace Latios.Kinemation.Systems
                         {
                             if (j >= boundsArray.Length)
                                 UnityEngine.Debug.LogError(
-                                    $"Skinned Mesh Entity {depsBuffer[i].skinnedMesh} specifies a boneSkinningIndex of {j} but OptimizedBoneTransform buffer on Entity {skeletonEntity} only has {boundsArray.Length} elements.");
+                                    $"Skinned Mesh Entity {depsBuffer[i].skinnedMesh.ToFixedString()} specifies a boneSkinningIndex of {j} but OptimizedBoneTransform buffer on Entity {skeletonEntity.ToFixedString()} only has {boundsArray.Length} elements.");
                             else
                                 boundsArray[j] = math.max(boundsArray[j], blobBounds[k]);
                             k++;
@@ -1911,7 +1913,7 @@ namespace Latios.Kinemation.Systems
                         {
                             if (j >= boundsArray.Length)
                                 UnityEngine.Debug.LogError(
-                                    $"Skinned Mesh Entity {depsBuffer[i].skinnedMesh} specifies a boneSkinningIndex of {j} but BoneReference buffer on Entity {skeletonEntity} only has {boundsArray.Length} elements.");
+                                    $"Skinned Mesh Entity {depsBuffer[i].skinnedMesh.ToFixedString()} specifies a boneSkinningIndex of {j} but BoneReference buffer on Entity {skeletonEntity.ToFixedString()} only has {boundsArray.Length} elements.");
                             else
                                 boundsArray[j] = math.max(boundsArray[j], blobBounds[k]);
                             k++;

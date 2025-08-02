@@ -51,7 +51,7 @@ namespace Latios.Psyshock
                                                      out RigidTransform inertialPoseWorldTransform)
         {
             inertialPoseWorldTransform = new RigidTransform(qvvs.TransformRotation(in worldTransform, localInertiaTensorDiagonal.tensorOrientation),
-                                                            qvvs.TransformPoint(in worldTransform, localCenterOfMassUnscaled));
+                                                            qvvs.TransformPoint(in worldTransform, localCenterOfMassUnscaled * worldTransform.scale * worldTransform.stretch));
             massOut = new Mass
             {
                 inverseMass    = inverseMass,

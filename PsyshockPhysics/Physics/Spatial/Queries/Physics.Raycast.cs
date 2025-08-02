@@ -16,7 +16,7 @@ namespace Latios.Psyshock
         /// <param name="result">If the ray hits the collider, this is populated with info about the hit,
         /// otherwise its contents are undefined</param>
         /// <returns>True if the ray hit the collider, false otherwise</returns>
-        public static bool Raycast(float3 start, float3 end, Collider collider, in TransformQvvs transform, out RaycastResult result)
+        public static bool Raycast(float3 start, float3 end, in Collider collider, in TransformQvvs transform, out RaycastResult result)
         {
             return PointRayDispatch.Raycast(new Ray(start, end), in collider, in transform, out result);
         }
@@ -30,9 +30,25 @@ namespace Latios.Psyshock
         /// <param name="result">If the ray hits the collider, this is populated with info about the hit,
         /// otherwise its contents are undefined</param>
         /// <returns>True if the ray hit the collider, false otherwise</returns>
-        public static bool Raycast(in Ray ray, Collider collider, in TransformQvvs transform, out RaycastResult result)
+        public static bool Raycast(in Ray ray, in Collider collider, in TransformQvvs transform, out RaycastResult result)
         {
             return PointRayDispatch.Raycast(ray, in collider, in transform, out result);
+        }
+
+        /// <summary>
+        /// Raycasts against a subCollider within the collider. If the base collider is not a composite type,
+        /// then it is raycasted directly.
+        /// </summary>
+        /// <param name="ray">The ray to cast against the collider</param>
+        /// <param name="collider">The base collider to test against</param>
+        /// <param name="transform">The transform of the vase collider tested</param>
+        /// <param name="subCollider">The index of the subCollider within the base collider</param>
+        /// <param name="result">If the ray hits the collider, this is populated with info about the hit,
+        /// otherwise its contents are undefined</param>
+        /// <returns>True if the ray hit the subCollider, false otherwise</returns>
+        public static bool Raycast(in Ray ray, in Collider collider, in TransformQvvs transform, int subCollider, out RaycastResult result)
+        {
+            return PointRayDispatch.Raycast(ray, in collider, in transform, subCollider, out result);
         }
 
         /// <summary>

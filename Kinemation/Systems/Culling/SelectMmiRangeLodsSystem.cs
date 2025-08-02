@@ -1,4 +1,3 @@
-using Latios;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
@@ -154,7 +153,7 @@ namespace Latios.Kinemation
                     }
                     else
                     {
-                        for (int i = 0; i < chunk.Count; i++)
+                        while (enumerator.NextEntityIndex(out var i))
                         {
                             var select    = select2s[i];
                             var transform = transforms[i].worldTransformQvvs;
@@ -261,7 +260,7 @@ namespace Latios.Kinemation
                     }
                     else
                     {
-                        for (int i = 0; i < chunk.Count; i++)
+                        while (enumerator.NextEntityIndex(out var i))
                         {
                             var select    = select3s[i];
                             var transform = transforms[i].worldTransformQvvs;

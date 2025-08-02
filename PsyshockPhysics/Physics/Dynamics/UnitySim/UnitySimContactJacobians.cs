@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics;
+using Latios.Transforms;
 using Unity.Collections;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -72,6 +72,8 @@ namespace Latios.Psyshock
             public float coefficientOfFriction;
             public float coefficientOfRestitution;
 
+            public float substep;
+
             public void SetSurfaceVelocity(Velocity surfaceVelocity)
             {
                 surfaceVelocityDv = default;
@@ -107,6 +109,54 @@ namespace Latios.Psyshock
             /// The impulse from friction applied via rotational friction about the contact
             /// </summary>
             public float frictionAngularImpulse;
+        }
+
+        /// <summary>
+        /// A filter that can be applied to contacts during solving to eliminate ghost collisions.
+        /// When the A collider is static, contact points on B are raycasted against colliderA
+        /// from the initial contact point to the speculated ending location of the contact point
+        /// based on the current velocity. If the ray misses, the contact is ignored for the solve
+        /// iteration. The roles flip if the B collider is static. The contact speculation is copied
+        /// from Unity Physics as-is, bugs and all.
+        /// </summary>
+        public struct ContactJacobianStaticCollisionFilter
+        {
+            internal Collider      collider;
+            internal TransformQvvs transform;
+            internal float3        contactPointOnB;
+            internal float3        centerOfMass;
+            internal float3        contactDistanceDirectionFactor;
+            internal int           subCollider;
+            internal bool          aIsStatic;
+            internal bool          enabled;
+
+            public ContactJacobianStaticCollisionFilter(in Collider colliderA, in TransformQvvs transformA, in RigidTransform inertialPoseWorldTransformA,
+                                                        in Collider colliderB, in TransformQvvs transformB, in RigidTransform inertialPoseWorldTransformB,
+                                                        in ColliderDistanceResult distanceResult, in ContactsBetweenResult contactsResult, bool aIsStatic)
+            {
+                if (aIsStatic)
+                {
+                    this.collider                       = colliderA;
+                    this.transform                      = transformA;
+                    this.contactPointOnB                = contactsResult[contactsResult.contactCount - 1].location;
+                    this.centerOfMass                   = inertialPoseWorldTransformA.pos;
+                    this.contactDistanceDirectionFactor = float3.zero;
+                    this.subCollider                    = distanceResult.subColliderIndexA;
+                    this.aIsStatic                      = aIsStatic;
+                    this.enabled                        = true;
+                }
+                else
+                {
+                    this.collider                       = colliderB;
+                    this.transform                      = transformB;
+                    this.contactPointOnB                = contactsResult[contactsResult.contactCount - 1].location;
+                    this.centerOfMass                   = inertialPoseWorldTransformB.pos;
+                    this.contactDistanceDirectionFactor = contactsResult.contactNormal;
+                    this.subCollider                    = distanceResult.subColliderIndexB;
+                    this.aIsStatic                      = aIsStatic;
+                    this.enabled                        = true;
+                }
+            }
         }
 
         /// <summary>
@@ -238,6 +288,7 @@ namespace Latios.Psyshock
             bodyParameters.contactNormal            = contactNormal;
             bodyParameters.centerA                  = centerA;
             bodyParameters.centerB                  = centerB;
+            bodyParameters.substep                  = substep;
 
             // Build friction jacobians
             BuildFrictionJacobians(ref bodyParameters,
@@ -350,6 +401,8 @@ namespace Latios.Psyshock
                     bodyParameters.frictionEffectiveMassOffDiag  *= 0.25f;
                 }
             }
+
+            bodyParameters.substep = substep;
         }
 
         // Returns true if a collision event was detected.
@@ -369,13 +422,14 @@ namespace Latios.Psyshock
         /// <param name="enableFrictionVelocitiesHeuristic">If true, enables the friction velocities heuristic from the motion stabilization inputs.</param>
         /// <param name="invNumSolverIterations">The reciprocal of the number of solver iterations. That is, for 4 solver iterations, this would be 0.25f</param>
         /// <param name="outputImpulses">Impulses computed by this solver iteration</param>
+        /// <param name="collisionFilter">An optional collision filter used to filter out contacts that are likely to produce ghost collisions</param>
         /// <returns>True if a collision was detected during this solve operation, meaning that a collision occurred within the timestep</returns>
         public static bool SolveJacobian(ref Velocity velocityA, in Mass massA, in MotionStabilizer motionStabilizationSolverInputA,
                                          ref Velocity velocityB, in Mass massB, in MotionStabilizer motionStabilizationSolverInputB,
                                          ReadOnlySpan<ContactJacobianContactParameters> perContactParameters, Span<float> perContactImpulses,
                                          in ContactJacobianBodyParameters bodyParameters,
                                          bool enableFrictionVelocitiesHeuristic, float invNumSolverIterations,
-                                         out ContactJacobianImpulses outputImpulses)
+                                         out ContactJacobianImpulses outputImpulses, in ContactJacobianStaticCollisionFilter collisionFilter = default)
         {
             CheckContactAndImpulseSpanLengthsEqual(perContactParameters.Length, perContactImpulses.Length);
 
@@ -388,7 +442,9 @@ namespace Latios.Psyshock
             float sumImpulses       = 0.0f;
             outputImpulses          = default;
 
-            for (int j = 0; j < perContactParameters.Length; j++)
+            var validContacts = WillContactsHit(in collisionFilter, in perContactParameters, velocityA, velocityB, bodyParameters.substep);
+
+            for (int j = validContacts.CountTrailingZeros(); j < 32; validContacts.SetBits(j, false), j = validContacts.CountTrailingZeros())
             {
                 ref readonly ContactJacobianContactParameters jacAngular     = ref perContactParameters[j];
                 var                                           contactImpulse = perContactImpulses[j];
@@ -403,9 +459,10 @@ namespace Latios.Psyshock
 
                 // Accumulation of impulses for each contact point over numSolverIterations. Cannot be negative
                 float accumulatedImpulse = math.max(contactImpulse + impulse, 0.0f);
+                float deltaImpulse       = 0f;
                 if (accumulatedImpulse != contactImpulse)
                 {
-                    float deltaImpulse = accumulatedImpulse - contactImpulse;
+                    deltaImpulse = accumulatedImpulse - contactImpulse;
                     ApplyImpulse(deltaImpulse, bodyParameters.contactNormal, jacAngular.jacobianAngular, ref tempVelocityA, ref tempVelocityB, in massA, in massB,
                                  motionStabilizationSolverInputA.inverseInertiaScale, motionStabilizationSolverInputB.inverseInertiaScale);
                     //UnityEngine.Debug.Log($"contact: {j} impulse: {deltaImpulse}, new velocity: {tempVelocityA.angular}, old velocity: {velocityA.angular}");
@@ -419,7 +476,7 @@ namespace Latios.Psyshock
                 contactImpulse                               = accumulatedImpulse;
                 perContactImpulses[j]                        = contactImpulse;
                 sumImpulses                                 += accumulatedImpulse;
-                outputImpulses.combinedContactPointsImpulse += contactImpulse;
+                outputImpulses.combinedContactPointsImpulse += deltaImpulse;
 
                 // Force contact event even when no impulse is applied, but there is penetration.
                 hasCollisionEvent |= jacAngular.velocityToReachContactPlane > 0.0f;
@@ -749,6 +806,54 @@ namespace Latios.Psyshock
             temp        += angVelA * jacAngular.angularA;
             temp        += angVelB * jacAngular.angularB;
             return math.csum(temp);
+        }
+
+        static BitField64 WillContactsHit(in ContactJacobianStaticCollisionFilter collisionFilter,
+                                          in ReadOnlySpan<ContactJacobianContactParameters> parameters,
+                                          Velocity velocityA,
+                                          Velocity velocityB,
+                                          float deltaTime)
+        {
+            BitField64 result = default;
+            result.SetBits(0, true, parameters.Length);
+            if (!collisionFilter.enabled)
+                return result;
+
+            // Unity's algorithm for this doesn't make a whole lot of sense. I believe the idea is that each contact point
+            // raycasts against the other static collider, and if it misses, then the contact should be ignored.
+            // There are many problems with Unity's implementation:
+            // 1) Contacts are usually chosen on the edges of geometry, so slight movements will result in incorrect behavior
+            // on cliff edges.
+            // 2) Unity Physics only allocates a single contact point in the stream for this, and every contact evaluated at
+            // build time writes to this single value. This effectively means the last contact in the contacts array is the
+            // one tested, except...
+            // 3) Unity Physics uses the single contact on B, but uses individual contact distances when it needs contacts on A,
+            // making the behavior wildly different if A or B is static.
+            // 4) The torsion calculation treats the angular velocity as-if it were in world-space.
+            // 5) The torsion calculation is a tangential velocity, which is a poor approximation of where the contact will be.
+            // 6) The contact does not update with TGS, so it always casts a ray from the beginning of the time step to the end
+            // of the first substep.
+            var velocity = collisionFilter.aIsStatic ? velocityB : velocityA;
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                // Check if contact is already penetrating
+                if (parameters[i].contactDistance <= 0f)
+                    continue;
+
+                var contactPoint = collisionFilter.contactPointOnB + collisionFilter.contactDistanceDirectionFactor * parameters[i].contactDistance;
+
+                // Create the predicted contact point which the contact will occur in the next timestep.
+                var contactDirection             = contactPoint - collisionFilter.centerOfMass;
+                var velocityTorsion              = math.cross(velocity.angular, contactDirection);
+                var linearVelocityAtContactPoint = velocityTorsion + velocity.linear;
+                var predictedContactPoint        = contactPoint + deltaTime * linearVelocityAtContactPoint;
+
+                if (!Physics.Raycast(new Ray(contactPoint, predictedContactPoint), in collisionFilter.collider, in collisionFilter.transform, collisionFilter.subCollider, out _))
+                {
+                    result.SetBits(i, false);
+                }
+            }
+            return result;
         }
         #endregion
 

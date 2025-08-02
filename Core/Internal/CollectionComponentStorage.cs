@@ -216,7 +216,7 @@ namespace Latios
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
             {
-                throw new InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
+                throw new InvalidOperationException($"Entity {entity.ToFixedString()} does not have a component of type: {typeof(T).Name}");
             }
 
             return new CollectionComponentRef<T>(ref tcs, entity, index);
@@ -293,7 +293,7 @@ namespace Latios
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
             {
-                throw new InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T)}");
+                throw new InvalidOperationException($"Entity {entity.ToFixedString()} does not have a component of type: {typeof(T)}");
             }
 
             tcs.TryDisposeIndexAndFree(index, out disposeHandle, true);

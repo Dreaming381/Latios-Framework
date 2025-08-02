@@ -119,6 +119,8 @@ namespace Latios.Kinemation.Authoring
                                 var parent = GetParent(go);
                                 while (parent != null)
                                 {
+                                    if (GetComponent<Animator>(parent) != null)
+                                        break;
                                     pathsPacked.Append(GetName(go));
                                     pathsPacked.Append('/');
                                     go     = parent;

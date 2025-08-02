@@ -7,7 +7,6 @@ using Unity.Jobs;
 using Unity.Mathematics;
 
 using static Unity.Entities.SystemAPI;
-using Unity.Rendering;
 
 namespace Latios.Kinemation.Authoring.Systems
 {

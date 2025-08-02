@@ -1,18 +1,25 @@
-using Unity.Collections;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
     public static partial class UnitySim
     {
-        // Integrate the relative orientation of a pair of bodies, faster and less memory than storing both bodies' orientations and integrating them separately
-        static quaternion IntegrateOrientationBFromA(quaternion bFromA, float3 angularVelocityA, float3 angularVelocityB, float timestep)
+        static float CapImpulse(float impulse, ref float accumulatedImpulse, float maxImpulse)
         {
-            var halfDeltaTime = timestep * 0.5f;
-            var dqA           = new quaternion(new float4(angularVelocityA * halfDeltaTime, 1f));
-            var invDqB        = new quaternion(new float4(angularVelocityB * -halfDeltaTime, 1f));
-            return math.normalize(math.mul(math.mul(invDqB, bFromA), dqA));
+            var newAccumulatedImpulse = math.clamp(accumulatedImpulse + impulse, -maxImpulse, maxImpulse);
+            var result                = newAccumulatedImpulse - accumulatedImpulse;
+            accumulatedImpulse        = newAccumulatedImpulse;
+            return result;
+        }
+
+        static float3 CapImpulse(float3 impulse, ref float3 accumulatedImpulse, float maxImpulseMagnitude)
+        {
+            var newAccumulatedImpulse = accumulatedImpulse + impulse;
+            if (math.length(newAccumulatedImpulse) > maxImpulseMagnitude)
+                newAccumulatedImpulse = math.normalize(newAccumulatedImpulse) * maxImpulseMagnitude;
+            var result                = newAccumulatedImpulse - accumulatedImpulse;
+            accumulatedImpulse        = newAccumulatedImpulse;
+            return result;
         }
 
         // Calculate the inverse effective mass of a linear jacobian
@@ -29,6 +36,15 @@ namespace Latios.Psyshock
                                                       float3 angB0, float3 angB1, float3 invInertiaB)
         {
             return math.csum(angA0 * angA1 * invInertiaA + angB0 * angB1 * invInertiaB);
+        }
+
+        // Integrate the relative orientation of a pair of bodies, faster and less memory than storing both bodies' orientations and integrating them separately
+        static quaternion IntegrateOrientationBFromA(quaternion bFromA, float3 angularVelocityA, float3 angularVelocityB, float timestep)
+        {
+            var halfDeltaTime = timestep * 0.5f;
+            var dqA           = new quaternion(new float4(angularVelocityA * halfDeltaTime, 1f));
+            var invDqB        = new quaternion(new float4(angularVelocityB * -halfDeltaTime, 1f));
+            return math.normalize(math.mul(math.mul(invDqB, bFromA), dqA));
         }
 
         // Inverts a symmetric 3x3 matrix with diag = (0, 0), (1, 1), (2, 2), offDiag = (0, 1), (0, 2), (1, 2) = (1, 0), (2, 0), (2, 1)

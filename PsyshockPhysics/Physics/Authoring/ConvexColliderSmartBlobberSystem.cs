@@ -101,6 +101,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 {
                     meshes[i]   = pair.Value.bakeData.mesh;
                     builders[i] = default;
+                    i++;
                 }
             }).Schedule();
 

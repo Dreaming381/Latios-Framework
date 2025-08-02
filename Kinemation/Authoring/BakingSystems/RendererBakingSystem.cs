@@ -286,7 +286,7 @@ namespace Latios.Kinemation.Authoring.Systems
 
             public unsafe void Execute(Entity entity, ref MaterialMeshInfo mmi, in DynamicBuffer<BakingMaterialMeshSubmesh> buffer)
             {
-                if (buffer.Length == 1)
+                if (buffer.Length == 1 && (buffer[0].submesh & 0xff000000) == 0xff000000)
                 {
                     // Create MMI with negative indices
                     var element       = buffer[0];
