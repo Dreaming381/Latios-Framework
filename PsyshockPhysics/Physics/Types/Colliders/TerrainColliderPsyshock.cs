@@ -75,7 +75,7 @@ namespace Latios.Psyshock
             root.minHeight      = short.MaxValue;
             root.maxHeight      = short.MinValue;
             root.quadsPerRow    = (short)quadsPerRow;
-            root.quadRows       = (short)(heightsRowMajor.Length / (quadsPerRow + 1));
+            root.quadRows       = (short)((heightsRowMajor.Length / (quadsPerRow + 1)) - 1);
             root.patchesPerRow  = (short)(CollectionHelper.Align(root.quadsPerRow, 8) / 8);
             var patchRows       = (short)(CollectionHelper.Align(root.quadRows, 8) / 8);
             root.tilesPerRow    = (short)(CollectionHelper.Align(root.patchesPerRow, 8) / 8);

@@ -162,6 +162,7 @@ namespace Latios.Psyshock.Authoring.Systems
 
                 var vector3CachePtr = tsa.Allocate<UnityEngine.Vector3>(mesh.vertexCount);
                 var vector3Cache    = CollectionHelper.ConvertExistingDataToNativeArray<UnityEngine.Vector3>(vector3CachePtr, mesh.vertexCount, Allocator.None, true);
+                mesh.GetVertices(vector3Cache);
 
                 var builder = new BlobBuilder(Allocator.Temp);
                 result      = ConvexColliderBlob.BuildBlob(ref builder, vector3Cache.Reinterpret<float3>().AsReadOnlySpan(), in meshName, Allocator.Persistent);
