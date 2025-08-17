@@ -1,6 +1,4 @@
 using Latios.Transforms;
-using Unity.Collections;
-using Unity.Entities;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -24,11 +22,16 @@ namespace Latios.Psyshock
             /// Converts the inertia diagonal and orientation back into a singular matrix.
             /// This can be useful when combining inertia tensors.
             /// </summary>
-            public float3x3 ToMatrix()
+            public float3x3 ToMatrix() => TrueSim.InertiaTensorFrom(tensorOrientation, inertiaDiagonal);
+
+            /// <summary>
+            /// Computes an approximated LocalInertiaTensorDiagonal from the inertia tensor matrix.
+            /// This uses a numeric solver with a hardcoded max of 10 iterations.
+            /// </summary>
+            public static LocalInertiaTensorDiagonal ApproximateFrom(float3x3 inertiaTensor)
             {
-                var r  = new float3x3(tensorOrientation);
-                var r2 = new float3x3(inertiaDiagonal.x * r.c0, inertiaDiagonal.y * r.c1, inertiaDiagonal.z * r.c2);
-                return math.mul(r2, math.transpose(r));
+                mathex.DiagonalizeSymmetricApproximation(inertiaTensor, out float3x3 orientation, out float3 diagonal);
+                return new LocalInertiaTensorDiagonal { tensorOrientation = new quaternion(orientation), inertiaDiagonal = diagonal };
             }
         }
 
@@ -162,7 +165,7 @@ namespace Latios.Psyshock
                 case ColliderType.Sphere:
                     return new LocalInertiaTensorDiagonal
                     {
-                        inertiaDiagonal   = (2f / 5f) * collider.m_sphere.radius * collider.m_sphere.radius,
+                        inertiaDiagonal   = TrueSim.DiagonalizedGyrationTensorOfSphere(collider.m_sphere.radius),
                         tensorOrientation = quaternion.identity
                     };
                 case ColliderType.Capsule:
@@ -174,23 +177,12 @@ namespace Latios.Psyshock
                     {
                         new LocalInertiaTensorDiagonal
                         {
-                            inertiaDiagonal   = (2f / 5f) * collider.m_capsule.radius * collider.m_capsule.radius,
+                            inertiaDiagonal   = TrueSim.DiagonalizedGyrationTensorOfSphere(collider.m_capsule.radius),
                             tensorOrientation = quaternion.identity
                         };
                     }
 
-                    float radius   = collider.m_capsule.radius;
-                    float radiusSq = radius * radius;
-
-                    float cylinderMassPart  = math.PI * length * radiusSq;
-                    float sphereMassPart    = math.PI * (4f / 3f) * radiusSq * radius;
-                    float totalMass         = cylinderMassPart + sphereMassPart;
-                    cylinderMassPart       /= totalMass;
-                    sphereMassPart         /= totalMass;
-
-                    float onAxisInertia  = (cylinderMassPart / 2f + sphereMassPart * 2f / 5f) * radiusSq;
-                    float offAxisInertia = cylinderMassPart * (radiusSq / 4f + lengthSq / 12f) +
-                                           sphereMassPart * (radiusSq * 2f / 5f + radius * length * 3f / 8f + lengthSq / 4f);
+                    TrueSim.DiagonalizedGyrationTensorOfCapsule(length, collider.m_capsule.radius, out var onAxisInertia, out var offAxisInertia);
 
                     return new LocalInertiaTensorDiagonal
                     {
@@ -200,16 +192,15 @@ namespace Latios.Psyshock
                 }
                 case ColliderType.Box:
                 {
-                    var    halfSq    = collider.m_box.halfSize * collider.m_box.halfSize;
-                    float3 tensorNum = new float3(halfSq.y + halfSq.z, halfSq.x + halfSq.z, halfSq.x + halfSq.y);
                     return new LocalInertiaTensorDiagonal
                     {
-                        inertiaDiagonal   = tensorNum / 3f,
+                        inertiaDiagonal   = TrueSim.DiagonalizedGyrationTensorOfBox(collider.m_box.halfSize),
                         tensorOrientation = quaternion.identity
                     };
                 }
                 case ColliderType.Triangle:
                 {
+                    // Note: Unity Physics uses inertia tensor of sphere here.
                     var center     = (collider.m_triangle.pointA + collider.m_triangle.pointB + collider.m_triangle.pointC) / 3f;
                     var distanceSq = math.cmax(simd.distancesq(collider.m_triangle.AsSimdFloat3(), center));
                     return new LocalInertiaTensorDiagonal
@@ -243,25 +234,19 @@ namespace Latios.Psyshock
                     }
 
                     // Todo: Is there a faster way to do this when we already have the unscaled orientation and diagonal?
-                    var scaledTensor = StretchInertiaTensor(blob.inertiaTensor, scale);
-                    mathex.DiagonalizeSymmetricApproximation(scaledTensor, out var orientation, out var diagonal);
-                    return new LocalInertiaTensorDiagonal
-                    {
-                        inertiaDiagonal   = diagonal,
-                        tensorOrientation = new quaternion(orientation)
-                    };
+                    var scaledTensor = TrueSim.StretchInertiaTensor(blob.inertiaTensor, scale);
+                    return LocalInertiaTensorDiagonal.ApproximateFrom(scaledTensor);
                 }
                 case ColliderType.TriMesh:
                 {
+                    // Note: Unity Physics approximates this as a box formed from the AABB
                     var aabb  = collider.m_triMesh().triMeshColliderBlob.Value.localAabb;
                     aabb.min *= collider.m_triMesh().scale;
                     aabb.max *= collider.m_triMesh().scale;
                     Physics.GetCenterExtents(aabb, out _, out var extents);
-                    var    halfSq    = extents * extents;
-                    float3 tensorNum = new float3(halfSq.y + halfSq.z, halfSq.x + halfSq.z, halfSq.x + halfSq.y);
                     return new LocalInertiaTensorDiagonal
                     {
-                        inertiaDiagonal   = tensorNum / 3f,
+                        inertiaDiagonal   = TrueSim.DiagonalizedGyrationTensorOfBox(extents),
                         tensorOrientation = quaternion.identity
                     };
                 }
@@ -290,51 +275,13 @@ namespace Latios.Psyshock
                     }
 
                     // Todo: Is there a faster way to do this when we already have the unscaled orientation and diagonal?
-                    var scaledTensor = StretchInertiaTensor(blob.inertiaTensor, scale);
-                    mathex.DiagonalizeSymmetricApproximation(scaledTensor, out var orientation, out var diagonal);
-                    return new LocalInertiaTensorDiagonal
-                    {
-                        inertiaDiagonal   = diagonal,
-                        tensorOrientation = new quaternion(orientation)
-                    };
+                    // Side note: This is an approximation because compound children don't necessarily stretch perfectly,
+                    // whereas this is a true stretching of the inertia tensor.
+                    var scaledTensor = TrueSim.StretchInertiaTensor(blob.inertiaTensor, scale);
+                    return LocalInertiaTensorDiagonal.ApproximateFrom(scaledTensor);
                 }
                 default: return default;
             }
-        }
-
-        static float3x3 StretchInertiaTensor(float3x3 original, float3 stretch)
-        {
-            // The inertia tensor matrix diagonal components (not necessarily a diagonalized inertia tensor) are defined as follows:
-            // diagonal.x = sum_1_k(mass_k * (y_k^2 + z_k^2)) = sum_1_k(mass_k * y_k^2) + sum_1_k(mass_k * z_k^2)
-            // And for uniform density, m_k is constant, so:
-            // diagonal.x = mass * sum_1_k(y_k^2) + sum_1_k(z_k^2)
-            // diagonal.y = mass * sum_1_k(x_k^2) + sum_1_k(z_k^2)
-            // diagonal.z = mass * sum_1_k(x_k^2) + sum_1_k(y_k^2)
-            // The base inertia diagonal has mass divided out to be 1f, so we can drop it from our expression.
-            //
-            // We can define a property s as the sum of diagonals.
-            // diagonal.x + diagonal.y + diagonal.z = sum_1_k(y_k^2) + sum_1_k(z_k^2) + sum_1_k(x_k^2) + sum_1_k(z_k^2) + sum_1_k(x_k^2) + sum_1_k(y_k^2)
-            // diagonal.x + diagonal.y + diagonal.z = 2 * ( sum_1_k(x_k^2) + sum_1_k(y_k^2) + sum_1_k(z_k^2) )
-            //
-            // And with this, we can write this expression:
-            // (diagonal.x + diagonal.y + diagonal.z) / 2 - diagonal.x = sum_1_k(x_k^2)
-            // And we can do similar for the other two axes.
-            //
-            // Applying stretch changes the expression of sum_1_k(x_k^2) to sum_1_k( (x_k * stretch.x)^2 ) = sum_1_k(x_k^2 * stretch.x^2) = stretch.x^2 * sum_1_k(x_k^2)
-            // And with that, we have all the data we need to reassemble the inertia tensor.
-            var diagonal        = new float3(original.c0.x, original.c1.y, original.c2.z);
-            var diagonalHalfSum = math.csum(diagonal) / 2f;
-            var xSqySqzSq       = diagonalHalfSum - diagonal;
-            var newDiagonal     = stretch * stretch * xSqySqzSq;
-
-            // The off diagonals are just products, so we can actually just scale those.
-            var scaleMatrix =
-                new float3x3(new float3(0f, stretch.x * stretch.yz), new float3(stretch.x * stretch.y, 0f, stretch.x * stretch.z), new float3(stretch.z * stretch.xy, 0f));
-            var result  = original * scaleMatrix;
-            result.c0.x = newDiagonal.x;
-            result.c1.y = newDiagonal.y;
-            result.c2.z = newDiagonal.z;
-            return result;
         }
     }
 }

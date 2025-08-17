@@ -602,48 +602,181 @@ namespace Latios
             }
         }
 
-        // Todo: These are disabled as they are not atomic
-        //public EnabledRefRO<T> GetEnabledROIgnoreParallelSafety<T>(Entity entity) where T : unmanaged, IEnableableComponent
-        //{
-        //    var typeIndex = TypeManager.GetTypeIndex<T>().Index;
-        //    CheckTypeIndexIsInComponentList(typeIndex);
-        //    fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
-        //    {
-        //        ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
-        //        if (entity == currentEntity)
-        //        {
-        //            var mask = currentChunk.GetEnabledMask(ref handle);
-        //            return mask.GetOptionalEnabledRefRO<T>(currentIndexInChunk);
-        //        }
-        //        else
-        //        {
-        //            var info = esil[entity];
-        //            var mask = info.Chunk.GetEnabledMask(ref handle);
-        //            return mask.GetOptionalEnabledRefRO<T>(info.IndexInChunk);
-        //        }
-        //    }
-        //}
-        //
-        //public EnabledRefRW<T> GetEnabledRWIgnoreParallelSafety<T>(Entity entity) where T : unmanaged, IEnableableComponent
-        //{
-        //    var typeIndex = TypeManager.GetTypeIndex<T>().Index;
-        //    CheckTypeIndexIsInComponentList(typeIndex);
-        //    fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
-        //    {
-        //        ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
-        //        if (entity == currentEntity)
-        //        {
-        //            var mask = currentChunk.GetEnabledMask(ref handle);
-        //            return mask.GetOptionalEnabledRefRW<T>(currentIndexInChunk);
-        //        }
-        //        else
-        //        {
-        //            var info = esil[entity];
-        //            var mask = info.Chunk.GetEnabledMask(ref handle);
-        //            return mask.GetOptionalEnabledRefRW<T>(info.IndexInChunk);
-        //        }
-        //    }
-        //}
+        /// <summary>
+        /// Gets the readonly pointer to either the IComponentData or ISharedComponentData
+        /// </summary>
+        /// <param name="entity">The entity to get the component from</param>
+        /// <param name="typeIndex">The type of component to get</param>
+        /// <returns>A pointer to the component, or null if the component is not present</returns>
+        public void* GetUnsafeComponentPtrRO(Entity entity, TypeIndex typeIndex)
+        {
+            CheckTypeIndexIsInComponentList(typeIndex);
+            CheckTypeNotBuffer(typeIndex);
+
+            if (typeIndex.IsSharedComponentType)
+            {
+                fixed (DynamicSharedComponentTypeHandle* s0Ptr = &s0)
+                {
+                    ref var handle = ref s0Ptr[handleIndices[typeIndex].index];
+                    void*   ptr    = default;
+                    if (entity == currentEntity)
+                    {
+                        ptr = currentChunk.GetDynamicSharedComponentDataAddress(ref handle);
+                    }
+                    else
+                    {
+                        var info = esil[entity];
+                        ptr      = info.Chunk.GetDynamicSharedComponentDataAddress(ref handle);
+                    }
+                    return ptr;
+                }
+            }
+
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
+            {
+                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                if (entity == currentEntity)
+                {
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * currentIndexInChunk;
+                }
+                else
+                {
+                    CheckSafeAccessForForeignEntity(ref handle);
+                    var info  = esil[entity];
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * info.IndexInChunk;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the read-write pointer to either the IComponentData or ISharedComponentData
+        /// </summary>
+        /// <param name="entity">The entity to get the component from</param>
+        /// <param name="typeIndex">The type of component to get</param>
+        /// <returns>A pointer to the component, or null if the component is not present</returns>
+        public void* GetUnsafeComponentPtrRW(Entity entity, TypeIndex typeIndex)
+        {
+            CheckTypeIndexIsInComponentList(typeIndex);
+            CheckTypeNotBuffer(typeIndex);
+            CheckTypeNotShared(typeIndex);
+
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
+            {
+                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                if (entity == currentEntity)
+                {
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafePtr() + typeSize * currentIndexInChunk;
+                }
+                else
+                {
+                    CheckSafeAccessForForeignEntity(ref handle);
+                    var info  = esil[entity];
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafePtr() + typeSize * info.IndexInChunk;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the readonly pointer to either the IComponentData or ISharedComponentData,
+        /// ignoring parallel safety checks as if [NativeDisableParallelForRestriction] was used
+        /// </summary>
+        /// <param name="entity">The entity to get the component from</param>
+        /// <param name="typeIndex">The type of component to get</param>
+        /// <returns>A pointer to the component, or null if the component is not present</returns>
+        public void* GetUnsafeComponentPtrROIgnoreParallelSafety(Entity entity, TypeIndex typeIndex)
+        {
+            CheckTypeIndexIsInComponentList(typeIndex);
+            CheckTypeNotBuffer(typeIndex);
+
+            if (typeIndex.IsSharedComponentType)
+            {
+                fixed (DynamicSharedComponentTypeHandle* s0Ptr = &s0)
+                {
+                    ref var handle = ref s0Ptr[handleIndices[typeIndex].index];
+                    void*   ptr    = default;
+                    if (entity == currentEntity)
+                    {
+                        ptr = currentChunk.GetDynamicSharedComponentDataAddress(ref handle);
+                    }
+                    else
+                    {
+                        var info = esil[entity];
+                        ptr      = info.Chunk.GetDynamicSharedComponentDataAddress(ref handle);
+                    }
+                    return ptr;
+                }
+            }
+
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
+            {
+                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                if (entity == currentEntity)
+                {
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * currentIndexInChunk;
+                }
+                else
+                {
+                    var info  = esil[entity];
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * info.IndexInChunk;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the read-write pointer to either the IComponentData or ISharedComponentData,
+        /// ignoring parallel safety checks as if [NativeDisableParallelForRestriction] was used
+        /// </summary>
+        /// <param name="entity">The entity to get the component from</param>
+        /// <param name="typeIndex">The type of component to get</param>
+        /// <returns>A pointer to the component, or null if the component is not present</returns>
+        public void* GetUnsafeComponentPtrRWIgnoreParallelSafety(Entity entity, TypeIndex typeIndex)
+        {
+            CheckTypeIndexIsInComponentList(typeIndex);
+            CheckTypeNotBuffer(typeIndex);
+            CheckTypeNotShared(typeIndex);
+
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
+            {
+                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                if (entity == currentEntity)
+                {
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafePtr() + typeSize * currentIndexInChunk;
+                }
+                else
+                {
+                    var info  = esil[entity];
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    if (array.Length == 0)
+                        return null;
+                    return (byte*)array.GetUnsafePtr() + typeSize * info.IndexInChunk;
+                }
+            }
+        }
         #endregion
 
         #region Constructor, Update, and Dispose
@@ -1115,6 +1248,27 @@ namespace Latios
                 throw new System.InvalidOperationException(
                     "Attempted to access a component from an external entity inside a parallel job. This is not thread-safe. Call SetupEntity() to specify an entity that is safe to access in a parallel job, such as one from an IJobChunk or IJobEntity");
 #endif
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckTypeNotBuffer(TypeIndex typeIndex)
+        {
+            if (typeIndex.IsBuffer)
+                throw new System.ArgumentOutOfRangeException($"The specified TypeIndex is for a DynamicBuffer, which is not supported in this operation.");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckTypeNotShared(TypeIndex typeIndex)
+        {
+            if (typeIndex.IsSharedComponentType)
+                throw new System.ArgumentOutOfRangeException($"The specified TypeIndex is for a SharedComponent, which is not supported in this operation.");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckTypeIsBuffer(TypeIndex typeIndex)
+        {
+            if (!typeIndex.IsBuffer)
+                throw new System.ArgumentOutOfRangeException($"The specified TypeIndex is not for a DynamicBuffer, and a DynamicBuffer type is required for this operation.");
         }
         #endregion
     }

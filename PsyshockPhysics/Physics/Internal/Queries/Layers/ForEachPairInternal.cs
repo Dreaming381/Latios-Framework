@@ -271,8 +271,11 @@ namespace Latios.Psyshock
             // Remap ranks to unique island indices
             for (int islandIndex = 0, i = 0; i < ranks.Length; i++)
             {
-                if (i == uniqueIslandIndices[islandIndex])
+                if (islandIndex < uniqueIslandIndices.Length && i == uniqueIslandIndices[islandIndex])
+                {
                     ranks[i] = islandIndex;
+                    islandIndex++;
+                }
                 else
                     ranks[i] = ranks[ranks[i]];
             }

@@ -99,6 +99,8 @@ namespace Latios.Psyshock
                     // Compute the contact normal based on contact points from GJK.
                     aLocalContactNormal =
                         math.normalizesafe((distanceResult.hitpointB - distanceResult.hitpointA) * math.select(1f, -1f, distanceResult.distance < 0f), float3.zero);
+                    // Yes, normalizesafe has produced "valid" normals on floating point errors before. The result can get pretty noisy, so the tolerance is high.
+                    aLocalContactNormal = math.select(aLocalContactNormal, float3.zero, math.abs(distanceResult.distance) < 1e-3f);
                     if (aLocalContactNormal.Equals(float3.zero))
                     {
                         aLocalContactNormal = math.normalize(distanceResult.normalA - distanceResult.normalB);

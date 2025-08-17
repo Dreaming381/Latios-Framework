@@ -87,8 +87,8 @@ namespace Latios.Psyshock
                                                                           in RigidTransform bTransform,
                                                                           in ColliderDistanceResult distanceResult)
         {
-            UnitySim.ContactsBetweenResult result = default;
-            var bInATransform = math.mul(math.inverse(aTransform), bTransform);
+            UnitySim.ContactsBetweenResult result        = default;
+            var                            bInATransform = math.mul(math.inverse(aTransform), bTransform);
 
             // Unity Physics prefers to use the SAT axes for the contact normal if it can.
             // We attempt to recover the best SAT axis here.
@@ -113,6 +113,8 @@ namespace Latios.Psyshock
                     // the axis between the closest points. The last option is effectively the same result.
                     aLocalContactNormal =
                         math.normalizesafe((distanceResult.hitpointB - distanceResult.hitpointA) * math.select(1f, -1f, distanceResult.distance < 0f), float3.zero);
+                    // Yes, normalizesafe has produced "valid" normals on floating point errors before. The result can get pretty noisy, so the tolerance is high.
+                    aLocalContactNormal = math.select(aLocalContactNormal, float3.zero, math.abs(distanceResult.distance) < 1e-3f);
                     if (aLocalContactNormal.Equals(float3.zero))
                     {
                         aLocalContactNormal = math.normalize(distanceResult.normalA - distanceResult.normalB);
@@ -231,7 +233,7 @@ namespace Latios.Psyshock
                         {
                             var clippedSegmentB = rayStart + fractionB * rayDisplacement;
                             var bDistance       = mathex.SignedDistance(bPlane, clippedSegmentB) * distanceScalarAlongContactNormalB;
-                            var bContact = math.transform(aTransform, clippedSegmentB + aLocalContactNormal * bDistance);
+                            var bContact        = math.transform(aTransform, clippedSegmentB + aLocalContactNormal * bDistance);
                             result.Add(bContact, bDistance);
                             needsClosestPoint &= bDistance > distanceResult.distance + 1e-4f;
                         }
@@ -391,9 +393,12 @@ namespace Latios.Psyshock
                         var faceSupportB = math.transform(bInASpace, math.chgsign(halfSizeB, signs));
 
                         // It is possible that A is fully inside B. If so, we want the bFace result instead. In such a case,
-                        // the following clamp check will fail.
+                        // the following clamp check will fail. Due to floating point precision though, we need a little bit
+                        // of margin, so we use the difference of the max distance between aFaceBPoint and aPointBFace as a
+                        // margin.
                         var clampedSupport = math.clamp(faceSupportB, -halfSizeA, halfSizeA);
-                        if (math.all(aFaceMask | (faceSupportB == clampedSupport)))
+                        var margin         = math.distance(math.cmax(aFaceBPointDistances), math.cmax(aPointBFaceDistances));
+                        if (math.all(aFaceMask | (math.abs(faceSupportB - clampedSupport) <= margin)))
                         {
                             ushort featureCodeA = (ushort)(0x8000 | (math.tzcnt(math.bitmask(new bool4(aFaceMask, false))) + math.select(0, 3, math.any(aFaceNormal < -0.5f))));
                             ushort featureCodeB = (ushort)math.bitmask(new bool4(signs < 0f, false));
@@ -412,10 +417,26 @@ namespace Latios.Psyshock
                     }
                     var bFaceMask = alignedMaxDistance == aPointBFaceDistances;
                     // Catch the edge case where A was inside B but floating point imprecision caused the aFace axis to be larger.
-                    if (!math.any(bFaceMask))
-                        bFaceMask = math.abs(alignedMaxDistance - aPointBFaceDistances) <= 1e-5f;
-                    // There's a vertex on A closet to face B.
+                    bool bFaceValid = math.any(bFaceMask);
+                    if (!bFaceValid)
                     {
+                        bFaceMask  = math.abs(alignedMaxDistance - aPointBFaceDistances) <= 1e-5f;
+                        bFaceValid = math.any(bFaceMask);
+                    }
+                    if (!bFaceValid)
+                    {
+                        // If edges are better, we should fall back to that.
+                        bool bFaceBetterThanEdges = math.cmax(aPointBFaceDistances) <= edgeMaxDistance;
+                        if (bFaceBetterThanEdges)
+                        {
+                            // Precision is bad. Just commit to this.
+                            bFaceMask  = aPointBFaceDistances == math.cmax(aPointBFaceDistances);
+                            bFaceValid = true;
+                        }
+                    }
+                    if (bFaceValid)
+                    {
+                        // There's a vertex on A closet to face B.
                         // If multiple axes match, prioritize y, then z over x.
                         bFaceMask.xz       &= !bFaceMask.y;
                         bFaceMask.x        &= !bFaceMask.z;
@@ -611,21 +632,21 @@ namespace Latios.Psyshock
                 }
                 var aSigns       = math.select(axis, 1f, maskA);
                 var aSupportP    = math.chgsign(halfSizeA, aSigns);
-                var aSupportE    = math.select(0f, -1f, maskA);
+                var aSupportE    = math.select(0f, -2f * halfSizeA, maskA);
                 var edgeAxisInB  = math.rotate(aInBSpace.rot, axis);
                 var bSigns       = math.select(-edgeAxisInB, 1f, maskB);
                 var bSupportPinB = math.chgsign(halfSizeB, bSigns);
-                var bSupportEinB = math.select(0f, -1f, maskB);
+                var bSupportEinB = math.select(0f, -2f * halfSizeB, maskB);
                 var bSupportP    = math.transform(bInASpace, bSupportPinB);
                 var bSupportE    = math.rotate(bInASpace, bSupportEinB);
 
                 // Look for the ordinate of the axis closest to zero. Flipping that should give us the next best support.
                 var absAxis            = math.abs(axis);
-                var aFlipMask          = absAxis == math.cmin(absAxis);
+                var aFlipMask          = absAxis == math.cmin(math.select(absAxis, float.MaxValue, maskA));
                 var aAlternateSupportP = math.select(aSupportP, -aSupportP, aFlipMask);
 
                 var absAxisInB         = math.abs(edgeAxisInB);
-                var bFlipMask          = absAxisInB == math.cmin(absAxisInB);
+                var bFlipMask          = absAxisInB == math.cmin(math.select(absAxisInB, float.MaxValue, maskB));
                 var bAlternateSupportP = math.transform(bInASpace, math.select(bSupportPinB, -bSupportPinB, bFlipMask));
 
                 var aStarts = new simdFloat3(aSupportP, aSupportP, aAlternateSupportP, aAlternateSupportP);
@@ -658,7 +679,7 @@ namespace Latios.Psyshock
                         featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(normalA),
                         featureCodeB = PointRayBox.FeatureCodeFromBoxNormal(normalBinB)
                     };
-                    if (result.distance < alignedMaxDistance)
+                    if (alignedMaxDistance < 0f || result.distance < alignedMaxDistance)
                     {
                         return result.distance <= maxDistance;
                     }
@@ -748,7 +769,21 @@ namespace Latios.Psyshock
                         result.hitpointA = aPoints47.d;
                         break;
                 }
-                result.distance = math.sqrt(result.distance);
+                result.distance   = math.sqrt(result.distance);
+                var hitBInsideBox = halfSizeB - math.abs(hitB);
+                // Sometimes due to floating point error, we actually have overlap here. So we need to push the hitpoint out to the surface.
+                // First, try to correct very tiny floating point errors, so that we catch edges.
+                var isVeryTinyError = hitBInsideBox < 1e-5f;
+                hitB                = math.select(hitB, math.chgsign(halfSizeB, hitB), isVeryTinyError);
+                hitBInsideBox       = halfSizeB - math.abs(hitB);
+                if (math.all(hitBInsideBox > 0f))
+                {
+                    // The error is a little bigger. Pick the closest axis and push out to the face.
+                    var boostAxis    = math.tzcnt(math.bitmask(new bool4(hitBInsideBox == math.cmin(hitBInsideBox), false)));
+                    var boostAmount  = hitBInsideBox[boostAxis];
+                    result.distance -= boostAmount;
+                    hitB[boostAxis]  = math.chgsign(halfSizeB[boostAxis], hitB[boostAxis]);
+                }
                 result.hitpointB    = math.transform(bInASpace, hitB);
                 result.featureCodeA = (ushort)bestId;
                 result.normalA      = math.normalize(math.select(1f, -1f, (bestId & new int3(1, 2, 4)) != 0));
@@ -802,12 +837,26 @@ namespace Latios.Psyshock
                         result.hitpointB = bPoints47inA.d;
                         break;
                 }
-                result.distance = math.sqrt(result.distance);
+                result.distance   = math.sqrt(result.distance);
+                var hitAInsideBox = halfSizeA - math.abs(hitA);
+                // Sometimes due to floating point error, we actually have overlap here. So we need to push the hitpoint out to the surface.
+                // First, try to correct very tiny floating point errors, so that we catch edges.
+                var isVeryTinyError = hitAInsideBox < 1e-5f;
+                hitA                = math.select(hitA, math.chgsign(halfSizeA, hitA), isVeryTinyError);
+                hitAInsideBox       = halfSizeA - math.abs(hitA);
+                if (math.all(hitAInsideBox > 0f))
+                {
+                    // The error is a little bigger. Pick the closest axis and push out to the face.
+                    var boostAxis    = math.tzcnt(math.bitmask(new bool4(hitAInsideBox == math.cmin(hitAInsideBox), false)));
+                    var boostAmount  = hitAInsideBox[boostAxis];
+                    result.distance -= boostAmount;
+                    hitA[boostAxis]  = math.chgsign(halfSizeA[boostAxis], hitA[boostAxis]);
+                }
                 result.hitpointA    = hitA;
                 result.featureCodeB = (ushort)bestId;
                 result.normalB      = math.rotate(bInASpace.rot, math.normalize(math.select(1f, -1f, (bestId & new int3(1, 2, 4)) != 0)));
                 result.normalA      = math.normalize(math.select(0f, math.chgsign(1f, hitA), hitA == math.chgsign(halfSizeA, hitA)));
-                result.featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(result.normalB);
+                result.featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(result.normalA);
             }
             return result.distance <= maxDistance;
         }

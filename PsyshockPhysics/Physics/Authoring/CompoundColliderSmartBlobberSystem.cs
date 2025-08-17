@@ -187,11 +187,9 @@ namespace Latios.Psyshock.Authoring.Systems
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(sphere, 1f).ToMatrix();
-                            // rotate inertia into compound space
-                            float3x3 temp = math.mul(childInertia, new float3x3(math.inverse(blobTransforms[i].rot)));
                             childPropertiesCache.Add(new ChildProperties
                             {
-                                inertiaMatrixUnshifted = math.mul(new float3x3(blobTransforms[i].rot), temp),
+                                inertiaMatrixUnshifted = TrueSim.RotateInertiaTensor(childInertia, blobTransforms[i].rot),
                                 centerOfMassInCompound = centerOfMass,
                                 volume                 = volume,
                             });
@@ -208,10 +206,9 @@ namespace Latios.Psyshock.Authoring.Systems
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(capsule, 1f).ToMatrix();
                             // rotate inertia into compound space
-                            float3x3 temp = math.mul(childInertia, new float3x3(math.inverse(blobTransforms[i].rot)));
                             childPropertiesCache.Add(new ChildProperties
                             {
-                                inertiaMatrixUnshifted = math.mul(new float3x3(blobTransforms[i].rot), temp),
+                                inertiaMatrixUnshifted = TrueSim.RotateInertiaTensor(childInertia, blobTransforms[i].rot),
                                 centerOfMassInCompound = centerOfMass,
                                 volume                 = volume,
                             });
@@ -228,10 +225,9 @@ namespace Latios.Psyshock.Authoring.Systems
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(box, 1f).ToMatrix();
                             // rotate inertia into compound space
-                            float3x3 temp = math.mul(childInertia, new float3x3(math.inverse(blobTransforms[i].rot)));
                             childPropertiesCache.Add(new ChildProperties
                             {
-                                inertiaMatrixUnshifted = math.mul(new float3x3(blobTransforms[i].rot), temp),
+                                inertiaMatrixUnshifted = TrueSim.RotateInertiaTensor(childInertia, blobTransforms[i].rot),
                                 centerOfMassInCompound = centerOfMass,
                                 volume                 = volume,
                             });
@@ -248,15 +244,8 @@ namespace Latios.Psyshock.Authoring.Systems
                 foreach (var child in childPropertiesCache)
                 {
                     // shift the inertia to be relative to the new center of mass
-                    float3 shift          = child.centerOfMassInCompound - combinedCenterOfMass;
-                    float3 shiftSq        = shift * shift;
-                    var    diag           = new float3(shiftSq.y + shiftSq.z, shiftSq.x + shiftSq.z, shiftSq.x + shiftSq.y);
-                    var    offDiag        = new float3(shift.x * shift.y, shift.y * shift.z, shift.z * shift.x) * -1.0f;
-                    var    inertiaMatrix  = child.inertiaMatrixUnshifted;
-                    inertiaMatrix.c0     += new float3(diag.x, offDiag.x, offDiag.z);
-                    inertiaMatrix.c1     += new float3(offDiag.x, diag.y, offDiag.y);
-                    inertiaMatrix.c2     += new float3(offDiag.z, offDiag.y, diag.z);
-
+                    float3 shift         = child.centerOfMassInCompound - combinedCenterOfMass;
+                    var    inertiaMatrix = TrueSim.TranslateInertiaTensor(child.inertiaMatrixUnshifted, shift);
                     // weight by its proportional volume (=mass)
                     inertiaMatrix         *= child.volume / (combinedVolume + float.Epsilon);
                     combinedInertiaMatrix += inertiaMatrix;

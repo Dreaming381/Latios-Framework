@@ -127,6 +127,8 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             var contactNormal = math.normalizesafe((distanceResult.hitpointB - distanceResult.hitpointA) * math.select(1f, -1f, distanceResult.distance < 0f), float3.zero);
+            // Yes, normalizesafe has produced "valid" normals on floating point errors before. The result can get pretty noisy, so the tolerance is high.
+            contactNormal = math.select(contactNormal, float3.zero, math.abs(distanceResult.distance) < 1e-3f);
             if (contactNormal.Equals(float3.zero))
             {
                 contactNormal = math.normalize(distanceResult.normalA - distanceResult.normalB);

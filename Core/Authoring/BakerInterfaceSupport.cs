@@ -10,6 +10,44 @@ namespace Latios.Authoring
     public static class BakerInterfaceSupport
     {
         /// <summary>
+        /// Retrieves all components of the authoring type. If the passed in authoring is the primary, returns true.
+        /// Use this method to determine if you should bake an aggregate of multiple authoring components to combine
+        /// them into a DynamicBuffer or something.
+        /// </summary>
+        /// <typeparam name="T">The type of Component that is being baked</typeparam>
+        /// <param name="authoring">The authoring component passed into the baker</param>
+        /// <param name="allAuthorings">An output list of all components of the authoring's type, including derived components.
+        /// This list is reused by multiple bakers and its contents are only valid within the lifecycle of the current Bake() call.</param>
+        /// <returns>True if this particular authoring component is the one that should be in control of baking all the components</returns>
+        public static bool ShouldBakeAll<T>(this IBaker baker, T authoring, out List<T> allAuthorings) where T : Component
+        {
+            allAuthorings = CachedList<T>.list;
+            baker.GetComponents(allAuthorings);
+            if (allAuthorings.Count == 0)
+                return false;
+            return authoring == allAuthorings[0];
+        }
+
+        /// <summary>
+        /// Retrieves all components of the authoring type. If the passed in authoring is the primary, returns true.
+        /// Use this method to determine if you should bake an aggregate of multiple authoring components to combine
+        /// them into a DynamicBuffer or something.
+        /// </summary>
+        /// <typeparam name="T">The type of component casted to the interface that is being baked</typeparam>
+        /// <param name="authoring">The authoring component passed into the baker</param>
+        /// <param name="allAuthorings">An output list of all components of the authoring's type, including derived components.
+        /// This list is reused by multiple bakers and its contents are only valid within the lifecycle of the current Bake() call.</param>
+        /// <returns>True if this particular authoring component is the one that should be in control of baking all the components</returns>
+        public static bool ShouldBakeAllInterface<T>(this IBaker baker, T authoring, out List<T> allAuthorings)
+        {
+            allAuthorings = CachedList<T>.list;
+            baker.GetComponents(allAuthorings);
+            if (allAuthorings.Count == 0)
+                return false;
+            return authoring.Equals(allAuthorings[0]);
+        }
+
+        /// <summary>
         /// Retrieves the component of Type T in the GameObject
         /// </summary>
         /// <typeparam name="T">The type of component to retrieve</typeparam>
@@ -123,7 +161,7 @@ namespace Latios.Authoring
         public static T GetComponentInParent<T>(this IBaker baker, GameObject gameObject)
         {
             foreach (var type in InterfaceState<T>.implementingComponents)
-                type.GetComponents(baker, gameObject);
+                type.GetComponentInParent(baker, gameObject);
             return gameObject.GetComponentInParent<T>(true);
         }
 
@@ -162,7 +200,7 @@ namespace Latios.Authoring
         public static void GetComponentsInParent<T>(this IBaker baker, GameObject gameObject, List<T> components)
         {
             foreach (var type in InterfaceState<T>.implementingComponents)
-                type.GetComponents(baker, gameObject);
+                type.GetComponentsInParent(baker, gameObject);
             gameObject.GetComponentsInParent(true, components);
         }
 
@@ -201,7 +239,7 @@ namespace Latios.Authoring
         public static T GetComponentInChildren<T>(this IBaker baker, GameObject gameObject)
         {
             foreach (var type in InterfaceState<T>.implementingComponents)
-                type.GetComponents(baker, gameObject);
+                type.GetComponentInChildren(baker, gameObject);
             return gameObject.GetComponentInChildren<T>(true);
         }
 
@@ -239,7 +277,7 @@ namespace Latios.Authoring
         public static void GetComponentsInChildren<T>(this IBaker baker, GameObject gameObject, List<T> components)
         {
             foreach (var type in InterfaceState<T>.implementingComponents)
-                type.GetComponents(baker, gameObject);
+                type.GetComponentsInChildren(baker, gameObject);
             gameObject.GetComponentsInChildren(true, components);
         }
 
@@ -314,6 +352,11 @@ namespace Latios.Authoring
                     baker.GetComponentsInParent(gameObject, cache);
                 }
             }
+        }
+
+        static class CachedList<T>
+        {
+            public static List<T> list = new List<T>();
         }
     }
 }
