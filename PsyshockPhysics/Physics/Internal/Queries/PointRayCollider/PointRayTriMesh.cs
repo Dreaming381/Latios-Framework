@@ -33,7 +33,7 @@ namespace Latios.Psyshock
         public static bool Raycast(in Ray ray, in TriMeshCollider triMesh, in RigidTransform triMeshTransform, out RaycastResult result)
         {
             var transform         = new TransformQvvs(triMeshTransform.pos, triMeshTransform.rot, 1f, triMesh.scale);
-            var rayInTriMeshSpace = new Ray(qvvs.TransformPoint(in transform, ray.start), qvvs.TransformPoint(in transform, ray.end));
+            var rayInTriMeshSpace = new Ray(qvvs.InverseTransformPoint(in transform, ray.start), qvvs.InverseTransformPoint(in transform, ray.end));
             var aabb              = Physics.AabbFrom(in rayInTriMeshSpace);
             var processor         = new RayProcessor
             {

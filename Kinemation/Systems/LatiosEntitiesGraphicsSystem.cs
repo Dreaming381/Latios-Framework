@@ -669,6 +669,7 @@ namespace Latios.Kinemation.Systems
                 cullingPlanesBuffer.Clear();
                 cullingPlanesBuffer.Reinterpret<Plane>().AddRange(batchCullingContext.cullingPlanes);
                 var splitsBuffer = worldBlackboardEntity.GetBuffer<CullingSplitElement>(false);
+                splitsBuffer.Clear();
                 splitsBuffer.Reinterpret<CullingSplit>().AddRange(batchCullingContext.cullingSplits);
                 var packedSplits = worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(false);
                 //m_beforeCreateSplitsMarker.End();

@@ -452,7 +452,7 @@ namespace Latios.Kinemation
                     if (colors.Length > 0)
                     {
                         vertexCount = colors.Length;
-                        tempDescriptors.Add(new VertexAttributeDescriptor(VertexAttribute.Color));
+                        tempDescriptors.Add(new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.Float32, 4, 0));
                     }
                     if (uv0xys.Length > 0)
                     {
