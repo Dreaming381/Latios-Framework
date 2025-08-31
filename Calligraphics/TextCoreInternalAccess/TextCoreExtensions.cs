@@ -1,3 +1,4 @@
+#if !LATIOS_DISABLE_CALLIGRAPHICS
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.TextCore.LowLevel;
@@ -25,4 +26,5 @@ public static class TextCoreExtensions
         return TextShaderUtilities.GetPadding(material, enableExtraPadding, isBold);
     }
 }
+#endif
 

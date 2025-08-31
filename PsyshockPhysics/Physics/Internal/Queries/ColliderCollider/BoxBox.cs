@@ -29,10 +29,12 @@ namespace Latios.Psyshock
             //}, aTransform);
             //return result.distance <= maxDistance;
 
-            var bInATransform  = math.mul(math.inverse(aTransform), bTransform);
-            var aInBTransform  = math.mul(math.inverse(bTransform), aTransform);
-            bInATransform.pos -= boxA.center;
-            aInBTransform.pos -= boxB.center;
+            var aOffsetTransform  = aTransform;
+            aOffsetTransform.pos += math.rotate(aTransform.rot, boxA.center);
+            var bOffsetTransform  = bTransform;
+            bOffsetTransform.pos += math.rotate(bTransform.rot, boxB.center);
+            var bInATransform     = math.mul(math.inverse(aOffsetTransform), bOffsetTransform);
+            var aInBTransform     = math.mul(math.inverse(bOffsetTransform), aOffsetTransform);
 
             var hit                = BoxBoxDistance(boxA.halfSize, boxB.halfSize, in bInATransform, in aInBTransform, maxDistance, out var localResult);
             localResult.hitpointA += boxA.center;
