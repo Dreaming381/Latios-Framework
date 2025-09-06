@@ -289,17 +289,19 @@ namespace Latios
             CheckTypeIndexIsInComponentList(typeIndex);
             fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
             {
-                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                ref var                    handle               = ref c0Ptr[handleIndices[typeIndex].index];
+                DynamicComponentTypeHandle forcedReadOnlyHandle = !handle.IsReadOnly ? handle.CopyToReadOnly() : default;
+                ref var                    handleToUse          = ref (handle.IsReadOnly ? ref handle : ref forcedReadOnlyHandle);
                 if (entity == currentEntity)
                 {
-                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<T>(ref handle, UnsafeUtility.SizeOf<T>());
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<T>(ref handleToUse, UnsafeUtility.SizeOf<T>());
                     return RefRO<T>.Optional(array, currentIndexInChunk);
                 }
                 else
                 {
                     CheckSafeAccessForForeignEntity(ref handle);
                     var info  = esil[entity];
-                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<T>(ref handle, UnsafeUtility.SizeOf<T>());
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<T>(ref handleToUse, UnsafeUtility.SizeOf<T>());
                     return RefRO<T>.Optional(array, info.IndexInChunk);
                 }
             }
@@ -418,17 +420,19 @@ namespace Latios
             CheckTypeIndexIsInComponentList(typeIndex);
             fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
             {
-                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                ref var                    handle               = ref c0Ptr[handleIndices[typeIndex].index];
+                DynamicComponentTypeHandle forcedReadOnlyHandle = !handle.IsReadOnly ? handle.CopyToReadOnly() : default;
+                ref var                    handleToUse          = ref (handle.IsReadOnly ? ref handle : ref forcedReadOnlyHandle);
                 if (entity == currentEntity)
                 {
-                    var mask = currentChunk.GetEnabledMask(ref handle);
+                    var mask = currentChunk.GetEnabledMask(ref handleToUse);
                     return mask.GetOptionalEnabledRefRO<T>(currentIndexInChunk);
                 }
                 else
                 {
                     CheckSafeAccessForForeignEntity(ref handle);
                     var info = esil[entity];
-                    var mask = info.Chunk.GetEnabledMask(ref handle);
+                    var mask = info.Chunk.GetEnabledMask(ref handleToUse);
                     return mask.GetOptionalEnabledRefRO<T>(info.IndexInChunk);
                 }
             }
@@ -527,16 +531,18 @@ namespace Latios
             CheckTypeIndexIsInComponentList(typeIndex);
             fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
             {
-                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                ref var                    handle               = ref c0Ptr[handleIndices[typeIndex].index];
+                DynamicComponentTypeHandle forcedReadOnlyHandle = !handle.IsReadOnly ? handle.CopyToReadOnly() : default;
+                ref var                    handleToUse          = ref (handle.IsReadOnly ? ref handle : ref forcedReadOnlyHandle);
                 if (entity == currentEntity)
                 {
-                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<T>(ref handle, UnsafeUtility.SizeOf<T>());
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<T>(ref handleToUse, UnsafeUtility.SizeOf<T>());
                     return RefRO<T>.Optional(array, currentIndexInChunk);
                 }
                 else
                 {
                     var info  = esil[entity];
-                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<T>(ref handle, UnsafeUtility.SizeOf<T>());
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<T>(ref handleToUse, UnsafeUtility.SizeOf<T>());
                     return RefRO<T>.Optional(array, info.IndexInChunk);
                 }
             }
@@ -635,10 +641,12 @@ namespace Latios
             var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
             fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
             {
-                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                ref var                    handle               = ref c0Ptr[handleIndices[typeIndex].index];
+                DynamicComponentTypeHandle forcedReadOnlyHandle = !handle.IsReadOnly ? handle.CopyToReadOnly() : default;
+                ref var                    handleToUse          = ref (handle.IsReadOnly ? ref handle : ref forcedReadOnlyHandle);
                 if (entity == currentEntity)
                 {
-                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleToUse, typeSize);
                     if (array.Length == 0)
                         return null;
                     return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * currentIndexInChunk;
@@ -647,7 +655,7 @@ namespace Latios
                 {
                     CheckSafeAccessForForeignEntity(ref handle);
                     var info  = esil[entity];
-                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleToUse, typeSize);
                     if (array.Length == 0)
                         return null;
                     return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * info.IndexInChunk;
@@ -724,10 +732,12 @@ namespace Latios
             var                                typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
             fixed (DynamicComponentTypeHandle* c0Ptr    = &c0)
             {
-                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                ref var                    handle               = ref c0Ptr[handleIndices[typeIndex].index];
+                DynamicComponentTypeHandle forcedReadOnlyHandle = !handle.IsReadOnly ? handle.CopyToReadOnly() : default;
+                ref var                    handleToUse          = ref (handle.IsReadOnly ? ref handle : ref forcedReadOnlyHandle);
                 if (entity == currentEntity)
                 {
-                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    var array = currentChunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleToUse, typeSize);
                     if (array.Length == 0)
                         return null;
                     return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * currentIndexInChunk;
@@ -735,7 +745,7 @@ namespace Latios
                 else
                 {
                     var info  = esil[entity];
-                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize);
+                    var array = info.Chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handleToUse, typeSize);
                     if (array.Length == 0)
                         return null;
                     return (byte*)array.GetUnsafeReadOnlyPtr() + typeSize * info.IndexInChunk;
@@ -1251,14 +1261,14 @@ namespace Latios
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        void CheckTypeNotBuffer(TypeIndex typeIndex)
+        internal void CheckTypeNotBuffer(TypeIndex typeIndex)
         {
             if (typeIndex.IsBuffer)
                 throw new System.ArgumentOutOfRangeException($"The specified TypeIndex is for a DynamicBuffer, which is not supported in this operation.");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        void CheckTypeNotShared(TypeIndex typeIndex)
+        internal void CheckTypeNotShared(TypeIndex typeIndex)
         {
             if (typeIndex.IsSharedComponentType)
                 throw new System.ArgumentOutOfRangeException($"The specified TypeIndex is for a SharedComponent, which is not supported in this operation.");
@@ -1284,7 +1294,6 @@ namespace Latios
         /// <exception cref="ArgumentException">If you call this function on a "tag" component type (which is an empty
         /// component with no fields).</exception>
         /// <returns>A native array containing the components in the chunk.</returns>
-        /// <summary>
         public static NativeArray<T> GetNativeArray<T>(in this ArchetypeChunk chunk, ref ComponentBroker broker) where T : unmanaged, IComponentData
         {
             var typeIndex = TypeManager.GetTypeIndex<T>().Index;
@@ -1292,6 +1301,73 @@ namespace Latios
             fixed (DynamicComponentTypeHandle* c0Ptr = &broker.c0)
             {
                 return chunk.GetDynamicComponentDataArrayReinterpret<T>(ref c0Ptr[broker.handleIndices[typeIndex].index], UnsafeUtility.SizeOf<T>());
+            }
+        }
+
+        /// <summary>
+        /// Provides a typed pointer to the array of components stored in the chunk, requested with write access
+        /// </summary>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <typeparam name="T">The data type of the component.</typeparam>
+        /// <returns>A pointer to the first component in the array</returns>
+        public static T* GetComponentDataPtrRW<T>(in this ArchetypeChunk chunk, ref ComponentBroker broker) where T : unmanaged, IComponentData
+        {
+            var typeIndex = TypeManager.GetTypeIndex<T>().Index;
+            return (T*)chunk.GetDynamicComponentDataPtrRW(ref broker, typeIndex);
+        }
+
+        /// <summary>
+        /// Provides a typed pointer to the array of components stored in the chunk, requested with readonly access
+        /// </summary>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <typeparam name="T">The data type of the component.</typeparam>
+        /// <returns>A pointer to the first component in the array</returns>
+        public static T* GetComponentDataPtrRO<T>(in this ArchetypeChunk chunk, ref ComponentBroker broker) where T : unmanaged, IComponentData
+        {
+            var typeIndex = TypeManager.GetTypeIndex<T>().Index;
+            return (T*)chunk.GetDynamicComponentDataPtrRO(ref broker, typeIndex);
+        }
+
+        /// <summary>
+        /// Provides the raw pointer to the component array in this chunk in a type-agnostic way, with read-only access.
+        /// </summary>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <param name="typeIndex">The type index for the type to fetch</param>
+        /// <returns>A pointer to the first component instance of the specified type in the chunk</returns>
+        public static void* GetDynamicComponentDataPtrRO(in this ArchetypeChunk chunk, ref ComponentBroker broker, TypeIndex typeIndex)
+        {
+            broker.CheckTypeIndexIsInComponentList(typeIndex);
+            broker.CheckTypeNotBuffer(typeIndex);
+            broker.CheckTypeNotShared(typeIndex);
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).SizeInChunk;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &broker.c0)
+            {
+                ref var handle = ref c0Ptr[broker.handleIndices[typeIndex].index];
+                if (!handle.IsReadOnly)
+                {
+                    var roHandle = handle.CopyToReadOnly();
+                    return chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref roHandle, typeSize).GetUnsafeReadOnlyPtr();
+                }
+                return chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize).GetUnsafeReadOnlyPtr();
+            }
+        }
+
+        /// <summary>
+        /// Provides the raw pointer to the component array in this chunk in a type-agnostic way, with read-write access.
+        /// </summary>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <param name="typeIndex">The type index for the type to fetch</param>
+        /// <returns>A pointer to the first component instance of the specified type in the chunk</returns>
+        public static void* GetDynamicComponentDataPtrRW(in this ArchetypeChunk chunk, ref ComponentBroker broker, TypeIndex typeIndex)
+        {
+            broker.CheckTypeIndexIsInComponentList(typeIndex);
+            broker.CheckTypeNotBuffer(typeIndex);
+            broker.CheckTypeNotShared(typeIndex);
+            var                                typeSize = TypeManager.GetTypeInfo(typeIndex).SizeInChunk;
+            fixed (DynamicComponentTypeHandle* c0Ptr    = &broker.c0)
+            {
+                ref var handle = ref c0Ptr[broker.handleIndices[typeIndex].index];
+                return chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref handle, typeSize).GetUnsafePtr();
             }
         }
 
@@ -1308,6 +1384,52 @@ namespace Latios
             fixed (DynamicComponentTypeHandle* c0Ptr = &broker.c0)
             {
                 return chunk.GetBufferAccessor<T>(ref c0Ptr[broker.handleIndices[typeIndex].index]);
+            }
+        }
+
+        /// <summary>
+        /// Gets the ISharedComponentData value for the chunk, if it exists. Returns true if the result is valid.
+        /// </summary>
+        /// <typeparam name="T">The type of shared component to get</typeparam>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <param name="sharedComponentOrDefault">The shared component value if found, default otherwise</param>
+        /// <returns>True if the chunk has the shared component type, false otherwise</returns>
+        public static bool TryGetSharedComponent<T>(in this ArchetypeChunk chunk, ref ComponentBroker broker, out T sharedComponentOrDefault) where T : unmanaged,
+        ISharedComponentData
+        {
+            var typeIndex = TypeManager.GetTypeIndex<T>().Index;
+            broker.CheckTypeIndexIsInComponentList(typeIndex);
+            fixed (DynamicSharedComponentTypeHandle* s0Ptr = &broker.s0)
+            {
+                ref var handle = ref s0Ptr[broker.handleIndices[typeIndex].index];
+                T*      ptr    = (T*)chunk.GetDynamicSharedComponentDataAddress(ref handle);
+                if (ptr != null)
+                {
+                    sharedComponentOrDefault = *ptr;
+                    return true;
+                }
+                else
+                {
+                    sharedComponentOrDefault = default;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the EnabledMask of the IEnableableComponent for the entire chunk
+        /// </summary>
+        /// <typeparam name="T">The type of IEnableableComponent to retrieve the enable bits for</typeparam>
+        /// <param name="broker">The ComponentBroker containing type and job safety information.</param>
+        /// <returns>The enable bits in EnabledMask form</returns>
+        public static EnabledMask GetEnabledMask<T>(in this ArchetypeChunk chunk, ref ComponentBroker broker) where T : unmanaged, IEnableableComponent
+        {
+            var typeIndex = TypeManager.GetTypeIndex<T>().Index;
+            broker.CheckTypeIndexIsInComponentList(typeIndex);
+            fixed (DynamicComponentTypeHandle* c0Ptr = &broker.c0)
+            {
+                ref var handle = ref c0Ptr[broker.handleIndices[typeIndex].index];
+                return chunk.GetEnabledMask(ref handle);
             }
         }
 
