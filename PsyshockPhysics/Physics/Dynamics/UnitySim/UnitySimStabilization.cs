@@ -14,8 +14,17 @@ namespace Latios.Psyshock
         /// </summary>
         public struct MotionStabilizer
         {
+            /// <summary>
+            /// When substepping, update this value after every gravity update
+            /// </summary>
             public Velocity inputVelocity;
             public float    inverseInertiaScale;
+
+            public MotionStabilizer(in Velocity velocityAfterGravity)
+            {
+                inputVelocity = velocityAfterGravity;
+                inverseInertiaScale = 1f;
+            }
 
             public static readonly MotionStabilizer kDefault = new MotionStabilizer
             {

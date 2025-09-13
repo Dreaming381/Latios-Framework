@@ -19,6 +19,14 @@ namespace Latios
     /// while the second half is an overflow region. There is always one "element" in the overflow region to ensure that if the
     /// buffer were to be trimmed, it could be recovered again. That element may or may not be occupied, and uses the bucket linked
     /// list index as the count of real elements in the hashmap.
+    /// 
+    /// The element in the bucket is the start of a forward-linked list of elements sharing the same mapped bucket (hash modulus collisions), 
+    /// with all other elements in the linked list being in the overflow region. Elements in the linked list should always progress forward
+    /// in the buffer. That is, a linked list of indices 1, 10, 14 is fine, but a linked list of indices 1, 14, 10 is illegal.
+    /// 
+    /// The very last element in the DynamicBuffer uses the linked list pointer to instead hold the count within the hashmap.
+    /// The element may or may not be occupied, as it might exist to conserve the bucket count, which is computed from the ceilPow2
+    /// of the length of the DynamicBuffer.
     /// </remarks>
     /// <typeparam name="TKey"></typeparam>
     /// <typeparam name="TValue"></typeparam>
@@ -420,19 +428,26 @@ namespace Latios
                 {
                     if (!reinserted)
                     {
+                        // We found the candidate pointing to the last element,
+                        // and we know that candidate is before the backfill index
                         candidate.nextIndex     = index;
                         elementToFill           = elementToMove;
                         elementToFill.nextIndex = 0;
                     }
                     else
                     {
+                        // We already moved the last element, so clear the candidate's link.
                         candidate.nextIndex = 0;
                     }
-                    Backfill(m_buffer.Length - 1);
+                    Backfill(m_buffer.Length - 1); // Do the block at the top of this method to erase the last element after we moved it.
                     return;
                 }
-                else if (candidate.nextIndex > index)
+                else if (candidate.nextIndex > index && !reinserted)
                 {
+                    // We found a point where the candidate points to an index past our fill index.
+                    // We reorder the linked list by moving the last element to the fill index, and
+                    // reconnect the linked list. After that, we let the loop run to the last element
+                    // so we can clear the last link.
                     var fillNext            = candidate.nextIndex;
                     candidate.nextIndex     = index;
                     elementToFill           = elementToMove;
@@ -558,9 +573,14 @@ namespace Latios
                             // Start over
                             return TryAdd(in key, in value, replace, out dstIndex);
                         }
-                        last.nextIndex = m_buffer.Length;
+
                         if (candidate.nextIndex == 0)
-                            candidate.nextIndex     = m_buffer.Length;
+                        {
+                            candidate.nextIndex = m_buffer.Length;
+                            last.nextIndex      = 0;
+                        }
+                        else
+                            last.nextIndex          = m_buffer.Length;
                         dstIndex                    = m_buffer.Length;
                         m_buffer.Add(new Pair { key = key, value = value, meta = (uint)m_count | 0x80000000 });
                         IncrementCount();
