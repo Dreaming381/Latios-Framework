@@ -17,7 +17,7 @@ namespace Latios
     {
         #region Structure
         [NativeDisableUnsafePtrRestriction]
-        private UnsafeParallelBlockList* m_prefabSortkeyBlockList;
+        private UnsafeParallelBlockList<PrefabSortkey>* m_prefabSortkeyBlockList;
         [NativeDisableUnsafePtrRestriction]
         private UnsafeParallelBlockList* m_componentDataBlockList;
 
@@ -40,7 +40,7 @@ namespace Latios
             public bool                             playedBack;
         }
 
-        private struct PrefabSortkey : IRadixSortableInt3
+        internal struct PrefabSortkey : IRadixSortableInt3
         {
             public Entity prefab;
             public int    sortKey;
@@ -78,10 +78,10 @@ namespace Latios
                 typesWithData.Add(componentTypesWithData[i].TypeIndex);
             }
             CheckComponentTypesValid(BuildComponentTypesFromFixedList(typesWithData));
-            m_prefabSortkeyBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
+            m_prefabSortkeyBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList<PrefabSortkey> >(allocator, 1);
             m_componentDataBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
             m_state                   = AllocatorManager.Allocate<State>(allocator, 1);
-            *m_prefabSortkeyBlockList = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<PrefabSortkey>(), 256, allocator);
+            *m_prefabSortkeyBlockList = new UnsafeParallelBlockList<PrefabSortkey>(256, allocator);
             *m_componentDataBlockList = new UnsafeParallelBlockList(dataPayloadSize, 256, allocator);
             *m_state                  = new State
             {
@@ -100,7 +100,7 @@ namespace Latios
             public State* state;
 
             [NativeDisableUnsafePtrRestriction]
-            public UnsafeParallelBlockList* prefabSortkeyBlockList;
+            public UnsafeParallelBlockList<PrefabSortkey>* prefabSortkeyBlockList;
             [NativeDisableUnsafePtrRestriction]
             public UnsafeParallelBlockList* componentDataBlockList;
 
@@ -143,7 +143,7 @@ namespace Latios
             Deallocate(m_state, m_prefabSortkeyBlockList, m_componentDataBlockList);
         }
 
-        private static void Deallocate(State* state, UnsafeParallelBlockList* prefabSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList)
+        private static void Deallocate(State* state, UnsafeParallelBlockList<PrefabSortkey>* prefabSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList)
         {
             var allocator = state->allocator;
             prefabSortkeyBlockList->Dispose();
@@ -696,7 +696,7 @@ namespace Latios
         public struct ParallelWriter
         {
             [NativeDisableUnsafePtrRestriction]
-            private UnsafeParallelBlockList* m_prefabSortkeyBlockList;
+            private UnsafeParallelBlockList<PrefabSortkey>* m_prefabSortkeyBlockList;
             [NativeDisableUnsafePtrRestriction]
             private UnsafeParallelBlockList* m_componentDataBlockList;
 
@@ -712,7 +712,7 @@ namespace Latios
             internal static readonly SharedStatic<int> s_staticSafetyId = SharedStatic<int>.GetOrCreate<ParallelWriter>();
 #endif
 
-            internal ParallelWriter(UnsafeParallelBlockList* prefabSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList, void* state)
+            internal ParallelWriter(UnsafeParallelBlockList<PrefabSortkey>* prefabSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList, void* state)
             {
                 m_prefabSortkeyBlockList = prefabSortkeyBlockList;
                 m_componentDataBlockList = componentDataBlockList;

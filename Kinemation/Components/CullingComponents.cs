@@ -28,6 +28,14 @@ namespace Latios.Kinemation
     public struct UsedOnlyForCustomGraphicsTag : IComponentData { }
 
     /// <summary>
+    /// Add this component to entities when you can promise that all entities within the chunk will use the exact
+    /// same MaterialMeshInfo values (excluding LOD Pack). This can usually be enforced through the use of
+    /// ISharedComponentData. Promising this may unlock some optimizations with rendering a large amount of
+    /// distant entities using the same MaterialMeshInfo data.
+    /// </summary>
+    public struct PromiseAllEntitiesInChunkUseSameMaterialMeshInfoTag : IComponentData { }
+
+    /// <summary>
     /// Contains the visibility mask for the current camera culling pass
     /// Usage: Read or Write
     /// This is a chunk component and also a WriteGroup target.

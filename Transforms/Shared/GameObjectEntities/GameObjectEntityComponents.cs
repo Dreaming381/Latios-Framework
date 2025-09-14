@@ -6,7 +6,13 @@ using Unity.Mathematics;
 namespace Latios.Transforms
 {
     #region Components
-    // Todo: Change GameObjectEntity to an ICleanupComponentData. Avoiding now due to risk and infrequent use.
+    /// <summary>
+    /// Contains a UnityObjectRef to the associated GameObject.
+    /// </summary>
+    public struct GameObjectEntityUnmanaged : IComponentData
+    {
+        public UnityObjectRef<UnityEngine.GameObject> gameObject;
+    }
 
     /// <summary>
     /// Contains a reference to the GameObject's Transform, which is a general-purpose access

@@ -34,8 +34,6 @@ namespace Latios.Kinemation.Systems
         EntityQuery m_deadSkinnedMeshesQuery;
         EntityQuery m_newCopyDeformQuery;
         EntityQuery m_deadCopyDeformQuery;
-        EntityQuery m_disableComputeDeformQuery;
-        EntityQuery m_enableComputeDeformQuery;
         EntityQuery m_meshesWithReinitQuery;
 
         EntityQuery m_newSkeletonsQuery;
@@ -86,9 +84,6 @@ namespace Latios.Kinemation.Systems
             m_deadSkinnedMeshesQuery = state.Fluent().With<SkeletonDependent>().Without<MeshDeformDataBlobReference>().Build();
             m_newCopyDeformQuery     = state.Fluent().With<CopyDeformFromEntity>(true).Without<ChunkCopyDeformTag>(true).Build();
             m_deadCopyDeformQuery    = state.Fluent().With<ChunkCopyDeformTag>(false, true).Without<CopyDeformFromEntity>().Build();
-
-            m_disableComputeDeformQuery = state.Fluent().With<DisableComputeShaderProcessingTag>(true).With<ChunkSkinningCullingTag>(false, true).Build();
-            m_enableComputeDeformQuery  = state.Fluent().With<SkeletonDependent>(true).Without<DisableComputeShaderProcessingTag>().Without<ChunkSkinningCullingTag>(true).Build();
 
             m_meshesWithReinitQuery = state.Fluent().With<BoundMeshNeedsReinit>().Build();
 
@@ -176,18 +171,18 @@ namespace Latios.Kinemation.Systems
 
             var allocator = state.WorldUpdateAllocator;
 
-            UnsafeParallelBlockList bindingOpsBlockList           = default;
-            UnsafeParallelBlockList meshAddOpsBlockList           = default;
-            UnsafeParallelBlockList meshRemoveOpsBlockList        = default;
-            UnsafeParallelBlockList skinnedMeshAddOpsBlockList    = default;
-            UnsafeParallelBlockList skinnedMeshRemoveOpsBlockList = default;
+            UnsafeParallelBlockList<BindUnbindOperation>        bindingOpsBlockList           = default;
+            UnsafeParallelBlockList<MeshAddOperation>           meshAddOpsBlockList           = default;
+            UnsafeParallelBlockList<MeshRemoveOperation>        meshRemoveOpsBlockList        = default;
+            UnsafeParallelBlockList<SkinnedMeshAddOperation>    skinnedMeshAddOpsBlockList    = default;
+            UnsafeParallelBlockList<SkinnedMeshRemoveOperation> skinnedMeshRemoveOpsBlockList = default;
             if (haveNewDeformMeshes | haveDeadDeformMeshes | haveBindableMeshes)
             {
-                bindingOpsBlockList           = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<BindUnbindOperation>(), 128, allocator);
-                meshAddOpsBlockList           = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<SkinnedMeshAddOperation>(), 128, allocator);
-                meshRemoveOpsBlockList        = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<SkinnedMeshRemoveOperation>(), 128, allocator);
-                skinnedMeshAddOpsBlockList    = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<SkinnedMeshAddOperation>(), 128, allocator);
-                skinnedMeshRemoveOpsBlockList = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<SkinnedMeshRemoveOperation>(), 128, allocator);
+                bindingOpsBlockList           = new UnsafeParallelBlockList<BindUnbindOperation>(128, allocator);
+                meshAddOpsBlockList           = new UnsafeParallelBlockList<MeshAddOperation>(128, allocator);
+                meshRemoveOpsBlockList        = new UnsafeParallelBlockList<MeshRemoveOperation>(128, allocator);
+                skinnedMeshAddOpsBlockList    = new UnsafeParallelBlockList<SkinnedMeshAddOperation>(128, allocator);
+                skinnedMeshRemoveOpsBlockList = new UnsafeParallelBlockList<SkinnedMeshRemoveOperation>(128, allocator);
             }
 
             MeshGpuManager             meshGpuManager        = default;
@@ -363,7 +358,6 @@ namespace Latios.Kinemation.Systems
                 state.EntityManager.RemoveComponent<BoundMeshNeedsReinit>(m_meshesWithReinitQuery);
                 state.EntityManager.RemoveComponent(                      m_deadSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
                                                                                                                          ComponentType.ReadWrite<SkeletonDependent>(),
-                                                                                                                         ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>(),
                                                                                                                          ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
                 // If Socket somehow gets added by accident, we might as well remove it.
@@ -380,18 +374,15 @@ namespace Latios.Kinemation.Systems
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<SkeletonDependent>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadOnly<CopyParentWorldTransformTag>());
                 skinnedMeshAddTypes.Add(ParentReadWriteAspect.componentType);
-                skinnedMeshAddTypes.Add(ComponentType.ChunkComponentReadOnly<ChunkSkinningCullingTag>());
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformPrefixSums>());
 
                 state.EntityManager.AddComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(in skinnedMeshAddTypes));
 
                 state.EntityManager.RemoveComponent(m_deadDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
                                                                                                   ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
-                state.EntityManager.AddComponent( m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
-                                                                                               ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
+                state.EntityManager.AddComponent(                           m_newDeformMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<BoundMesh>(),
+                                                                                                                         ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
-                state.EntityManager.AddChunkComponentData<ChunkSkinningCullingTag>(m_enableComputeDeformQuery, default);
-                state.EntityManager.RemoveChunkComponentData<ChunkSkinningCullingTag>(m_disableComputeDeformQuery);
                 state.EntityManager.AddComponent<PreviousPostProcessMatrix>(m_newPreviousPostProcessMatrixQuery);
 
                 state.EntityManager.RemoveComponent(m_deadCopyDeformQuery, ComponentType.ChunkComponent<ChunkCopyDeformTag>());
@@ -411,32 +402,21 @@ namespace Latios.Kinemation.Systems
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedBoneTransform>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonState>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonTag>());
-                optimizedTypes.Add(ComponentType.ReadWrite<OptimizedSkeletonWorldBounds>());
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedBoneBounds>());
-                optimizedTypes.Add(ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingMask>());
-                optimizedTypes.Add(ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingSplitsMask>());
-                optimizedTypes.Add(ComponentType.ChunkComponent<ChunkOptimizedSkeletonWorldBounds>());
+                optimizedTypes.Add(ComponentType.ReadWrite<SkeletonWorldBoundsOffsetsFromPosition>());
 
                 state.EntityManager.RemoveComponent( m_deadOptimizedSkeletonsQuery, new ComponentTypeSet(optimizedTypes));
-                state.EntityManager.RemoveComponent( m_deadExposedSkeletonsQuery,
-                                                     new ComponentTypeSet(ComponentType.ReadWrite<ExposedSkeletonCullingIndex>(),
-                                                                          ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingMask>(),
-                                                                          ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingSplitsMask>()));
-                state.EntityManager.RemoveComponent(m_deadSkeletonsQuery, new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>(),
-                                                                                               ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>()));
+                state.EntityManager.RemoveComponent( m_deadExposedSkeletonsQuery,   new ComponentTypeSet(ComponentType.ReadWrite<ExposedSkeletonCullingIndex>()));
+                state.EntityManager.RemoveComponent( m_deadSkeletonsQuery,          new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>()));
 
                 optimizedTypes.Add(ComponentType.ReadWrite<DependentSkinnedMesh>());
-                optimizedTypes.Add(ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>());
 
                 state.EntityManager.AddComponent(m_newOptimizedSkeletonsQuery, new ComponentTypeSet(optimizedTypes));
                 state.EntityManager.AddComponent(m_newExposedSkeletonsQuery,   new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>(),
-                                                                                                    ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>(),
-                                                                                                    ComponentType.ReadWrite<ExposedSkeletonCullingIndex>(),
-                                                                                                    ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingMask>(),
-                                                                                                    ComponentType.ChunkComponent<ChunkPerCameraSkeletonCullingSplitsMask>()));
+                                                                                                    ComponentType.ReadWrite<SkeletonWorldBoundsOffsetsFromPosition>(),
+                                                                                                    ComponentType.ReadWrite<ExposedSkeletonCullingIndex>()));
 
-                state.EntityManager.AddComponent(m_newSkeletonsQuery, new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>(),
-                                                                                           ComponentType.ReadWrite<SkeletonBoundsOffsetFromMeshes>()));
+                state.EntityManager.AddComponent(m_newSkeletonsQuery, new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>()));
             }
 
             if (haveNewExposedSkeletons | haveDeadExposedSkeletons | haveDeadExposedSkeletons2 | haveNewDeformMeshes | haveBindableMeshes | haveDeadDeformMeshes)
@@ -655,10 +635,10 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<BoundMesh>         boundMeshHandle;
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent> depsHandle;
 
-            public UnsafeParallelBlockList bindingOpsBlockList;
-            public UnsafeParallelBlockList meshRemoveOpsBlockList;
-            public UnsafeParallelBlockList skinnedMeshRemoveOpsBlockList;
-            [NativeSetThreadIndex] int     m_nativeThreadIndex;
+            public UnsafeParallelBlockList<BindUnbindOperation>        bindingOpsBlockList;
+            public UnsafeParallelBlockList<MeshRemoveOperation>        meshRemoveOpsBlockList;
+            public UnsafeParallelBlockList<SkinnedMeshRemoveOperation> skinnedMeshRemoveOpsBlockList;
+            [NativeSetThreadIndex] int                                 m_nativeThreadIndex;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -726,10 +706,10 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<MeshBindingPathsBlobReference> pathBindingsBlobRefHandle;
             [ReadOnly] public BufferTypeHandle<OverrideSkinningBoneIndex>        overrideBonesHandle;
 
-            public UnsafeParallelBlockList bindingOpsBlockList;
-            public UnsafeParallelBlockList meshAddOpsBlockList;
-            public UnsafeParallelBlockList skinnedMeshAddOpsBlockList;
-            [NativeSetThreadIndex] int     m_nativeThreadIndex;
+            public UnsafeParallelBlockList<BindUnbindOperation>     bindingOpsBlockList;
+            public UnsafeParallelBlockList<MeshAddOperation>        meshAddOpsBlockList;
+            public UnsafeParallelBlockList<SkinnedMeshAddOperation> skinnedMeshAddOpsBlockList;
+            [NativeSetThreadIndex] int                              m_nativeThreadIndex;
 
             public Allocator allocator;
 
@@ -952,8 +932,8 @@ namespace Latios.Kinemation.Systems
 
             [ReadOnly] public ComponentTypeHandle<BoundMeshNeedsReinit> needsReinitHandle;
 
-            public UnsafeParallelBlockList meshRemoveOpsBlockList;
-            public UnsafeParallelBlockList skinnedMeshRemoveOpsBlockList;
+            public UnsafeParallelBlockList<MeshRemoveOperation>        meshRemoveOpsBlockList;
+            public UnsafeParallelBlockList<SkinnedMeshRemoveOperation> skinnedMeshRemoveOpsBlockList;
 
             public uint lastSystemVersion;
 
@@ -1111,9 +1091,9 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct BatchBindingOpsJob : IJob
         {
-            [NativeDisableUnsafePtrRestriction] public UnsafeParallelBlockList bindingsBlockList;
-            public NativeList<BindUnbindOperation>                             operations;
-            public NativeList<int2>                                            startsAndCounts;
+            [NativeDisableUnsafePtrRestriction] public UnsafeParallelBlockList<BindUnbindOperation> bindingsBlockList;
+            public NativeList<BindUnbindOperation>                                                  operations;
+            public NativeList<int2>                                                                 startsAndCounts;
 
             public void Execute()
             {
@@ -1142,12 +1122,12 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct ProcessMeshGpuChangesJob : IJob
         {
-            public UnsafeParallelBlockList meshAddOpsBlockList;
-            public UnsafeParallelBlockList meshRemoveOpsBlockList;
-            public UnsafeParallelBlockList skinnedMeshAddOpsBlockList;
-            public UnsafeParallelBlockList skinnedMeshRemoveOpsBlockList;
-            public MeshGpuManager          meshManager;
-            public BoneOffsetsGpuManager   boneManager;
+            public UnsafeParallelBlockList<MeshAddOperation>           meshAddOpsBlockList;
+            public UnsafeParallelBlockList<MeshRemoveOperation>        meshRemoveOpsBlockList;
+            public UnsafeParallelBlockList<SkinnedMeshAddOperation>    skinnedMeshAddOpsBlockList;
+            public UnsafeParallelBlockList<SkinnedMeshRemoveOperation> skinnedMeshRemoveOpsBlockList;
+            public MeshGpuManager                                      meshManager;
+            public BoneOffsetsGpuManager                               boneManager;
 
             public NativeList<MeshWriteStateOperation>        outputWriteOps;
             public NativeList<SkinnedMeshWriteStateOperation> outputSkinnedWriteOps;
@@ -1744,7 +1724,6 @@ namespace Latios.Kinemation.Systems
                             meshBindPosesStart = meshEntry.bindPosesStart,
                             boneOffsetsCount   = boneOffsetsEntry.count,
                             boneOffsetsStart   = boneOffsetsEntry.start,
-                            meshRadialOffset   = 0f,
                         });
                         needsAddBoundsUpdate = true;
                     }

@@ -241,7 +241,6 @@ namespace Latios.Kinemation.Systems
             worldBlackboardEntity.AddComponent<DispatchContext>();
             worldBlackboardEntity.AddBuffer<CullingPlane>();
             worldBlackboardEntity.AddBuffer<CullingSplitElement>();
-            worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new PackedCullingSplits { packedSplits = new NativeReference<CullingSplits>(Allocator.Persistent) });
             worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new BrgCullingContext());
             worldBlackboardEntity.AddBuffer<MaterialPropertyComponentType>();
             worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new MaterialPropertiesUploadContext());
@@ -623,13 +622,8 @@ namespace Latios.Kinemation.Systems
             public NativeParallelHashMap<int, BRGRenderMeshArray>  brgRenderMeshArrays;
             public BatchCullingOutput                              cullingOutput;
 
-            //public ProfilerMarker m_beforeCreateSplitsMarker;
-            //public ProfilerMarker m_createSplitsMarker;
-            //public ProfilerMarker m_afterCreateSplitsMarker;
-
             public bool Do()
             {
-                //m_beforeCreateSplitsMarker.Begin();
                 IncludeExcludeListFilter includeExcludeListFilter = GetPickingIncludeExcludeListFilterForCurrentCullingCallback(entityManager,
                                                                                                                                 batchCullingContext,
                                                                                                                                 wrappedIncludeExcludeList,
@@ -671,15 +665,7 @@ namespace Latios.Kinemation.Systems
                 var splitsBuffer = worldBlackboardEntity.GetBuffer<CullingSplitElement>(false);
                 splitsBuffer.Clear();
                 splitsBuffer.Reinterpret<CullingSplit>().AddRange(batchCullingContext.cullingSplits);
-                var packedSplits = worldBlackboardEntity.GetCollectionComponent<PackedCullingSplits>(false);
-                //m_beforeCreateSplitsMarker.End();
-                //m_createSplitsMarker.Begin();
-                fixed (BatchCullingContext* bcc = &batchCullingContext)
-                {
-                    packedSplits.packedSplits.Value = CullingSplits.Create(bcc, shadowProjection, threadLocalAllocators.GeneralAllocator->Handle);
-                }
-                //m_createSplitsMarker.End();
-                //m_afterCreateSplitsMarker.Begin();
+
                 worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new BrgCullingContext
                 {
                     cullingThreadLocalAllocator                          = threadLocalAllocators,
@@ -693,9 +679,7 @@ namespace Latios.Kinemation.Systems
                     includeExcludeListFilter = includeExcludeListFilter,
 #endif
                 });
-                worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(  default, false);
-                worldBlackboardEntity.UpdateJobDependency<PackedCullingSplits>(default, false);
-                //m_afterCreateSplitsMarker.End();
+                worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>( default, false);
                 return true;
             }
         }
@@ -1228,19 +1212,9 @@ namespace Latios.Kinemation.Systems
                     $"Chunks changed, new chunks: {numNewChunks}, removed batches: {numRemoved}, batch count: {m_ExistingBatchBatchIndices.Count()}, chunk count: {m_MetaEntitiesForHybridRenderableChunks.CalculateEntityCount()}");
 #endif
 
-            Profiler.BeginSample("UpdateGlobalAABB");
-            UpdateGlobalAABB();
-            Profiler.EndSample();
-
             JobHandle outputDeps = drawCommandFlagsUpdated;
 
             return outputDeps;
-        }
-
-        private void UpdateGlobalAABB()
-        {
-            Psyshock.Physics.GetCenterExtents(worldBlackboardEntity.GetComponentData<BrgAabb>().aabb, out var center, out var extents);
-            m_BatchRendererGroup.SetGlobalBounds(new Bounds(center, extents));
         }
 
         private void ComputeUploadSizeRequirements(

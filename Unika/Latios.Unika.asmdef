@@ -3,6 +3,7 @@
     "rootNamespace": "Latios.Unika",
     "references": [
         "GUID:46fe9b4ef94d76744bc0b97bc2f73d94",
+        "GUID:b9c5f905e723bc54eb280c03e635224b",
         "GUID:2665a8d13d1b3f18800f46e256720795",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:734d92eba21c94caba915361bd5ac177",

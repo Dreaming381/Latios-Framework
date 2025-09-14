@@ -12,9 +12,7 @@ namespace Latios.Kinemation
     /// QVVS Transforms: An optional matrix that is applied after computing the final WorldTransform.
     /// It can be used for additional squash, stretch, and shear effects on a renderer.
     ///
-    /// Unity Transforms: An optional matrix used to inform culling that a skinned mesh has
-    /// a different transform than the skeleton root. This transform must be assigned such that
-    /// the skinned mesh's LocalToWorld = math.mul(PostProcessMatrix, skeleton LocalToWorld)
+    /// Unity Transforms: This component is ignored.
     /// </summary>
     /// <remarks>
     /// If you remove this component from an entity which also has a PreviousPostProcessMatrix,
@@ -41,6 +39,18 @@ namespace Latios.Kinemation
     /// This allows you to render multiple materials in a single entity using a runtime-generated mesh.
     /// </summary>
     public struct OverrideMeshInRangeTag : IComponentData { }
+
+    /// <summary>
+    /// An optional component which specifies the equivalent of Renderer.rendererPriority, which dictates
+    /// the rendering order within a Material/Shader RenderQueue. If not present, the value is assumed to be 0.
+    /// Usage: Add/Write as needed
+    /// </summary>
+    /// <remarks>In Unity 6.0 HDRP, this value is only used for transparent objects and user-defined passes that request it.
+    /// In Unity 6.0 URP, this is only used in user-defined passes that request it.</remarks>
+    public struct RendererPriority : IComponentData
+    {
+        public int priority;
+    }
 
     /// <summary></summary>
     /// An optional flag which specifies when a deformed mesh needs to be rebound

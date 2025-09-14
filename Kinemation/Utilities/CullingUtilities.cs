@@ -23,7 +23,6 @@ namespace Latios.Kinemation
             boneTypes.Add(ComponentType.ReadWrite<BoneCullingIndex>());
             boneTypes.Add(ComponentType.ReadWrite<BoneBounds>());
             boneTypes.Add(ComponentType.ReadWrite<BoneWorldBounds>());
-            boneTypes.Add(ComponentType.ChunkComponent<ChunkBoneWorldBounds>());
             return new ComponentTypeSet(boneTypes);
         }
 

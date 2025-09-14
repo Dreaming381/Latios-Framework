@@ -31,9 +31,6 @@ namespace Latios.Kinemation
 
     internal struct BoundMeshNeedsReinit : IComponentData { }
 
-    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
-    internal struct ChunkSkinningCullingTag : IComponentData { }
-
     [MaterialProperty("_ComputeMeshIndex")]
     internal struct LegacyComputeDeformShaderIndex : IComponentData
     {
@@ -70,7 +67,6 @@ namespace Latios.Kinemation
         // Legacy are aliases/combinations of these
     }
 
-    [WriteGroup(typeof(ChunkPerCameraCullingMask))]
     internal struct ChunkCopyDeformTag : IComponentData { }
 
     internal struct TrackedUniqueMesh : ICleanupComponentData
@@ -88,18 +84,18 @@ namespace Latios.Kinemation
         {
             public EntityWith<SkeletonDependent> skinnedMesh;
             // Todo: Store entry indices instead?
-            public uint  meshVerticesStart;
-            public uint  meshWeightsStart;
-            public uint  meshBindPosesStart;
-            public uint  boneOffsetsCount;
-            public uint  boneOffsetsStart;
-            public float meshRadialOffset;
+            public uint meshVerticesStart;
+            public uint meshWeightsStart;
+            public uint meshBindPosesStart;
+            public uint boneOffsetsCount;
+            public uint boneOffsetsStart;
         }
     }
 
-    internal struct SkeletonBoundsOffsetFromMeshes : IComponentData
+    internal struct SkeletonWorldBoundsOffsetsFromPosition : IComponentData
     {
-        public float radialBoundsInWorldSpace;
+        public float3 minOffset;
+        public float3 maxOffset;
     }
 
     // Exposed skeletons
@@ -123,32 +119,17 @@ namespace Latios.Kinemation
         public Aabb bounds;
     }
 
-    internal struct ChunkBoneWorldBounds : IComponentData
-    {
-        public AABB chunkBounds;
-    }
-
     // Optimized skeletons
 
     // There's currently no other system state for optimized skeletons, so we need something
     // to track conversions between skeleton types.
     internal struct OptimizedSkeletonTag : ICleanupComponentData { }
 
-    internal struct OptimizedSkeletonWorldBounds : IComponentData
-    {
-        public AABB bounds;
-    }
-
     // The length of this should be 0 when no meshes are bound.
     [InternalBufferCapacity(0)]
     internal struct OptimizedBoneBounds : IBufferElementData
     {
         public float radialOffsetInBoneSpace;
-    }
-
-    internal struct ChunkOptimizedSkeletonWorldBounds : IComponentData
-    {
-        public AABB chunkBounds;
     }
     #endregion
 
@@ -354,20 +335,6 @@ namespace Latios.Kinemation
         }
     }
 
-    internal partial struct PackedCullingSplits : ICollectionComponent
-    {
-        public NativeReference<CullingSplits> packedSplits;
-
-        public JobHandle TryDispose(JobHandle inputDeps)
-        {
-            // The collections inside packedSplits is managed by a RewindableAllocator,
-            // but the NativeReference is allocated persistently.
-            if (packedSplits.IsCreated)
-                return packedSplits.Dispose(inputDeps);
-            return inputDeps;
-        }
-    }
-
     internal struct MaxRequiredDeformData : IComponentData
     {
         public uint maxRequiredBoneTransformsForVertexSkinning;
@@ -386,31 +353,6 @@ namespace Latios.Kinemation
             // We don't own this data
             return inputDeps;
         }
-    }
-
-    internal partial struct ExposedSkeletonBoundsArrays : ICollectionComponent
-    {
-        public NativeList<AABB>  allAabbs;
-        public NativeList<AABB>  batchedAabbs;
-        public NativeList<AABB>  allAabbsPreOffset;
-        public NativeList<float> meshOffsets;
-        public const int         kCountPerBatch = 32;  // Todo: Is there a better size?
-
-        public JobHandle TryDispose(JobHandle inputDeps)
-        {
-            if (!allAabbs.IsCreated)
-                return inputDeps;
-
-            inputDeps = allAabbs.Dispose(inputDeps);
-            inputDeps = allAabbsPreOffset.Dispose(inputDeps);
-            inputDeps = meshOffsets.Dispose(inputDeps);
-            return batchedAabbs.Dispose(inputDeps);
-        }
-    }
-
-    internal struct BrgAabb : IComponentData
-    {
-        public Aabb aabb;
     }
 
     // Int because this will grow in the future and it would be great to not have a regression
@@ -440,28 +382,6 @@ namespace Latios.Kinemation
     internal partial struct DeformClassificationMap : ICollectionComponent
     {
         public NativeParallelHashMap<ArchetypeChunk, DeformClassification> deformClassificationMap;
-
-        // The data is owned by a world or system rewindable allocator.
-        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
-    }
-
-    internal partial struct LODCrossfadePtrMap : ICollectionComponent
-    {
-        public unsafe struct CrossfadePtr { public LodCrossfade* ptr; }
-        public struct ChunkIdentifier : IEquatable<ChunkIdentifier>
-        {
-            public uint batchID;
-            public int  batchStartIndex;
-
-            bool IEquatable<ChunkIdentifier>.Equals(ChunkIdentifier other)
-            {
-                return batchID.Equals(other.batchID) && batchStartIndex.Equals(other.batchStartIndex);
-            }
-
-            public override int GetHashCode() => new int2(math.asint(batchID), batchStartIndex).GetHashCode();
-        }
-
-        public NativeHashMap<ChunkIdentifier, CrossfadePtr> chunkIdentifierToPtrMap;
 
         // The data is owned by a world or system rewindable allocator.
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;

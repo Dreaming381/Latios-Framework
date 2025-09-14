@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Latios.Calci;
+using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {

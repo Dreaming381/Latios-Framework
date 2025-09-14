@@ -4,11 +4,11 @@
     "references": [
         "Latios.Core",
         "Latios.Transforms",
+        "Latios.Calci",
         "Unity.Audio.DSPGraph",
         "Unity.Burst",
         "Unity.Collections",
         "Unity.Entities",
-        "Unity.Jobs",
         "Unity.Mathematics",
         "Unity.Media.Utilities",
         "Unity.Entities.Hybrid"

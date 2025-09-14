@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
@@ -271,65 +272,184 @@ namespace Latios.Kinemation
             return false;
         }
 
-        void PropagatePositionChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, in TransformQvvs rootTransform, int currentRootBaseIndex, int changedBoneIndex)
+        struct ParentChild
         {
-            ref var children = ref childrenIndicesBlob[changedBoneIndex];
-            for (int i = 0; i < children.Length; i++)
+            public short parent;
+            public short child;
+        }
+
+        ref struct PropagationQueue
+        {
+            Span<ParentChild> m_queue;
+            int               m_next;
+            int               m_count;
+
+            public PropagationQueue(Span<ParentChild> buffer)
             {
-                var     childIndex          = children[i];
-                ref var local               = ref m_boneTransforms.ElementAt(currentRootBaseIndex + m_boneCount + childIndex);
-                ref var root                = ref m_boneTransforms.ElementAt(currentRootBaseIndex + childIndex);
-                root.boneTransform.position = qvvs.TransformPoint(in rootTransform, local.boneTransform.position);
-                PropagatePositionChangeToChildren(ref childrenIndicesBlob, in root.boneTransform, currentRootBaseIndex, childIndex);
+                m_queue = buffer;
+                m_next  = 0;
+                m_count = 0;
+            }
+
+            public void EnqueueChildren(int parentIndex, ref BlobArray<BlobArray<short> > childrenIndicesBlob)
+            {
+                short   parent   = (short)parentIndex;
+                ref var children = ref childrenIndicesBlob[parentIndex];
+                for (int i = 0; i < children.Length; i++)
+                {
+                    m_queue[m_next + i] = new ParentChild { parent = parent, child = children[i] };
+                }
+                m_count += children.Length;
+            }
+
+            public bool TryDequeue(out ParentChild result)
+            {
+                if (m_count == 0)
+                {
+                    result = default;
+                    return false;
+                }
+
+                result = m_queue[m_next];
+                m_count--;
+                m_next++;
+                return true;
             }
         }
 
-        void PropagateRotationChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, in TransformQvvs rootTransform, int currentRootBaseIndex, int changedBoneIndex)
+        void PropagatePositionChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, int currentRootBaseIndex, int changedBoneIndex)
         {
-            ref var children = ref childrenIndicesBlob[changedBoneIndex];
-            for (int i = 0; i < children.Length; i++)
+            var queue = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - changedBoneIndex]);
+            queue.EnqueueChildren(changedBoneIndex, ref childrenIndicesBlob);
+            var bones = m_boneTransforms.AsNativeArray().AsSpan();
+            while (queue.TryDequeue(out var parentChild))
             {
-                var     childIndex          = children[i];
-                ref var local               = ref m_boneTransforms.ElementAt(currentRootBaseIndex + m_boneCount + childIndex);
-                ref var root                = ref m_boneTransforms.ElementAt(currentRootBaseIndex + childIndex);
-                root.boneTransform.position = qvvs.TransformPoint(in rootTransform, local.boneTransform.position);
-                root.boneTransform.rotation = qvvs.TransformRotation(in rootTransform, local.boneTransform.rotation);
-                PropagateRotationChangeToChildren(ref childrenIndicesBlob, in root.boneTransform, currentRootBaseIndex, childIndex);
+                ref var childLocal               = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                ref var childRoot                = ref bones[currentRootBaseIndex + parentChild.child];
+                ref var parentRoot               = ref bones[currentRootBaseIndex + parentChild.parent];
+                childRoot.boneTransform.position = qvvs.TransformPoint(in parentRoot.boneTransform, childLocal.boneTransform.position);
+                queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
             }
         }
 
-        void PropagateScaleChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, in TransformQvvs rootTransform, int currentRootBaseIndex, int changedBoneIndex)
+        void PropagateRotationChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, int currentRootBaseIndex, int changedBoneIndex)
         {
-            ref var children = ref childrenIndicesBlob[changedBoneIndex];
-            for (int i = 0; i < children.Length; i++)
+            var queue = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - changedBoneIndex]);
+            queue.EnqueueChildren(changedBoneIndex, ref childrenIndicesBlob);
+            var bones = m_boneTransforms.AsNativeArray().AsSpan();
+            while (queue.TryDequeue(out var parentChild))
             {
-                var     childIndex          = children[i];
-                ref var local               = ref m_boneTransforms.ElementAt(currentRootBaseIndex + m_boneCount + childIndex);
-                ref var root                = ref m_boneTransforms.ElementAt(currentRootBaseIndex + childIndex);
-                root.boneTransform.position = qvvs.TransformPoint(in rootTransform, local.boneTransform.position);
-                root.boneTransform.scale    = qvvs.TransformScale(in rootTransform, local.boneTransform.scale);
-                PropagateScaleChangeToChildren(ref childrenIndicesBlob, in root.boneTransform, currentRootBaseIndex, childIndex);
+                ref var childLocal               = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                ref var childRoot                = ref bones[currentRootBaseIndex + parentChild.child];
+                ref var parentRoot               = ref bones[currentRootBaseIndex + parentChild.parent];
+                childRoot.boneTransform.position = qvvs.TransformPoint(in parentRoot.boneTransform, childLocal.boneTransform.position);
+                childRoot.boneTransform.rotation = qvvs.TransformRotation(in parentRoot.boneTransform, childLocal.boneTransform.rotation);
+                queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
             }
         }
 
-        void PropagateStretchChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, in TransformQvvs rootTransform, int currentRootBaseIndex, int changedBoneIndex)
+        void PropagateScaleChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, int currentRootBaseIndex, int changedBoneIndex)
+        {
+            var queue = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - changedBoneIndex]);
+            queue.EnqueueChildren(changedBoneIndex, ref childrenIndicesBlob);
+            var bones = m_boneTransforms.AsNativeArray().AsSpan();
+            while (queue.TryDequeue(out var parentChild))
+            {
+                ref var childLocal               = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                ref var childRoot                = ref bones[currentRootBaseIndex + parentChild.child];
+                ref var parentRoot               = ref bones[currentRootBaseIndex + parentChild.parent];
+                childRoot.boneTransform.position = qvvs.TransformPoint(in parentRoot.boneTransform, childLocal.boneTransform.position);
+                childRoot.boneTransform.scale    = qvvs.TransformScale(in parentRoot.boneTransform, childLocal.boneTransform.scale);
+                queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
+            }
+        }
+
+        void PropagateStretchChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, int currentRootBaseIndex, int changedBoneIndex)
         {
             // Stretch affects children root positions, so that is all we have to update.
-            PropagatePositionChangeToChildren(ref childrenIndicesBlob, in rootTransform, currentRootBaseIndex, changedBoneIndex);
+            PropagatePositionChangeToChildren(ref childrenIndicesBlob, currentRootBaseIndex, changedBoneIndex);
         }
 
-        void PropagateTransformChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, in TransformQvvs rootTransform, int currentRootBaseIndex,
-                                                int changedBoneIndex)
+        void PropagateTransformChangeToChildren(ref BlobArray<BlobArray<short> > childrenIndicesBlob, int currentRootBaseIndex, int changedBoneIndex)
         {
-            ref var children = ref childrenIndicesBlob[changedBoneIndex];
-            for (int i = 0; i < children.Length; i++)
+            var queue = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - changedBoneIndex]);
+            queue.EnqueueChildren(changedBoneIndex, ref childrenIndicesBlob);
+            var bones = m_boneTransforms.AsNativeArray().AsSpan();
+            while (queue.TryDequeue(out var parentChild))
             {
-                var     childIndex = children[i];
-                ref var local      = ref m_boneTransforms.ElementAt(currentRootBaseIndex + m_boneCount + childIndex);
-                ref var root       = ref m_boneTransforms.ElementAt(currentRootBaseIndex + childIndex);
-                root.boneTransform = qvvs.mul(in rootTransform, local.boneTransform);
-                PropagateTransformChangeToChildren(ref childrenIndicesBlob, in root.boneTransform, currentRootBaseIndex, childIndex);
+                ref var childLocal      = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                ref var childRoot       = ref bones[currentRootBaseIndex + parentChild.child];
+                ref var parentRoot      = ref bones[currentRootBaseIndex + parentChild.parent];
+                childRoot.boneTransform = qvvs.mul(in parentRoot.boneTransform, childLocal.boneTransform);
+                queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
             }
+        }
+
+        internal void ApplyRootTransformChanges(Span<TransformQvvs> rootTransformsWithIndices, int currentRootBaseIndex)
+        {
+            rootTransformsWithIndices.Sort(new TransformWithIndicesComparer());
+            var     firstChangedBoneIndex = rootTransformsWithIndices[0].worldIndex;
+            ref var childrenIndicesBlob   = ref m_allChildrenIndices;
+            ref var parentIndicesBlob     = ref m_skeletonHierarchyBlobRef.ValueRO.blob.Value.parentIndices;
+            var     queue                 = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - firstChangedBoneIndex]);
+            int     transformSpanIndex    = 0;
+            var     bones                 = m_boneTransforms.AsNativeArray().AsSpan();
+            while (true)
+            {
+                var hasDirtyTransform = transformSpanIndex < rootTransformsWithIndices.Length;
+                var hasNextChild      = queue.TryDequeue(out var parentChild);
+                if (!hasDirtyTransform && !hasNextChild)
+                    return;
+
+                var nextTransformBoneIndex = hasDirtyTransform ? rootTransformsWithIndices[transformSpanIndex].worldIndex : childrenIndicesBlob.Length;
+                var nextChildIndex         = math.select(childrenIndicesBlob.Length, parentChild.child, hasNextChild);
+                if (nextChildIndex < nextTransformBoneIndex)
+                {
+                    // Do normal propagate from parent
+                    ref var childLocal      = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                    ref var childRoot       = ref bones[currentRootBaseIndex + parentChild.child];
+                    ref var parentRoot      = ref bones[currentRootBaseIndex + parentChild.parent];
+                    childRoot.boneTransform = qvvs.mul(in parentRoot.boneTransform, childLocal.boneTransform);
+                    queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
+                }
+                else if (nextChildIndex > nextTransformBoneIndex)
+                {
+                    // We have encountered one of our changed bones.
+                    // If it is the root, we need to not propagate.
+                    if (nextTransformBoneIndex == 0)
+                    {
+                        bones[currentRootBaseIndex + m_boneCount].boneTransform = rootTransformsWithIndices[nextTransformBoneIndex];
+                        bones[currentRootBaseIndex].boneTransform               = rootTransformsWithIndices[nextTransformBoneIndex];
+                    }
+                    else
+                    {
+                        // Recompute the local transform
+                        ref var childLocal       = ref bones[currentRootBaseIndex + m_boneCount + nextTransformBoneIndex];
+                        ref var childRoot        = ref bones[currentRootBaseIndex + nextTransformBoneIndex];
+                        ref var parentRoot       = ref bones[currentRootBaseIndex + parentIndicesBlob[nextTransformBoneIndex]];
+                        childRoot.boneTransform  = rootTransformsWithIndices[nextTransformBoneIndex];
+                        childLocal.boneTransform = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
+                        queue.EnqueueChildren(nextTransformBoneIndex, ref childrenIndicesBlob);
+                    }
+                    transformSpanIndex++;
+                }
+                else
+                {
+                    // The changed bone is the same as the next propagated child
+                    ref var childLocal       = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                    ref var childRoot        = ref bones[currentRootBaseIndex + parentChild.child];
+                    ref var parentRoot       = ref bones[currentRootBaseIndex + parentChild.parent];
+                    childRoot.boneTransform  = rootTransformsWithIndices[nextTransformBoneIndex];
+                    childLocal.boneTransform = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
+                    queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
+                    transformSpanIndex++;
+                }
+            }
+        }
+
+        struct TransformWithIndicesComparer : IComparer<TransformQvvs>
+        {
+            public int Compare(TransformQvvs x, TransformQvvs y) => x.worldIndex.CompareTo(y.worldIndex);
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]

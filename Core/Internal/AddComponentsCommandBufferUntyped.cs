@@ -17,7 +17,7 @@ namespace Latios
     {
         #region Structure
         [NativeDisableUnsafePtrRestriction]
-        private UnsafeParallelBlockList* m_targetSortkeyBlockList;
+        private UnsafeParallelBlockList<TargetSortkey>* m_targetSortkeyBlockList;
         [NativeDisableUnsafePtrRestriction]
         private UnsafeParallelBlockList* m_componentDataBlockList;
 
@@ -41,7 +41,7 @@ namespace Latios
             public bool                                   playedBack;
         }
 
-        private struct TargetSortkey : IRadixSortableInt
+        internal struct TargetSortkey : IRadixSortableInt
         {
             public Entity target;
             public int    sortKey;
@@ -89,10 +89,10 @@ namespace Latios
                 var set = new ComponentTypeSet(list);
                 CheckComponentTypesValid(set);
             }
-            m_targetSortkeyBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
+            m_targetSortkeyBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList<TargetSortkey> >(allocator, 1);
             m_componentDataBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
             m_state                   = AllocatorManager.Allocate<State>(allocator, 1);
-            *m_targetSortkeyBlockList = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<TargetSortkey>(), 256, allocator);
+            *m_targetSortkeyBlockList = new UnsafeParallelBlockList<TargetSortkey>(256, allocator);
             *m_componentDataBlockList = new UnsafeParallelBlockList(dataPayloadSize, 256, allocator);
             *m_state                  = new State
             {
@@ -112,7 +112,7 @@ namespace Latios
             public State* state;
 
             [NativeDisableUnsafePtrRestriction]
-            public UnsafeParallelBlockList* targetSortkeyBlockList;
+            public UnsafeParallelBlockList<TargetSortkey>* targetSortkeyBlockList;
             [NativeDisableUnsafePtrRestriction]
             public UnsafeParallelBlockList* componentDataBlockList;
 
@@ -155,7 +155,7 @@ namespace Latios
             Deallocate(m_state, m_targetSortkeyBlockList, m_componentDataBlockList);
         }
 
-        private static void Deallocate(State* state, UnsafeParallelBlockList* targetSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList)
+        private static void Deallocate(State* state, UnsafeParallelBlockList<TargetSortkey>* targetSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList)
         {
             var allocator = state->allocator;
             targetSortkeyBlockList->Dispose();
@@ -743,7 +743,7 @@ namespace Latios
         public struct ParallelWriter
         {
             [NativeDisableUnsafePtrRestriction]
-            private UnsafeParallelBlockList* m_targetSortkeyBlockList;
+            private UnsafeParallelBlockList<TargetSortkey>* m_targetSortkeyBlockList;
             [NativeDisableUnsafePtrRestriction]
             private UnsafeParallelBlockList* m_componentDataBlockList;
 
@@ -759,7 +759,7 @@ namespace Latios
             internal static readonly SharedStatic<int> s_staticSafetyId = SharedStatic<int>.GetOrCreate<ParallelWriter>();
 #endif
 
-            internal ParallelWriter(UnsafeParallelBlockList* targetSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList, void* state)
+            internal ParallelWriter(UnsafeParallelBlockList<TargetSortkey>* targetSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList, void* state)
             {
                 m_targetSortkeyBlockList = targetSortkeyBlockList;
                 m_componentDataBlockList = componentDataBlockList;

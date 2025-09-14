@@ -18,7 +18,7 @@ namespace Latios
     {
         #region Structure
         [NativeDisableUnsafePtrRestriction]
-        private UnsafeParallelBlockList* m_blockList;
+        private UnsafeParallelBlockList<EntityWithOperation>* m_blockList;
 
         [NativeDisableUnsafePtrRestriction]
         private State* m_state;
@@ -34,7 +34,7 @@ namespace Latios
             public AllocatorManager.AllocatorHandle allocator;
         }
 
-        private struct EntityWithOperation : IRadixSortableInt, IRadixSortableInt3
+        internal struct EntityWithOperation : IRadixSortableInt, IRadixSortableInt3
         {
             public Entity entity;
             public int    sortKey;
@@ -67,9 +67,9 @@ namespace Latios
             AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(m_Safety, true);
 #endif
 
-            m_blockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
+            m_blockList  = AllocatorManager.Allocate<UnsafeParallelBlockList<EntityWithOperation> >(allocator, 1);
             m_state      = AllocatorManager.Allocate<State>(allocator, 1);
-            *m_blockList = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<EntityWithOperation>(), 256, allocator);
+            *m_blockList = new UnsafeParallelBlockList<EntityWithOperation>(256, allocator);
             *m_state     = new State
             {
                 allocator = allocator,
@@ -83,7 +83,7 @@ namespace Latios
             public State* state;
 
             [NativeDisableUnsafePtrRestriction]
-            public UnsafeParallelBlockList* blockList;
+            public UnsafeParallelBlockList<EntityWithOperation>* blockList;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             internal AtomicSafetyHandle m_Safety;
@@ -132,7 +132,7 @@ namespace Latios
             m_state     = null;
         }
 
-        private static void Deallocate(State* state, UnsafeParallelBlockList* blockList)
+        private static void Deallocate(State* state, UnsafeParallelBlockList<EntityWithOperation>* blockList)
         {
             var allocator = state->allocator;
             blockList->Dispose();
@@ -404,7 +404,7 @@ namespace Latios
         public struct ParallelWriter
         {
             [NativeDisableUnsafePtrRestriction]
-            private UnsafeParallelBlockList* m_blockList;
+            private UnsafeParallelBlockList<EntityWithOperation>* m_blockList;
 
             [NativeDisableUnsafePtrRestriction]
             private State* m_state;
@@ -418,7 +418,7 @@ namespace Latios
             internal static readonly SharedStatic<int> s_staticSafetyId = SharedStatic<int>.GetOrCreate<ParallelWriter>();
 #endif
 
-            internal ParallelWriter(UnsafeParallelBlockList* blockList, void* state)
+            internal ParallelWriter(UnsafeParallelBlockList<EntityWithOperation>* blockList, void* state)
             {
                 m_blockList   = blockList;
                 m_state       = (State*)state;

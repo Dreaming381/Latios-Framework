@@ -331,11 +331,11 @@ namespace Latios.Psyshock
         /// <param name="substep">The time substep duration</param>
         /// <param name="gravityAgainstContactNormal">The maximum amount of gravity being applied opposite to the contact normal.
         /// You can simply use the magnitude of the gravity vector for this.</param>
-        public static void Update(Span<ContactJacobianContactParameters> perContactParameters, ref ContactJacobianBodyParameters bodyParameters,
-                                  Span<float> perContactImpulses,
-                                  RigidTransform inertialPoseWorldTransformA, in Velocity velocityA, in Mass massA,
-                                  RigidTransform inertialPoseWorldTransformB, in Velocity velocityB, in Mass massB,
-                                  float substep, float gravityAgainstContactNormal)
+        public static void UpdateJacobian(Span<ContactJacobianContactParameters> perContactParameters, ref ContactJacobianBodyParameters bodyParameters,
+                                          Span<float> perContactImpulses,
+                                          RigidTransform inertialPoseWorldTransformA, in Velocity velocityA, in Mass massA,
+                                          RigidTransform inertialPoseWorldTransformB, in Velocity velocityB, in Mass massB,
+                                          float substep, float gravityAgainstContactNormal)
         {
             perContactImpulses.Clear();
 

@@ -1,4 +1,5 @@
-﻿using Unity.Mathematics;
+﻿using Latios.Calci;
+using Unity.Mathematics;
 
 // This file contains Minkowski Portal Refinement algorithms primarily purposed for shapecasting.
 // The implementations here were not derived from any particular reference code.

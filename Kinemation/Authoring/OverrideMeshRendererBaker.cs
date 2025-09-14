@@ -100,6 +100,25 @@ namespace Latios.Kinemation.Authoring
         /// True if the entity should be treated as if it were marked static
         /// </summary>
         public bool isStatic;
+        /// <summary>
+        /// Specifies the rendererPriority the entity will be baked with.
+        /// The runtime component will be omitted if this value is 0.
+        /// </summary>
+        public int rendererPriority;
+        /// <summary>
+        /// If 0 or greater, MeshLodCurve will not be added to the entity, and this
+        /// value will be the initial LOD level.
+        /// </summary>
+        public short overrideMeshLod;
+        /// <summary>
+        /// Represents the post-clamped LOD level bias, if there is no override
+        /// </summary>
+        public float meshLodRendererBias;
+        /// <summary>
+        /// If true, LOD Crossfade will be added for MmiRangeLOD or LOD Group,
+        /// otherwise it will solely be added based on Mesh LOD
+        /// </summary>
+        public bool requireLodCrossfade;
     }
 
     /// <summary>
@@ -392,8 +411,10 @@ namespace Latios.Kinemation.Authoring
         /// <param name="baker">The active baker</param>
         /// <param name="targetEntity">The entity to add the components to</param>
         /// <param name="lodSettings">The LOD settings used to derive the components to bake.</param>
-        public static void BakeLodMaskForEntity(IBaker baker, Entity targetEntity, LodSettings lodSettings)
+        /// <param name="requireLodCrossfade">True if the entity requires LOD crossfade, which should be added to the MeshRendererBakeSettings</param>
+        public static void BakeLodMaskForEntity(IBaker baker, Entity targetEntity, LodSettings lodSettings, out bool requireLodCrossfade)
         {
+            requireLodCrossfade = false;
             if (!lodSettings.Equals(default(LodSettings)))
             {
                 bool negHeight = (lodSettings.lowestResLodLevel & 0x1) == 1;
@@ -414,8 +435,8 @@ namespace Latios.Kinemation.Authoring
                     if (lodSettings.maxScreenHeightPercentAtCrossfadeEdge < 0f)
                         lodSettings.maxScreenHeightPercentAtCrossfadeEdge = half.MaxValueAsHalf;
 
-                    baker.AddComponent<LodCrossfade>(targetEntity);
-                    baker.AddComponent(              targetEntity, new LodHeightPercentagesWithCrossfadeMargins
+                    requireLodCrossfade = true;
+                    baker.AddComponent(targetEntity, new LodHeightPercentagesWithCrossfadeMargins
                     {
                         localSpaceHeight = lodSettings.localHeight,
                         maxCrossFadeEdge = lodSettings.maxScreenHeightPercentAtCrossfadeEdge,
@@ -468,7 +489,7 @@ namespace Latios.Kinemation.Authoring
 
             var entity = GetEntity(TransformUsageFlags.Renderable);
             RenderingBakingTools.GetLOD(this, authoring, out var lodSettings);
-            RenderingBakingTools.BakeLodMaskForEntity(this, entity, lodSettings);
+            RenderingBakingTools.BakeLodMaskForEntity(this, entity, lodSettings, out var requireCrossfade);
 
             int  totalMms        = m_materialsCache.Count;
             var  lodAppend       = GetComponent<LodAppendAuthoring>();
@@ -530,6 +551,33 @@ namespace Latios.Kinemation.Authoring
 
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
+            MmiRange2LodSelect select2Lod = default;
+            MmiRange3LodSelect select3Lod = default;
+            if (lodAppend != null)
+            {
+                requireCrossfade = true;
+                if (!lodAppend.enableLod2)
+                {
+                    select2Lod.fullLod0ScreenHeightFraction = (half)(lodAppend.lod01TransitionMaxPercentage / 100f);
+                    select2Lod.fullLod1ScreenHeightFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f);
+                    if (lodAppend.lod01TransitionMaxPercentage < lodAppend.lod01TransitionMinPercentage) // Be nice to the designers
+                        (select2Lod.fullLod1ScreenHeightFraction, select2Lod.fullLod0ScreenHeightFraction) =
+                            (select2Lod.fullLod0ScreenHeightFraction, select2Lod.fullLod1ScreenHeightFraction);
+                    if (lodAppend.lod1Mesh == null)
+                        select2Lod.fullLod1ScreenHeightFraction = (half)(-select2Lod.fullLod1ScreenHeightFraction);
+                    AddComponent(entity, select2Lod);
+                }
+                else
+                {
+                    select3Lod.fullLod0ScreenHeightFraction    = (half)(lodAppend.lod01TransitionMaxPercentage / 100f);
+                    select3Lod.fullLod1ScreenHeightMaxFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f);
+                    select3Lod.fullLod1ScreenHeightMinFraction = (half)(lodAppend.lod12TransitionMaxPercentage / 100f);
+                    select3Lod.fullLod2ScreenHeightFraction    = (half)(lodAppend.lod12TransitionMinPercentage / 100f * math.select(1f, -1f, lodAppend.lod2Mesh == null));
+                    AddComponent(entity, select3Lod);
+                }
+                AddComponent<UseMmiRangeLodTag>(entity);
+            }
+
             var rendererSettings = new MeshRendererBakeSettings
             {
                 targetEntity                = entity,
@@ -541,34 +589,13 @@ namespace Latios.Kinemation.Authoring
                 lightmapScaleOffset         = authoring.lightmapScaleOffset,
                 isStatic                    = IsStatic(),
                 localBounds                 = mesh != null ? mesh.bounds : default,
+                rendererPriority            = authoring.rendererPriority,
+#if UNITY_6000_2_OR_NEWER
+                meshLodRendererBias = authoring.meshLodSelectionBias,
+                overrideMeshLod     = authoring.forceMeshLod,
+#endif
+                requireLodCrossfade = requireCrossfade
             };
-
-            MmiRange2LodSelect select2Lod = default;
-            MmiRange3LodSelect select3Lod = default;
-            if (lodAppend != null)
-            {
-                if (!lodAppend.enableLod2)
-                {
-                    select2Lod.height                       = math.cmax(rendererSettings.localBounds.extents) * 2f * math.select(1f, -1f, lodAppend.lod1Mesh == null);
-                    select2Lod.fullLod0ScreenHeightFraction = (half)(lodAppend.lod01TransitionMaxPercentage / 100f);
-                    select2Lod.fullLod1ScreenHeightFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f);
-                    if (lodAppend.lod01TransitionMaxPercentage < lodAppend.lod01TransitionMinPercentage) // Be nice to the designers
-                        (select2Lod.fullLod1ScreenHeightFraction, select2Lod.fullLod0ScreenHeightFraction) =
-                            (select2Lod.fullLod0ScreenHeightFraction, select2Lod.fullLod1ScreenHeightFraction);
-                    AddComponent(entity, select2Lod);
-                }
-                else
-                {
-                    select3Lod.height                          = math.cmax(rendererSettings.localBounds.extents) * 2f * math.select(1f, -1f, lodAppend.lod2Mesh == null);
-                    select3Lod.fullLod0ScreenHeightFraction    = (half)(lodAppend.lod01TransitionMaxPercentage / 100f);
-                    select3Lod.fullLod1ScreenHeightMaxFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f);
-                    select3Lod.fullLod1ScreenHeightMinFraction = (half)(lodAppend.lod12TransitionMaxPercentage / 100f);
-                    select3Lod.fullLod2ScreenHeightFraction    = (half)(lodAppend.lod12TransitionMinPercentage / 100f);
-                    AddComponent(entity, select3Lod);
-                }
-                AddComponent<UseMmiRangeLodTag>(entity);
-                AddComponent<LodCrossfade>(     entity);
-            }
 
             if (opaqueMaterialCount == mms.Length || opaqueMaterialCount == 0)
             {
@@ -588,9 +615,8 @@ namespace Latios.Kinemation.Authoring
                     else
                         AddComponent(additionalEntity, select3Lod);
                     AddComponent<UseMmiRangeLodTag>(additionalEntity);
-                    AddComponent<LodCrossfade>(     additionalEntity);
                 }
-                RenderingBakingTools.BakeLodMaskForEntity(this, additionalEntity, lodSettings);
+                RenderingBakingTools.BakeLodMaskForEntity(this, additionalEntity, lodSettings, out _);
                 Span <MeshRendererBakeSettings> renderers = stackalloc MeshRendererBakeSettings[2];
                 renderers[0]                              = rendererSettings;
                 renderers[1]                              = rendererSettings;

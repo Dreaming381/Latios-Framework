@@ -22,7 +22,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
             var entity = baker.GetEntity(TransformUsageFlags.Renderable);
 
             RenderingBakingTools.GetLOD(baker, renderer, out var lodSettings);
-            RenderingBakingTools.BakeLodMaskForEntity(baker, entity, lodSettings);
+            RenderingBakingTools.BakeLodMaskForEntity(baker, entity, lodSettings, out var useCrossfade);
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -35,6 +35,7 @@ namespace Latios.Calligraphics.Rendering.Authoring
                 lightmapScaleOffset         = renderer.lightmapScaleOffset,
                 isStatic                    = baker.IsStatic(),
                 localBounds                 = default,
+                requireLodCrossfade         = useCrossfade
             };
 
             baker.BakeMeshAndMaterial(rendererSettings, mesh, material);

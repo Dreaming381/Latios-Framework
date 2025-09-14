@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -38,6 +39,23 @@ namespace Latios
         {
             s.Data = t;
             return s;
+        }
+
+        public static unsafe void Sort<T>(this Span<T> span) where T : unmanaged, IComparable<T>
+        {
+            fixed (T* ptr = &span[0])
+            {
+                NativeSortExtension.Sort(ptr, span.Length);
+            }
+        }
+
+        public static unsafe void Sort<TElement, TComparer>(this Span<TElement> span, TComparer comparer) where TElement : unmanaged where TComparer : unmanaged,
+        IComparer<TElement>
+        {
+            fixed (TElement* ptr = &span[0])
+            {
+                NativeSortExtension.Sort(ptr, span.Length, comparer);
+            }
         }
     }
 }

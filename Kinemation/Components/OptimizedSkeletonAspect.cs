@@ -126,6 +126,38 @@ namespace Latios.Kinemation
 
         #region Modification Methods
         /// <summary>
+        /// Applies a batch of world transforms for the bones at the specified indices to the skeleton at once.
+        /// This is usually useful for applying the results of a focused IK algorithm. The skeleton must be synced.
+        /// </summary>
+        /// <param name="transforms">The world-space transforms to apply. This Span will be overwritten by the algorithm.</param>
+        /// <param name="boneIndices">The indices of the bones corresponding to each transform</param>
+        public void ApplyWorldTransforms(Span<TransformQvvs> transforms, ReadOnlySpan<short> boneIndices)
+        {
+            var skeletonTransform = skeletonWorldTransform;
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                transforms[i]            = qvvs.inversemulqvvs(in skeletonTransform, in transforms[i]);
+                transforms[i].worldIndex = boneIndices[i];
+            }
+            bones[0].ApplyRootTransformChanges(transforms, m_currentBaseRootIndexWrite);
+        }
+
+        /// <summary>
+        /// Applies a batch of root-space transforms for the bones at the specified indices to the skeleton at once.
+        /// This is usually useful for applying the results of a focused IK algorithm. The skeleton must be synced.
+        /// </summary>
+        /// <param name="transforms">The world-space transforms to apply. This Span will be overwritten by the algorithm.</param>
+        /// <param name="boneIndices">The indices of the bones corresponding to each transform</param>
+        public void ApplyRootTransforms(Span<TransformQvvs> transforms, ReadOnlySpan<short> boneIndices)
+        {
+            for (int i = 0; i < transforms.Length; i++)
+            {
+                transforms[i].worldIndex = boneIndices[i];
+            }
+            bones[0].ApplyRootTransformChanges(transforms, m_currentBaseRootIndexWrite);
+        }
+
+        /// <summary>
         /// Begins a new inertial blend for the entire skeleton. You may call this prior to syncing if you wish.
         /// However, needsHistorySync must be <see langword="false"/> or else results will be unusable.
         /// </summary>
@@ -406,7 +438,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform.position = value;
                 if (m_index > 0)
-                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -428,7 +460,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform.rotation = value;
                 if (m_index > 0)
-                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -450,7 +482,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform.scale = value;
                 if (m_index > 0)
-                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -472,7 +504,7 @@ namespace Latios.Kinemation
                 else
                     root.boneTransform.position = value;
                 if (m_index > 0)
-                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagatePositionChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -494,7 +526,7 @@ namespace Latios.Kinemation
                 else
                     root.boneTransform.rotation = value;
                 if (m_index > 0)
-                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateRotationChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -516,7 +548,7 @@ namespace Latios.Kinemation
                 else
                     root.boneTransform.scale = value;
                 if (m_index > 0)
-                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateScaleChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -535,7 +567,7 @@ namespace Latios.Kinemation
                 ref var root                = ref m_boneTransforms.ElementAt(currentRootIndex);
                 root.boneTransform.stretch  = value;
                 if (m_index > 0)
-                    PropagateStretchChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateStretchChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -567,7 +599,7 @@ namespace Latios.Kinemation
                 else
                     local.boneTransform = value;
                 if (m_index > 0)
-                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
 
@@ -589,7 +621,7 @@ namespace Latios.Kinemation
                 else
                     root.boneTransform = value;
                 if (m_index > 0)
-                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, in root.boneTransform, currentRootIndex - m_index, m_index);
+                    PropagateTransformChangeToChildren(ref m_allChildrenIndices, currentRootIndex - m_index, m_index);
             }
         }
         #endregion

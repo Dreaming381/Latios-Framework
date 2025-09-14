@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
+using Latios.Calci;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
-using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
@@ -50,7 +48,7 @@ namespace Latios.Psyshock
 
             var qxmax = aabb.max.x;
 
-            var linearSweepStartIndex = BinarySearchFirstGreaterOrEqual(in bucket.xmins, context.qxmin);
+            var linearSweepStartIndex = BinarySearch.FirstGreaterOrEqual(in bucket.xmins, context.qxmin);
 
             for (int indexInBucket = linearSweepStartIndex; indexInBucket < bucket.count && bucket.xmins[indexInBucket] <= qxmax; indexInBucket++)
             {
@@ -63,52 +61,6 @@ namespace Latios.Psyshock
 
             SearchTreeLooped(ref context, ref processor);
         }
-
-        internal static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
-        {
-            return BinarySearchFirstGreaterOrEqual((float*)array.GetUnsafeReadOnlyPtr(), array.Length, searchValue);
-        }
-
-        // Returns count if nothing is greater or equal
-        //   The following function is a C# and Burst adaptation of Paul-Virak Khuong and Pat Morin's
-        //   optimized sequential order binary search: https://github.com/patmorin/arraylayout/blob/master/src/sorted_array.h
-        //   This code is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
-        private static unsafe int BinarySearchFirstGreaterOrEqual(float* array, [AssumeRange(0, int.MaxValue)] int count, float searchValue)
-        {
-            bool isBurst = true;
-            SkipWithoutBurst(ref isBurst);
-            if (isBurst)
-            {
-                for (int i = 1; i < count; i++)
-                {
-                    Hint.Assume(array[i] >= array[i - 1]);
-                }
-            }
-
-            var  basePtr = array;
-            uint n       = (uint)count;
-            while (Hint.Likely(n > 1))
-            {
-                var half    = n / 2;
-                n          -= half;
-                var newPtr  = &basePtr[half];
-
-                // As of Burst 1.8.0 prev 2
-                // Burst never loads &basePtr[half] into a register for newPtr, and instead uses dual register addressing instead.
-                // Because of this, instead of loading into the register, performing the comparison, using a cmov, and then a jump,
-                // Burst immediately performs the comparison, conditionally jumps, uses a lea, and then a jump.
-                // This is technically less instructions on average. But branch prediction may suffer as a result.
-                basePtr = *newPtr < searchValue ? newPtr : basePtr;
-            }
-
-            if (*basePtr < searchValue)
-                basePtr++;
-
-            return (int)(basePtr - array);
-        }
-
-        [BurstDiscard]
-        static void SkipWithoutBurst(ref bool isBurst) => isBurst = false;
 
         private struct AabbSweepRecursiveContext
         {
@@ -288,7 +240,7 @@ namespace Latios.Psyshock
                 m_qxmax     = aabb.max.x;
                 m_qyzMinMax = new float4(aabb.max.yz, -aabb.min.yz);
 
-                m_indexInBucket     = LayerQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
+                m_indexInBucket     = BinarySearch.FirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
                 m_currentFrameIndex = 0;
                 m_stack[0]          = new LayerQuerySweepMethods.StackFrame { currentIndex = 0, checkpoint = 0 };
             }
@@ -323,7 +275,7 @@ namespace Latios.Psyshock
                 m_bucket        = m_result.layer.GetBucketSlices(bucketIndex);
                 m_result        = new FindObjectsResult(in m_result.layer, in m_bucket, bucketIndex, false, m_layerIndex);
 
-                m_indexInBucket     = LayerQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
+                m_indexInBucket     = BinarySearch.FirstGreaterOrEqual(in m_bucket.xmins, m_qxmin);
                 m_currentFrameIndex = 0;
                 m_stack[0]          = new LayerQuerySweepMethods.StackFrame { currentIndex = 0, checkpoint = 0 };
             }

@@ -6,7 +6,6 @@ using Unity.Mathematics;
 
 namespace Latios.Transforms
 {
-    // World space transform for all entities. Is also local space for root entities. It is always present, and is the only required transform component for rendering.
     /// <summary>
     /// The world-space transform for all entities. It is also the local-space transform for root entities.
     /// This component is always present, and the only required transform component for rendering with Kinemation.
@@ -100,7 +99,6 @@ namespace Latios.Transforms
         public int worldIndex => parentToWorldTransform.worldIndex;
     }
 
-    // Local space transform relative to the parent, only valid if parent exists
     /// <summary>
     /// A local space transform (excluding stretch) relative to the parent. It should only exist if the entity has a parent.
     /// </summary>

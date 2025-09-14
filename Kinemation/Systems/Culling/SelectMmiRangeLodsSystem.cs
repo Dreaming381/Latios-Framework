@@ -11,7 +11,7 @@ using Unity.Rendering;
 
 using static Unity.Entities.SystemAPI;
 
-namespace Latios.Kinemation
+namespace Latios.Kinemation.Systems
 {
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
@@ -32,8 +32,10 @@ namespace Latios.Kinemation
             latiosWorld            = state.GetLatiosWorldUnmanaged();
             m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
 
-            m_query = state.Fluent().With<MaterialMeshInfo, LodCrossfade>(false).With<UseMmiRangeLodTag>(true)
+            m_query = state.Fluent().With<MaterialMeshInfo, LodCrossfade>(false).With<UseMmiRangeLodTag, WorldRenderBounds>(true)
                       .WithAnyEnabled<MmiRange2LodSelect, MmiRange3LodSelect>(true).WithWorldTransformReadOnly().Build();
+
+            latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new MeshLodCrossfadeMargin { margin = (half)0.05f });
         }
 
         public bool ShouldUpdateSystem(ref SystemState state)
@@ -50,34 +52,48 @@ namespace Latios.Kinemation
 
             m_worldTransformHandle.Update(ref state);
 
+            float cameraFactorNoBias = LodUtilities.CameraFactorFrom(in parameters, 1f);
+
             state.Dependency = new Job
             {
-                perCameraMaskHandle   = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                worldTransformHandle  = m_worldTransformHandle,
-                select2Handle         = GetComponentTypeHandle<MmiRange2LodSelect>(true),
-                select3Handle         = GetComponentTypeHandle<MmiRange3LodSelect>(true),
-                mmiHandle             = GetComponentTypeHandle<MaterialMeshInfo>(false),
-                crossfadeHandle       = GetComponentTypeHandle<LodCrossfade>(false),
-                cameraPosition        = parameters.cameraPosition,
-                isPerspective         = !parameters.isOrthographic,
-                cameraFactor          = LodUtilities.CameraFactorFrom(in parameters, m_lodBias),
-                maxResolutionLodLevel = m_maximumLODLevel
+                perCameraMaskHandle    = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
+                worldTransformHandle   = m_worldTransformHandle,
+                boundsHandle           = GetComponentTypeHandle<WorldRenderBounds>(true),
+                select2Handle          = GetComponentTypeHandle<MmiRange2LodSelect>(true),
+                select3Handle          = GetComponentTypeHandle<MmiRange3LodSelect>(true),
+                lodGroupCrossfades     = GetComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins>(true),
+                mmiHandle              = GetComponentTypeHandle<MaterialMeshInfo>(false),
+                crossfadeHandle        = GetComponentTypeHandle<LodCrossfade>(false),
+                meshLodHandle          = GetComponentTypeHandle<MeshLod>(false),
+                meshLodCurveHandle     = GetComponentTypeHandle<MeshLodCurve>(true),
+                meshLodCrossfadeMargin = latiosWorld.worldBlackboardEntity.GetComponentData<MeshLodCrossfadeMargin>().margin,
+                cameraPosition         = parameters.cameraPosition,
+                isPerspective          = !parameters.isOrthographic,
+                cameraFactor           = cameraFactorNoBias * m_lodBias,
+                cameraFactorNoBias     = cameraFactorNoBias,
+                maxResolutionLodLevel  = m_maximumLODLevel
             }.ScheduleParallel(m_query, state.Dependency);
         }
 
         [BurstCompile]
-        struct Job : IJobChunk
+        unsafe struct Job : IJobChunk
         {
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
-            [ReadOnly] public ComponentTypeHandle<MmiRange2LodSelect> select2Handle;
-            [ReadOnly] public ComponentTypeHandle<MmiRange3LodSelect> select3Handle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                       worldTransformHandle;
+            [ReadOnly] public ComponentTypeHandle<WorldRenderBounds>                        boundsHandle;
+            [ReadOnly] public ComponentTypeHandle<MmiRange2LodSelect>                       select2Handle;
+            [ReadOnly] public ComponentTypeHandle<MmiRange3LodSelect>                       select3Handle;
+            [ReadOnly] public ComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins> lodGroupCrossfades;
+            [ReadOnly] public ComponentTypeHandle<MeshLodCurve>                             meshLodCurveHandle;
 
             public ComponentTypeHandle<ChunkPerCameraCullingMask> perCameraMaskHandle;
             public ComponentTypeHandle<MaterialMeshInfo>          mmiHandle;
             public ComponentTypeHandle<LodCrossfade>              crossfadeHandle;
+            public ComponentTypeHandle<MeshLod>                   meshLodHandle;
 
             public float3 cameraPosition;
             public float  cameraFactor;
+            public float  cameraFactorNoBias;
+            public float  meshLodCrossfadeMargin;
             public int    maxResolutionLodLevel;
             public bool   isPerspective;
 
@@ -87,223 +103,222 @@ namespace Latios.Kinemation
                 if ((mask.upper.Value | mask.lower.Value) == 0)
                     return;
 
-                var transforms        = worldTransformHandle.Resolve(chunk);
-                var mmis              = chunk.GetNativeArray(ref mmiHandle);
-                var crossfades        = chunk.GetNativeArray(ref crossfadeHandle);
-                var crossfadesEnabled = chunk.GetEnabledMask(ref crossfadeHandle);
-                var select2s          = chunk.GetNativeArray(ref select2Handle);
-                var enumerator        = new ChunkEntityEnumerator(true, new v128(mask.lower.Value, mask.upper.Value), chunk.Count);
-                if (select2s.Length > 0)
+                var transforms              = worldTransformHandle.Resolve(chunk);
+                var boundsArray             = (WorldRenderBounds*)chunk.GetRequiredComponentDataPtrRO(ref boundsHandle);
+                var mmis                    = (MaterialMeshInfo*)chunk.GetRequiredComponentDataPtrRW(ref mmiHandle);
+                var crossfades              = (LodCrossfade*)chunk.GetRequiredComponentDataPtrRW(ref crossfadeHandle);
+                var crossfadesEnabled       = chunk.GetEnabledMask(ref crossfadeHandle);
+                var select2s                = chunk.GetComponentDataPtrRO(ref select2Handle);
+                var select3s                = chunk.GetComponentDataPtrRO(ref select3Handle);
+                var lodGroupPercentages     = chunk.GetComponentDataPtrRO(ref lodGroupCrossfades);
+                var meshLods                = chunk.GetComponentDataPtrRW(ref meshLodHandle);
+                var enableMeshLodCrossfades = chunk.GetEnabledMask(ref meshLodHandle);
+                var meshLodCurves           = chunk.GetComponentDataPtrRO(ref meshLodCurveHandle);
+                var enumerator              = new ChunkEntityEnumerator(true, new v128(mask.lower.Value, mask.upper.Value), chunk.Count);
+                while (enumerator.NextEntityIndex(out int i))
                 {
-                    if (maxResolutionLodLevel >= 1)
+                    MmiRange3LodSelect select;
+                    MaterialMeshInfo   mmi;
+                    int                maxLodSupported;
+                    if (select3s != null)
                     {
-                        while (enumerator.NextEntityIndex(out var i))
-                        {
-                            crossfadesEnabled[i] = false;
-                            var mmi              = mmis[i];
-                            mmi.SetCurrentLodRegion(1, false);
-                            mmis[i] = mmi;
-                            if (select2s[i].height < 0f)
-                            {
-                                mask.ClearBitAtIndex(i);
-                            }
-                        }
-                        return;
+                        select          = select3s[i];
+                        mmi             = mmis[i];
+                        maxLodSupported = 2;
                     }
-
-                    if (isPerspective)
+                    else if (select2s != null)
                     {
-                        while (enumerator.NextEntityIndex(out var i))
+                        select = new MmiRange3LodSelect
                         {
-                            var select    = select2s[i];
-                            var transform = transforms[i].worldTransformQvvs;
-                            var height    = LodUtilities.ViewHeightFrom(select.height, transform.scale, transform.stretch, cameraFactor);
-                            var distance  = math.distance(transform.position, cameraPosition);
-                            var mmi       = mmis[i];
-
-                            var zeroHeight = select.fullLod0ScreenHeightFraction * distance;
-                            var oneHeight  = select.fullLod1ScreenHeightFraction * distance;
-
-                            if (height >= zeroHeight)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(0, false);
-                            }
-                            else if (height <= oneHeight)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(1, false);
-                                if (select.height < 0f)
-                                    mask.ClearBitAtIndex(i);
-                                //if (transform.scale > 0.9f)
-                                //    UnityEngine.Debug.Log(
-                                //        $"selectHeight: {select.height}, height: {height}, oneHeight: {oneHeight}, distance: {distance}, fraction: {(float)select.fullLod1ScreenHeightFraction}");
-                            }
-                            else
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(0, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(oneHeight, zeroHeight, height), false);
-                                crossfades[i] = fade;
-                            }
-
-                            mmis[i] = mmi;
-                        }
+                            fullLod0ScreenHeightFraction    = select2s[i].fullLod0ScreenHeightFraction,
+                            fullLod1ScreenHeightMaxFraction = (half)math.abs(select2s[i].fullLod1ScreenHeightFraction),
+                            fullLod1ScreenHeightMinFraction = default,
+                            fullLod2ScreenHeightFraction    = (half)math.select(0f, -1f, select2s[i].fullLod1ScreenHeightFraction < 0f),
+                        };
+                        mmi             = mmis[i];
+                        maxLodSupported = 1;
                     }
                     else
                     {
-                        while (enumerator.NextEntityIndex(out var i))
+                        select = new MmiRange3LodSelect
                         {
-                            var select    = select2s[i];
-                            var transform = transforms[i].worldTransformQvvs;
-                            var height    = LodUtilities.ViewHeightFrom(select.height, transform.scale, transform.stretch, cameraFactor);
-                            var mmi       = mmis[i];
-
-                            if (height >= select.fullLod0ScreenHeightFraction)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(0, false);
-                            }
-                            else if (height <= select.fullLod1ScreenHeightFraction)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(1, false);
-                                mask.ClearBitAtIndex(i);
-                            }
-                            else
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(0, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(select.fullLod1ScreenHeightFraction, select.fullLod0ScreenHeightFraction, height), false);
-                                crossfades[i] = fade;
-                            }
-
-                            mmis[i] = mmi;
-                        }
+                            fullLod0ScreenHeightFraction    = default,
+                            fullLod1ScreenHeightMaxFraction = default,
+                            fullLod1ScreenHeightMinFraction = default,
+                            fullLod2ScreenHeightFraction    = default,
+                        };
+                        mmi             = default;
+                        maxLodSupported = 0;
                     }
+
+                    float height = math.cmax(boundsArray[i].Value.Extents) * 2f;
+                    float groupMin, groupMax;
+                    if (lodGroupPercentages != null)
+                    {
+                        // Todo: This is the only reason we still need to use the transform instead of using the AABB center.
+                        var   transform        = transforms[i].worldTransformQvvs;
+                        float groupWorldHeight = math.abs(lodGroupPercentages[i].localSpaceHeight) * math.abs(transform.scale) * math.cmax(math.abs(transform.stretch));
+                        float factor           = height / groupWorldHeight;
+                        groupMin               = factor * lodGroupPercentages[i].minCrossFadeEdge;
+                        groupMax               = factor * lodGroupPercentages[i].maxCrossFadeEdge;
+                    }
+                    else
+                    {
+                        groupMin = 0f;
+                        groupMax = float.MaxValue;
+                    }
+
+                    MeshLod      meshLodDummy = default;
+                    ref var      meshLod      = ref meshLodDummy;
+                    MeshLodCurve meshLodCurve = default;
+                    if (meshLods != null && meshLodCurves != null)
+                    {
+                        meshLod      = ref meshLods[i];
+                        meshLodCurve = meshLodCurves[i];
+                    }
+
+                    DoEntity(ref mmi,
+                             ref crossfades[i],
+                             out var crossfadeEnabled,
+                             out var cull,
+                             select,
+                             transforms[i].worldTransformQvvs,
+                             height,
+                             groupMin,
+                             groupMax,
+                             maxLodSupported,
+                             ref meshLod,
+                             meshLodCurve,
+                             out var enableMeshLodCrossfade);
+
+                    if (cull)
+                        mask.ClearBitAtIndex(i);
+                    if (lodGroupPercentages == null || !crossfadesEnabled[i])
+                        crossfadesEnabled[i] = crossfadeEnabled;
+                    if (enableMeshLodCrossfade)
+                        enableMeshLodCrossfades[i] = true;
+                    if (select2s != null || select3s != null)
+                        mmis[i] = mmi;
+                }
+            }
+
+            void DoEntity(ref MaterialMeshInfo mmi,
+                          ref LodCrossfade crossfade,
+                          out bool crossfadeEnabled,
+                          out bool cull,
+                          MmiRange3LodSelect select,
+                          in TransformQvvs transform,
+                          float height,
+                          float groupMin,
+                          float groupMax,
+                          int maxLodSupported,
+                          ref MeshLod meshLod,
+                          in MeshLodCurve meshLodCurve,
+                          out bool enableMeshLodCrossfade)
+            {
+                cull                   = false;
+                enableMeshLodCrossfade = false;
+                int minLod             = 0;
+                int maxLod             = 2;
+                if (select.fullLod1ScreenHeightMinFraction < groupMin)
+                    maxLod = 0;
+                else if (select.fullLod2ScreenHeightFraction < groupMin)
+                    maxLod = 1;
+                if (select.fullLod1ScreenHeightMaxFraction > groupMax)
+                    minLod = 2;
+                else if (select.fullLod0ScreenHeightFraction > groupMax)
+                    minLod = 1;
+                minLod     = math.max(minLod, maxResolutionLodLevel);
+                maxLod     = math.max(maxLod, maxResolutionLodLevel);
+                minLod     = math.min(minLod, maxLodSupported);
+                maxLod     = math.min(maxLod, maxLodSupported);
+                minLod     = math.min(minLod, maxLodSupported);
+                groupMin   = math.min(groupMin, select.fullLod0ScreenHeightFraction);
+                if (minLod == maxLod)
+                {
+                    crossfadeEnabled = false;
+                    mmi.SetCurrentLodRegion(minLod, false);
                 }
                 else
                 {
-                    var select3s = chunk.GetNativeArray(ref select3Handle);
-                    if (maxResolutionLodLevel >= 2)
+                    if (minLod == 1)
                     {
-                        while (enumerator.NextEntityIndex(out var i))
-                        {
-                            crossfadesEnabled[i] = false;
-                            var mmi              = mmis[i];
-                            mmi.SetCurrentLodRegion(2, false);
-                            mmis[i] = mmi;
-                            if (select2s[i].height < 0f)
-                            {
-                                mask.ClearBitAtIndex(i);
-                            }
-                        }
-                        return;
+                        select.fullLod1ScreenHeightMaxFraction = half.MaxValueAsHalf;
+                        select.fullLod0ScreenHeightFraction    = half.MaxValueAsHalf;
+                    }
+                    else if (maxLod == 1)
+                    {
+                        select.fullLod1ScreenHeightMinFraction = default;
+                        select.fullLod2ScreenHeightFraction    = (half)math.min(select.fullLod2ScreenHeightFraction, 0f);
                     }
 
-                    if (isPerspective)
+                    var biasHeight = height * cameraFactor;
+                    var distance   = math.select(1f, math.distance(transform.position, cameraPosition), isPerspective);
+
+                    var zeroHeight   = select.fullLod0ScreenHeightFraction * distance;
+                    var oneMaxHeight = select.fullLod1ScreenHeightMaxFraction * distance;
+                    var oneMinHeight = select.fullLod1ScreenHeightMinFraction * distance;
+                    var twoHeight    = select.fullLod2ScreenHeightFraction * distance;
+
+                    if (biasHeight >= zeroHeight)
                     {
-                        while (enumerator.NextEntityIndex(out var i))
-                        {
-                            var select    = select3s[i];
-                            var transform = transforms[i].worldTransformQvvs;
-                            var height    = LodUtilities.ViewHeightFrom(select.height, transform.scale, transform.stretch, cameraFactor);
-                            var distance  = math.distance(transform.position, cameraPosition);
-                            var mmi       = mmis[i];
-
-                            var zeroHeight   = select.fullLod0ScreenHeightFraction * distance;
-                            var oneMaxHeight = select.fullLod1ScreenHeightMaxFraction * distance;
-                            var oneMinHeight = select.fullLod1ScreenHeightMinFraction * distance;
-                            var twoHeight    = select.fullLod2ScreenHeightFraction * distance;
-
-                            if (height >= zeroHeight)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(maxResolutionLodLevel, false);
-                            }
-                            else if (height <= twoHeight)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(2, false);
-                                if (select.height < 0f)
-                                    mask.ClearBitAtIndex(i);
-                                //if (transform.scale > 0.9f)
-                                //    UnityEngine.Debug.Log(
-                                //        $"selectHeight: {select.height}, height: {height}, oneHeight: {oneHeight}, distance: {distance}, fraction: {(float)select.fullLod1ScreenHeightFraction}");
-                            }
-                            else if ((height <= oneMaxHeight || maxResolutionLodLevel > 0) && height >= oneMinHeight)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(1, false);
-                            }
-                            else if (height > oneMaxHeight)
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(0, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(oneMaxHeight, zeroHeight, height), false);
-                                crossfades[i] = fade;
-                            }
-                            else
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(1, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(twoHeight, oneMinHeight, height), false);
-                                crossfades[i] = fade;
-                            }
-
-                            mmis[i] = mmi;
-                        }
+                        crossfadeEnabled = false;
+                        mmi.SetCurrentLodRegion(0, false);
+                    }
+                    else if (biasHeight <= twoHeight)
+                    {
+                        crossfadeEnabled = false;
+                        mmi.SetCurrentLodRegion(2, false);
+                        if (select.fullLod2ScreenHeightFraction < 0f)
+                            cull = true;
+                    }
+                    else if ((biasHeight <= oneMaxHeight) && biasHeight >= oneMinHeight)
+                    {
+                        crossfadeEnabled = false;
+                        mmi.SetCurrentLodRegion(1, false);
+                    }
+                    else if (biasHeight > oneMaxHeight)
+                    {
+                        crossfadeEnabled = true;
+                        mmi.SetCurrentLodRegion(0, true);
+                        crossfade.SetFromHiResOpacity(math.unlerp(oneMaxHeight, zeroHeight, biasHeight), false);
                     }
                     else
                     {
-                        while (enumerator.NextEntityIndex(out var i))
-                        {
-                            var select    = select3s[i];
-                            var transform = transforms[i].worldTransformQvvs;
-                            var height    = LodUtilities.ViewHeightFrom(select.height, transform.scale, transform.stretch, cameraFactor);
-                            var mmi       = mmis[i];
-
-                            if (height >= select.fullLod0ScreenHeightFraction)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(maxResolutionLodLevel, false);
-                            }
-                            else if (height <= select.fullLod2ScreenHeightFraction)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(2, false);
-                                if (select.height < 0f)
-                                    mask.ClearBitAtIndex(i);
-                            }
-                            else if ((height <= select.fullLod1ScreenHeightMaxFraction || maxResolutionLodLevel > 0) && height >= select.fullLod1ScreenHeightMinFraction)
-                            {
-                                crossfadesEnabled[i] = false;
-                                mmi.SetCurrentLodRegion(1, false);
-                            }
-                            else if (height > select.fullLod1ScreenHeightMaxFraction)
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(0, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(select.fullLod1ScreenHeightMaxFraction, select.fullLod0ScreenHeightFraction, height), false);
-                                crossfades[i] = fade;
-                            }
-                            else
-                            {
-                                crossfadesEnabled[i] = true;
-                                mmi.SetCurrentLodRegion(1, true);
-                                LodCrossfade fade = default;
-                                fade.SetFromHiResOpacity(math.unlerp(select.fullLod2ScreenHeightFraction, select.fullLod1ScreenHeightMinFraction, height), false);
-                                crossfades[i] = fade;
-                            }
-
-                            mmis[i] = mmi;
-                        }
+                        crossfadeEnabled = true;
+                        mmi.SetCurrentLodRegion(1, true);
+                        crossfade.SetFromHiResOpacity(math.unlerp(twoHeight, oneMinHeight, biasHeight), false);
                     }
+                }
+
+                if (meshLod.levelCount <= 0)
+                    return;
+
+                var heights           = new float3(height, groupMax, groupMin);
+                var meshLodDistance   = math.select(1f, math.distance(transform.position, cameraPosition), isPerspective);
+                var screenFractions   = heights * new float3(cameraFactorNoBias, cameraFactor, cameraFactor) / meshLodDistance;
+                var preClamp          = math.log2(screenFractions) * meshLodCurve.slope + meshLodCurve.preClampBias;
+                var postClamp         = math.max(0f, preClamp) + meshLodCurve.postClampBias;
+                var rounded           = math.round(postClamp);
+                var isWithinCrossfade = math.abs(postClamp - rounded) <= meshLodCrossfadeMargin;
+                var groupClampRegion  = rounded + math.select(float3.zero, new float3(0f, meshLodCrossfadeMargin, -meshLodCrossfadeMargin), isWithinCrossfade);
+                var meshLodLevel      = math.clamp(groupClampRegion.x, groupClampRegion.y, groupClampRegion.z);
+                meshLodLevel          = math.min(meshLodLevel, meshLod.levelCount - 1.5f);  // The extra 0.5 is to prevent crossfading
+                var meshLodRounded    = math.round(meshLodLevel);
+                if (math.distance(meshLodLevel, meshLodRounded) < meshLodCrossfadeMargin)
+                {
+                    var hiResOpacity = math.unlerp(meshLodRounded - meshLodCrossfadeMargin, meshLodRounded + meshLodCrossfadeMargin, meshLodLevel);
+                    meshLod.lodLevel = (ushort)meshLodLevel;
+                    if (meshLodLevel > meshLodRounded)
+                        meshLod.lodLevel--;
+                    crossfade.SetFromHiResOpacity(hiResOpacity, false);
+                    crossfadeEnabled       = true;
+                    enableMeshLodCrossfade = true;
+                }
+                else
+                {
+                    crossfadeEnabled = false;
+                    meshLod.lodLevel = (ushort)meshLodLevel;
                 }
             }
         }

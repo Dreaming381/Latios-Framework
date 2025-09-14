@@ -61,10 +61,6 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateBrgBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<BeginPerFrameDeformMeshBuffersUploadSystem>();
         }
     }
@@ -85,10 +81,10 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
             GetOrCreateAndAddUnmanagedSystem<ClearPerFrameCullingMasksSystem>();
             GetOrCreateAndAddUnmanagedSystem<InitializeAndClassifyPerFrameDeformMetadataSystem>();
-            GetOrCreateAndAddUnmanagedSystem<PrepareLODsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();
-            GetOrCreateAndAddUnmanagedSystem<CombineExposedBonesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<UpdateSkinnedPostProcessMatrixBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<AllocateUniqueMeshesSystem>();
             GetOrCreateAndAddManagedSystem<KinemationCustomGraphicsSuperSystem>();
 #if UNITY_EDITOR
@@ -218,13 +214,8 @@ namespace Latios.Kinemation.Systems
 
             GetOrCreateAndAddUnmanagedSystem<InitializeAndFilterPerCameraSystem>();
             GetOrCreateAndAddUnmanagedSystem<CullInvalidUniqueMeshesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<FrustumCullExposedSkeletonsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<FrustumCullOptimizedSkeletonsSystem>();
             GetOrCreateAndAddUnmanagedSystem<CullLodsSystem>();
-            GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedEntitiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<FrustumCullSkinnedPostProcessEntitiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<FrustumCullUnskinnedEntitiesSystem>();
-            GetOrCreateAndAddUnmanagedSystem<CopyDeformCullingSystem>();
+            GetOrCreateAndAddUnmanagedSystem<FrustumCullSystem>();
             GetOrCreateAndAddUnmanagedSystem<SelectMmiRangeLodsSystem>();
             GetOrCreateAndAddUnmanagedSystem<GenerateBrgDrawCommandsSystem>();
 

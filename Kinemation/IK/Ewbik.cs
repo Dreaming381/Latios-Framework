@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Latios.Calci;
 using Latios.Transforms;
 using Unity.Collections;
 using Unity.Entities;

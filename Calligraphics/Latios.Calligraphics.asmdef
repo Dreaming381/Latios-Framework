@@ -3,6 +3,7 @@
     "rootNamespace": "Latios.Calligraphics",
     "references": [
         "Latios.Core",
+        "Latios.Calci",
         "Latios.Psyshock",
         "Latios.Kinemation",
         "Unity.Entities",

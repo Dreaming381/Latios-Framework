@@ -48,7 +48,7 @@ namespace Latios.Unsafe
         /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
         /// <param name="value">The value to write</param>
         /// <param name="threadIndex">The thread index to use when writing. This should come from [NativeSetThreadIndex] or JobsUtility.ThreadIndex.</param>
-        public void Write<T>(T value, int threadIndex) where T : unmanaged
+        public void Write<T>(in T value, int threadIndex) where T : unmanaged
         {
             m_blockList.Write(value, threadIndex);
         }

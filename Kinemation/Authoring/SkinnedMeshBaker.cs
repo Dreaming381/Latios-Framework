@@ -173,12 +173,26 @@ namespace Latios.Kinemation.Authoring
             });
             AddComponent<MeshDeformDataBlobReference>(entity);
 
+            bool useFadeOut = settings != null ? settings.useFadeOut : false;
             Span<MeshMaterialSubmeshSettings> mms = stackalloc MeshMaterialSubmeshSettings[m_materialsCache.Count];
-            RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, sharedMesh, m_materialsCache);
+            RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, sharedMesh, m_materialsCache, useFadeOut ? (byte)1 : (byte)255);
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
             RenderingBakingTools.GetLOD(this, authoring, out var lodSettings);
-            RenderingBakingTools.BakeLodMaskForEntity(this, entity, lodSettings);
+            RenderingBakingTools.BakeLodMaskForEntity(this, entity, lodSettings, out var requireCrossfade);
+
+            MmiRange2LodSelect fadeOut = default;
+            if (useFadeOut)
+            {
+                fadeOut = new MmiRange2LodSelect
+                {
+                    fullLod0ScreenHeightFraction = (half)(math.max(settings.fadeOutMinPercentage, settings.fadeOutMaxPercentage) / 100f),
+                    fullLod1ScreenHeightFraction = (half)(-math.min(settings.fadeOutMinPercentage, settings.fadeOutMaxPercentage) / 100f),
+                };
+                AddComponent(                   entity, fadeOut);
+                AddComponent<UseMmiRangeLodTag>(entity);
+                requireCrossfade = true;
+            }
 
             var rendererSettings = new MeshRendererBakeSettings
             {
@@ -191,6 +205,12 @@ namespace Latios.Kinemation.Authoring
                 lightmapScaleOffset         = authoring.lightmapScaleOffset,
                 isStatic                    = IsStatic(),
                 localBounds                 = sharedMesh != null ? sharedMesh.bounds : default,
+#if UNITY_6000_2_OR_NEWER
+                overrideMeshLod     = authoring.forceMeshLod,
+                meshLodRendererBias = authoring.meshLodSelectionBias,
+#endif
+                rendererPriority    = authoring.rendererPriority,
+                requireLodCrossfade = requireCrossfade
             };
 
             if (opaqueMaterialCount == mms.Length || opaqueMaterialCount == 0)
@@ -204,7 +224,12 @@ namespace Latios.Kinemation.Authoring
             else
             {
                 var additionalEntity = CreateAdditionalEntity(TransformUsageFlags.Renderable, false, $"{GetName()}-TransparentRenderEntity");
-                RenderingBakingTools.BakeLodMaskForEntity(this, additionalEntity, lodSettings);
+                if (settings.useFadeOut)
+                {
+                    AddComponent(                   entity, fadeOut);
+                    AddComponent<UseMmiRangeLodTag>(entity);
+                }
+                RenderingBakingTools.BakeLodMaskForEntity(this, additionalEntity, lodSettings, out _);
                 Span<MeshRendererBakeSettings> renderers = stackalloc MeshRendererBakeSettings[2];
                 renderers[0]                             = rendererSettings;
                 renderers[1]                             = rendererSettings;

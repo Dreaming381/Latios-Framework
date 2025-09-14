@@ -1,3 +1,4 @@
+using Latios.Calci;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
@@ -49,7 +50,7 @@ namespace Latios.Psyshock
 
             var qxmax = aabb.max.x;
 
-            var linearSweepStartIndex = BinarySearchFirstGreaterOrEqual(in bucket.slices.xmins, context.qxmin);
+            var linearSweepStartIndex = BinarySearch.FirstGreaterOrEqual(in bucket.slices.xmins, context.qxmin);
             foreach (var archetypeIndex in archetypeIndices)
             {
                 var asac = bucket.archetypeStartsAndCounts[archetypeIndex];
@@ -57,7 +58,7 @@ namespace Latios.Psyshock
                     continue;
 
                 var bodyIndices      = bucket.archetypeBodyIndices.GetSubArray(asac.x, asac.y);
-                var sparseStartIndex = BinarySearchFirstGreaterOrEqual(in bodyIndices, linearSweepStartIndex);
+                var sparseStartIndex = BinarySearch.FirstGreaterOrEqual(in bodyIndices, linearSweepStartIndex);
 
                 for (int indexInSparse = sparseStartIndex; indexInSparse < bodyIndices.Length && bucket.slices.xmins[bodyIndices[indexInSparse]] <= qxmax; indexInSparse++)
                 {
@@ -71,86 +72,6 @@ namespace Latios.Psyshock
                 context.tree = bucket.archetypeIntervalTrees.GetSubArray(asac.x, asac.y);
                 SearchTreeLooped(ref context, ref processor);
             }
-        }
-
-        internal static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<float> array, float searchValue)
-        {
-            return BinarySearchFirstGreaterOrEqual((float*)array.GetUnsafeReadOnlyPtr(), array.Length, searchValue);
-        }
-        internal static unsafe int BinarySearchFirstGreaterOrEqual(in NativeArray<int> array, int searchValue)
-        {
-            return BinarySearchFirstGreaterOrEqual((int*)array.GetUnsafeReadOnlyPtr(), array.Length, searchValue);
-        }
-
-        // Returns count if nothing is greater or equal
-        //   The following function is a C# and Burst adaptation of Paul-Virak Khuong and Pat Morin's
-        //   optimized sequential order binary search: https://github.com/patmorin/arraylayout/blob/master/src/sorted_array.h
-        //   This code is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
-        private static unsafe int BinarySearchFirstGreaterOrEqual(float* array, [AssumeRange(0, int.MaxValue)] int count, float searchValue)
-        {
-            bool isBurst = true;
-            SkipWithoutBurst(ref isBurst);
-            if (isBurst)
-            {
-                for (int i = 1; i < count; i++)
-                {
-                    Hint.Assume(array[i] >= array[i - 1]);
-                }
-            }
-
-            var  basePtr = array;
-            uint n       = (uint)count;
-            while (Hint.Likely(n > 1))
-            {
-                var half    = n / 2;
-                n          -= half;
-                var newPtr  = &basePtr[half];
-
-                // As of Burst 1.8.0 prev 2
-                // Burst never loads &basePtr[half] into a register for newPtr, and instead uses dual register addressing instead.
-                // Because of this, instead of loading into the register, performing the comparison, using a cmov, and then a jump,
-                // Burst immediately performs the comparison, conditionally jumps, uses a lea, and then a jump.
-                // This is technically less instructions on average. But branch prediction may suffer as a result.
-                basePtr = *newPtr < searchValue ? newPtr : basePtr;
-            }
-
-            if (*basePtr < searchValue)
-                basePtr++;
-
-            return (int)(basePtr - array);
-        }
-        private static unsafe int BinarySearchFirstGreaterOrEqual(int* array, [AssumeRange(0, int.MaxValue)] int count, int searchValue)
-        {
-            bool isBurst = true;
-            SkipWithoutBurst(ref isBurst);
-            if (isBurst)
-            {
-                for (int i = 1; i < count; i++)
-                {
-                    Hint.Assume(array[i] > array[i - 1]);
-                }
-            }
-
-            var  basePtr = array;
-            uint n       = (uint)count;
-            while (Hint.Likely(n > 1))
-            {
-                var half    = n / 2;
-                n          -= half;
-                var newPtr  = &basePtr[half];
-
-                // As of Burst 1.8.0 prev 2
-                // Burst never loads &basePtr[half] into a register for newPtr, and instead uses dual register addressing instead.
-                // Because of this, instead of loading into the register, performing the comparison, using a cmov, and then a jump,
-                // Burst immediately performs the comparison, conditionally jumps, uses a lea, and then a jump.
-                // This is technically less instructions on average. But branch prediction may suffer as a result.
-                basePtr = *newPtr < searchValue ? newPtr : basePtr;
-            }
-
-            if (*basePtr < searchValue)
-                basePtr++;
-
-            return (int)(basePtr - array);
         }
 
         [BurstDiscard]
@@ -296,7 +217,7 @@ namespace Latios.Psyshock
                 m_bucketEnumerator.m_bucket                = m_world.GetBucket(bucketIndex);
                 m_result                                   = new FindObjectsResult(in m_world.layer, in m_bucketEnumerator.m_bucket.slices, bucketIndex, false, m_layerIndex);
                 m_bucketEnumerator.m_archetypeEnumerator   = m_mask;
-                m_bucketEnumerator.m_linearSweepStartIndex = WorldQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucketEnumerator.m_bucket.slices.xmins, m_qxmin);
+                m_bucketEnumerator.m_linearSweepStartIndex = BinarySearch.FirstGreaterOrEqual(in m_bucketEnumerator.m_bucket.slices.xmins, m_qxmin);
                 m_bucketEnumerator.isInside                = false;
             }
         }
@@ -330,7 +251,7 @@ namespace Latios.Psyshock
                 m_bucketEnumerator.m_bucket                = m_world.GetBucket(bucketIndex);
                 m_result                                   = new FindObjectsResult(in m_world.layer, in m_bucketEnumerator.m_bucket.slices, bucketIndex, false, m_layerIndex);
                 m_bucketEnumerator.m_archetypeEnumerator   = m_mask;
-                m_bucketEnumerator.m_linearSweepStartIndex = WorldQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bucketEnumerator.m_bucket.slices.xmins, m_qxmin);
+                m_bucketEnumerator.m_linearSweepStartIndex = BinarySearch.FirstGreaterOrEqual(in m_bucketEnumerator.m_bucket.slices.xmins, m_qxmin);
                 m_bucketEnumerator.isInside                = false;
             }
 
@@ -371,7 +292,7 @@ namespace Latios.Psyshock
                                 continue;
                             m_bodyIndices       = m_bucket.archetypeBodyIndices.GetSubArray(asac.x, asac.y);
                             m_tree              = m_bucket.archetypeIntervalTrees.GetSubArray(asac.x, asac.y);
-                            m_indexInSparse     = WorldQuerySweepMethods.BinarySearchFirstGreaterOrEqual(in m_bodyIndices, m_linearSweepStartIndex);
+                            m_indexInSparse     = BinarySearch.FirstGreaterOrEqual(in m_bodyIndices, m_linearSweepStartIndex);
                             m_currentFrameIndex = 0;
                             m_stack[0]          = new LayerQuerySweepMethods.StackFrame { currentIndex = 0, checkpoint = 0 };
                             isInside            = true;

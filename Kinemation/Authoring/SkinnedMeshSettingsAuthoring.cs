@@ -23,6 +23,15 @@ namespace Latios.Kinemation.Authoring
         public bool useDualQuaternionSkinning = false;
 
         /// <summary>
+        /// Enables a MmiRangeLod
+        /// </summary>
+        public bool useFadeOut = false;
+        [Range(0.0f, 100f)]
+        public float fadeOutMaxPercentage = 0.5f;
+        [Range(0.0f, 100f)]
+        public float fadeOutMinPercentage = 0.1f;
+
+        /// <summary>
         /// Assign a list of bone name hierarchy paths (leaf to root delineated with '/') corresponding to each bone index in the mesh
         /// (which also corresponds to the BindPoses array). Each path will be matched to a bone in the skeleton whose skeleton path
         /// starts with the mesh path. If all bone names are unique, then theoretically, parent paths and '/' delineation are unnecessary.

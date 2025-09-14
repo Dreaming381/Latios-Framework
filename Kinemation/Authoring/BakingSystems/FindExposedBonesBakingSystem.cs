@@ -36,7 +36,6 @@ namespace Latios.Kinemation.Authoring.Systems
             exposedBoneTypes.Add(ComponentType.ReadWrite<BoneCullingIndex>());
             exposedBoneTypes.Add(ComponentType.ReadWrite<BoneBounds>());
             exposedBoneTypes.Add(ComponentType.ReadWrite<BoneWorldBounds>());
-            exposedBoneTypes.Add(ComponentType.ChunkComponent<ChunkBoneWorldBounds>());
             exposedBoneTypes.Add(ComponentType.ReadWrite<RequestPreviousTransform>());
             exposedBoneTypes.Add(ComponentType.ReadWrite<RequestTwoAgoTransform>());
             ComponentTypeSet exposedBoneTypesToRemove = new ComponentTypeSet(in exposedBoneTypes);

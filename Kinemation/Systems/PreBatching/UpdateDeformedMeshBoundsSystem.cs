@@ -22,7 +22,7 @@ namespace Latios.Kinemation.Systems
 
         public void OnCreate(ref SystemState state)
         {
-            m_query = state.Fluent().With<BoundMesh>(true).Build();
+            m_query = state.Fluent().With<BoundMesh>(true).With<RenderBounds>(false).Build();
         }
 
         [BurstCompile]
@@ -40,11 +40,6 @@ namespace Latios.Kinemation.Systems
                 dependentSkinnedMeshLookup             = GetBufferLookup<DependentSkinnedMesh>(false),
                 lastSystemVersion                      = state.LastSystemVersion
             }.ScheduleParallel(m_query, state.Dependency);
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
         }
 
         [BurstCompile]
@@ -133,7 +128,6 @@ namespace Latios.Kinemation.Systems
                             weights = weights.GetSubArray(weightsBase, shapeOffsets.Length);
                             for (int j = 0; j < shapeOffsets.Length; j++)
                             {
-                                //UnityEngine.Debug.Log($"j: {j} offset: {shapeOffsets[j]}, weight: {weights[j]}");
                                 localRadialBounds[i] += weights[j] * shapeOffsets[j];
                             }
                         }
@@ -142,13 +136,13 @@ namespace Latios.Kinemation.Systems
 
                 if (hasSkeleton)
                 {
-                    var skeletonDependents = chunk.GetNativeArray(ref skeletonDependentHandle);
+                    // If we have a skeleton, we want the local RenderBounds to just be radial expansions, as this will be added
+                    // to the skeleton bounds to create the WorldRenderBounds.
+                    var bounds = chunk.GetNativeArray(ref localBoundsHandle);
+
                     for (int i = 0; i < chunk.Count; i++)
                     {
-                        var skeletonDependent = skeletonDependents[i];
-                        if (skeletonDependent.root == Entity.Null)
-                            continue;
-                        dependentSkinnedMeshLookup[skeletonDependent.root].ElementAt(skeletonDependent.indexInDependentSkinnedMeshesBuffer).meshRadialOffset = localRadialBounds[i];
+                        bounds[i] = new RenderBounds { Value = new AABB { Center = float3.zero, Extents = localRadialBounds[i] } };
                     }
                 }
                 else if (hasLocalBounds)
@@ -161,7 +155,6 @@ namespace Latios.Kinemation.Systems
                         var aabb = blobs[i].meshBlob.Value.undeformedAabb;
                         Physics.GetCenterExtents(aabb, out var center, out var extents);
                         bounds[i] = new RenderBounds { Value = new AABB { Center = center, Extents = extents + localRadialBounds[i] } };
-                        //UnityEngine.Debug.Log($"aabb: {aabb.min}, {aabb.max}, center: {center}, extents: {extents}, radial: {localRadialBounds[i]}");
                     }
                 }
             }

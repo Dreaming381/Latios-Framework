@@ -36,29 +36,6 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// A mask which specifies if this skeleton is visible for the current
-    /// camera culling pass
-    /// Usage: Typically Read Only
-    /// </summary>
-    public struct ChunkPerCameraSkeletonCullingMask : IComponentData
-    {
-        public BitField64 lower;
-        public BitField64 upper;
-    }
-
-    /// <summary>
-    /// A mask which specifies the visible splits for this skeleton in the
-    /// current shadow-casting light culling pass
-    /// Usage: Only write to this if performing custom skeleton LODing logic for shadows.
-    /// </summary>
-    [StructLayout(LayoutKind.Explicit)]
-    public unsafe struct ChunkPerCameraSkeletonCullingSplitsMask : IComponentData
-    {
-        [FieldOffset(0)] public fixed byte  splitMasks[128];
-        [FieldOffset(0)] public fixed ulong ulongMasks[16];  // Ensures 8 byte alignment which is helpful (16 would be better)
-    }
-
-    /// <summary>
     /// A blob asset which contains bone path "strings" in reverse path order,
     /// that is from leaf bone to root bone, for each bone in the skeleton.
     /// </summary>

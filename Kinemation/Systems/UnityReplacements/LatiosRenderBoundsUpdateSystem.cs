@@ -1,3 +1,4 @@
+using Latios.Kinemation.InternalSourceGen;
 using Latios.Psyshock;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
@@ -23,24 +24,16 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct LatiosRenderBoundsUpdateSystem : ISystem
     {
-        EntityQuery                             m_WorldRenderBounds;
-        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
+        EntityQuery                      m_WorldRenderBounds;
+        WorldTransformReadOnlyTypeHandle m_worldTransformHandle;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             m_WorldRenderBounds = state.Fluent().With<ChunkWorldRenderBounds>(false, true).With<WorldRenderBounds>(false).With<RenderBounds>(true)
-                                  .WithWorldTransformReadOnly().Without<ChunkSkinningCullingTag>(true).Build();
-            m_WorldRenderBounds.AddChangedVersionFilter(ComponentType.ReadOnly<RenderBounds>());
-            m_WorldRenderBounds.AddWorldTranformChangeFilter();
-            m_WorldRenderBounds.AddOrderVersionFilter();
+                                  .WithWorldTransformReadOnly().Build();
 
-            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
-        }
-
-        [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
+            m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
         }
 
         [BurstCompile]
@@ -50,43 +43,94 @@ namespace Latios.Kinemation.Systems
 
             var boundsJob = new BoundsJob
             {
-                RendererBounds                 = GetComponentTypeHandle<RenderBounds>(true),
-                WorldTransform                 = m_worldTransformHandle,
-                PostProcessMatrix              = GetComponentTypeHandle<PostProcessMatrix>(true),
-                WorldRenderBounds              = GetComponentTypeHandle<WorldRenderBounds>(),
-                ChunkWorldRenderBounds         = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
-                shaderEffectRadialBoundsHandle = GetComponentTypeHandle<ShaderEffectRadialBounds>(true),
+                renderBoundsHandle                           = GetComponentTypeHandle<RenderBounds>(true),
+                worldTransformHandle                         = m_worldTransformHandle,
+                postProcessMatrixHandle                      = GetComponentTypeHandle<PostProcessMatrix>(true),
+                worldRenderBoundsHandle                      = GetComponentTypeHandle<WorldRenderBounds>(),
+                chunkWorldRenderBoundsHandle                 = GetComponentTypeHandle<ChunkWorldRenderBounds>(),
+                shaderEffectRadialBoundsHandle               = GetComponentTypeHandle<ShaderEffectRadialBounds>(true),
+                copyDeformFromEntityHandle                   = GetComponentTypeHandle<CopyDeformFromEntity>(true),
+                disableComputeTagHandle                      = GetComponentTypeHandle<DisableComputeShaderProcessingTag>(true),
+                esil                                         = GetEntityStorageInfoLookup(),
+                lastSystemVersion                            = state.LastSystemVersion,
+                skeletonDependentHandle                      = GetComponentTypeHandle<SkeletonDependent>(true),
+                skeletonWorldBoundsOffsetsFromPositionLookup = GetComponentLookup<SkeletonWorldBoundsOffsetsFromPosition>(true),
             };
             state.Dependency = boundsJob.ScheduleParallel(m_WorldRenderBounds, state.Dependency);
         }
 
         [BurstCompile]
-        struct BoundsJob : IJobChunk
+        unsafe struct BoundsJob : IJobChunk
         {
-            [ReadOnly] public ComponentTypeHandle<RenderBounds>             RendererBounds;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle       WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>        PostProcessMatrix;
-            [ReadOnly] public ComponentTypeHandle<ShaderEffectRadialBounds> shaderEffectRadialBoundsHandle;
-            public ComponentTypeHandle<WorldRenderBounds>                   WorldRenderBounds;
-            public ComponentTypeHandle<ChunkWorldRenderBounds>              ChunkWorldRenderBounds;
+            [ReadOnly] public ComponentTypeHandle<RenderBounds>                       renderBoundsHandle;
+            [ReadOnly] public WorldTransformReadOnlyTypeHandle                        worldTransformHandle;
+            [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>                  postProcessMatrixHandle;
+            [ReadOnly] public ComponentTypeHandle<ShaderEffectRadialBounds>           shaderEffectRadialBoundsHandle;
+            [ReadOnly] public ComponentTypeHandle<SkeletonDependent>                  skeletonDependentHandle;
+            [ReadOnly] public ComponentTypeHandle<CopyDeformFromEntity>               copyDeformFromEntityHandle;
+            [ReadOnly] public ComponentTypeHandle<DisableComputeShaderProcessingTag>  disableComputeTagHandle;
+            [ReadOnly] public ComponentLookup<SkeletonWorldBoundsOffsetsFromPosition> skeletonWorldBoundsOffsetsFromPositionLookup;
+            [ReadOnly] public EntityStorageInfoLookup                                 esil;
+            public ComponentTypeHandle<WorldRenderBounds>                             worldRenderBoundsHandle;
+            public ComponentTypeHandle<ChunkWorldRenderBounds>                        chunkWorldRenderBoundsHandle;
+            public uint                                                               lastSystemVersion;
 
-            [NoAlias, NativeDisableContainerSafetyRestriction] NativeArray<RenderBounds> tempBoundsBuffer;
+            [NoAlias, NativeDisableUnsafePtrRestriction] RenderBounds*                           tempBoundsBuffer;
+            [NoAlias, NativeDisableUnsafePtrRestriction] SkeletonWorldBoundsOffsetsFromPosition* tempSkeletonOffsetsBuffer;
+            bool                                                                                 skeletonBufferFilled;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                // This job is not written to support queries with enableable component types.
-                Unity.Assertions.Assert.IsFalse(useEnabledMask);
-
-                var worldBounds     = chunk.GetNativeArray(ref WorldRenderBounds);
-                var localBounds     = chunk.GetNativeArray(ref RendererBounds);
-                var worldTransforms = WorldTransform.Resolve(chunk);
-                var shaderBounds    = chunk.GetNativeArray(ref shaderEffectRadialBoundsHandle);
-
-                if (shaderBounds.Length > 0)
+                var worldTransformChanged = worldTransformHandle.DidChange(in chunk, lastSystemVersion);
+                var renderBoundsChanged   = chunk.DidChange(ref renderBoundsHandle, lastSystemVersion);
+                var skeletonDependents    = chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
+                var copyDeforms           = chunk.GetComponentDataPtrRO(ref copyDeformFromEntityHandle);
+                if (chunk.Has(ref disableComputeTagHandle))
                 {
-                    if (!tempBoundsBuffer.IsCreated)
-                        tempBoundsBuffer = new NativeArray<RenderBounds>(128, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                    for (int i = 0; i < shaderBounds.Length; i++)
+                    skeletonDependents = null;
+                    copyDeforms        = null;
+                }
+                if (!worldTransformChanged && !renderBoundsChanged)
+                {
+                    bool requiresUpdate = false;
+                    if (skeletonDependents != null)
+                    {
+                        var otherWorldTransformHandle = worldTransformHandle;
+                        for (int i = 0; i < chunk.Count; i++)
+                        {
+                            if (DidOtherTransformChange(ref otherWorldTransformHandle, skeletonDependents[i].root))
+                            {
+                                requiresUpdate = true;
+                                break;
+                            }
+                        }
+                    }
+                    else if (copyDeforms != null)
+                    {
+                        var otherWorldTransformHandle = worldTransformHandle;
+                        for (int i = 0; i < chunk.Count; i++)
+                        {
+                            if (DidOtherDependentsTransformChange(ref otherWorldTransformHandle, copyDeforms[i].sourceDeformedEntity))
+                            {
+                                requiresUpdate = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!requiresUpdate)
+                        return;
+                }
+
+                var worldBounds     = (WorldRenderBounds*)chunk.GetRequiredComponentDataPtrRW(ref worldRenderBoundsHandle);
+                var localBounds     = (RenderBounds*)chunk.GetRequiredComponentDataPtrRO(ref renderBoundsHandle);
+                var worldTransforms = worldTransformHandle.Resolve(chunk);
+                var shaderBounds    = chunk.GetComponentDataPtrRO(ref shaderEffectRadialBoundsHandle);
+
+                if (shaderBounds != null)
+                {
+                    if (tempBoundsBuffer == null)
+                        tempBoundsBuffer = (RenderBounds*)new NativeArray<RenderBounds>(128, Allocator.Temp, NativeArrayOptions.UninitializedMemory).GetUnsafePtr();
+                    for (int i = 0; i < chunk.Count; i++)
                     {
                         var bounds            = localBounds[i];
                         bounds.Value.Extents += shaderBounds[i].radialBounds;
@@ -95,37 +139,87 @@ namespace Latios.Kinemation.Systems
                     localBounds = tempBoundsBuffer;
                 }
 
+                if (tempSkeletonOffsetsBuffer == null)
+                    tempSkeletonOffsetsBuffer = (SkeletonWorldBoundsOffsetsFromPosition*)new NativeArray<SkeletonWorldBoundsOffsetsFromPosition>(128,
+                                                                                                                                                 Allocator.Temp,
+                                                                                                                                                 NativeArrayOptions.ClearMemory).
+                                                GetUnsafePtr();
+                if (skeletonDependents != null || copyDeforms != null)
+                {
+                    if (skeletonDependents != null)
+                    {
+                        for (int i = 0; i < chunk.Count; i++)
+                            tempSkeletonOffsetsBuffer[i] = skeletonWorldBoundsOffsetsFromPositionLookup[skeletonDependents[i].root];
+                    }
+                    else
+                    {
+                        for (int i = 0; i < chunk.Count; i++)
+                        {
+                            var dependentInfo = esil[copyDeforms[i].sourceDeformedEntity];
+                            var dependents    = dependentInfo.Chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
+                            if (dependents == null)
+                                tempSkeletonOffsetsBuffer[i] = default; // We are missing the dependent, so ignore the offset.
+                            tempSkeletonOffsetsBuffer[i]     = skeletonWorldBoundsOffsetsFromPositionLookup[dependents[dependentInfo.IndexInChunk].root];
+                        }
+                    }
+                }
+                else if (skeletonBufferFilled)
+                {
+                    UnsafeUtility.MemClear(tempSkeletonOffsetsBuffer, 128 * UnsafeUtility.SizeOf<SkeletonWorldBoundsOffsetsFromPosition>());
+                    skeletonBufferFilled = false;
+                }
+
                 var chunkAabb = new Aabb(float.MaxValue, float.MinValue);
 
-                if (chunk.Has(ref PostProcessMatrix))
+                if (chunk.Has(ref postProcessMatrixHandle))
                 {
-                    var matrices = chunk.GetNativeArray(ref PostProcessMatrix);
-                    for (int i = 0; i != localBounds.Length; i++)
+                    // Only applies to QVVS Transforms
+                    var matrices = chunk.GetNativeArray(ref postProcessMatrixHandle);
+                    for (int i = 0; i != chunk.Count; i++)
                     {
-                        var worldAabb = Physics.TransformAabb(worldTransforms[i], new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
-                        chunkAabb     = Physics.CombineAabb(chunkAabb, worldAabb);
+                        var worldAabb  = Physics.TransformAabb(worldTransforms[i].worldTransformQvvs, new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
+                        worldAabb.min += tempSkeletonOffsetsBuffer[i].minOffset;
+                        worldAabb.max += tempSkeletonOffsetsBuffer[i].maxOffset;
                         Physics.GetCenterExtents(worldAabb, out var center, out var extents);
                         var matrix = new float4x4(new float4(matrices[i].postProcessMatrix.c0, 0f),
                                                   new float4(matrices[i].postProcessMatrix.c1, 0f),
                                                   new float4(matrices[i].postProcessMatrix.c2, 0f),
                                                   new float4(matrices[i].postProcessMatrix.c3, 1f));
                         worldBounds[i] = new WorldRenderBounds { Value = AABB.Transform(matrix, new AABB { Center = center, Extents = extents } )};
+                        chunkAabb                                                                                                   =
+                            Physics.CombineAabb(chunkAabb, new Aabb(worldBounds[i].Value.Min, worldBounds[i].Value.Max));
                     }
                 }
                 else
                 {
-                    for (int i = 0; i != localBounds.Length; i++)
+                    for (int i = 0; i != chunk.Count; i++)
                     {
-                        var worldAabb = Physics.TransformAabb(worldTransforms[i], new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
-                        chunkAabb     = Physics.CombineAabb(chunkAabb, worldAabb);
+                        var worldAabb  = Physics.TransformAabb(worldTransforms[i], new Aabb(localBounds[i].Value.Min, localBounds[i].Value.Max));
+                        worldAabb.min += tempSkeletonOffsetsBuffer[i].minOffset;
+                        worldAabb.max += tempSkeletonOffsetsBuffer[i].maxOffset;
+                        chunkAabb      = Physics.CombineAabb(chunkAabb, worldAabb);
                         Physics.GetCenterExtents(worldAabb, out var center, out var extents);
                         worldBounds[i] = new WorldRenderBounds { Value = new AABB { Center = center, Extents = extents } };
                     }
                 }
                 {
                     Physics.GetCenterExtents(chunkAabb, out var center, out var extents);
-                    chunk.SetChunkComponentData(ref ChunkWorldRenderBounds, new ChunkWorldRenderBounds { Value = new AABB { Center = center, Extents = extents } });
+                    chunk.SetChunkComponentData(ref chunkWorldRenderBoundsHandle, new ChunkWorldRenderBounds { Value = new AABB { Center = center, Extents = extents } });
                 }
+            }
+
+            bool DidOtherTransformChange(ref WorldTransformReadOnlyTypeHandle handle, Entity entity)
+            {
+                return handle.DidChange(esil[entity].Chunk, lastSystemVersion);
+            }
+
+            bool DidOtherDependentsTransformChange(ref WorldTransformReadOnlyTypeHandle handle, Entity dependent)
+            {
+                var dependentInfo = esil[dependent];
+                var dependents    = dependentInfo.Chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
+                if (dependents == null)
+                    return false; // We are missing the dependent, so just keep things as-is.
+                return DidOtherDependentsTransformChange(ref handle, dependents[dependentInfo.IndexInChunk].root);
             }
         }
     }
