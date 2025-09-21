@@ -83,6 +83,11 @@ namespace Latios.Unsafe
         }
 
         /// <summary>
+        /// Removes all elements
+        /// </summary>
+        public void Clear() => m_blockList.Clear();
+
+        /// <summary>
         /// Uses a job to dispose this container
         /// </summary>
         /// <param name="inputDeps">A JobHandle for all jobs which should finish before disposal.</param>
@@ -99,6 +104,52 @@ namespace Latios.Unsafe
         public void Dispose()
         {
             m_blockList.Dispose();
+        }
+
+        /// <summary>
+        /// Gets an enumerator for one of the thread indices in the job.
+        /// </summary>
+        /// <param name="nativeThreadIndex">
+        /// The thread index that was used when the elements were written.
+        /// This does not have to be the thread index of the reader.
+        /// In fact, you usually want to iterate through all threads.
+        /// </param>
+        public UnsafeIndexedBlockList<T>.Enumerator GetEnumerator(int nativeThreadIndex)
+        {
+            return new UnsafeIndexedBlockList<T>.Enumerator(m_blockList.GetEnumerator(nativeThreadIndex));
+        }
+
+        /// <summary>
+        /// Gets an enumerator for all thread indices
+        /// </summary>
+        public UnsafeIndexedBlockList<T>.AllIndicesEnumerator GetEnumerator()
+        {
+            return new UnsafeIndexedBlockList<T>.AllIndicesEnumerator(m_blockList.GetEnumerator());
+        }
+
+        /// <summary>
+        /// Uses atomics to lock a thread index for thread-safe access. If already locked by the same value, this method returns.
+        /// You only ever need this when a writing job and a reading job are allowed to execute at the same time, and the reading
+        /// job is allowed to access all threads.
+        /// </summary>
+        /// <param name="threadIndex">The index to lock.</param>
+        /// <param name="lockValue">A value to represent this context owns the lock. If the index has already been locked by this value, the method returns.</param>
+        /// <param name="unlockValue">A value that specifies the index is not currently locked.</param>
+        /// <returns>Returns true if the lock was acquired while the value was previously unlockValue. Returns false if the index was already locked by lockValue.</returns>
+        public bool LockIndexReentrant(int threadIndex, int lockValue, int unlockValue = 0)
+        {
+            return m_blockList.LockIndexReentrant(threadIndex, lockValue, unlockValue);
+        }
+
+        /// <summary>
+        /// Unlocks the thread index, resetting its internal value to the unlocked state.
+        /// </summary>
+        /// <param name="threadIndex">The index this context locked.</param>
+        /// <param name="lockValue">The lock value that was stored.</param>
+        /// <param name="unlockValue">The unlock value that should be left in the index.</param>
+        public void UnlockIndex(int threadIndex, int lockValue, int unlockValue = 0)
+        {
+            m_blockList.UnlockIndex(threadIndex, lockValue, unlockValue);
         }
     }
 
@@ -138,7 +189,7 @@ namespace Latios.Unsafe
         /// </summary>
         /// <param name="value">The value to write</param>
         /// <param name="index">The index to use when writing.</param>
-        public void Write(T value, int index) =>m_blockList.Write(value, index);
+        public void Write(T value, int index) => m_blockList.Write(value, index);
 
         /// <summary>
         /// Reserve memory for an element and return the fixed memory address.
@@ -205,177 +256,107 @@ namespace Latios.Unsafe
         public void Dispose() => m_blockList.Dispose();
         #endregion
 
-        //#region Enumerator
-        ///// <summary>
-        ///// Gets an enumerator for one of the indices in the job.
-        ///// </summary>
-        ///// <param name="index">
-        ///// The index that was used when the elements were written.
-        ///// </param>
-        //public Enumerator GetEnumerator(int index)
-        //{
-        //    return new Enumerator(m_perIndexBlockList + index, m_elementSize, m_elementsPerBlock);
-        //}
-        //
-        ///// <summary>
-        ///// An enumerator which can be used for iterating over the elements written by a single index.
-        ///// It is allowed to have multiple enumerators for the same thread index.
-        ///// </summary>
-        //public struct Enumerator
-        //{
-        //    private PerIndexBlockList* m_perThreadBlockList;
-        //    private byte* m_readAddress;
-        //    private byte* m_lastByteAddressInBlock;
-        //    private int m_blockIndex;
-        //    private int m_elementSize;
-        //    private int m_elementsPerBlock;
-        //
-        //    internal Enumerator(void* perThreadBlockList, int elementSize, int elementsPerBlock)
-        //    {
-        //        m_perThreadBlockList = (PerIndexBlockList*)perThreadBlockList;
-        //        m_readAddress = null;
-        //        m_readAddress++;
-        //        m_lastByteAddressInBlock = null;
-        //        m_blockIndex = -1;
-        //        m_elementSize = elementSize;
-        //        m_elementsPerBlock = elementsPerBlock;
-        //    }
-        //
-        //    /// <summary>
-        //    /// Advance to the next element
-        //    /// </summary>
-        //    /// <returns>Returns false if the previous element was the last, true otherwise</returns>
-        //    public bool MoveNext()
-        //    {
-        //        m_readAddress += m_elementSize;
-        //        if (m_readAddress > m_lastByteAddressInBlock)
-        //        {
-        //            m_blockIndex++;
-        //            if (m_perThreadBlockList->elementCount == 0 || m_blockIndex >= m_perThreadBlockList->blocks.Length)
-        //                return false;
-        //
-        //            int elementsInBlock = math.min(m_elementsPerBlock, m_perThreadBlockList->elementCount - m_blockIndex * m_elementsPerBlock);
-        //            var blocks = m_perThreadBlockList->blocks.Ptr;
-        //            m_lastByteAddressInBlock = blocks[m_blockIndex].ptr + elementsInBlock * m_elementSize - 1;
-        //            m_readAddress = blocks[m_blockIndex].ptr;
-        //        }
-        //        return true;
-        //    }
-        //
-        //    /// <summary>
-        //    /// Retrieves the current element, copying it to a variable of the specified type.
-        //    /// </summary>
-        //    /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
-        //    /// <returns>A value containing a copy of the element stored, reinterpreted with the strong type</returns>
-        //    public T GetCurrent<T>() where T : unmanaged
-        //    {
-        //        UnsafeUtility.CopyPtrToStructure(m_readAddress, out T t);
-        //        return t;
-        //    }
-        //
-        //    /// <summary>
-        //    /// Retrieves the current element by ref of the specified type.
-        //    /// </summary>
-        //    /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
-        //    /// <returns>A ref of the element stored, reinterpreted with the strong type</returns>
-        //    public ref T GetCurrentAsRef<T>() where T : unmanaged
-        //    {
-        //        return ref UnsafeUtility.AsRef<T>(m_readAddress);
-        //    }
-        //
-        //    /// <summary>
-        //    /// Returns the current element's raw address within the block list.
-        //    /// </summary>
-        //    public void* GetCurrentPtr() => m_readAddress;
-        //
-        //    internal Enumerator GetNextIndexEnumerator()
-        //    {
-        //        return new Enumerator(m_perThreadBlockList + 1, m_elementSize, m_elementsPerBlock);
-        //    }
-        //}
-        //
-        ///// <summary>
-        ///// Gets an enumerator for all indices.
-        ///// </summary>
-        //public AllIndicesEnumerator GetEnumerator()
-        //{
-        //    return new AllIndicesEnumerator(new Enumerator(m_perIndexBlockList, m_elementSize, m_elementsPerBlock), m_indexCount);
-        //}
-        //
-        ///// <summary>
-        ///// An enumerator which can be used for iterating over the elements written by all indices.
-        ///// </summary>
-        //public struct AllIndicesEnumerator
-        //{
-        //    Enumerator m_enumerator;
-        //    int m_index;
-        //    int m_indexCount;
-        //
-        //    internal AllIndicesEnumerator(Enumerator thread0Enumerator, int indexCount)
-        //    {
-        //        m_enumerator = thread0Enumerator;
-        //        m_index = 0;
-        //        m_indexCount = indexCount;
-        //    }
-        //
-        //    /// <summary>
-        //    /// Advance to the next element
-        //    /// </summary>
-        //    /// <returns>Returns false if the previous element was the last, true otherwise</returns>
-        //    public bool MoveNext()
-        //    {
-        //        while (!m_enumerator.MoveNext())
-        //        {
-        //            m_index++;
-        //            if (m_index >= m_indexCount)
-        //                return false;
-        //            m_enumerator = m_enumerator.GetNextIndexEnumerator();
-        //        }
-        //        return true;
-        //    }
-        //
-        //    /// <summary>
-        //    /// Retrieves the current element, copying it to a variable of the specified type.
-        //    /// </summary>
-        //    /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
-        //    /// <returns>A value containing a copy of the element stored, reinterpreted with the strong type</returns>
-        //    public T GetCurrent<T>() where T : unmanaged => m_enumerator.GetCurrent<T>();
-        //
-        //    /// <summary>
-        //    /// Retrieves the current element by ref of the specified type.
-        //    /// </summary>
-        //    /// <typeparam name="T">It is assumed the size of T is the same as what was passed into elementSize during construction</typeparam>
-        //    /// <returns>A ref of the element stored, reinterpreted with the strong type</returns>
-        //    public ref T GetCurrentAsRef<T>() where T : unmanaged => ref m_enumerator.GetCurrentAsRef<T>();
-        //
-        //    /// <summary>
-        //    /// Returns the current element's raw address within the block list.
-        //    /// </summary>
-        //    public void* GetCurrentPtr() => m_enumerator.GetCurrentPtr();
-        //
-        //    // Schedule for 128 iterations
-        //    //[BurstCompile]
-        //    //struct ExampleReadJob : IJobFor
-        //    //{
-        //    //    [NativeDisableUnsafePtrRestriction] public UnsafeParallelBlockList blockList;
-        //    //
-        //    //    public void Execute(int index)
-        //    //    {
-        //    //        var enumerator = blockList.GetEnumerator(index);
-        //    //
-        //    //        while (enumerator.MoveNext())
-        //    //        {
-        //    //            int number = enumerator.GetCurrent<int>();
-        //    //
-        //    //            if (number == 381)
-        //    //                UnityEngine.Debug.Log("You found me!");
-        //    //            else if (number == 380)
-        //    //                UnityEngine.Debug.Log("Where?");
-        //    //        }
-        //    //    }
-        //    //}
-        //}
-        //#endregion
+        #region Enumerator
+        /// <summary>
+        /// Gets an enumerator for one of the indices in the job.
+        /// </summary>
+        /// <param name="index">
+        /// The index that was used when the elements were written.
+        /// </param>
+        public Enumerator GetEnumerator(int index)
+        {
+            return new Enumerator(m_blockList.GetEnumerator(index));
+        }
+
+        /// <summary>
+        /// An enumerator which can be used for iterating over the elements written by a single index.
+        /// It is allowed to have multiple enumerators for the same thread index.
+        /// </summary>
+        public struct Enumerator
+        {
+            UnsafeIndexedBlockList.Enumerator m_enumerator;
+
+            internal Enumerator(UnsafeIndexedBlockList.Enumerator enumerator)
+            {
+                m_enumerator = enumerator;
+            }
+
+            /// <summary>
+            /// Advance to the next element
+            /// </summary>
+            /// <returns>Returns false if the previous element was the last, true otherwise</returns>
+            public bool MoveNext()
+            {
+                return m_enumerator.MoveNext();
+            }
+
+            /// <summary>
+            /// Retrieves the current element
+            /// </summary>
+            /// <returns>A value containing a copy of the element stored</returns>
+            public T Current => m_enumerator.GetCurrent<T>();
+
+            /// <summary>
+            /// Retrieves the current element by ref
+            /// </summary>
+            /// <returns>A ref of the element stored</returns>
+            public ref T GetCurrentAsRef() => ref m_enumerator.GetCurrentAsRef<T>();
+
+            /// <summary>
+            /// Returns the current element's raw address within the block list.
+            /// </summary>
+            public T* GetCurrentPtr() => (T*)m_enumerator.GetCurrentPtr();
+
+            internal Enumerator GetNextIndexEnumerator()
+            {
+                return new Enumerator(m_enumerator.GetNextIndexEnumerator());
+            }
+        }
+
+        /// <summary>
+        /// Gets an enumerator for all indices.
+        /// </summary>
+        public AllIndicesEnumerator GetEnumerator()
+        {
+            return new AllIndicesEnumerator(m_blockList.GetEnumerator());
+        }
+
+        /// <summary>
+        /// An enumerator which can be used for iterating over the elements written by all indices.
+        /// </summary>
+        public struct AllIndicesEnumerator
+        {
+            UnsafeIndexedBlockList.AllIndicesEnumerator m_enumerator;
+
+            internal AllIndicesEnumerator(UnsafeIndexedBlockList.AllIndicesEnumerator enumerator)
+            {
+                m_enumerator = enumerator;
+            }
+
+            /// <summary>
+            /// Advance to the next element
+            /// </summary>
+            /// <returns>Returns false if the previous element was the last, true otherwise</returns>
+            public bool MoveNext() => m_enumerator.MoveNext();
+
+            /// <summary>
+            /// Retrieves the current element.
+            /// </summary>
+            /// <returns>A value containing a copy of the element stored</returns>
+            public T Current => m_enumerator.GetCurrent<T>();
+
+            /// <summary>
+            /// Retrieves the current element by ref.
+            /// </summary>
+            /// <returns>A ref of the element stored</returns>
+            public ref T GetCurrentAsRef() => ref m_enumerator.GetCurrentAsRef<T>();
+
+            /// <summary>
+            /// Returns the current element's raw address within the block list.
+            /// </summary>
+            public T* GetCurrentPtr() => (T*)m_enumerator.GetCurrentPtr();
+        }
+        #endregion
 
         #region Threading
         /// <summary>

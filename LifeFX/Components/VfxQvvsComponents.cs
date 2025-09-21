@@ -36,8 +36,8 @@ namespace Latios.LifeFX
 
     internal partial struct TrackedTransformUploadList : ICollectionComponent
     {
-        public NativeList<TransformQvvs> trackedTransforms;
-        public UnsafeParallelBlockList   uploadIndices;  // int
+        public NativeList<TransformQvvs>    trackedTransforms;
+        public UnsafeParallelBlockList<int> uploadIndices;
 
         // worldUpdateAllocator / owned explicitly by UpdateTrackedWorldTransformSystem
         public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;

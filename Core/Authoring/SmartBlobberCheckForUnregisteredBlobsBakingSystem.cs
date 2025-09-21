@@ -50,7 +50,7 @@ namespace Latios.Authoring.Systems
             m_resultHandle.Update(ref state);
             m_hashHandle.Update(ref state);
 
-            var blobsToDispose = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<UnsafeUntypedBlobAssetReference>(), 64, state.WorldUpdateAllocator);
+            var blobsToDispose = new UnsafeParallelBlockList<UnsafeUntypedBlobAssetReference>(64, state.WorldUpdateAllocator);
 
             state.Dependency = new Job
             {
@@ -72,7 +72,7 @@ namespace Latios.Authoring.Systems
             [ReadOnly] public ComponentTypeHandle<SmartBlobberTrackingData>       trackingDataHandle;
             public ComponentTypeHandle<SmartBlobberResult>                        resultHandle;
             [ReadOnly] public SharedComponentTypeHandle<SmartBlobberBlobTypeHash> hashHandle;
-            public UnsafeParallelBlockList                                        blobsToDispose;
+            public UnsafeParallelBlockList<UnsafeUntypedBlobAssetReference>       blobsToDispose;
 
             [NativeSetThreadIndex]
             int threadIndex;
@@ -115,7 +115,7 @@ namespace Latios.Authoring.Systems
         [BurstCompile]
         struct DisposeJob : IJob
         {
-            public UnsafeParallelBlockList blobsToDispose;
+            public UnsafeParallelBlockList<UnsafeUntypedBlobAssetReference> blobsToDispose;
 
             public unsafe void Execute()
             {
@@ -128,10 +128,8 @@ namespace Latios.Authoring.Systems
 
                 var set = new NativeHashSet<PtrWrapper>(blobCount, Allocator.Temp);
 
-                var enumerator = blobsToDispose.GetEnumerator();
-                while (enumerator.MoveNext())
+                foreach (var blob in blobsToDispose)
                 {
-                    var blob = enumerator.GetCurrent<UnsafeUntypedBlobAssetReference>();
                     if (set.Contains(blob))
                         continue;
                     set.Add(blob);

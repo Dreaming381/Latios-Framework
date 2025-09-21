@@ -36,7 +36,7 @@ namespace Latios.Kinemation.Systems
             if (cullingContext.cullIndexThisFrame == 0)
                 state.Dependency = new NewFrameJob { meshPool = meshPool }.Schedule(state.Dependency);
 
-            var changeRequests = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<ChangeRequest>(), 256, state.WorldUpdateAllocator);
+            var changeRequests = new UnsafeParallelBlockList<ChangeRequest>(256, state.WorldUpdateAllocator);
             state.Dependency   = new CullJob
             {
                 entityHandle   = GetEntityTypeHandle(),
@@ -93,7 +93,7 @@ namespace Latios.Kinemation.Systems
 
             public ComponentTypeHandle<UniqueMeshConfig>          configHandle;
             public ComponentTypeHandle<ChunkPerCameraCullingMask> maskHandle;
-            public UnsafeParallelBlockList                        changeRequests;
+            public UnsafeParallelBlockList<ChangeRequest>         changeRequests;
 
             [NativeSetThreadIndex]
             int threadIndex;
@@ -177,15 +177,13 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct UpdateRequestsJob : IJob
         {
-            public UnsafeParallelBlockList changeRequests;
-            public UniqueMeshPool          meshPool;
+            public UnsafeParallelBlockList<ChangeRequest> changeRequests;
+            public UniqueMeshPool                         meshPool;
 
             public void Execute()
             {
-                var enumerator = changeRequests.GetEnumerator();
-                while (enumerator.MoveNext())
+                foreach (var request in changeRequests)
                 {
-                    var request = enumerator.GetCurrent<ChangeRequest>();
                     if (request.isInvalid)
                     {
                         meshPool.invalidMeshesToCull.Add(request.meshID);

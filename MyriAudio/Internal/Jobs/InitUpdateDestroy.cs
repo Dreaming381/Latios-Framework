@@ -115,17 +115,17 @@ namespace Latios.Myri
                                 ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
                                 if (sampleRate == clip.m_clip.Value.sampleRate && sampleRateMultiplier == 1.0)
                                 {
-                                    int clipStart     = (int)(samplesPlayed % (ulong)clip.m_clip.Value.samplesLeftOrMono.Length);
-                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                    int clipStart     = (int)(samplesPlayed % (ulong)clip.m_clip.Value.sampleCountPerChannel);
+                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.sampleCountPerChannel - clipStart);
                                 }
                                 else
                                 {
                                     double clipSampleStride             = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
                                     double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
-                                    double clipStart                    = samplesPlayedInSourceSamples % clip.m_clip.Value.samplesLeftOrMono.Length;
+                                    double clipStart                    = samplesPlayedInSourceSamples % clip.m_clip.Value.sampleCountPerChannel;
                                     // We can't get exact due to the mismatched rate, so we choose a rounded start point between
                                     // the last and first sample by chopping off the fractional part
-                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                    clip.m_loopOffset = (uint)(clip.m_clip.Value.sampleCountPerChannel - clipStart);
                                 }
                                 clip.m_spawnedBufferId = bufferId;
                             }
@@ -148,13 +148,13 @@ namespace Latios.Myri
                                 ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
                                 double clipSampleStride             = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
                                 double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
-                                double clipStart                    = (samplesPlayedInSourceSamples + clip.m_loopOffset) % clip.m_clip.Value.samplesLeftOrMono.Length;
+                                double clipStart                    = (samplesPlayedInSourceSamples + clip.m_loopOffset) % clip.m_clip.Value.sampleCountPerChannel;
                                 // We add a one sample tolerance in case we are regenerating the same audio frame, in which case the old values are fine.
-                                if (clipStart < clip.m_clip.Value.samplesLeftOrMono.Length / 2 && clipStart > 1)
+                                if (clipStart < clip.m_clip.Value.sampleCountPerChannel / 2 && clipStart > 1)
                                 {
                                     // We missed the buffer
-                                    clipStart              = samplesPlayedInSourceSamples % clip.m_clip.Value.samplesLeftOrMono.Length;
-                                    clip.m_loopOffset      = (uint)(clip.m_clip.Value.samplesLeftOrMono.Length - clipStart);
+                                    clipStart              = samplesPlayedInSourceSamples % clip.m_clip.Value.sampleCountPerChannel;
+                                    clip.m_loopOffset      = (uint)(clip.m_clip.Value.sampleCountPerChannel - clipStart);
                                     clip.m_spawnedBufferId = bufferId;
                                 }
                             }
@@ -184,7 +184,7 @@ namespace Latios.Myri
                         else
                         {
                             double resampleRate = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
-                            if (clip.m_initialized && clip.m_clip.Value.samplesLeftOrMono.Length < resampleRate * framesPlayed * samplesPerFrame)
+                            if (clip.m_initialized && clip.m_clip.Value.sampleCountPerChannel < resampleRate * framesPlayed * samplesPerFrame)
                             {
                                 if (expireMask.EnableBit.IsValid)
                                     expireMask[i] = false;

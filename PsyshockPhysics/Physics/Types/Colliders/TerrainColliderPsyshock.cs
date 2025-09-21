@@ -359,7 +359,7 @@ namespace Latios.Psyshock
             [FieldOffset(2)]   public short max;
             [FieldOffset(4)]   public short startX;
             [FieldOffset(6)]   public short startY;
-            [FieldOffset(8)]   public ulong triangleSplitParity;  // (0, 0) is bottom left, (1, 1) is top right, which both have parity 0, thus bl -> tr split edge is partity 0.
+            [FieldOffset(8)]   public ulong triangleSplitParity;  // (0, 0) is bottom left, (1, 1) is top right, which both have parity 0, thus bl -> tr split edge is parity 0.
             [FieldOffset(16)]  public ulong isFirstTriangleOrChildPatchValid;
             [FieldOffset(24)]  public ulong isSecondTriangleValid;
             [FieldOffset(32)]  public v128  minA;
@@ -587,7 +587,21 @@ namespace Latios.Psyshock
             }
         }
 
-        int ToHeight1D(int2 height2D) => height2D.y * (quadsPerRow + 1) + height2D.x;
+        internal bool GetSplitParity(int quadIndex)
+        {
+            var     quadRow               = quadIndex / quadsPerRow;
+            var     quadIndexInRow        = quadIndex % quadsPerRow;
+            var     patchRow              = quadRow / 8;
+            var     patchIndexInRow       = quadIndexInRow / 8;
+            var     patchIndex            = patchRow * patchesPerRow + patchIndexInRow;
+            ref var patch                 = ref patches[patchIndex];
+            var     quadRowInPatch        = quadRow % 8;
+            var     quadIndexInRowInPatch = quadIndexInRow % 8;
+            var     bitInPatch            = quadRowInPatch * 8 + quadIndexInRowInPatch;
+            return (patch.triangleSplitParity & (1ul << bitInPatch)) != 0;
+        }
+
+        internal int ToHeight1D(int2 height2D) => height2D.y * (quadsPerRow + 1) + height2D.x;
 
         void DoFinal<T>(ref Patch patch, int4 packedSearchDomain, ref T processor) where T : unmanaged, IFindTrianglesProcessor
         {

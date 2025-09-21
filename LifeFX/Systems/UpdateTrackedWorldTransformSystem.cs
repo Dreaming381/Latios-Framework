@@ -62,7 +62,7 @@ namespace Latios.LifeFX.Systems
         {
             var chunkCount    = m_query.CalculateChunkCountWithoutFiltering();
             var newChunks     = new NativeList<DeferredChunk>(chunkCount, state.WorldUpdateAllocator);
-            var uploadIndices = new UnsafeParallelBlockList(4, 1024, state.WorldUpdateAllocator);
+            var uploadIndices = new UnsafeParallelBlockList<int>(1024, state.WorldUpdateAllocator);
             var aliveByThread = CollectionHelper.CreateNativeArray<UnsafeBitArray>(JobsUtility.ThreadIndexCount, state.WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
             int reapCapacity  = m_trackedEntities.Length;
             var reaped        = new NativeList<int>(reapCapacity, state.WorldUpdateAllocator);
@@ -135,7 +135,7 @@ namespace Latios.LifeFX.Systems
             [NativeDisableParallelForRestriction] public NativeArray<TransformQvvs>  trackedTransforms;
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeBitArray> aliveByThread;
             public NativeList<DeferredChunk>.ParallelWriter                          newChunks;
-            public UnsafeParallelBlockList                                           uploadIndices;
+            public UnsafeParallelBlockList<int>                                      uploadIndices;
             public AllocatorManager.AllocatorHandle                                  allocator;
             public uint                                                              lastSystemVersion;
 
@@ -223,7 +223,7 @@ namespace Latios.LifeFX.Systems
         struct ReapJob : IJobParallelForBatch
         {
             [ReadOnly] public NativeArray<UnsafeBitArray>                               aliveByThread;
-            public UnsafeParallelBlockList                                              uploadIndices;
+            public UnsafeParallelBlockList<int>                                         uploadIndices;
             [NativeDisableParallelForRestriction] public NativeArray<Entity>            trackedEntities;
             [NativeDisableParallelForRestriction] public NativeArray<TransformQvvs>     trackedTransforms;
             [NativeDisableParallelForRestriction] public NativeList<int>.ParallelWriter reaped;
@@ -275,7 +275,7 @@ namespace Latios.LifeFX.Systems
             public NativeList<TransformQvvs>                  trackedTransforms;
             public NativeList<int>                            freelist;
             public NativeArray<DeferredChunk>                 newChunks;
-            public UnsafeParallelBlockList                    uploadIndices;
+            public UnsafeParallelBlockList<int>               uploadIndices;
             public NativeList<int>                            reaped;
 
             [NativeSetThreadIndex]

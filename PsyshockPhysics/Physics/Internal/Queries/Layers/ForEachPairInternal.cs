@@ -204,7 +204,7 @@ namespace Latios.Psyshock
             var enumerator = pairStream.data.pairHeaders.GetEnumerator(aggregateStream);
             while (enumerator.MoveNext())
             {
-                ref var header = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
+                ref var header = ref enumerator.GetCurrentAsRef();
 
                 bool addedA = entityLookup.TryGetValue(header.entityA, out var indexA);
                 bool addedB = entityLookup.TryGetValue(header.entityB, out var indexB);
@@ -290,7 +290,7 @@ namespace Latios.Psyshock
                 enumerator                    = pairStream.data.pairHeaders.GetEnumerator(aggregateStream);
                 while (enumerator.MoveNext())
                 {
-                    var entityA                           = enumerator.GetCurrentAsRef<PairStream.PairHeader>().entityA;
+                    var entityA                           = enumerator.GetCurrentAsRef().entityA;
                     var targetIsland                      = ranks[entityLookup[entityA]];
                     islandIndicesAndCounts[targetIsland] += new int2(0, 1);
                 }
@@ -374,7 +374,7 @@ namespace Latios.Psyshock
             enumerator     = pairStream.data.pairHeaders.GetEnumerator(aggregateStream);
             while (enumerator.MoveNext())
             {
-                ref var header       = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
+                ref var header       = ref enumerator.GetCurrentAsRef();
                 int     targetStream = ranks[entityLookup[header.entityA]];
                 pairStream.data.pairHeaders.Write(header, baseStream + targetStream);
             }
@@ -410,7 +410,7 @@ namespace Latios.Psyshock
                     var enumerator = pairStream.data.pairHeaders.GetEnumerator(i);
                     while (enumerator.MoveNext())
                     {
-                        ref var header = ref enumerator.GetCurrentAsRef<PairStream.PairHeader>();
+                        ref var header = ref enumerator.GetCurrentAsRef();
                         bool    aIsRW  = (header.flags & PairStream.PairHeader.kWritableA) == PairStream.PairHeader.kWritableA;
                         if (aIsRW && map.TryGetValue(header.entityA, out var oldIndex))
                         {

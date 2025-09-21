@@ -1,5 +1,8 @@
-﻿using Latios.Authoring;
+﻿using System;
+using Latios.Authoring;
 using Latios.Authoring.Systems;
+using Latios.Myri.DSP;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -27,12 +30,14 @@ namespace Latios.Myri.Authoring
         /// <param name="sampleRate">The number of samples per second, AKA Hertz</param>
         /// <param name="channelCount">The number of channels. Must be 1 (Mono) or 2 (Stereo)</param>
         /// <param name="blobEntity">An entity on which to add parameter components for the baking system via the baker</param>
+        /// <param name="codec">The compression codec to use</param>
         /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
         public static unsafe SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker,
                                                                                       FixedString128Bytes name,
                                                                                       int sampleRate,
                                                                                       int channelCount,
                                                                                       out Entity blobEntity,
+                                                                                      Codec codec = Codec.Uncompressed,
                                                                                       int numVoices = 0)
         {
             Entity capturedEntity;
@@ -42,6 +47,7 @@ namespace Latios.Myri.Authoring
                 channelCount   = channelCount,
                 sampleRate     = sampleRate,
                 numVoices      = numVoices,
+                codec          = codec,
                 capturedEntity = &capturedEntity
             };
             var result = baker.RequestCreateBlobAsset<AudioClipBlob, CustomAudioClipBakeData>(data);
@@ -55,11 +61,13 @@ namespace Latios.Myri.Authoring
         /// <param name="name">The name of the clip</param>
         /// <param name="sampleRate">The number of samples per second, AKA Hertz</param>
         /// <param name="monoSamples">A buffer which should be populated with the samples for a single mono channel</param>
+        /// <param name="codec">The compression codec to use</param>
         /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
         public static unsafe SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker,
                                                                                       FixedString128Bytes name,
                                                                                       int sampleRate,
                                                                                       out DynamicBuffer<float> monoSamples,
+                                                                                      Codec codec = Codec.Uncompressed,
                                                                                       int numVoices = 0)
         {
             DynamicBuffer<CustomAudioClipLeftOrMonoSample> capturedMono;
@@ -69,6 +77,7 @@ namespace Latios.Myri.Authoring
                 channelCount       = 1,
                 sampleRate         = sampleRate,
                 numVoices          = numVoices,
+                codec              = codec,
                 capturedLeftOrMono = &capturedMono
             };
             var result  = baker.RequestCreateBlobAsset<AudioClipBlob, CustomAudioClipBakeData>(data);
@@ -83,12 +92,14 @@ namespace Latios.Myri.Authoring
         /// <param name="sampleRate">The number of samples per second, AKA Hertz</param>
         /// <param name="leftSamples">A buffer which should be populated with the samples for the left channel</param>
         /// <param name="rightSamples">A buffer which should be populated with the samples for the right channel</param>
+        /// <param name="codec">The compression codec to use</param>
         /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
         public static unsafe SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker,
                                                                                       FixedString128Bytes name,
                                                                                       int sampleRate,
                                                                                       out DynamicBuffer<float> leftSamples,
                                                                                       out DynamicBuffer<float> rightSamples,
+                                                                                      Codec codec = Codec.Uncompressed,
                                                                                       int numVoices = 0)
         {
             DynamicBuffer<CustomAudioClipLeftOrMonoSample> capturedLeft;
@@ -99,6 +110,7 @@ namespace Latios.Myri.Authoring
                 channelCount       = 2,
                 sampleRate         = sampleRate,
                 numVoices          = numVoices,
+                codec              = codec,
                 capturedLeftOrMono = &capturedLeft,
                 capturedRight      = &capturedRight,
             };
@@ -136,6 +148,7 @@ namespace Latios.Myri.Authoring
         public int                 channelCount;
         public int                 sampleRate;
         public int                 numVoices;
+        public Codec               codec;
 
         internal DynamicBuffer<CustomAudioClipLeftOrMonoSample>* capturedLeftOrMono;
         internal DynamicBuffer<CustomAudioClipRightSample>*      capturedRight;
@@ -151,7 +164,8 @@ namespace Latios.Myri.Authoring
             {
                 name       = name,
                 sampleRate = sampleRate,
-                numVoices  = numVoices
+                numVoices  = numVoices,
+                codec      = codec
             });
             if (capturedEntity != null)
                 *capturedEntity = blobBakingEntity;
@@ -173,6 +187,7 @@ namespace Latios.Myri.Authoring
         public FixedString128Bytes name;
         public int                 sampleRate;
         public int                 numVoices;
+        public Codec               codec;
     }
 }
 
@@ -204,19 +219,23 @@ namespace Latios.Myri.Authoring.Systems
         [BurstCompile]
         partial struct MonoJob : IJobEntity
         {
-            public void Execute(ref SmartBlobberResult result, in CustomAudioClipParametersBlobBakeData parameters, in DynamicBuffer<CustomAudioClipLeftOrMonoSample> monoSamples)
+            public void Execute(ref SmartBlobberResult result, in CustomAudioClipParametersBlobBakeData parameters, ref DynamicBuffer<CustomAudioClipLeftOrMonoSample> monoSamples)
             {
-                var     builder   = new BlobBuilder(Allocator.Temp);
-                ref var root      = ref builder.ConstructRoot<AudioClipBlob>();
-                var     blobLeft  = builder.Allocate(ref root.samplesLeftOrMono, monoSamples.Length);
-                var     blobRight = builder.Allocate(ref root.samplesRight, 1);
-                blobRight[0]      = 0f;
-                for (int i = 0; i < monoSamples.Length; i++)
+                var     builder = new BlobBuilder(Allocator.Temp);
+                ref var root    = ref builder.ConstructRoot<AudioClipBlob>();
+
+                var context = new CodecContext
                 {
-                    blobLeft[i] = monoSamples[i].sample;
-                }
+                    sampleRate           = parameters.sampleRate,
+                    threadStackAllocator = ThreadStackAllocator.GetAllocator()
+                };
+
+                root.sampleCountPerChannel = monoSamples.Length;
+                var mono                   = monoSamples.AsNativeArray().Reinterpret<float>().AsSpan();
+                CodecDispatch.Encode(parameters.codec, ref builder, ref root.encodedSamples, mono, ref context);
+
                 int offsetCount = math.max(parameters.numVoices, 1);
-                int stride      = blobLeft.Length / offsetCount;
+                int stride      = monoSamples.Length / offsetCount;
                 var offsets     = builder.Allocate(ref root.loopedOffsets, offsetCount);
                 for (int i = 0; i < offsetCount; i++)
                 {
@@ -224,8 +243,11 @@ namespace Latios.Myri.Authoring.Systems
                 }
                 root.sampleRate = parameters.sampleRate;
                 root.name       = parameters.name;
+                root.isStereo   = false;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent));
+
+                context.threadStackAllocator.Dispose();
             }
         }
 
@@ -235,25 +257,30 @@ namespace Latios.Myri.Authoring.Systems
         {
             public void Execute(ref SmartBlobberResult result,
                                 in CustomAudioClipParametersBlobBakeData parameters,
-                                in DynamicBuffer<CustomAudioClipLeftOrMonoSample> leftSamples,
-                                in DynamicBuffer<CustomAudioClipRightSample>      rightSamples)
+                                ref DynamicBuffer<CustomAudioClipLeftOrMonoSample> leftSamples,
+                                ref DynamicBuffer<CustomAudioClipRightSample>      rightSamples)
             {
                 if (leftSamples.Length != rightSamples.Length)
                 {
                     UnityEngine.Debug.LogError($"Myri failed to baked custom clip {parameters.name}. The number of samples provided by the left and right buffers do not match.");
                 }
 
-                var     builder   = new BlobBuilder(Allocator.Temp);
-                ref var root      = ref builder.ConstructRoot<AudioClipBlob>();
-                var     blobLeft  = builder.Allocate(ref root.samplesLeftOrMono, leftSamples.Length);
-                var     blobRight = builder.Allocate(ref root.samplesRight, rightSamples.Length);
-                for (int i = 0; i < leftSamples.Length; i++)
+                var     builder = new BlobBuilder(Allocator.Temp);
+                ref var root    = ref builder.ConstructRoot<AudioClipBlob>();
+
+                var context = new CodecContext
                 {
-                    blobLeft[i]  = leftSamples[i].sample;
-                    blobRight[i] = rightSamples[i].sample;
-                }
+                    sampleRate           = parameters.sampleRate,
+                    threadStackAllocator = ThreadStackAllocator.GetAllocator()
+                };
+
+                root.sampleCountPerChannel = leftSamples.Length;
+                var left                   = leftSamples.AsNativeArray().Reinterpret<float>().AsSpan();
+                var right                  = rightSamples.AsNativeArray().Reinterpret<float>().AsSpan();
+                CodecDispatch.Encode(parameters.codec, ref builder, ref root.encodedSamples, left, right, ref context);
+
                 int offsetCount = math.max(parameters.numVoices, 1);
-                int stride      = blobLeft.Length / offsetCount;
+                int stride      = leftSamples.Length / offsetCount;
                 var offsets     = builder.Allocate(ref root.loopedOffsets, offsetCount);
                 for (int i = 0; i < offsetCount; i++)
                 {
@@ -261,6 +288,8 @@ namespace Latios.Myri.Authoring.Systems
                 }
                 root.sampleRate = parameters.sampleRate;
                 root.name       = parameters.name;
+                root.isStereo   = true;
+                root.codec      = parameters.codec;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent));
             }

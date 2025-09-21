@@ -750,7 +750,7 @@ namespace Latios.Psyshock
                 [ReadOnly] CollisionLayer      layerA;
                 [ReadOnly] CollisionLayer      layerB;
                 T                              processor;
-                UnsafeIndexedBlockList         blockList;
+                UnsafeIndexedBlockList<int2>   blockList;
                 ScheduleMode                   m_scheduleMode;
                 Unity.Profiling.ProfilerMarker modeAndTMarker;
 
@@ -801,7 +801,7 @@ namespace Latios.Psyshock
                         if (useCrossCache)
                         {
                             var crossCount = IndexStrategies.ParallelByACrossCount(layerA.cellCount);
-                            blockList      = new UnsafeIndexedBlockList(8, 1024, crossCount, Allocator.TempJob);
+                            blockList      = new UnsafeIndexedBlockList<int2>(1024, crossCount, Allocator.TempJob);
                             inputDeps      = new FindPairsParallelByACrossCacheJob { layerA = layerA, layerB = layerB, cache = blockList }.ScheduleParallel(crossCount,
                                                                                                                                                             1,
                                                                                                                                                             inputDeps);
@@ -1906,9 +1906,9 @@ namespace Latios.Psyshock
     [BurstCompile]
     internal struct FindPairsParallelByACrossCacheJob : IJobFor
     {
-        [ReadOnly] public CollisionLayer layerA;
-        [ReadOnly] public CollisionLayer layerB;
-        public UnsafeIndexedBlockList    cache;
+        [ReadOnly] public CollisionLayer    layerA;
+        [ReadOnly] public CollisionLayer    layerB;
+        public UnsafeIndexedBlockList<int2> cache;
 
         public void Execute(int index)
         {
@@ -1920,8 +1920,8 @@ namespace Latios.Psyshock
 
         struct Cacher : IFindPairsProcessor
         {
-            public UnsafeIndexedBlockList cache;
-            public int                    writeIndex;
+            public UnsafeIndexedBlockList<int2> cache;
+            public int                          writeIndex;
 
             public void Execute(in FindPairsResult result)
             {

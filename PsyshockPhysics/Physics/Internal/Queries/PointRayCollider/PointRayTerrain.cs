@@ -171,6 +171,12 @@ namespace Latios.Psyshock
             triangle.pointC      *= scale;
             return triangle;
         }
+
+        internal static float3 CreateLocalVertex(ref TerrainColliderBlob blob, int2 heightCoordinate, int heightOffset, float3 scale)
+        {
+            var vertex = new float3(heightCoordinate.x, blob.heights[blob.ToHeight1D(heightCoordinate)] + heightOffset, heightCoordinate.y);
+            return vertex * scale;
+        }
     }
 }
 

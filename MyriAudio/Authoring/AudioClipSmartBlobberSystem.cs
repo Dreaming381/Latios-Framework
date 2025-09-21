@@ -1,6 +1,7 @@
 using System;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -18,10 +19,11 @@ namespace Latios.Myri.Authoring
         /// Requests the creation of a AudioClipBlob Blob Asset
         /// </summary>
         /// <param name="clip">The audio clip to bake</param>
+        /// <param name="codec">The compression codec to use</param>
         /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
-        public static SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker, AudioClip clip, int numVoices = 0)
+        public static SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker, AudioClip clip, Codec codec = Codec.Uncompressed, int numVoices = 0)
         {
-            return baker.RequestCreateBlobAsset<AudioClipBlob, AudioClipBakeData>(new AudioClipBakeData { clip = clip, numVoices = numVoices });
+            return baker.RequestCreateBlobAsset<AudioClipBlob, AudioClipBakeData>(new AudioClipBakeData { clip = clip, numVoices = numVoices, codec = codec });
         }
     }
 
@@ -29,11 +31,13 @@ namespace Latios.Myri.Authoring
     {
         public AudioClip clip;
         public int       numVoices;
+        public Codec     codec;
 
-        public AudioClipBakeData(AudioClip clip, int numVoices)
+        public AudioClipBakeData(AudioClip clip, int numVoices, Codec codec)
         {
             this.clip      = clip;
             this.numVoices = numVoices;
+            this.codec     = codec;
         }
 
         public bool Filter(IBaker baker, Entity blobBakingEntity)
@@ -54,16 +58,27 @@ namespace Latios.Myri.Authoring
                 Debug.LogError($"Myri failed to bake clip {clip.name}. The clip must be imported with \"Decompress On Load\".");
                 return false;
             }
-            baker.AddComponent(blobBakingEntity, new AudioClipBlobBakeData { clip = clip, numVoices = numVoices });
+            baker.AddComponent(blobBakingEntity, new AudioClipBlobBakeData { clip = clip, numVoices = numVoices, codec = codec });
             return true;
         }
     }
 
     [TemporaryBakingType]
-    internal struct AudioClipBlobBakeData : IComponentData
+    internal struct AudioClipBlobBakeData : IComponentData, IEquatable<AudioClipBlobBakeData>
     {
         public UnityObjectRef<AudioClip> clip;
         public int                       numVoices;
+        public Codec                     codec;
+
+        public bool Equals(AudioClipBlobBakeData other)
+        {
+            return clip.Equals(other.clip) && numVoices == other.numVoices && codec == other.codec;
+        }
+
+        public override int GetHashCode()
+        {
+            return new int3(clip.GetHashCode(), numVoices, (int)codec).GetHashCode();
+        }
     }
 }
 
@@ -72,141 +87,143 @@ namespace Latios.Myri.Authoring.Systems
     [RequireMatchingQueriesForUpdate]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(SmartBlobberBakingGroup))]
-    public unsafe sealed partial class AudioClipSmartBlobberSystem : SystemBase
+    public unsafe partial struct AudioClipSmartBlobberSystem : ISystem
     {
         EntityQuery m_query;
 
-        struct UniqueItem
+        public void OnCreate(ref SystemState state)
         {
-            public AudioClipBlobBakeData             bakeData;
-            public BlobAssetReference<AudioClipBlob> blob;
+            new SmartBlobberTools<AudioClipBlob>().Register(state.World);
+            m_query = state.Fluent().With<AudioClipBlobBakeData>(true).IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
-        protected override void OnCreate()
+        public void OnUpdate(ref SystemState state)
         {
-            new SmartBlobberTools<AudioClipBlob>().Register(World);
-        }
+            int count   = m_query.CalculateEntityCountWithoutFiltering();
+            var hashmap = new NativeParallelHashMap<AudioClipBlobBakeData, BlobAssetReference<AudioClipBlob> >(count * 2, state.WorldUpdateAllocator);
 
-        protected override void OnUpdate()
-        {
-            int count = m_query.CalculateEntityCountWithoutFiltering();
+            new CollectJob { hashmap = hashmap.AsParallelWriter() }.ScheduleParallel(m_query);
 
-            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, WorldUpdateAllocator);
-            var mapWriter = hashmap.AsParallelWriter();
+            var builders     = new NativeList<AudioClipBuilder>(state.WorldUpdateAllocator);
+            state.Dependency = new SetupListJob { builders = builders, hashmap = hashmap }.Schedule(state.Dependency);
 
-            Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in AudioClipBlobBakeData data) =>
+            state.CompleteDependency();
+
+            for (int i = 0; i < builders.Length; i++)
             {
-                mapWriter.TryAdd(data.clip.GetHashCode(), new UniqueItem { bakeData = data });
-            }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
-
-            var clips    = new NativeList<UnityObjectRef<AudioClip> >(WorldUpdateAllocator);
-            var builders = new NativeList<AudioClipBuilder>(WorldUpdateAllocator);
-
-            Job.WithCode(() =>
-            {
-                int count = hashmap.Count();
-                if (count == 0)
-                    return;
-
-                clips.ResizeUninitialized(count);
-                builders.ResizeUninitialized(count);
-
-                int i = 0;
-                foreach (var pair in hashmap)
-                {
-                    clips[i]    = pair.Value.bakeData.clip;
-                    builders[i] = new AudioClipBuilder { numVoices = pair.Value.bakeData.numVoices };
-                    i++;
-                }
-            }).Schedule();
-
-            CompleteDependency();
-
-            for (int i = 0; i < clips.Length; i++)
-            {
-                var clip           = clips[i].Value;
                 var builder        = builders[i];
+                var clip           = builder.bakeData.clip.Value;
                 builder.isStereo   = clip.channels == 2;
                 builder.name       = clip.name;
                 builder.sampleRate = clip.frequency;
-                ReadClip(clip, ref builder.samples);
+                ReadClip(ref state, clip, ref builder.samples);
                 builders[i] = builder;
             }
 
-            Dependency = new BuildBlobsJob
+            state.Dependency = new BuildBlobsJob
             {
                 builders = builders.AsArray()
-            }.ScheduleParallel(builders.Length, 1, Dependency);
+            }.ScheduleParallel(builders.Length, 1, state.Dependency);
 
-            Job.WithCode(() =>
+            state.Dependency = new CollectBlobsJob
             {
-                for (int i = 0; i < clips.Length; i++)
-                {
-                    var element                     = hashmap[clips[i].GetHashCode()];
-                    element.blob                    = builders[i].result;
-                    hashmap[clips[i].GetHashCode()] = element;
-                }
-            }).Schedule();
+                builders = builders.AsArray(),
+                hashmap  = hashmap
+            }.Schedule(state.Dependency);
 
-            Entities.ForEach((ref SmartBlobberResult result, in AudioClipBlobBakeData data) =>
-            {
-                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.clip.GetHashCode()].blob);
-            }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
+            new AssignJob { hashmap = hashmap }.ScheduleParallel(m_query);
         }
 
-        void ReadClip(AudioClip clip, ref UnsafeList<float> samples)
+        void ReadClip(ref SystemState state, AudioClip clip, ref UnsafeList<float> samples)
         {
             int sampleCount = clip.samples * clip.channels;
-            samples         = new UnsafeList<float>(sampleCount, WorldUpdateAllocator);
+            samples         = new UnsafeList<float>(sampleCount, state.WorldUpdateAllocator);
             samples.Resize(sampleCount, NativeArrayOptions.UninitializedMemory);
             Span<float> span = new Span<float>(samples.Ptr, sampleCount);
             clip.GetData(span, 0);
         }
 
+        [BurstCompile]
+        partial struct CollectJob : IJobEntity
+        {
+            public NativeParallelHashMap<AudioClipBlobBakeData, BlobAssetReference<AudioClipBlob> >.ParallelWriter hashmap;
+
+            public void Execute(in AudioClipBlobBakeData bakeData) => hashmap.TryAdd(bakeData, default);
+        }
+
+        [BurstCompile]
+        struct SetupListJob : IJob
+        {
+            [ReadOnly] public NativeParallelHashMap<AudioClipBlobBakeData, BlobAssetReference<AudioClipBlob> > hashmap;
+            public NativeList<AudioClipBuilder>                                                                builders;
+
+            public void Execute()
+            {
+                var count         = hashmap.Count();
+                builders.Capacity = count;
+
+                foreach (var pair in hashmap)
+                    builders.Add(new AudioClipBuilder { bakeData = pair.Key });
+            }
+        }
+
         struct AudioClipBuilder
         {
+            public AudioClipBlobBakeData             bakeData;
             public UnsafeList<float>                 samples;
             public int                               sampleRate;
-            public int                               numVoices;
             public FixedString128Bytes               name;
             public bool                              isStereo;
             public BlobAssetReference<AudioClipBlob> result;
 
             public void BuildBlob()
             {
-                var     builder  = new BlobBuilder(Allocator.Temp);
-                ref var root     = ref builder.ConstructRoot<AudioClipBlob>();
-                var     blobLeft = builder.Allocate(ref root.samplesLeftOrMono, samples.Length / math.select(1, 2, isStereo));
+                var     builder = new BlobBuilder(Allocator.Temp);
+                ref var root    = ref builder.ConstructRoot<AudioClipBlob>();
+
+                var context = new CodecContext
+                {
+                    sampleRate           = sampleRate,
+                    threadStackAllocator = ThreadStackAllocator.GetAllocator()
+                };
+
                 if (isStereo)
                 {
-                    var blobRight = builder.Allocate(ref root.samplesRight, samples.Length / 2);
+                    root.sampleCountPerChannel = samples.Length / 2;
+                    var left                   = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length / 2);
+                    var right                  = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length / 2);
+
                     for (int i = 0; i < samples.Length; i++)
                     {
-                        blobLeft[i / 2] = samples[i];
+                        left[i / 2] = samples[i];
                         i++;
-                        blobRight[i / 2] = samples[i];
+                        right[i / 2] = samples[i];
                     }
+
+                    CodecDispatch.Encode(bakeData.codec, ref builder, ref root.encodedSamples, left, right, ref context);
                 }
                 else
                 {
-                    var blobRight = builder.Allocate(ref root.samplesRight, 1);
-                    blobRight[0]  = 0f;
-                    for (int i = 0; i < samples.Length; i++)
-                    {
-                        blobLeft[i] = samples[i];
-                    }
+                    root.sampleCountPerChannel = samples.Length;
+                    var mono                   = new Span<float>(samples.Ptr, samples.Length);
+                    CodecDispatch.Encode(bakeData.codec, ref builder, ref root.encodedSamples, mono, ref context);
                 }
-                int offsetCount = math.max(numVoices, 1);
-                int stride      = blobLeft.Length / offsetCount;
+
+                int offsetCount = math.max(bakeData.numVoices, 1);
+                int stride      = root.sampleCountPerChannel / offsetCount;
                 var offsets     = builder.Allocate(ref root.loopedOffsets, offsetCount);
                 for (int i = 0; i < offsetCount; i++)
                 {
                     offsets[i] = i * stride;
                 }
                 root.sampleRate = sampleRate;
+                root.isStereo   = isStereo;
+                root.codec      = bakeData.codec;
                 root.name       = name;
 
                 result = builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent);
+
+                context.threadStackAllocator.Dispose();
             }
         }
 
@@ -220,6 +237,30 @@ namespace Latios.Myri.Authoring.Systems
                 var builder = builders[i];
                 builder.BuildBlob();
                 builders[i] = builder;
+            }
+        }
+
+        [BurstCompile]
+        struct CollectBlobsJob : IJob
+        {
+            [ReadOnly] public NativeArray<AudioClipBuilder>                                         builders;
+            public NativeParallelHashMap<AudioClipBlobBakeData, BlobAssetReference<AudioClipBlob> > hashmap;
+
+            public void Execute()
+            {
+                foreach (var builder in builders)
+                    hashmap[builder.bakeData] = builder.result;
+            }
+        }
+
+        [BurstCompile]
+        partial struct AssignJob : IJobEntity
+        {
+            [ReadOnly] public NativeParallelHashMap<AudioClipBlobBakeData, BlobAssetReference<AudioClipBlob> > hashmap;
+
+            public void Execute(ref SmartBlobberResult result, in AudioClipBlobBakeData bakeData)
+            {
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[bakeData]);
             }
         }
     }

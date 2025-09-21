@@ -165,8 +165,8 @@ namespace Latios.LifeFX.Systems
         [BurstCompile]
         struct CollectJob : IJob
         {
-            public NativeArray<int2>       threadRanges;
-            public UnsafeParallelBlockList uploadIndices;
+            public NativeArray<int2>            threadRanges;
+            public UnsafeParallelBlockList<int> uploadIndices;
 
             public void Execute()
             {
@@ -185,7 +185,7 @@ namespace Latios.LifeFX.Systems
         {
             [ReadOnly] public NativeArray<int2>                                  threadRanges;
             [ReadOnly] public NativeArray<TransformQvvs>                         trackedTransforms;
-            public UnsafeParallelBlockList                                       uploadIndices;
+            public UnsafeParallelBlockList<int>                                  uploadIndices;
             [NativeDisableParallelForRestriction] public NativeArray<UploadQvvs> uploadBuffer;
 
             public void Execute(int index)
@@ -195,7 +195,7 @@ namespace Latios.LifeFX.Systems
                 for (int i = 0; i < range.y; i++)
                 {
                     enumerator.MoveNext();
-                    var dst                   = enumerator.GetCurrent<int>();
+                    var dst                   = enumerator.Current;
                     uploadBuffer[range.x + i] = new UploadQvvs
                     {
                         dst  = dst,

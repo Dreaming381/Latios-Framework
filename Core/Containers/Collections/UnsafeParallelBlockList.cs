@@ -120,6 +120,15 @@ namespace Latios.Unsafe
         }
 
         /// <summary>
+        /// Removes all elements
+        /// </summary>
+        public void Clear()
+        {
+            for (int i = 0; i < JobsUtility.MaxJobThreadCount; i++)
+                m_blockList.ClearIndex(i);
+        }
+
+        /// <summary>
         /// Uses a job to dispose this container
         /// </summary>
         /// <param name="inputDeps">A JobHandle for all jobs which should finish before disposal.</param>
@@ -158,6 +167,31 @@ namespace Latios.Unsafe
         public UnsafeIndexedBlockList.AllIndicesEnumerator GetEnumerator()
         {
             return m_blockList.GetEnumerator();
+        }
+
+        /// <summary>
+        /// Uses atomics to lock a thread index for thread-safe access. If already locked by the same value, this method returns.
+        /// You only ever need this when a writing job and a reading job are allowed to execute at the same time, and the reading
+        /// job is allowed to access all threads.
+        /// </summary>
+        /// <param name="threadIndex">The index to lock.</param>
+        /// <param name="lockValue">A value to represent this context owns the lock. If the index has already been locked by this value, the method returns.</param>
+        /// <param name="unlockValue">A value that specifies the index is not currently locked.</param>
+        /// <returns>Returns true if the lock was acquired while the value was previously unlockValue. Returns false if the index was already locked by lockValue.</returns>
+        public bool LockIndexReentrant(int threadIndex, int lockValue, int unlockValue = 0)
+        {
+            return m_blockList.LockIndexReentrant(threadIndex, lockValue, unlockValue);
+        }
+
+        /// <summary>
+        /// Unlocks the thread index, resetting its internal value to the unlocked state.
+        /// </summary>
+        /// <param name="threadIndex">The index this context locked.</param>
+        /// <param name="lockValue">The lock value that was stored.</param>
+        /// <param name="unlockValue">The unlock value that should be left in the index.</param>
+        public void UnlockIndex(int threadIndex, int lockValue, int unlockValue = 0)
+        {
+            m_blockList.UnlockIndex(threadIndex, lockValue, unlockValue);
         }
     }
 

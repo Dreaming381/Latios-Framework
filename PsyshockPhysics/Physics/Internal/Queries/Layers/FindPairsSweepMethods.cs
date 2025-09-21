@@ -240,7 +240,7 @@ namespace Latios.Psyshock
             BipartiteSweepDualIndicesFilteredCross(ref result, in bucketA.slices, indicesA, in bucketB.slices, indicesB, ref processor, in bucketAabb, true, allocator);
         }
 
-        public static int BipartiteSweepPlayCache<T>(UnsafeIndexedBlockList.Enumerator enumerator,
+        public static int BipartiteSweepPlayCache<T>(UnsafeIndexedBlockList<int2>.Enumerator enumerator,
                                                      in CollisionLayer layerA,
                                                      in CollisionLayer layerB,
                                                      int bucketIndexA,
@@ -258,7 +258,7 @@ namespace Latios.Psyshock
 
             do
             {
-                var indices = enumerator.GetCurrent<int2>();
+                var indices = enumerator.Current;
                 result.SetBucketRelativePairIndices(indices.x, indices.y);
                 processor.Execute(in result);
                 count++;

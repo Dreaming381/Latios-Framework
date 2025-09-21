@@ -351,38 +351,6 @@ namespace Latios.Psyshock
             }
         }
 
-        /// <summary>
-        /// Draw an AABB wireframe using UnityEngine.Debug.DrawLine calls
-        /// </summary>
-        /// <param name="aabb">The AABB to draw</param>
-        /// <param name="color">The color of the wireframe</param>
-        public static void DrawAabb(Aabb aabb, Color color)
-        {
-            float3 leftTopFront     = new float3(aabb.min.x, aabb.max.y, aabb.min.z);
-            float3 rightTopFront    = new float3(aabb.max.x, aabb.max.y, aabb.min.z);
-            float3 leftBottomFront  = new float3(aabb.min.x, aabb.min.y, aabb.min.z);
-            float3 rightBottomFront = new float3(aabb.max.x, aabb.min.y, aabb.min.z);
-            float3 leftTopBack      = new float3(aabb.min.x, aabb.max.y, aabb.max.z);
-            float3 rightTopBack     = new float3(aabb.max.x, aabb.max.y, aabb.max.z);
-            float3 leftBottomBack   = new float3(aabb.min.x, aabb.min.y, aabb.max.z);
-            float3 rightBottomBack  = new float3(aabb.max.x, aabb.min.y, aabb.max.z);
-
-            Debug.DrawLine(leftTopFront,     rightTopFront,    color);
-            Debug.DrawLine(rightTopFront,    rightBottomFront, color);
-            Debug.DrawLine(rightBottomFront, leftBottomFront,  color);
-            Debug.DrawLine(leftBottomFront,  leftTopFront,     color);
-
-            Debug.DrawLine(leftTopBack,      rightTopBack,     color);
-            Debug.DrawLine(rightTopBack,     rightBottomBack,  color);
-            Debug.DrawLine(rightBottomBack,  leftBottomBack,   color);
-            Debug.DrawLine(leftBottomBack,   leftTopBack,      color);
-
-            Debug.DrawLine(leftTopFront,     leftTopBack,      color);
-            Debug.DrawLine(rightTopFront,    rightTopBack,     color);
-            Debug.DrawLine(leftBottomFront,  leftBottomBack,   color);
-            Debug.DrawLine(rightBottomFront, rightBottomBack,  color);
-        }
-
         #region DrawLayerUtils
         [BurstCompile]
         private struct DebugDrawLayerJob : IJob, IJobParallelFor

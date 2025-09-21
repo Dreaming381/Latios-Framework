@@ -39,7 +39,7 @@ namespace Latios.Kinemation
             var chunkCount      = m_query.CalculateChunkCountWithoutFiltering();
             var collectedChunks = new NativeList<CollectedChunk>(chunkCount, state.WorldUpdateAllocator);
             collectedChunks.Resize(chunkCount, NativeArrayOptions.ClearMemory);
-            var meshIDsToInvalidate = new UnsafeParallelBlockList(UnsafeUtility.SizeOf<BatchMeshID>(), 256, state.WorldUpdateAllocator);
+            var meshIDsToInvalidate = new UnsafeParallelBlockList<int>(256, state.WorldUpdateAllocator);
             var meshPool            = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
 
             state.Dependency = new FindAndValidateMeshesJob
@@ -164,7 +164,7 @@ namespace Latios.Kinemation
             [ReadOnly] public UniqueMeshPool                                   meshPool;
 
             public ComponentTypeHandle<UniqueMeshConfig>                            configHandle;
-            public UnsafeParallelBlockList                                          meshIDsToInvalidate;
+            public UnsafeParallelBlockList<int>                                     meshIDsToInvalidate;
             [NativeDisableParallelForRestriction] public NativeList<CollectedChunk> collectedChunks;  // Preallocated to query chunk count without filtering
 
             [NativeSetThreadIndex]
@@ -273,19 +273,15 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct OrganizeMeshesJob : IJob
         {
-            public NativeList<CollectedChunk> collectedChunks;
-            public UniqueMeshPool             meshPool;
-            public UnsafeParallelBlockList    meshIDsToInvalidate;
-            public NativeReference<int>       meshesNeeded;
+            public NativeList<CollectedChunk>   collectedChunks;
+            public UniqueMeshPool               meshPool;
+            public UnsafeParallelBlockList<int> meshIDsToInvalidate;
+            public NativeReference<int>         meshesNeeded;
 
             public void Execute()
             {
-                var enumerator = meshIDsToInvalidate.GetEnumerator();
-                while (enumerator.MoveNext())
-                {
-                    var id = enumerator.GetCurrent<int>();
+                foreach (var id in meshIDsToInvalidate)
                     meshPool.invalidMeshesToCull.Add(id);
-                }
 
                 int prefixSum  = 0;
                 int writeIndex = 0;

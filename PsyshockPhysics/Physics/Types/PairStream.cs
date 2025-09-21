@@ -158,7 +158,7 @@ namespace Latios.Psyshock
             int totalStreams = IndexStrategies.PairStreamIndexCount(cellCount);
             data             = new SharedContainerData
             {
-                pairHeaders      = new UnsafeIndexedBlockList(UnsafeUtility.SizeOf<PairHeader>(), 4096 / UnsafeUtility.SizeOf<PairHeader>(), totalStreams, allocator),
+                pairHeaders      = new UnsafeIndexedBlockList<PairHeader>(4096 / UnsafeUtility.SizeOf<PairHeader>(), totalStreams, allocator),
                 blockStreamArray = AllocatorManager.Allocate<BlockStream>(allocator, totalStreams),
                 state            = AllocatorManager.Allocate<State>(allocator),
                 cellCount        = cellCount,
@@ -724,7 +724,7 @@ namespace Latios.Psyshock
                 {
                     if (enumerator.MoveNext())
                     {
-                        currentHeader = (PairHeader*)UnsafeUtility.AddressOf(ref enumerator.GetCurrentAsRef<PairHeader>());
+                        currentHeader = (PairHeader*)UnsafeUtility.AddressOf(ref enumerator.GetCurrentAsRef());
                         pair.header   = currentHeader;
                         return true;
                     }
@@ -851,7 +851,7 @@ namespace Latios.Psyshock
                     data.state->needsAliasChecks = true;
                 }
 
-                var headerPtr = (PairHeader*)data.pairHeaders.Allocate(targetStream);
+                var headerPtr = (PairHeader*)UnsafeUtility.AddressOf(ref data.pairHeaders.Allocate(targetStream));
                 *   headerPtr = new PairHeader
                 {
                     entityA      = key.entityA,
@@ -915,11 +915,11 @@ namespace Latios.Psyshock
 
         partial struct Enumerator
         {
-            internal Pair                              pair;
-            internal UnsafeIndexedBlockList.Enumerator enumerator;
-            internal PairHeader*                       currentHeader;
-            internal int                               onePastLastStreamIndex;
-            internal int                               enumeratorVersion;
+            internal Pair                                          pair;
+            internal UnsafeIndexedBlockList<PairHeader>.Enumerator enumerator;
+            internal PairHeader*                                   currentHeader;
+            internal int                                           onePastLastStreamIndex;
+            internal int                                           enumeratorVersion;
 
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
             void CheckSafeToEnumerate()
@@ -1023,7 +1023,7 @@ namespace Latios.Psyshock
 
         internal struct SharedContainerData
         {
-            public UnsafeIndexedBlockList pairHeaders;
+            public UnsafeIndexedBlockList<PairHeader> pairHeaders;
 
             [NativeDisableUnsafePtrRestriction]
             public BlockStream* blockStreamArray;
@@ -1084,7 +1084,7 @@ namespace Latios.Psyshock
             else
                 data.state->needsAliasChecks = true;
 
-            var headerPtr = (PairHeader*)data.pairHeaders.Allocate(targetStream);
+            var headerPtr = (PairHeader*)UnsafeUtility.AddressOf(ref data.pairHeaders.Allocate(targetStream));
             *headerPtr    = new PairHeader
             {
                 entityA      = entityA,
@@ -1113,7 +1113,7 @@ namespace Latios.Psyshock
             return root;
         }
 
-        private static void Deallocate(State* state, UnsafeIndexedBlockList blockList, BlockStream* blockStreams, AllocatorManager.AllocatorHandle allocator)
+        private static void Deallocate(State* state, UnsafeIndexedBlockList<PairHeader> blockList, BlockStream* blockStreams, AllocatorManager.AllocatorHandle allocator)
         {
             for (int i = 0; i < blockList.indexCount; i++)
             {
@@ -1137,7 +1137,7 @@ namespace Latios.Psyshock
             [NativeDisableUnsafePtrRestriction]
             public State* state;
 
-            public UnsafeIndexedBlockList blockList;
+            public UnsafeIndexedBlockList<PairHeader> blockList;
 
             [NativeDisableUnsafePtrRestriction]
             public BlockStream* blockStreams;

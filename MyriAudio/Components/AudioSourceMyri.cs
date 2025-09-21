@@ -183,13 +183,9 @@ namespace Latios.Myri
     public struct AudioClipBlob
     {
         /// <summary>
-        /// The samples for either the left channel, or the mono channel if this is not a stereo clip.
+        /// The samples as stored in their possibly compressed format
         /// </summary>
-        public BlobArray<float> samplesLeftOrMono;
-        /// <summary>
-        /// The samples for the right channel. It is length 0 if this is not a stereo clip.
-        /// </summary>
-        public BlobArray<float> samplesRight;
+        public BlobPtr<byte> encodedSamples;
         /// <summary>
         /// These are offsets for the different voices used in looping audio. The number of offsets is equal to the number of voices.
         /// </summary>
@@ -204,9 +200,20 @@ namespace Latios.Myri
         public int sampleRate;
 
         /// <summary>
+        /// The number of samples in the clip for a single channel. This divided by the sampleRate produces the realtime length
+        /// of the clip in seconds.
+        /// </summary>
+        public int sampleCountPerChannel;
+
+        /// <summary>
         /// If true, the audio clip is a stereo clip. Otherwise it is a mono clip. Surround is not supported.
         /// </summary>
-        public bool isStereo => samplesRight.Length == samplesLeftOrMono.Length;
+        public bool isStereo;
+
+        /// <summary>
+        /// The codec used for the encodedSamples
+        /// </summary>
+        public Codec codec;
     }
 }
 

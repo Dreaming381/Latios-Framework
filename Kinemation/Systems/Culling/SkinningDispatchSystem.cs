@@ -119,9 +119,9 @@ namespace Latios.Kinemation.Systems
             var perChunkPrefixSums = CollectionHelper.CreateNativeArray<PerChunkPrefixSums>(skeletonChunkCount,
                                                                                             state.WorldUpdateAllocator,
                                                                                             NativeArrayOptions.UninitializedMemory);
-            var meshChunks        = new NativeList<ArchetypeChunk>(m_skinnedMeshMetaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
-            var requestsBlockList =
-                new UnsafeParallelBlockList(UnsafeUtility.SizeOf<MeshSkinningRequestWithSkeletonTarget>(), 256, state.WorldUpdateAllocator);
+            var meshChunks =
+                new NativeList<ArchetypeChunk>(m_skinnedMeshMetaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
+            var requestsBlockList                        = new UnsafeParallelBlockList<MeshSkinningRequestWithSkeletonTarget>(256, state.WorldUpdateAllocator);
             var groupedSkinningRequestsStartsAndCounts   = new NativeList<int2>(state.WorldUpdateAllocator);
             var groupedSkinningRequests                  = new NativeList<MeshSkinningRequest>(state.WorldUpdateAllocator);
             var skeletonEntityToSkinningRequestsGroupMap = new NativeHashMap<Entity, int>(1, state.WorldUpdateAllocator);
@@ -566,7 +566,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<PreviousDeformShaderIndex> previousDeformHandle;
             [ReadOnly] public ComponentTypeHandle<TwoAgoDeformShaderIndex>   twoAgoDeformHandle;
 
-            public UnsafeParallelBlockList requestsBlockList;
+            public UnsafeParallelBlockList<MeshSkinningRequestWithSkeletonTarget> requestsBlockList;
 
             [NativeSetThreadIndex]
             int m_nativeThreadIndex;
@@ -828,7 +828,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct GroupRequestsBySkeletonJob : IJob
         {
-            public UnsafeParallelBlockList requestsBlockList;
+            public UnsafeParallelBlockList<MeshSkinningRequestWithSkeletonTarget> requestsBlockList;
 
             public NativeList<MeshSkinningRequest> groupedSkinningRequests;
             public NativeList<int2>                groupedSkinningRequestsStartsAndCounts;
@@ -846,10 +846,8 @@ namespace Latios.Kinemation.Systems
                 {
                     int    i                = 0;
                     Entity previousSkeleton = Entity.Null;
-                    var    enumerator       = requestsBlockList.GetEnumerator();
-                    while (enumerator.MoveNext())
+                    foreach (var request in  requestsBlockList)
                     {
-                        var request = enumerator.GetCurrent<MeshSkinningRequestWithSkeletonTarget>();
                         if (request.skeletonEntity == previousSkeleton)
                         {
                             dstIndices[i] = dstIndices[i - 1];
@@ -896,11 +894,10 @@ namespace Latios.Kinemation.Systems
                 groupedSkinningRequests.ResizeUninitialized(count);
                 var requests = groupedSkinningRequests.AsArray();
                 {
-                    int i          = 0;
-                    var enumerator = requestsBlockList.GetEnumerator();
-                    while (enumerator.MoveNext())
+                    int i = 0;
+                    foreach (var request in requestsBlockList)
                     {
-                        requests[dstIndices[i]] = enumerator.GetCurrent<MeshSkinningRequestWithSkeletonTarget>().request;
+                        requests[dstIndices[i]] = request.request;
                         i++;
                     }
                 }
