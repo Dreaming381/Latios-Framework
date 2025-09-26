@@ -452,7 +452,7 @@ namespace Latios.Psyshock
                 // Solve velocity so that predicted contact distance is greater than or equal to zero
                 // applyImpulse is required check for substepping because having a contact is not guaranteed. We need to check if the contact point has been reached this step
                 // (when ContactDistance <= 0), otherwise, we need to ensure that no impulse will be applied.
-                var dv = jacAngular.applyImpulse ? CalculateRelativeVelocityAlongNormal(in velocityA, in velocityB, in jacAngular, bodyParameters.contactNormal, out _) : 0f;
+                var dv = jacAngular.applyImpulse ? CalculateRelativeVelocityAlongNormal(in tempVelocityA, in tempVelocityB, in jacAngular, bodyParameters.contactNormal, out _) : 0f;
                 //var dv = CalculateRelativeVelocityAlongNormal(in velocityA, in velocityB, in jacAngular, bodyParameters.contactNormal, out var relVel);
 
                 float impulse = dv * jacAngular.jacobianAngular.effectiveMass;

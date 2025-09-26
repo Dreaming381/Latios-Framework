@@ -94,7 +94,7 @@ namespace Latios.Myri.Authoring.Systems
         public void OnCreate(ref SystemState state)
         {
             new SmartBlobberTools<AudioClipBlob>().Register(state.World);
-            m_query = state.Fluent().With<AudioClipBlobBakeData>(true).IncludeDisabledEntities().IncludePrefabs().Build();
+            m_query = state.Fluent().With<AudioClipBlobBakeData>(true).With<SmartBlobberResult>(false).IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         public void OnUpdate(ref SystemState state)

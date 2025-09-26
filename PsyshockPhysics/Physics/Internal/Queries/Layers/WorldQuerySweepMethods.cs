@@ -117,7 +117,7 @@ namespace Latios.Psyshock
                 var currentFrame = stack[currentFrameIndex];
                 if (currentFrame.checkpoint == 0)
                 {
-                    if (currentFrame.currentIndex >= context.bucket.count)
+                    if (currentFrame.currentIndex >= context.tree.Length)
                     {
                         currentFrameIndex--;
                         continue;

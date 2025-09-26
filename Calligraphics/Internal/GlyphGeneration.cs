@@ -702,7 +702,7 @@ namespace Latios.Calligraphics
                 }
                 case VerticalAlignmentOptions.MiddleTopAscentToBottomDescent:
                 {
-                    float fullHeight = accumulatedVerticalOffset - bottomAnchor + topAnchor;
+                    float fullHeight = accumulatedVerticalOffset - topAnchor - bottomAnchor;
                     float offset     = fullHeight / 2f;
                     for (int i = 0; i < glyphs.Length; i++)
                     {

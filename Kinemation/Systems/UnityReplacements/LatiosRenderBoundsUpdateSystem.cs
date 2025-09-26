@@ -118,7 +118,13 @@ namespace Latios.Kinemation.Systems
                         }
                     }
                     if (!requiresUpdate)
+                    {
+                        if (chunk.DidOrderChange(lastSystemVersion))
+                        {
+                            ComputeChunkAabbOnly(in chunk);
+                        }
                         return;
+                    }
                 }
 
                 var worldBounds     = (WorldRenderBounds*)chunk.GetRequiredComponentDataPtrRW(ref worldRenderBoundsHandle);
@@ -220,6 +226,16 @@ namespace Latios.Kinemation.Systems
                 if (dependents == null)
                     return false; // We are missing the dependent, so just keep things as-is.
                 return DidOtherDependentsTransformChange(ref handle, dependents[dependentInfo.IndexInChunk].root);
+            }
+
+            void ComputeChunkAabbOnly(in ArchetypeChunk chunk)
+            {
+                var bounds = chunk.GetComponentDataPtrRO(ref worldRenderBoundsHandle);
+                var aabb = new Aabb(float.MaxValue, float.MinValue);
+                for (int i = 0; i < chunk.Count; i++)
+                    aabb = Physics.CombineAabb(aabb, new Aabb(bounds[i].Value.Min, bounds[i].Value.Max));
+                Physics.GetCenterExtents(aabb, out var center, out var extents);
+                chunk.SetChunkComponentData(ref chunkWorldRenderBoundsHandle, new ChunkWorldRenderBounds { Value = new AABB { Center = center, Extents = extents } });
             }
         }
     }

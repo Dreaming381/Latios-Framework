@@ -56,6 +56,7 @@ public class LatiosBootstrap : ICustomBootstrap
         //Latios.Transforms.TransformsBootstrap.InstallGameObjectEntitySynchronization(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        //Latios.Kinemation.KinemationBootstrap.InstallUniqueMeshesEarlyUploader(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
         Latios.Unika.UnikaBootstrap.InstallUnikaEntitySerialization(world);
