@@ -316,7 +316,7 @@ namespace Latios.Psyshock
                             var currentFrame = m_stack[m_currentFrameIndex];
                             if (currentFrame.checkpoint == 0)
                             {
-                                if (currentFrame.currentIndex >= m_bucket.slices.count)
+                                if (currentFrame.currentIndex >= m_tree.Length)
                                 {
                                     m_currentFrameIndex--;
                                     continue;

@@ -444,7 +444,7 @@ namespace Latios.Psyshock
                     var node                     = nodesToPopulate[i];
                     var parentIndex              = (i - 1) / 2;
                     var parent                   = nodesToPopulate[parentIndex];
-                    parent.subtreeXmax           = math.max(parent.subtreeXmax, node.xmax);
+                    parent.subtreeXmax           = math.max(parent.subtreeXmax, node.subtreeXmax);
                     nodesToPopulate[parentIndex] = parent;
                 }
             }
