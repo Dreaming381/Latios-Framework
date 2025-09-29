@@ -2,42 +2,54 @@ using System;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine;
 
 namespace Latios.Myri
 {
-    internal struct UncompressedCodecData
+    internal struct ADPCMCodecData
     {
-        BlobArray<float> leftOrMono;
-        BlobArray<float> right;
+        BlobArray<byte> leftOrMonoEncoded;
+        BlobArray<byte> rightEncoded;
 
         public void Encode(ref BlobBuilder builder, ReadOnlySpan<float> monoSamplesToEncode, ref CodecContext context)
         {
-            var array = builder.Allocate(ref leftOrMono, monoSamplesToEncode.Length, 16);
-            for (int i = 0; i < monoSamplesToEncode.Length; i++)
-                array[i] = monoSamplesToEncode[i];
+            var array = builder.Allocate(ref leftOrMonoEncoded, (monoSamplesToEncode.Length + 1) / 2);
+
+            ADPCMCodec.EncodeMonoChannel(monoSamplesToEncode, ref array, context.sampleRate);
+            int originalDataSize = monoSamplesToEncode.Length;
+            context.compressionRatio = GetRatio(originalDataSize, array.Length);
         }
 
         public void Encode(ref BlobBuilder builder, ReadOnlySpan<float> leftSamplesToEncode, ReadOnlySpan<float> rightSamplesToEncode, ref CodecContext context)
         {
-            var leftArray = builder.Allocate(ref leftOrMono, leftSamplesToEncode.Length, 16);
-            for (int i = 0; i < leftSamplesToEncode.Length; i++)
-                leftArray[i] = leftSamplesToEncode[i];
-            var rightArray   = builder.Allocate(ref right, rightSamplesToEncode.Length, 16);
-            for (int i = 0; i < rightSamplesToEncode.Length; i++)
-                rightArray[i] = rightSamplesToEncode[i];
+            var leftArray = builder.Allocate(ref leftOrMonoEncoded, (leftSamplesToEncode.Length + 1) / 2);
+            var rightArray   = builder.Allocate(ref rightEncoded, (leftSamplesToEncode.Length + 1) / 2);
+
+            ADPCMCodec.EncodeStereoChannels(leftSamplesToEncode, rightSamplesToEncode, ref leftArray, ref rightArray, context.sampleRate);
+            int originalDataSize = (leftSamplesToEncode.Length *2);
+            context.compressionRatio = GetRatio(originalDataSize, (leftArray.Length + rightArray.Length));
         }
 
-        public ReadOnlySpan<float> DecodeSingleChannel(int start, int count, bool rightChannel)
+        public ReadOnlySpan<float> DecodeSingleChannel(int start, int count, bool rightChannel, ref CodecContext context)
         {
+            var decoded = context.threadStackAllocator.AllocateAsSpan<float>(count);
             if (rightChannel)
-                return right.AsSpan().Slice(start, count);
-            return leftOrMono.AsSpan().Slice(start, count);
+                ADPCMCodec.DecodeMonoChannel(rightEncoded.AsSpan(), ref decoded, context.sampleRate, start);
+            else
+                ADPCMCodec.DecodeMonoChannel(leftOrMonoEncoded.AsSpan(), ref decoded, context.sampleRate, start);
+            return decoded;
+            
         }
 
-        public StereoSamples DecodeBothChannels(int start, int count)
+        public StereoSamples DecodeBothChannels(int start, int count, ref CodecContext context)
         {
-            return new StereoSamples { left = DecodeSingleChannel(start, count, false), right = DecodeSingleChannel(start, count, true) };
+            return new StereoSamples { 
+                left = DecodeSingleChannel(start, count, false, ref context),
+                right = DecodeSingleChannel(start, count, true, ref context) 
+            };
         }
+
+        private float GetRatio(int originalDataSize, int decodedSize) => decodedSize > 0 || originalDataSize > 0 ? (originalDataSize * sizeof(float)) / decodedSize : 0f;
     }
 }
 

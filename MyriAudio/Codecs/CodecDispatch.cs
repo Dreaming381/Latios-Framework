@@ -9,13 +9,14 @@ namespace Latios.Myri
 {
     public enum Codec : byte
     {
-        Uncompressed,
+        ADPCM,
     }
 
     internal struct CodecContext
     {
         public ThreadStackAllocator threadStackAllocator;
         public int                  sampleRate;
+        public float                  compressionRatio;
     }
 
     internal ref struct StereoSamples
@@ -30,8 +31,8 @@ namespace Latios.Myri
         {
             switch (codec)
             {
-                case Codec.Uncompressed:
-                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<UncompressedCodecData> >(ref codecStruct));
+                case Codec.ADPCM:
+                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
                     data.Encode(ref builder, monoSamplesToEncode, ref context);
                     break;
             }
@@ -46,8 +47,8 @@ namespace Latios.Myri
         {
             switch (codec)
             {
-                case Codec.Uncompressed:
-                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<UncompressedCodecData> >(ref codecStruct));
+                case Codec.ADPCM:
+                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
                     data.Encode(ref builder, leftSamplesToEncode, rightSamplesToEncode, ref context);
                     break;
             }
@@ -57,9 +58,9 @@ namespace Latios.Myri
         {
             switch (codec)
             {
-                case Codec.Uncompressed:
-                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<UncompressedCodecData> >(ref codecStruct).Value;
-                    return data.DecodeSingleChannel(startSample, sampleCount, false);
+                case Codec.ADPCM:
+                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct).Value;
+                    return data.DecodeSingleChannel(startSample, sampleCount, false, ref context);
             }
             return default;
         }
@@ -68,9 +69,9 @@ namespace Latios.Myri
         {
             switch (codec)
             {
-                case Codec.Uncompressed:
-                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<UncompressedCodecData> >(ref codecStruct).Value;
-                    return data.DecodeSingleChannel(startSample, sampleCount, rightChannel);
+                case Codec.ADPCM:
+                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct).Value;
+                    return data.DecodeSingleChannel(startSample, sampleCount, rightChannel , ref context);
             }
             return default;
         }
@@ -79,9 +80,9 @@ namespace Latios.Myri
         {
             switch (codec)
             {
-                case Codec.Uncompressed:
-                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<UncompressedCodecData> >(ref codecStruct).Value;
-                    return data.DecodeBothChannels(startSample, sampleCount);
+                case Codec.ADPCM:
+                    ref var data = ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct).Value;
+                    return data.DecodeBothChannels(startSample, sampleCount, ref context);
             }
             return default;
         }

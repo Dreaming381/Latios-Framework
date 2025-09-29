@@ -21,7 +21,7 @@ namespace Latios.Myri.Authoring
         /// <param name="clip">The audio clip to bake</param>
         /// <param name="codec">The compression codec to use</param>
         /// <param name="numVoices">The number of voices to use (only applies to Looping clips)</param>
-        public static SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker, AudioClip clip, Codec codec = Codec.Uncompressed, int numVoices = 0)
+        public static SmartBlobberHandle<AudioClipBlob> RequestCreateBlobAsset(this IBaker baker, AudioClip clip, Codec codec = Codec.ADPCM, int numVoices = 0)
         {
             return baker.RequestCreateBlobAsset<AudioClipBlob, AudioClipBakeData>(new AudioClipBakeData { clip = clip, numVoices = numVoices, codec = codec });
         }
@@ -94,7 +94,7 @@ namespace Latios.Myri.Authoring.Systems
         public void OnCreate(ref SystemState state)
         {
             new SmartBlobberTools<AudioClipBlob>().Register(state.World);
-            m_query = state.Fluent().With<AudioClipBlobBakeData>(true).IncludeDisabledEntities().IncludePrefabs().Build();
+            m_query = state.Fluent().With<AudioClipBlobBakeData>(true).With<SmartBlobberResult>(false).IncludeDisabledEntities().IncludePrefabs().Build();
         }
 
         public void OnUpdate(ref SystemState state)
@@ -190,8 +190,8 @@ namespace Latios.Myri.Authoring.Systems
                 if (isStereo)
                 {
                     root.sampleCountPerChannel = samples.Length / 2;
-                    var left                   = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length / 2);
-                    var right                  = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length / 2);
+                    var left                   = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length/2);
+                    var right                  = context.threadStackAllocator.AllocateAsSpan<float>(samples.Length/2);
 
                     for (int i = 0; i < samples.Length; i++)
                     {
@@ -199,6 +199,7 @@ namespace Latios.Myri.Authoring.Systems
                         i++;
                         right[i / 2] = samples[i];
                     }
+
 
                     CodecDispatch.Encode(bakeData.codec, ref builder, ref root.encodedSamples, left, right, ref context);
                 }

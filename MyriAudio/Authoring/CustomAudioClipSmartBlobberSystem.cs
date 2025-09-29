@@ -37,7 +37,7 @@ namespace Latios.Myri.Authoring
                                                                                       int sampleRate,
                                                                                       int channelCount,
                                                                                       out Entity blobEntity,
-                                                                                      Codec codec = Codec.Uncompressed,
+                                                                                      Codec codec = Codec.ADPCM,
                                                                                       int numVoices = 0)
         {
             Entity capturedEntity;
@@ -67,7 +67,7 @@ namespace Latios.Myri.Authoring
                                                                                       FixedString128Bytes name,
                                                                                       int sampleRate,
                                                                                       out DynamicBuffer<float> monoSamples,
-                                                                                      Codec codec = Codec.Uncompressed,
+                                                                                      Codec codec = Codec.ADPCM,
                                                                                       int numVoices = 0)
         {
             DynamicBuffer<CustomAudioClipLeftOrMonoSample> capturedMono;
@@ -99,7 +99,7 @@ namespace Latios.Myri.Authoring
                                                                                       int sampleRate,
                                                                                       out DynamicBuffer<float> leftSamples,
                                                                                       out DynamicBuffer<float> rightSamples,
-                                                                                      Codec codec = Codec.Uncompressed,
+                                                                                      Codec codec = Codec.ADPCM,
                                                                                       int numVoices = 0)
         {
             DynamicBuffer<CustomAudioClipLeftOrMonoSample> capturedLeft;
