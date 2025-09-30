@@ -69,7 +69,7 @@ namespace Latios.Myri
                         else
                         {
                             double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
-                            double clipStart                    = (samplesPlayedInSourceSamples + clip.m_loopOffset + itdOffset) % blob.sampleCountPerChannel;
+                            double clipStart                    = samplesPlayedInSourceSamples + clip.m_loopOffset + itdOffset;
                             SampleMismatchedRateLooped(tsa,
                                                        ref blob,
                                                        clipStart,
@@ -124,7 +124,7 @@ namespace Latios.Myri
                         for (int i = 0; i < output.Length; i++)
                         {
                             int index = (clipStart + i) % clip.sampleCountPerChannel;
-                            output[i] = input[index] * weight;
+                            output[i] += input[index] * weight;
                         }
                         context.threadStackAllocator.Dispose();
                         return;
@@ -149,9 +149,9 @@ namespace Latios.Myri
                 var clipLengthInOutputSamples = clip.sampleCountPerChannel * clipSampleStride;
                 while (clipStart < 0.0)
                 {
-                    clipStart += clipLengthInOutputSamples;
+                    clipStart += clip.sampleCountPerChannel;
                 }
-                clipStart %= clipLengthInOutputSamples;
+                clipStart %= clip.sampleCountPerChannel;
                 if (clipStart + output.Length * clipSampleStride + 1 < clipLengthInOutputSamples)
                 {
                     // No wrapping.
@@ -165,6 +165,7 @@ namespace Latios.Myri
                 var       inputSampleCount = lastInputSample - firstInputSample + 2;  // Give us a little padding
                 using var allocator        = tsa.CreateChildAllocator();
                 var       unwrappedBuffer  = allocator.AllocateAsSpan<float>(inputSampleCount);
+                unwrappedBuffer.Clear();
                 SampleMatchedRateLooped(allocator, ref clip, firstInputSample, isRightChannel, weight, unwrappedBuffer);
 
                 clipStart -= firstInputSample;

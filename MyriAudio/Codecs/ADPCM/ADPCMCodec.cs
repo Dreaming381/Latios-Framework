@@ -1,17 +1,11 @@
 using System;
-using System.Text;
-using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Jobs;
 using Unity.Mathematics;
-using UnityEngine;
-using static UnityEngine.UI.Image;
 
 namespace Latios.Myri
 {
-    [BurstCompile]
-    public struct ADPCMCodec
+    internal static class ADPCMCodec
     {
         // ADPCM step table
         private static readonly int[] StepTable = new int[]
@@ -37,16 +31,16 @@ namespace Latios.Myri
         /// <summary>
         /// Encode a single mono channel
         /// </summary>
-        public static void EncodeMonoChannel(in ReadOnlySpan<float> monoInput, ref BlobBuilderArray<byte> output, int sampleRate = 44100)
+        public static void EncodeChannel(in ReadOnlySpan<float> monoInput, ref BlobBuilderArray<byte> output)
         {
             var encoderState = new IMAState
             {
                 previousSample = 0,
-                stepIndex = 0
+                stepIndex      = 0
             };
 
-            int outputIndex = 0;
-            byte currentByte = 0;
+            int  outputIndex   = 0;
+            byte currentByte   = 0;
             bool isUpperNibble = true;
 
             for (int i = 0; i < monoInput.Length; i++)
@@ -54,7 +48,7 @@ namespace Latios.Myri
                 // Convert float to 16-bit PCM
                 int sample = (int)math.clamp(monoInput[i] * 32767f, -32768f, 32767f);
 
-                byte adpcmSample = EncodeIntToADPCMSample(sample, ref encoderState, sampleRate);
+                byte adpcmSample = EncodeIntToADPCMSample(sample, ref encoderState);
 
                 if (isUpperNibble)
                 {
@@ -65,7 +59,7 @@ namespace Latios.Myri
                     currentByte |= (byte)(adpcmSample & 0x0F);
                     if (outputIndex < output.Length)
                         output[outputIndex++] = currentByte;
-                    currentByte = 0;
+                    currentByte               = 0;
                 }
 
                 isUpperNibble = !isUpperNibble;
@@ -81,21 +75,21 @@ namespace Latios.Myri
         /// <summary>
         /// Decode a single mono channel
         /// </summary>
-        public static void DecodeMonoChannel(in ReadOnlySpan<byte> input, ref Span<float> output,
-                                           int sampleRate = 44100, int startSample = 0)
+        public static void DecodeChannel(in ReadOnlySpan<byte> input, ref Span<float> output, int startSample, IMAState seekIMAState = default, int seekIMAStateIndex = default)
         {
             var decoderState = new IMAState
             {
                 previousSample = 0,
-                stepIndex = 0
+                stepIndex      = 0
             };
 
             if (startSample > 0)
             {
-                SeekToSample(input, ref decoderState, startSample, sampleRate);
+                SeekToSample(input, ref decoderState, startSample, seekIMAState, seekIMAStateIndex);
+                //SeekToSample(input, ref decoderState, startSample, default, default);
             }
 
-            int inputIndex = startSample / 2; // 2 samples per byte
+            int  inputIndex    = startSample / 2;  // 2 samples per byte
             bool isUpperNibble = (startSample % 2) == 0;
 
             for (int i = 0; i < output.Length; i++)
@@ -118,78 +112,57 @@ namespace Latios.Myri
                     adpcmSample = 0;
                 }
 
-                int pcmSample = DecodeSample(adpcmSample, ref decoderState, sampleRate);
-                output[i] = math.clamp(pcmSample / 32768f, -1f, 1f);
+                int pcmSample = DecodeSample(adpcmSample, ref decoderState);
+                output[i]     = math.clamp(pcmSample / 32768f, -1f, 1f);
 
                 isUpperNibble = !isUpperNibble;
             }
         }
 
         /// <summary>
-        /// Encode stereo audio by processing each channel separately
+        /// Decode a single mono channel entirely with IMA states (used for seek tables and SNR analysis)
         /// </summary>
-        public static void EncodeStereoChannels(in ReadOnlySpan<float> leftChannel, in ReadOnlySpan<float> rightChannel,
-                                              ref BlobBuilderArray<byte> leftOutput, ref BlobBuilderArray<byte> rightOutput,
-                                              int sampleRate = 44100)
+        public static void DecodeChannelWithIMAStates(in ReadOnlySpan<byte> input, ref Span<float> output, ref Span<IMAState> ima)
         {
-            // Encode each channel independently
-            EncodeMonoChannel(leftChannel, ref leftOutput, sampleRate);
-            EncodeMonoChannel(rightChannel, ref rightOutput, sampleRate);
-        }
-
-        /// <summary>
-        /// Decode stereo audio by processing each channel separately
-        /// </summary>
-        public static void DecodeStereoChannels(in NativeArray<byte> leftInput, in NativeArray<byte> rightInput,
-                                              ref Span<float> leftOutput, ref Span<float> rightOutput,
-                                              int sampleRate = 44100, int startSample = 0)
-        {
-            // Decode each channel independently
-            DecodeMonoChannel(leftInput, ref leftOutput, sampleRate, startSample);
-            DecodeMonoChannel(rightInput, ref rightOutput, sampleRate, startSample);
-        }
-
-        /// <summary>
-        /// Split interleaved stereo samples into separate channel arrays
-        /// </summary>
-        [BurstCompile]
-        public static void SplitStereoSamples(in NativeArray<float> interleavedSamples,
-                                            ref NativeArray<float> leftChannel, ref NativeArray<float> rightChannel)
-        {
-            for (int i = 0; i < interleavedSamples.Length; i += 2)
+            var decoderState = new IMAState
             {
-                int channelIndex = i / 2;
-                if (channelIndex < leftChannel.Length)
+                previousSample = 0,
+                stepIndex      = 0
+            };
+
+            int  inputIndex    = 0;
+            bool isUpperNibble = true;
+
+            for (int i = 0; i < ima.Length; i++)
+            {
+                ima[i] = decoderState;
+                byte adpcmSample;
+                if (inputIndex < input.Length)
                 {
-                    leftChannel[channelIndex] = interleavedSamples[i];
-                    if (i + 1 < interleavedSamples.Length && channelIndex < rightChannel.Length)
-                        rightChannel[channelIndex] = interleavedSamples[i + 1];
+                    if (isUpperNibble)
+                    {
+                        adpcmSample = (byte)((input[inputIndex] >> 4) & 0x0F);
+                    }
+                    else
+                    {
+                        adpcmSample = (byte)(input[inputIndex] & 0x0F);
+                        inputIndex++;
+                    }
                 }
+                else
+                {
+                    adpcmSample = 0;
+                }
+
+                int pcmSample = DecodeSample(adpcmSample, ref decoderState);
+                output[i]     = math.clamp(pcmSample / 32768f, -1f, 1f);
+
+                isUpperNibble = !isUpperNibble;
             }
         }
-
-        /// <summary>
-        /// Combine separate channel arrays into interleaved stereo samples
-        /// </summary>
-        [BurstCompile]
-        public static void CombineStereoSamples(in NativeArray<float> leftChannel, in NativeArray<float> rightChannel,
-                                              ref NativeArray<float> interleavedSamples)
-        {
-            for (int i = 0; i < leftChannel.Length && i < rightChannel.Length; i++)
-            {
-                int interleavedIndex = i * 2;
-                if (interleavedIndex + 1 < interleavedSamples.Length)
-                {
-                    interleavedSamples[interleavedIndex] = leftChannel[i];
-                    interleavedSamples[interleavedIndex + 1] = rightChannel[i];
-                }
-            }
-        }
-
 
         // Private helper methods (same as original implementation)
-        [BurstCompile]
-        private static byte EncodeIntToADPCMSample(int sample, ref IMAState state, int sampleRate)
+        private static byte EncodeIntToADPCMSample(int sample, ref IMAState state)
         {
             int diff = sample - state.previousSample;
             int step = StepTable[state.stepIndex];
@@ -224,47 +197,53 @@ namespace Latios.Myri
 
             // Update state
             int deltaValue = 0;
-            if ((code & 4) != 0) deltaValue += step;
-            if ((code & 2) != 0) deltaValue += step >> 1;
-            if ((code & 1) != 0) deltaValue += step >> 2;
-            deltaValue += step >> 3;
+            if ((code & 4) != 0)
+                deltaValue += step;
+            if ((code & 2) != 0)
+                deltaValue += step >> 1;
+            if ((code & 1) != 0)
+                deltaValue += step >> 2;
+            deltaValue     += step >> 3;
 
             if ((code & 8) != 0)
                 deltaValue = -deltaValue;
 
             state.previousSample = math.clamp(state.previousSample + deltaValue, -32768, 32767);
-            state.stepIndex = math.clamp(state.stepIndex + IndexTable[code], 0, StepTable.Length - 1);
+            state.stepIndex      = math.clamp(state.stepIndex + IndexTable[code], 0, StepTable.Length - 1);
 
             return code;
         }
 
-        [BurstCompile]
-        private static int DecodeSample(byte code, ref IMAState state, int sampleRate)
+        private static int DecodeSample(byte code, ref IMAState state)
         {
-            int step = StepTable[state.stepIndex];
+            int step       = StepTable[state.stepIndex];
             int deltaValue = 0;
 
-            if ((code & 4) != 0) deltaValue += step;
-            if ((code & 2) != 0) deltaValue += step >> 1;
-            if ((code & 1) != 0) deltaValue += step >> 2;
-            deltaValue += step >> 3;
+            if ((code & 4) != 0)
+                deltaValue += step;
+            if ((code & 2) != 0)
+                deltaValue += step >> 1;
+            if ((code & 1) != 0)
+                deltaValue += step >> 2;
+            deltaValue     += step >> 3;
 
             if ((code & 8) != 0)
                 deltaValue = -deltaValue;
 
             state.previousSample = math.clamp(state.previousSample + deltaValue, -32768, 32767);
-            state.stepIndex = math.clamp(state.stepIndex + IndexTable[code], 0, StepTable.Length - 1);
+            state.stepIndex      = math.clamp(state.stepIndex + IndexTable[code], 0, StepTable.Length - 1);
 
             return state.previousSample;
         }
 
-        private static void SeekToSample(in ReadOnlySpan<byte> input, ref IMAState state,
-                                           int targetSample, int sampleRate)
+        private static void SeekToSample(in ReadOnlySpan<byte> input, ref IMAState state, int targetSample, IMAState seekIMAState, int seekIMAStateIndex)
         {
-            int inputIndex = 0;
+            int  inputIndex    = seekIMAStateIndex / 2;
             bool isUpperNibble = true;
 
-            for (int sample = 0; sample < targetSample; sample++)
+            state = seekIMAState;
+
+            for (int sample = seekIMAStateIndex; sample < targetSample; sample++)
             {
                 byte adpcmSample;
                 if (inputIndex < input.Length)
@@ -284,98 +263,16 @@ namespace Latios.Myri
                     adpcmSample = 0;
                 }
 
-                DecodeSample(adpcmSample, ref state, sampleRate);
+                DecodeSample(adpcmSample, ref state);
                 isUpperNibble = !isUpperNibble;
             }
         }
 
-        [BurstCompile]
-        private static int GetOptimalInitialStepIndex(int sampleRate)
+        public struct IMAState
         {
-            if (sampleRate >= 88200) return 2;
-            if (sampleRate >= 48000) return 1;
-            if (sampleRate >= 44100) return 0;
-            if (sampleRate >= 22050) return 0;
-            if (sampleRate >= 11025) return 1;
-            return 2;
+            public int previousSample;
+            public int stepIndex;
         }
-
-        [BurstCompile]
-        private static int ApplySampleRateAdaptation(int originalIndexChange, int sampleRate)
-        {
-            if (sampleRate >= 96000)
-            {
-                if (originalIndexChange > 0) return originalIndexChange + 1;
-                return originalIndexChange;
-            }
-            else if (sampleRate <= 8000)
-            {
-                if (originalIndexChange > 2) return originalIndexChange - 1;
-                if (originalIndexChange < -2) return originalIndexChange + 1;
-                return originalIndexChange;
-            }
-
-            return originalIndexChange;
-        }
-
-
-        /// <summary>
-        /// Accumulate signal and noise powers
-        /// </summary>
-        public static (double signal, double noise) AccumulateSignalNoisePower(ReadOnlySpan<float> original, ReadOnlySpan<float> decoded)
-        {
-            if (original.Length != decoded.Length)
-            {
-                Debug.LogWarning($"Array lengths don't match: {original.Length} vs {decoded.Length}");
-                return (0, 0);
-            }
-
-            double signalPower = 0;
-            double noisePower = 0;
-
-            for (int i = 0; i < original.Length; i++)
-            {
-                signalPower += original[i] * original[i];
-                double error = original[i] - decoded[i];
-                noisePower += error * error;
-            }
-
-            return (signalPower, noisePower);
-        }
-
-        /// <summary>
-        /// Calculate Signal-to-Noise Ratio between powers
-        /// </summary>
-        public static float CalculateSignalToNoiseRatio(double signalPower, double noisePower)
-        {
-            if (signalPower == 0)
-            {
-                Debug.LogWarning($"No signal");
-                return 0;
-            }
-
-            if (noisePower == 0) return float.PositiveInfinity; // Perfect match
-
-            double snr = 10 * math.log10(signalPower / noisePower);
-            return (float)snr;
-        }
-
-        /// <summary>
-        /// Calculate Signal-to-Noise Ratio between original and decoded audio
-        /// </summary>
-        public static float CalculateSignalToNoiseRatio(ReadOnlySpan<float> original, ReadOnlySpan<float> decoded)
-        {
-            var powers = AccumulateSignalNoisePower(original, decoded);
-            float snr = CalculateSignalToNoiseRatio(powers.signal, powers.noise);
-            return snr;
-        }
-    }
-
-
-    [System.Serializable]
-    public struct IMAState
-    {
-        public int previousSample;
-        public int stepIndex;
     }
 }
+

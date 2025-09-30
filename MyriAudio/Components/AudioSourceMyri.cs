@@ -16,8 +16,22 @@ namespace Latios.Myri
         internal ulong                             m_packed;
 
         /// <summary>
+        /// Gets or sets the audio clip. Setting this will cause the playback state to reset.
+        /// </summary>
+        [CreateProperty]
+        public BlobAssetReference<AudioClipBlob> clip
+        {
+            get => m_clip;
+            set
+            {
+                m_clip = value;
+                ResetPlaybackState();
+            }
+        }
+        /// <summary>
         /// Gets or sets the looping state. Setting this will cause the playback state to reset.
         /// </summary>
+        [CreateProperty]
         public bool looping
         {
             get => Bits.GetBit(m_packed, 63);
@@ -32,6 +46,7 @@ namespace Latios.Myri
         /// Setting this will cause the playback state to reset if looping is true.
         /// Returns false or does nothing if looping is false.
         /// </summary>
+        [CreateProperty]
         public bool offsetIsBasedOnSpawn
         {
             get => looping & Bits.GetBit(m_packed, 61);
@@ -92,6 +107,21 @@ namespace Latios.Myri
         {
             Bits.SetBits(ref m_packed, 60, 2, 0);
         }
+
+        [CreateProperty(ReadOnly = true)]
+        FixedString128Bytes clipName => m_clip.IsCreated ? m_clip.Value.name : default;
+
+        [CreateProperty(ReadOnly = true)]
+        double clipDuration => m_clip.IsCreated ? m_clip.Value.sampleCountPerChannel / (double)m_clip.Value.sampleRate : default;
+
+        [CreateProperty(ReadOnly = true)]
+        Codec codec => m_clip.IsCreated ? m_clip.Value.codec : default;
+
+        [CreateProperty(ReadOnly = true)]
+        float compressionRatio => m_clip.IsCreated ? CodecDispatch.GetCompressionRatio(m_clip.Value.codec, ref m_clip.Value.encodedSamples) : default;
+
+        [CreateProperty(ReadOnly = true)]
+        float compressionSignalToNoiseRatio => m_clip.IsCreated ? CodecDispatch.GetSignalToNoiseRatio(m_clip.Value.codec, ref m_clip.Value.encodedSamples) : default;
     }
 
     /// <summary>
@@ -193,6 +223,7 @@ namespace Latios.Myri
         /// <summary>
         /// The name of the audio clip asset that created this blob asset.
         /// </summary>
+        [CreateProperty]
         public FixedString128Bytes name;
         /// <summary>
         /// The sample rate of the audio clip. A value of 48000 would mean 48000 float samples are required for 1 second of audio.

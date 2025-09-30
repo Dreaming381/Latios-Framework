@@ -392,7 +392,7 @@ namespace Latios.Psyshock
             var drawEdge     = previousEdge;
             drawEdge.c0      = math.transform(transform, drawEdge.c0 * triMesh.scale);
             drawEdge.c1      = math.transform(transform, drawEdge.c1 * triMesh.scale);
-            drawer.DrawLine(previousEdge.c0, previousEdge.c1, color);
+            drawer.DrawLine(drawEdge.c0, drawEdge.c1, color);
             for (int i = 1; i < edges.Length; i++)
             {
                 var edge = edges[i];

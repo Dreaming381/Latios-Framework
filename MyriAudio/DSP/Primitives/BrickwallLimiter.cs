@@ -56,7 +56,7 @@ namespace Latios.Myri.DSP
         {
             m_allocator            = allocator;
             m_preGain              = initialPreGain;
-            m_preGainDB            = SampleUtilities.ConvertToDB(initialPreGain);
+            m_preGainDB            = DspTools.ConvertToDB(initialPreGain);
             m_volume               = initialVolume;
             m_releasePerSampleDB   = initialReleaseDBPerSample;
             m_currentAttenuationDB = 0f;
@@ -89,7 +89,7 @@ namespace Latios.Myri.DSP
             set
             {
                 m_preGain   = value;
-                m_preGainDB = SampleUtilities.ConvertToDB(m_preGain);
+                m_preGainDB = DspTools.ConvertToDB(m_preGain);
             }
         }
 
@@ -130,7 +130,7 @@ namespace Latios.Myri.DSP
                 m_delayQueueL.Enqueue(leftIn);
                 m_delayQueueR.Enqueue(rightIn);
                 var max = math.max(math.abs(leftIn), math.abs(rightIn));
-                m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(max));
+                m_delayAmplitudeDB.Enqueue(DspTools.ConvertToDB(max));
                 leftOut  = 0f;
                 rightOut = 0f;
                 return;
@@ -143,7 +143,7 @@ namespace Latios.Myri.DSP
             // Clamp the attenuation to whatever the sample needs
             m_currentAttenuationDB = math.min(m_currentAttenuationDB, -(amplitudeSampleDB + m_preGainDB));
 
-            var factor = m_preGain * m_volume * SampleUtilities.ConvertDBToRawAttenuation(m_currentAttenuationDB);
+            var factor = m_preGain * m_volume * DspTools.ConvertDBToRawAttenuation(m_currentAttenuationDB);
             leftOut    = leftSample * factor;
             rightOut   = rightSample * factor;
 
@@ -152,7 +152,7 @@ namespace Latios.Myri.DSP
                 m_delayQueueL.Enqueue(leftIn);
                 m_delayQueueR.Enqueue(rightIn);
                 var max = math.max(math.abs(leftIn), math.abs(rightIn));
-                m_delayAmplitudeDB.Enqueue(SampleUtilities.ConvertToDB(max));
+                m_delayAmplitudeDB.Enqueue(DspTools.ConvertToDB(max));
             }
 
             // Find the maximally decreasing attenuation slope in the lookahead queue

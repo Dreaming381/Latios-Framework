@@ -35,20 +35,5 @@ namespace Latios.Myri.DSP
             right.AsSpan().Clear();
         }
     }
-
-    // General reminder: Adding dB is like multiplying raw, and subtracting dB is like dividing.
-    public static class SampleUtilities
-    {
-        public static float ConvertToDB(float rawSample)
-        {
-            var result = 20f * math.log10(math.abs(rawSample));
-            return math.select(-144f, result, math.isfinite(result));
-        }
-
-        public static float ConvertDBToRawAttenuation(float dB)
-        {
-            return math.pow(10f, dB / 20f);
-        }
-    }
 }
 
