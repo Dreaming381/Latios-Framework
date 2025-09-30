@@ -14,8 +14,8 @@ namespace Latios.Myri
 
     internal struct CodecContext
     {
-        public ThreadStackAllocator threadStackAllocator;
-        public int                  sampleRate;
+        public ThreadStackAllocator   threadStackAllocator;
+        public int                    sampleRate;
         public float                  compressionRatio;
     }
 
@@ -35,6 +35,10 @@ namespace Latios.Myri
                     ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
                     data.Encode(ref builder, monoSamplesToEncode, ref context);
                     break;
+                case Codec.ADPCM:
+                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
+                    data.Encode(ref builder, monoSamplesToEncode, ref context);
+                    break;
             }
         }
 
@@ -47,6 +51,10 @@ namespace Latios.Myri
         {
             switch (codec)
             {
+                case Codec.ADPCM:
+                    ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
+                    data.Encode(ref builder, leftSamplesToEncode, rightSamplesToEncode, ref context);
+                    break;
                 case Codec.ADPCM:
                     ref var data = ref builder.Allocate(ref UnsafeUtility.As<BlobPtr<byte>, BlobPtr<ADPCMCodecData> >(ref codecStruct));
                     data.Encode(ref builder, leftSamplesToEncode, rightSamplesToEncode, ref context);

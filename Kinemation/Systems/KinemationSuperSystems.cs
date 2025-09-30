@@ -151,6 +151,7 @@ namespace Latios.Kinemation.Systems
 
             GetOrCreateAndAddUnmanagedSystem<AllocateDeformMaterialPropertiesSystem>();
             GetOrCreateAndAddUnmanagedSystem<CopyDeformCustomSystem>();
+            GetOrCreateAndAddUnmanagedSystem<CullInvalidUniqueMeshesSystem>();
 
             GetOrCreateAndAddManagedSystem<CustomGraphicsRoundRobinDispatchSuperSystem>();
 
@@ -179,6 +180,7 @@ namespace Latios.Kinemation.Systems
             EnableSystemSorting = false;
 
             GetOrCreateAndAddManagedSystem<DispatchRoundRobinEarlyExtensionsSuperSystem>();
+            GetOrCreateAndAddUnmanagedSystem<UploadUniqueMeshesSystem>();
             GetOrCreateAndAddUnmanagedSystem<UploadDynamicMeshesSystem>();
             GetOrCreateAndAddUnmanagedSystem<BlendShapesDispatchSystem>();
             GetOrCreateAndAddUnmanagedSystem<SkinningDispatchSystem>();

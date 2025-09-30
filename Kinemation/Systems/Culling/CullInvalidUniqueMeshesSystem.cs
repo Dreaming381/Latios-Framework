@@ -20,21 +20,28 @@ namespace Latios.Kinemation.Systems
     {
         LatiosWorldUnmanaged latiosWorld;
         EntityQuery          m_query;
+        uint m_lastEntitiesGraphicsUpdate;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_query     = state.Fluent().With<UniqueMeshConfig>(false).With<MaterialMeshInfo>(true).With<ChunkPerCameraCullingMask>(false, true).Build();
+            m_lastEntitiesGraphicsUpdate = 0;
         }
 
         [BurstCompile]
         public unsafe void OnUpdate(ref SystemState state)
         {
-            var cullingContext = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
+            bool isCustomGraphicsPass = false;
+            var dispatchContext = latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>();
             var meshPool       = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
-            if (cullingContext.cullIndexThisFrame == 0)
+            if (dispatchContext.globalSystemVersionOfLatiosEntitiesGraphics != m_lastEntitiesGraphicsUpdate)
+            {
                 state.Dependency = new NewFrameJob { meshPool = meshPool }.Schedule(state.Dependency);
+                isCustomGraphicsPass = latiosWorld.worldBlackboardEntity.HasComponent<EnableCustomGraphicsTag>();
+            }
+            m_lastEntitiesGraphicsUpdate = dispatchContext.globalSystemVersionOfLatiosEntitiesGraphics;
 
             var changeRequests = new UnsafeParallelBlockList<ChangeRequest>(256, state.WorldUpdateAllocator);
             state.Dependency   = new CullJob
@@ -52,7 +59,8 @@ namespace Latios.Kinemation.Systems
                 meshPool       = meshPool,
                 configHandle   = GetComponentTypeHandle<UniqueMeshConfig>(false),
                 maskHandle     = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                changeRequests = changeRequests
+                changeRequests = changeRequests,
+                isCustomGraphicsPass = isCustomGraphicsPass,
             }.ScheduleParallel(m_query, state.Dependency);
 
             state.Dependency = new UpdateRequestsJob
@@ -95,6 +103,8 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<ChunkPerCameraCullingMask> maskHandle;
             public UnsafeParallelBlockList<ChangeRequest>         changeRequests;
 
+            public bool isCustomGraphicsPass;
+
             [NativeSetThreadIndex]
             int threadIndex;
 
@@ -105,6 +115,8 @@ namespace Latios.Kinemation.Systems
                 var        configurations       = (UniqueMeshConfig*)chunk.GetRequiredComponentDataPtrRO(ref configHandle);
                 var        configuredBits       = chunk.GetEnabledMask(ref configHandle);
                 var        enumerator           = new ChunkEntityEnumerator(true, new v128(chunkMask.lower.Value, chunkMask.upper.Value), chunk.Count);
+                if (isCustomGraphicsPass)
+                    enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 BitField64 furtherEvaluateLower = default, furtherEvaluateUpper = default;
                 while (enumerator.NextEntityIndex(out var entityIndex))
                 {

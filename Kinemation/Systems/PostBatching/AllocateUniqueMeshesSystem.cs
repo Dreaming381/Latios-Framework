@@ -170,7 +170,9 @@ namespace Latios.Kinemation.Systems
                     var id                                             = meshPool.meshToIdMap[mesh];
                     meshPool.invalidMeshesToCull.Add(id);
                     if (mmis != null)
+                    {
                         mmis[i].Mesh = id;
+                    }
                 }
             }
         }

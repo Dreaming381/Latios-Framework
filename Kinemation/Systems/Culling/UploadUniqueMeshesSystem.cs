@@ -121,7 +121,8 @@ namespace Latios.Kinemation
             if (writeState.meshCount == 0)
                 return;
 
-            var flags = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
+            //var flags = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds;
+            var flags = MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | MeshUpdateFlags.DontRecalculateBounds;
             GraphicsUnmanaged.ApplyAndDisposeWritableMeshData(writeState.meshDataArray, writeState.meshesToUpload, flags);
         }
 

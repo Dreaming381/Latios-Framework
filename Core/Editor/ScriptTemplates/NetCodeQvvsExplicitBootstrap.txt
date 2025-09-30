@@ -54,6 +54,7 @@ public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
         Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        //Latios.Kinemation.KinemationBootstrap.InstallUniqueMeshesEarlyUploader(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
         //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
@@ -90,6 +91,7 @@ public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
         Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
+        //Latios.Kinemation.KinemationBootstrap.InstallUniqueMeshesEarlyUploader(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
         //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
