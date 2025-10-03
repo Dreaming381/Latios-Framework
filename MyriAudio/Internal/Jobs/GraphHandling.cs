@@ -181,7 +181,7 @@ namespace Latios.Myri
                         {
                             bufferStart       = megaBufferSampleCount,
                             leftChannelsCount = profile.channelDspsLeft.Length,
-                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
+                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames) + 8  // 8 extra samples for anti-stepping
                         };
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
                         channelCounts[i]       = numChannels;
@@ -222,7 +222,7 @@ namespace Latios.Myri
                         {
                             bufferStart       = megaBufferSampleCount,
                             leftChannelsCount = profile.channelDspsLeft.Length,
-                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames)
+                            samplesPerChannel = samplesPerFrame * (audioSettings.audioFramesPerUpdate + audioSettings.safetyAudioFrames) + 8  // 8 extra samples for anti-stepping
                         };
                         megaBufferSampleCount += listenerBufferParameters[i].samplesPerChannel * numChannels;
                         channelCounts[i]       = numChannels;
@@ -252,12 +252,12 @@ namespace Latios.Myri
                             var     channelCount = blob.channelDspsLeft.Length + blob.channelDspsRight.Length;
                             for (int i = listenerGraphState.inletPortCount; i < channelCount; i++)
                             {
-                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 1);
+                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 2);
                                 listenerGraphState.inletPortCount++;
                             }
                             for (int i = systemIldNodePortCount.Value; i < outputPortIndex + channelCount; i++)
                             {
-                                commandBlock.AddOutletPort(systemIldNode, 1);
+                                commandBlock.AddOutletPort(systemIldNode, 2);
                                 systemMasterMixNodePortCount.Value++;
                             }
                             for (int i = 0; i < channelCount; i++)
@@ -275,12 +275,12 @@ namespace Latios.Myri
                             var     channelCount = blob.channelDspsLeft.Length + blob.channelDspsRight.Length;
                             for (int i = listenerGraphState.inletPortCount; i < channelCount; i++)
                             {
-                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 1);
+                                commandBlock.AddInletPort(listenerGraphState.listenerMixNode, 2);
                                 listenerGraphState.inletPortCount++;
                             }
                             for (int i = systemIldNodePortCount.Value; i < outputPortIndex + channelCount; i++)
                             {
-                                commandBlock.AddOutletPort(systemIldNode, 1);
+                                commandBlock.AddOutletPort(systemIldNode, 2);
                                 systemMasterMixNodePortCount.Value++;
                             }
                             for (int i = 0; i < channelCount; i++)
@@ -327,7 +327,7 @@ namespace Latios.Myri
                 {
                     ildBuffer = new IldBuffer
                     {
-                        bufferChannels  = (IldBufferChannel*)outputSamplesMegaBufferChannels.GetUnsafePtr(),
+                        bufferChannels  = outputSamplesMegaBufferChannels.GetUnsafePtr(),
                         bufferId        = bufferId,
                         framesInBuffer  = 1 + audioSettings.safetyAudioFrames,
                         framesPerUpdate = audioSettings.audioFramesPerUpdate,

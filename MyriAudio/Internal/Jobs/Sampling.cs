@@ -123,7 +123,7 @@ namespace Latios.Myri
                         var input = CodecDispatch.DecodeChannel(clip.codec, ref clip.encodedSamples, isRightChannel, 0, clip.sampleCountPerChannel, ref context);
                         for (int i = 0; i < output.Length; i++)
                         {
-                            int index = (clipStart + i) % clip.sampleCountPerChannel;
+                            int index  = (clipStart + i) % clip.sampleCountPerChannel;
                             output[i] += input[index] * weight;
                         }
                         context.threadStackAllocator.Dispose();

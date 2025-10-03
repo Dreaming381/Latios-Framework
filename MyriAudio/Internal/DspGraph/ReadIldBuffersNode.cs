@@ -73,19 +73,16 @@ namespace Latios.Myri
                 if (channelOutput.Channels <= 0)
                     continue;
                 var outputBuffer = channelOutput.GetBuffer(0);
+                var stepBuffer   = channelOutput.GetBuffer(1);
                 if (m_ildBuffer.channelCount <= outputChannelIndex)
                 {
-                    for (int i = 0; i < outputBuffer.Length; i++)
-                    {
-                        outputBuffer[i] = 0f;
-                    }
+                    outputBuffer.AsSpan().Clear();
+                    stepBuffer.AsSpan().Slice(0, 8).Clear();
                 }
                 else if (m_currentFrame - m_ildBuffer.frame >= m_ildBuffer.framesInBuffer)
                 {
-                    for (int i = 0; i < outputBuffer.Length; i++)
-                    {
-                        outputBuffer[i] = 0f;
-                    }
+                    outputBuffer.AsSpan().Clear();
+                    stepBuffer.AsSpan().Slice(0, 8).Clear();
                     bufferStarved = true;
                 }
                 else
@@ -97,6 +94,10 @@ namespace Latios.Myri
                     for (int i = 0; i < outputBuffer.Length; i++)
                     {
                         outputBuffer[i] = ildBufferChannel.buffer[bufferOffset + i];
+                    }
+                    for (int i = 0; i < 8; i++)
+                    {
+                        stepBuffer[i] = ildBufferChannel.buffer[bufferOffset + outputBuffer.Length + i];
                     }
                 }
             }

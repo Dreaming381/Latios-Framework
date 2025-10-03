@@ -30,6 +30,8 @@ namespace Latios.Myri
         int                                              m_expectedSampleBufferSize;
         internal BlobAssetReference<ListenerProfileBlob> m_blob;
         internal UnsafeList<SvfState>                    m_svfs;
+        internal UnsafeList<float>                       m_channelStepReferences;
+        internal bool                                    m_firstFrame;
 
         public void Initialize()
         {
@@ -41,12 +43,15 @@ namespace Latios.Myri
             m_expectedSampleBufferSize = 1024;
             m_blob                     = default;
             m_svfs                     = new UnsafeList<SvfState>(8, Allocator.AudioKernel);
+            m_channelStepReferences    = new UnsafeList<float>(8, Allocator.AudioKernel);
+            m_firstFrame               = true;
         }
 
         public void Dispose()
         {
             m_limiter.Dispose();
             m_svfs.Dispose();
+            m_channelStepReferences.Dispose();
         }
 
         public void Execute(ref ExecuteContext<Parameters, SampleProviders> context)
@@ -64,12 +69,22 @@ namespace Latios.Myri
             int filterStart = 0;
             for (int c = 0; c < math.min(context.Inputs.Count, m_blob.Value.channelDspsLeft.Length); c++)
             {
-                var inputBuffer = context.Inputs.GetSampleBuffer(c).GetBuffer(0);
-                var filterCount = m_blob.Value.channelDspsLeft[c].filters.Length;
-                var volume      = m_blob.Value.channelDspsLeft[c].volume;
+                var   inputBuffer = context.Inputs.GetSampleBuffer(c).GetBuffer(0);
+                var   stepBuffer  = context.Inputs.GetSampleBuffer(c).GetBuffer(1);
+                var   filterCount = m_blob.Value.channelDspsLeft[c].filters.Length;
+                var   volume      = m_blob.Value.channelDspsLeft[c].volume;
+                float step        = m_channelStepReferences[c] - inputBuffer[0];
+                if (m_firstFrame)
+                    step = 0f;
+                if (leftBuffer.Length != 0)
+                    m_channelStepReferences[c] = stepBuffer[0];
+                else
+                    m_channelStepReferences[c] = 0f;
+
                 for (int i = 0; i < leftBuffer.Length; i++)
                 {
-                    var sample = inputBuffer[i];
+                    var sample  = inputBuffer[i];
+                    sample     += math.remap(0f, 127f, step, 0f, math.min(i, 127f));
 
                     for (int f = 0; f < filterCount; f++)
                     {
@@ -85,12 +100,21 @@ namespace Latios.Myri
             var rightBuffer = mixedOutputSampleBuffer.GetBuffer(1);
             for (int r = 0, c = m_blob.Value.channelDspsLeft.Length; c < context.Inputs.Count; c++, r++)
             {
-                var inputBuffer = context.Inputs.GetSampleBuffer(c).GetBuffer(0);
-                var filterCount = m_blob.Value.channelDspsRight[r].filters.Length;
-                var volume      = m_blob.Value.channelDspsRight[r].volume;
+                var   inputBuffer = context.Inputs.GetSampleBuffer(c).GetBuffer(0);
+                var   stepBuffer  = context.Inputs.GetSampleBuffer(c).GetBuffer(1);
+                var   filterCount = m_blob.Value.channelDspsRight[r].filters.Length;
+                var   volume      = m_blob.Value.channelDspsRight[r].volume;
+                float step        = m_channelStepReferences[c] - inputBuffer[0];
+                if (m_firstFrame)
+                    step = 0f;
+                if (leftBuffer.Length != 0)
+                    m_channelStepReferences[c] = stepBuffer[0];
+                else
+                    m_channelStepReferences[c] = 0f;
                 for (int i = 0; i < rightBuffer.Length; i++)
                 {
-                    var sample = inputBuffer[i];
+                    var sample  = inputBuffer[i];
+                    sample     += math.remap(0f, 127f, step, 0f, math.min(i, 127f));
 
                     for (int f = 0; f < filterCount; f++)
                     {
@@ -115,6 +139,8 @@ namespace Latios.Myri
                 leftBuffer[i]  = leftOut;
                 rightBuffer[i] = rightOut;
             }
+
+            m_firstFrame = false;
         }
 
         void ZeroSampleBuffer(SampleBuffer sb)
@@ -137,6 +163,8 @@ namespace Latios.Myri
         {
             audioKernel.m_blob = blob;
             audioKernel.m_svfs.Clear();
+            audioKernel.m_channelStepReferences.Clear();
+            audioKernel.m_firstFrame = true;
             for (int channel = 0; channel < blob.Value.channelDspsLeft.Length; channel++)
             {
                 foreach (var filter in blob.Value.channelDspsLeft[channel].filters.AsSpan())
@@ -147,6 +175,7 @@ namespace Latios.Myri
                         coefficients = StateVariableFilter.CreateFilterCoefficients(filter.type, filter.cutoff, filter.q, filter.gainInDecibels, sampleRate)
                     });
                 }
+                audioKernel.m_channelStepReferences.Add(0f);
             }
             for (int channel = 0; channel < blob.Value.channelDspsRight.Length; channel++)
             {
@@ -158,6 +187,7 @@ namespace Latios.Myri
                         coefficients = StateVariableFilter.CreateFilterCoefficients(filter.type, filter.cutoff, filter.q, filter.gainInDecibels, sampleRate)
                     });
                 }
+                audioKernel.m_channelStepReferences.Add(0f);
             }
         }
     }

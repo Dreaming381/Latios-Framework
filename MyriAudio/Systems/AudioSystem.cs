@@ -73,7 +73,7 @@ namespace Latios.Myri.Systems
             // Create queries
             m_aliveListenersQuery = state.Fluent().With<AudioListener>(true).Build();
             m_deadListenersQuery  = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
-            m_sourcesQuery        = state.Fluent().With<AudioSourceVolume, AudioSourceDistanceFalloff>(true).With<AudioSourceClip>(false).Build();
+            m_sourcesQuery        = state.Fluent().With<AudioSourceVolume>(true).With<AudioSourceClip>(false).Build();
 
             m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
         }

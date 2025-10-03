@@ -187,18 +187,18 @@ namespace Latios.Myri.Interop
 
     internal unsafe struct ListenerStackMetadata
     {
-        public TransformQvvs                             worldTransform;
-        public BrickwallLimiterSettings                  limiterSettings;
+        public TransformQvvs                           worldTransform;
+        public BrickwallLimiterSettings                limiterSettings;
         public BlobAssetReference<ListenerProfileBlob> listenerProfileBlob;
-        public Entity                                    listenerEntity;
-        public EffectIDInStack*                          effectIDs;
-        public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
-        public int                                       listenerId;
-        public int                                       effectIDsCount;
-        public uint                                      layerMask;
-        public bool                                      listenerEnabled;
-        public bool                                      stackEnabled;
-        public bool                                      hasVirtualOutput;
+        public Entity                                  listenerEntity;
+        public EffectIDInStack*                        effectIDs;
+        public DSP.StateVariableFilter.Channel*        listenerProfileFilters;
+        public int                                     listenerId;
+        public int                                     effectIDsCount;
+        public uint                                    layerMask;
+        public bool                                    listenerEnabled;
+        public bool                                    stackEnabled;
+        public bool                                    hasVirtualOutput;
 
         internal unsafe struct Ptr
         {
@@ -208,14 +208,14 @@ namespace Latios.Myri.Interop
 
     internal unsafe struct ListenerStackUpdate
     {
-        public BrickwallLimiterSettings                  limiterSettings;
+        public BrickwallLimiterSettings                limiterSettings;
         public BlobAssetReference<ListenerProfileBlob> listenerProfileBlob;
-        public EffectIDInStack*                          effectIDs;
-        public DSP.StateVariableFilter.Channel*          listenerProfileFilters;
-        public int                                       listenerId;
-        public int                                       effectIDsCount;
-        public uint                                      layerMask;
-        public bool                                      hasVirtualOutput;
+        public EffectIDInStack*                        effectIDs;
+        public DSP.StateVariableFilter.Channel*        listenerProfileFilters;
+        public int                                     listenerId;
+        public int                                     effectIDsCount;
+        public uint                                    layerMask;
+        public bool                                    hasVirtualOutput;
     }
     #endregion
 
