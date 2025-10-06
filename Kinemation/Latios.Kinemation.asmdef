@@ -43,35 +43,10 @@
             "expression": "9.9.9",
             "define": "SRP_10_0_0_OR_NEWER"
         },
-        {
-            "name": "com.unity.tiny",
-            "expression": "0.21.9",
-            "define": "TINY_0_22_0_OR_NEWER"
-        },
-        {
-            "name": "com.unity.cinemachine.dots",
-            "expression": "0.60.0-preview.81",
-            "define": "ENABLE_TRANSFORM_V1"
-        },
-        {
-            "name": "com.unity.stableid",
-            "expression": "0.60.0-preview.91",
-            "define": "ENABLE_TRANSFORM_V1"
-        },
-        {
-            "name": "com.unity.physics",
-            "expression": "0.60.0-preview.88",
-            "define": "ENABLE_TRANSFORM_V1"
-        },
-        {
-            "name": "com.unity.2d.entities.physics",
-            "expression": "0.5.0-preview.1",
-            "define": "ENABLE_TRANSFORM_V1"
-        },
-        {
-            "name": "com.unity.netcode",
-            "expression": "0.60.0-preview.90",
-            "define": "ENABLE_TRANSFORM_V1"
+		{
+            "name": "com.unity.entities",
+            "expression": "1.4.0",
+            "define": "ENTITIES_1_4"
         }
     ],
     "noEngineReferences": false

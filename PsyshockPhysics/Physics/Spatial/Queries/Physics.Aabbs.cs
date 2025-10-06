@@ -264,11 +264,42 @@ namespace Latios.Psyshock
 
         private static Aabb AabbFrom(in CompoundCollider compound, in RigidTransform transform)
         {
-            var         local = compound.compoundColliderBlob.Value.localAabb;
-            float3      c     = (local.min + local.max) / 2f;
-            BoxCollider box   = new BoxCollider(c, local.max - c);
-            ScaleStretchCollider(ref box, compound.scale, math.max(1f, compound.stretch));  // Be conservative here to avoid enum parsing
-            return AabbFrom(in box, transform);
+            switch (compound.stretchMode)
+            {
+                case CompoundCollider.StretchMode.RotateStretchLocally:
+                {
+                    var radialExtents = compound.scale * compound.compoundColliderBlob.Value.maxOffsetFromAnchors * math.cmax(math.abs(compound.stretch));
+                    var local         = compound.compoundColliderBlob.Value.anchorsAabb;
+                    GetCenterExtents(local, out var c, out var e);
+                    BoxCollider box = new BoxCollider(c, e);
+                    ScaleStretchCollider(ref box, compound.scale, compound.stretch);
+                    var transformed = AabbFrom(in box, transform);
+                    GetCenterExtents(transformed, out c, out e);
+                    e += radialExtents;
+                    return new Aabb(c - e, c + e);
+                }
+                case CompoundCollider.StretchMode.IgnoreStretch:
+                {
+                    var local = compound.compoundColliderBlob.Value.anchorsAabb;
+                    GetCenterExtents(local, out var c, out var e);
+                    BoxCollider box = new BoxCollider(c, e);
+                    ScaleStretchCollider(ref box, compound.scale, 1f);
+                    return AabbFrom(in box, transform);
+                }
+                case CompoundCollider.StretchMode.StretchPositionsOnly:
+                {
+                    var radialExtents = compound.scale * compound.compoundColliderBlob.Value.maxOffsetFromAnchors;
+                    var local         = compound.compoundColliderBlob.Value.anchorsAabb;
+                    GetCenterExtents(local, out var c, out var e);
+                    BoxCollider box = new BoxCollider(c, e);
+                    ScaleStretchCollider(ref box, compound.scale, compound.stretch);
+                    var transformed  = AabbFrom(in box, transform);
+                    transformed.min -= radialExtents;
+                    transformed.max += radialExtents;
+                    return transformed;
+                }
+                default: return new Aabb(transform.pos, transform.pos);
+            }
         }
 
         private static Aabb AabbFrom(CompoundCollider compound, in TransformQvvs transform)

@@ -1,18 +1,17 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.14.0-alpha.6]
+# Latios Framework for Unity ECS – [0.14.0-beta.1]
 
 **This is a prerelease version of the Latios Framework version 0.14 which is
 still under development. Changelogs and Documentation, including the remainder
-of this README, have not been updated to reflect the new features and changes in
-0.14. Git hashes might not be preserved on transition to beta or official
-release (though they most-likely will).**
+of this README, are currently being updated to reflect the new features and
+changes in 0.14.**
 
 **You are still welcome to submit bug reports and pull requests for this and
 future prerelease versions!**
 
-**This version of the alpha uses Unity 6000.0.48f1 with Entities 1.3.14
-(entities version is same as official release).**
+**This version of the beta uses Unity 6000.0.23f1 with Entities 1.3.14 (entities
+version is same as official release).**
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -43,7 +42,7 @@ towards Unity’s ECS.
 This version targets Entities 1.3.14 with ENTITY_STORE_V1 and a minimum editor
 version of 6000.0.23f1.
 
-*[0.12.x] users, please read the* [*Upgrade
+*[0.13.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 ## Modules
@@ -60,7 +59,7 @@ Bootstrap templates are provided in the Assets Create menu.
 
 [Core](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Core/README.md)
 is an essentials kit for handling common programming concerns in Unity’s ECS. It
-contains many features you might have heard of such as Rng, Blackboard Entities,
+contains many features you might have heard of such as Blackboard Entities,
 Collection Components, Instantiate Command Buffers, Smart Blobbers, Explicit
 System Ordering, and Baking Bootstraps. But there are many more features around.
 If there is a common “hard” problem in ECS, there’s a good chance Core has a
@@ -96,6 +95,24 @@ features in the other modules will be disabled when you do this.
 **Common Reasons to Use Unity Transforms:**
 
 -   You use Unity Physics, Unity Character Controller, or Unity NetCode
+
+### Calci
+
+[Calci](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Calci/README.md)
+is a module focused on math and algorithms that can be useful for gameplay
+design as well as building blocks for engine-level functionality. Curves, RNG,
+and search algorithms can all be found here, as well as some lesser-known
+algorithms such as QCP. Most implementations are also heavily optimized for
+Burst.
+
+**Common Reasons to Use:**
+
+-   You want a high-performance implementation of at least one of the algorithms
+    included
+
+**Common Reasons to Avoid:**
+
+-   You have no need for any of the algorithms included
 
 ### Psyshock
 
@@ -221,7 +238,7 @@ scripts, providing plenty of flexibility.
 -   You have too many small jobs
 -   You want something that can leverage your OOP experience as a fallback to
     reduce development costs
--   You have technical artists who want to write MonoBehaviour-like code
+-   You have technical artists who want to write `MonoBehaviour`-like code
 -   You want a better API for modders
 
 **Common Reasons to Avoid:**
@@ -230,7 +247,6 @@ scripts, providing plenty of flexibility.
 
 ### Future Modules
 
--   Calci – A library of useful math operations and solvers optimized for Burst
 -   Mach-Axle AI – A utility AI evaluator designed for high throughput
 -   Unnamed Networking – Something fast and flexible at scale
 
@@ -256,8 +272,8 @@ in [this video](https://youtu.be/AgcRePkWoFc). For a complete breakdown of these
 changes with each configuration and bootstrap, [check out this
 guide](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/What%20Parts%20of%20ECS%20Does%20the%20Latios%20Framework%20Change.md).
 
-0.13 marks the beginning of Phase IV, which focuses on higher-level workflows
-and advancing existing technologies for real productions.
+0.13 marked the beginning of Phase IV, which has focused on higher-level
+workflows and advancing existing technologies for real productions.
 
 Long term, the Latios Framework’s mission is to dramatically reduce the
 development effort required to make highly artistic 3D games and short films.

@@ -15,8 +15,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            ref var blob    = ref compound.compoundColliderBlob.Value;
-            for (int i = 0; i < blob.colliders.Length; i++)
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(box, boxTransform, compound, compoundTransform))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = DistanceBetween(in blobCollider,
@@ -41,8 +40,7 @@ namespace Latios.Psyshock
                                                  float maxDistance,
                                                  ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            ref var blob = ref compound.compoundColliderBlob.Value;
-            for (int i = 0; i < blob.colliders.Length; i++)
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(box, boxTransform, compound, compoundTransform))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = DistanceBetween(in blobCollider,
@@ -73,8 +71,7 @@ namespace Latios.Psyshock
             {
                 return false;
             }
-            ref var blob = ref targetCompound.compoundColliderBlob.Value;
-            for (int i = 0; i < blob.colliders.Length; i++)
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(Physics.AabbFrom(boxToCast, in castStart, castEnd), targetCompound, targetCompoundTransform))
             {
                 targetCompound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = ColliderCast(in boxToCast, in castStart, castEnd, in blobCollider,
@@ -103,8 +100,8 @@ namespace Latios.Psyshock
             {
                 return false;
             }
-            ref var blob = ref compoundToCast.compoundColliderBlob.Value;
-            for (int i = 0; i < blob.colliders.Length; i++)
+            var boxSweptAabb = Physics.AabbFrom(targetBox, targetBoxTransform, targetBoxTransform.pos - (castEnd - castStart.pos));
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(boxSweptAabb, compoundToCast, castStart))
             {
                 compoundToCast.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 var  start  = math.mul(castStart, blobTransform);

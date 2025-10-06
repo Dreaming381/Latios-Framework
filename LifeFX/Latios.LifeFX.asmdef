@@ -26,6 +26,11 @@
             "name": "com.unity.visualeffectgraph",
             "expression": "17.0.0",
             "define": "HAS_VFX_GRAPH_RUNTIME"
+        },
+		{
+            "name": "com.unity.entities",
+            "expression": "1.4.0",
+            "define": "ENTITIES_1_4"
         }
     ],
     "noEngineReferences": false

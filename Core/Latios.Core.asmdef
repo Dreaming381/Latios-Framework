@@ -26,6 +26,11 @@
             "name": "com.unity.netcode",
             "expression": "0.49",
             "define": "NETCODE_PROJECT"
+        },
+        {
+            "name": "com.unity.entities",
+            "expression": "1.4.0",
+            "define": "ENTITIES_1_4"
         }
     ],
     "noEngineReferences": false

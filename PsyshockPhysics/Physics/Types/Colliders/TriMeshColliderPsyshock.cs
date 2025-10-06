@@ -109,7 +109,7 @@ namespace Latios.Psyshock
             aabb.min         *= inverseScale;
             aabb.max         *= inverseScale;
             aabb.min          = math.select(aabb.min, float.MinValue, math.isnan(aabb.min));
-            aabb.max          = math.select(aabb.max, float.MinValue, math.isnan(aabb.max));
+            aabb.max          = math.select(aabb.max, float.MaxValue, math.isnan(aabb.max));
             FindTriangles(in aabb, ref processor);
         }
 

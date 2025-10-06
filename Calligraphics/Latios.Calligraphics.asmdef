@@ -23,6 +23,12 @@
     "defineConstraints": [
         "!LATIOS_DISABLE_CALLIGRAPHICS"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+		{
+            "name": "com.unity.entities",
+            "expression": "1.4.0",
+            "define": "ENTITIES_1_4"
+        }
+	],
     "noEngineReferences": false
 }

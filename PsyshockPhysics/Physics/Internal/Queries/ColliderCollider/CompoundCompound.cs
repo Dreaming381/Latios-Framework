@@ -15,13 +15,12 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            ref var blobA   = ref compoundA.compoundColliderBlob.Value;
-            ref var blobB   = ref compoundB.compoundColliderBlob.Value;
-            for (int i = 0; i < blobA.colliders.Length; i++)
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(compoundB, bTransform, compoundA, aTransform))
             {
                 compoundA.GetScaledStretchedSubCollider(i, out var blobACollider, out var blobATransform);
 
-                for (int j = 0; j < blobB.colliders.Length; j++)
+                var subATransform = math.mul(aTransform, blobATransform);
+                foreach (var j in new PointRayCompound.CompoundAabbEnumerator(blobACollider, subATransform, compoundB, bTransform))
                 {
                     compoundB.GetScaledStretchedSubCollider(j, out var blobBCollider, out var blobBTransform);
 
@@ -49,13 +48,12 @@ namespace Latios.Psyshock
                                                  float maxDistance,
                                                  ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            ref var blobA = ref compoundA.compoundColliderBlob.Value;
-            ref var blobB = ref compoundB.compoundColliderBlob.Value;
-            for (int i = 0; i < blobA.colliders.Length; i++)
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(compoundB, bTransform, compoundA, aTransform))
             {
                 compoundA.GetScaledStretchedSubCollider(i, out var blobACollider, out var blobATransform);
 
-                for (int j = 0; j < blobB.colliders.Length; j++)
+                var subATransform = math.mul(aTransform, blobATransform);
+                foreach (var j in new PointRayCompound.CompoundAabbEnumerator(blobACollider, subATransform, compoundB, bTransform))
                 {
                     compoundB.GetScaledStretchedSubCollider(j, out var blobBCollider, out var blobBTransform);
 
@@ -89,19 +87,22 @@ namespace Latios.Psyshock
             {
                 return false;
             }
-            ref var blobToCast = ref compoundToCast.compoundColliderBlob.Value;
-            ref var targetBlob = ref targetCompound.compoundColliderBlob.Value;
-            for (int i = 0; i < blobToCast.colliders.Length; i++)
+            ref var blobToCast      = ref compoundToCast.compoundColliderBlob.Value;
+            ref var targetBlob      = ref targetCompound.compoundColliderBlob.Value;
+            var     targetSweptAabb = Physics.AabbFrom(targetCompound, targetCompoundTransform, targetCompoundTransform.pos - (castEnd - castStart.pos));
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(targetSweptAabb, compoundToCast, castStart))
             {
                 compoundToCast.GetScaledStretchedSubCollider(i, out var blobColliderToCast, out var blobTransformToCast);
 
-                for (int j = 0; j < targetBlob.colliders.Length; j++)
+                var start = math.mul(castStart, blobTransformToCast);
+                var end   = start.pos + (castEnd - castStart.pos);
+                foreach (var j in new PointRayCompound.CompoundAabbEnumerator(Physics.AabbFrom(blobColliderToCast, in start, end), targetCompound, targetCompoundTransform))
                 {
                     targetCompound.GetScaledStretchedSubCollider(j, out var targetBlobCollider, out var targetBlobTransform);
-                    var  start  = math.mul(castStart, blobTransformToCast);
+
                     bool newHit = ColliderCast(in blobColliderToCast,
                                                start,
-                                               start.pos + (castEnd - castStart.pos),
+                                               end,
                                                in targetBlobCollider,
                                                math.mul(targetCompoundTransform, targetBlobTransform),
                                                out var newResult);

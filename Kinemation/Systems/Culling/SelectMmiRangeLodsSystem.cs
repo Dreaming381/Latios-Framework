@@ -25,6 +25,7 @@ namespace Latios.Kinemation.Systems
 
         int   m_maximumLODLevel;
         float m_lodBias;
+        float m_meshLodThreshold;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -32,16 +33,17 @@ namespace Latios.Kinemation.Systems
             latiosWorld            = state.GetLatiosWorldUnmanaged();
             m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
 
-            m_query = state.Fluent().With<MaterialMeshInfo, LodCrossfade>(false).With<UseMmiRangeLodTag, WorldRenderBounds>(true)
-                      .WithAnyEnabled<MmiRange2LodSelect, MmiRange3LodSelect>(true).WithWorldTransformReadOnly().Build();
+            m_query = state.Fluent().With<MaterialMeshInfo, LodCrossfade>(false).With<WorldRenderBounds>(true)
+                      .WithAnyEnabled<MmiRange2LodSelect, MmiRange3LodSelect, MeshLodCurve>(true).WithWorldTransformReadOnly().Build();
 
             latiosWorld.worldBlackboardEntity.AddComponentDataIfMissing(new MeshLodCrossfadeMargin { margin = (half)0.05f });
         }
 
         public bool ShouldUpdateSystem(ref SystemState state)
         {
-            m_maximumLODLevel = UnityEngine.QualitySettings.maximumLODLevel;
-            m_lodBias         = UnityEngine.QualitySettings.lodBias;
+            m_maximumLODLevel  = UnityEngine.QualitySettings.maximumLODLevel;
+            m_lodBias          = UnityEngine.QualitySettings.lodBias;
+            m_meshLodThreshold = UnityEngine.QualitySettings.meshLodThreshold;
             return m_maximumLODLevel < 2;
         }
 
@@ -70,7 +72,8 @@ namespace Latios.Kinemation.Systems
                 cameraPosition         = parameters.cameraPosition,
                 isPerspective          = !parameters.isOrthographic,
                 cameraFactor           = cameraFactorNoBias * m_lodBias,
-                cameraFactorNoBias     = cameraFactorNoBias,
+                meshLodFactor          = m_meshLodThreshold / (cameraFactorNoBias * parameters.cameraPixelHeight),
+                inverseLodBias         = 1f / m_lodBias,
                 maxResolutionLodLevel  = m_maximumLODLevel
             }.ScheduleParallel(m_query, state.Dependency);
         }
@@ -92,7 +95,8 @@ namespace Latios.Kinemation.Systems
 
             public float3 cameraPosition;
             public float  cameraFactor;
-            public float  cameraFactorNoBias;
+            public float  meshLodFactor;
+            public float  inverseLodBias;
             public float  meshLodCrossfadeMargin;
             public int    maxResolutionLodLevel;
             public bool   isPerspective;
@@ -151,16 +155,19 @@ namespace Latios.Kinemation.Systems
                         maxLodSupported = 0;
                     }
 
-                    float height = math.cmax(boundsArray[i].Value.Extents) * 2f;
-                    float groupMin, groupMax;
+                    float  height = math.cmax(boundsArray[i].Value.Extents) * 2f;
+                    float3 center = boundsArray[i].Value.Center;
+                    float  groupMin, groupMax;
                     if (lodGroupPercentages != null)
                     {
-                        // Todo: This is the only reason we still need to use the transform instead of using the AABB center.
+                        // We need to convert group LOD thresholds into local LOD thresholds. The key differences is that they use different center points and relative heights.
                         var   transform        = transforms[i].worldTransformQvvs;
                         float groupWorldHeight = math.abs(lodGroupPercentages[i].localSpaceHeight) * math.abs(transform.scale) * math.cmax(math.abs(transform.stretch));
                         float factor           = height / groupWorldHeight;
-                        groupMin               = factor * lodGroupPercentages[i].minCrossFadeEdge;
-                        groupMax               = factor * lodGroupPercentages[i].maxCrossFadeEdge;
+                        if (isPerspective)
+                            factor *= math.distance(cameraPosition, transform.position) / math.distance(cameraPosition, center);
+                        groupMin    = factor * lodGroupPercentages[i].minCrossFadeEdge;
+                        groupMax    = factor * lodGroupPercentages[i].maxCrossFadeEdge;
                     }
                     else
                     {
@@ -182,7 +189,7 @@ namespace Latios.Kinemation.Systems
                              out var crossfadeEnabled,
                              out var cull,
                              select,
-                             transforms[i].worldTransformQvvs,
+                             center,
                              height,
                              groupMin,
                              groupMax,
@@ -207,7 +214,7 @@ namespace Latios.Kinemation.Systems
                           out bool crossfadeEnabled,
                           out bool cull,
                           MmiRange3LodSelect select,
-                          in TransformQvvs transform,
+                          float3 center,
                           float height,
                           float groupMin,
                           float groupMax,
@@ -253,7 +260,7 @@ namespace Latios.Kinemation.Systems
                     }
 
                     var biasHeight = height * cameraFactor;
-                    var distance   = math.select(1f, math.distance(transform.position, cameraPosition), isPerspective);
+                    var distance   = math.select(1f, math.distance(center, cameraPosition), isPerspective);
 
                     var zeroHeight   = select.fullLod0ScreenHeightFraction * distance;
                     var oneMaxHeight = select.fullLod1ScreenHeightMaxFraction * distance;
@@ -294,17 +301,18 @@ namespace Latios.Kinemation.Systems
                 if (meshLod.levelCount <= 0)
                     return;
 
-                var heights           = new float3(height, groupMax, groupMin);
-                var meshLodDistance   = math.select(1f, math.distance(transform.position, cameraPosition), isPerspective);
-                var screenFractions   = heights * new float3(cameraFactorNoBias, cameraFactor, cameraFactor) / meshLodDistance;
-                var preClamp          = math.log2(screenFractions) * meshLodCurve.slope + meshLodCurve.preClampBias;
-                var postClamp         = math.max(0f, preClamp) + meshLodCurve.postClampBias;
-                var rounded           = math.round(postClamp);
-                var isWithinCrossfade = math.abs(postClamp - rounded) <= meshLodCrossfadeMargin;
-                var groupClampRegion  = rounded + math.select(float3.zero, new float3(0f, meshLodCrossfadeMargin, -meshLodCrossfadeMargin), isWithinCrossfade);
-                var meshLodLevel      = math.clamp(groupClampRegion.x, groupClampRegion.y, groupClampRegion.z);
-                meshLodLevel          = math.min(meshLodLevel, meshLod.levelCount - 1.5f);  // The extra 0.5 is to prevent crossfading
-                var meshLodRounded    = math.round(meshLodLevel);
+                var heights            = new float3(height, groupMax, groupMin);
+                heights.yz            *= inverseLodBias;
+                var meshLodDistance    = math.select(1f, math.distance(center, cameraPosition), isPerspective);
+                var screenFractions    = meshLodFactor * meshLodDistance / heights;
+                var preClamp           = math.log2(screenFractions) * meshLodCurve.slope + meshLodCurve.preClampBias;
+                var postClamp          = math.max(0f, preClamp) + meshLodCurve.postClampBias;
+                var rounded            = math.round(postClamp);
+                var isWithinCrossfade  = math.abs(postClamp - rounded) <= meshLodCrossfadeMargin;
+                var groupClampRegion   = rounded + math.select(float3.zero, new float3(0f, meshLodCrossfadeMargin, -meshLodCrossfadeMargin), isWithinCrossfade);
+                var meshLodLevel       = math.clamp(groupClampRegion.x, groupClampRegion.y, groupClampRegion.z);
+                meshLodLevel           = math.min(meshLodLevel, meshLod.levelCount - 1.5f);  // The extra 0.5 is to prevent crossfading
+                var meshLodRounded     = math.round(meshLodLevel);
                 if (math.distance(meshLodLevel, meshLodRounded) < meshLodCrossfadeMargin)
                 {
                     var hiResOpacity = math.unlerp(meshLodRounded - meshLodCrossfadeMargin, meshLodRounded + meshLodCrossfadeMargin, meshLodLevel);

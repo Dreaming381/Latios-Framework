@@ -116,7 +116,7 @@ namespace Latios.Psyshock
                 case StretchMode.StretchPositionsOnly:
                 {
                     blobTransform      = blob.transforms[index];
-                    blobTransform.pos *= scale;
+                    blobTransform.pos *= scale * stretch;
                     blobCollider       = blob.colliders[index];
                     Physics.ScaleStretchCollider(ref blobCollider, scale, 1f);
                     break;
@@ -145,6 +145,9 @@ namespace Latios.Psyshock
     public struct CompoundColliderBlob
     {
         internal BlobArray<BlobCollider> blobColliders;
+        // Because of stretch, we use bounding spheres for our mid-phase structure.
+        internal BlobArray<float> boundingSphereCenterXs;  // Sorted
+        internal BlobArray<int>   sourceIndices;
 
         /// <summary>
         /// The array of transforms of subcolliders
@@ -154,6 +157,9 @@ namespace Latios.Psyshock
         /// A local space Aabb encompassing all of the subcolliders
         /// </summary>
         public Aabb localAabb;
+
+        internal Aabb  anchorsAabb;
+        internal float maxOffsetFromAnchors;
 
         public float3     centerOfMass;
         public float3x3   inertiaTensor;

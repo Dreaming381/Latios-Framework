@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Latios.Authoring;
 using Latios.Authoring.Systems;
 using Latios.Transforms;
 using Latios.Transforms.Authoring.Abstract;
+using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -165,6 +167,8 @@ namespace Latios.Psyshock.Authoring.Systems
                 var     blobTransforms = builder.Allocate(ref root.transforms, buffer.Length);
 
                 Aabb   aabb                 = new Aabb(float.MaxValue, float.MinValue);
+                Aabb   anchorAabb           = aabb;
+                float  anchorOffset         = 0f;
                 float3 combinedCenterOfMass = float3.zero;
                 float  combinedVolume       = 0f;
                 for (int i = 0; i < buffer.Length; i++)
@@ -172,8 +176,8 @@ namespace Latios.Psyshock.Authoring.Systems
                     blobColliders[i]  = Physics.ScaleStretchCollider(buffer[i].collider, buffer[i].transform.scale, buffer[i].transform.stretch);
                     blobTransforms[i] = new RigidTransform(buffer[i].transform.rotation, buffer[i].transform.position);
                     var newbox        = Physics.AabbFrom(in blobColliders[i], in blobTransforms[i]);
-                    aabb.min          = math.min(aabb.min, newbox.min);
-                    aabb.max          = math.max(aabb.max, newbox.max);
+                    aabb              = Physics.CombineAabb(newbox, aabb);
+                    anchorAabb        = Physics.CombineAabb(buffer[i].transform.position, anchorAabb);
 
                     switch (blobColliders[i].type)
                     {
@@ -184,6 +188,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], sphere.center);
                             combinedCenterOfMass += centerOfMass * volume;
+                            anchorOffset          = math.max(anchorOffset, math.length(sphere.center) + sphere.radius);
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(sphere, 1f).ToMatrix();
@@ -202,6 +207,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], (capsule.pointA + capsule.pointB) / 2f);
                             combinedCenterOfMass += centerOfMass * volume;
+                            anchorOffset          = math.max(anchorOffset, math.max(math.length(capsule.pointA), math.length(capsule.pointB)) + capsule.radius);
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(capsule, 1f).ToMatrix();
@@ -221,6 +227,7 @@ namespace Latios.Psyshock.Authoring.Systems
                             combinedVolume       += volume;
                             var centerOfMass      = math.transform(blobTransforms[i], box.center);
                             combinedCenterOfMass += centerOfMass * volume;
+                            anchorOffset          = math.max(anchorOffset, math.length(box.center) + math.length(box.halfSize));
 
                             // The following comes from Unity Physics
                             float3x3 childInertia = UnitySim.LocalInertiaTensorFrom(box, 1f).ToMatrix();
@@ -251,11 +258,26 @@ namespace Latios.Psyshock.Authoring.Systems
                     combinedInertiaMatrix += inertiaMatrix;
                 }
 
-                root.localAabb     = aabb;
-                root.centerOfMass  = combinedCenterOfMass;
-                root.inertiaTensor = combinedInertiaMatrix;
+                root.localAabb            = aabb;
+                root.anchorsAabb          = anchorAabb;
+                root.maxOffsetFromAnchors = anchorOffset;
+                root.centerOfMass         = combinedCenterOfMass;
+                root.inertiaTensor        = combinedInertiaMatrix;
                 mathex.DiagonalizeSymmetricApproximation(root.inertiaTensor, out var inertiaTensorOrientation, out root.unscaledInertiaTensorDiagonal);
                 root.unscaledInertiaTensorOrientation = new quaternion(inertiaTensorOrientation);
+
+                using var tsa       = ThreadStackAllocator.GetAllocator();
+                var       sortables = tsa.AllocateAsSpan<XSortable>(blobTransforms.Length);
+                for (int i = 0; i < sortables.Length; i++)
+                    sortables[i] = new XSortable { index = i, x = blobTransforms[i].pos.x };
+                sortables.Sort();
+                var boundingSphereCenters = builder.Allocate(ref root.boundingSphereCenterXs, blobTransforms.Length);
+                var sourceIndices         = builder.Allocate(ref root.sourceIndices, blobTransforms.Length);
+                for (int i = 0; i < sortables.Length; i++)
+                {
+                    boundingSphereCenters[i] = sortables[i].x;
+                    sourceIndices[i]         = sortables[i].index;
+                }
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<CompoundColliderBlob>(Allocator.Persistent));
             }
@@ -265,6 +287,20 @@ namespace Latios.Psyshock.Authoring.Systems
                 public float3x3 inertiaMatrixUnshifted;
                 public float3   centerOfMassInCompound;
                 public float    volume;
+            }
+
+            struct XSortable : IComparable<XSortable>
+            {
+                public float x;
+                public int   index;
+
+                public int CompareTo(XSortable other)
+                {
+                    var result = x.CompareTo(other.x);
+                    if (result == 0)
+                        return index.CompareTo(other.index);
+                    return result;
+                }
             }
         }
     }
