@@ -2,17 +2,17 @@
     "name": "Latios.Kinemation.Editor",
     "rootNamespace": "Latios.Kinemation.Editor",
     "references": [
-        "GUID:734d92eba21c94caba915361bd5ac177",
-        "GUID:11912cc675165314485c904ed61b2e92",
-        "GUID:42b38659db4a3c64590f6c8e31576389",
-        "GUID:d8b63aba1907145bea998dd612889d6b",
-        "GUID:e0cd26848372d4e5c891c569017e11f1",
-        "GUID:d5b6d673878904c4e86229129b6086a2",
-        "GUID:e04e6c86a9f3947eb95fded39f9e60cc",
-        "GUID:7a450cf7ca9694b5a8bfa3fd83ec635a",
-        "GUID:59e15be979a1f934cac2dcd97dd0ea2b",
-        "GUID:c38fb62397af04c51b143415e1db6d90",
-        "GUID:46fe9b4ef94d76744bc0b97bc2f73d94"
+        "Unity.Entities",
+        "Latios.Kinemation",
+        "Latios.Core.Editor",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Unity.Entities.UI.Editor",
+        "Unity.Mathematics.Extensions",
+        "Unity.Entities.Graphics",
+        "Latios.Transforms",
+        "Unity.Entities.Editor",
+        "Latios.Core"
     ],
     "includePlatforms": [
         "Editor"

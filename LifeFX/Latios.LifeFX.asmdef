@@ -2,17 +2,17 @@
     "name": "Latios.LifeFX",
     "rootNamespace": "Latios.LifeFX",
     "references": [
-        "GUID:46fe9b4ef94d76744bc0b97bc2f73d94",
-        "GUID:59e15be979a1f934cac2dcd97dd0ea2b",
-        "GUID:2de22fb7141426546b7382812669d73f",
-        "GUID:11912cc675165314485c904ed61b2e92",
-        "GUID:2665a8d13d1b3f18800f46e256720795",
-        "GUID:e0cd26848372d4e5c891c569017e11f1",
-        "GUID:d8b63aba1907145bea998dd612889d6b",
-        "GUID:734d92eba21c94caba915361bd5ac177",
-        "GUID:8819f35a0fc84499b990e90a4ca1911f",
-        "GUID:7a450cf7ca9694b5a8bfa3fd83ec635a",
-        "GUID:d04eb9c554ad44ceab303cecf0c0cf82"
+        "Latios.Core",
+        "Latios.Transforms",
+        "Latios.Psyshock",
+        "Latios.Kinemation",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Entities.Graphics",
+        "Unity.VisualEffectGraph.Runtime"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -27,7 +27,7 @@
             "expression": "17.0.0",
             "define": "HAS_VFX_GRAPH_RUNTIME"
         },
-		{
+        {
             "name": "com.unity.entities",
             "expression": "1.4.0",
             "define": "ENTITIES_1_4"

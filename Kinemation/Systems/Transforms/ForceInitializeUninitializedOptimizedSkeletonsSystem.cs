@@ -29,7 +29,11 @@ namespace Latios.Kinemation.Systems
             state.Dependency = new Job().ScheduleParallel(m_query, state.Dependency);
         }
 
+#if LATIOS_BURST_DETERMINISM
+        [BurstCompile(FloatMode = FloatMode.Deterministic)]
+#else
         [BurstCompile]
+#endif
         partial struct Job : IJobEntity
         {
             public void Execute(OptimizedSkeletonAspect skeleton)

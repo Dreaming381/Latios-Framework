@@ -40,7 +40,9 @@ namespace Latios.Authoring.Systems
         {
             // Step 1: Update handles
             var blobAssetStore = m_bakingSystemReference.BlobAssetStore;
-            var typeHash       = blobAssetStore.GetTypeHashForBurst<TBlobType>();
+#if !ENTITIES_1_4
+            var typeHash = blobAssetStore.GetTypeHashForBurst<TBlobType>();
+#endif
 
             m_resultHandle.Update(this);
             m_trackingDataHandle.Update(this);
@@ -69,8 +71,10 @@ namespace Latios.Authoring.Systems
             // Step 5: Filter with BlobAssetStore and Deduplicate
             Dependency = new SmartBlobberTools<TBlobType>.DeduplicateBlobsWithBlobAssetStoreJob
             {
-                blobAssetStore     = blobAssetStore,
-                burstTypeHash      = typeHash,
+                blobAssetStore = blobAssetStore,
+#if !ENTITIES_1_4
+                burstTypeHash = typeHash,
+#endif
                 resultHandle       = m_resultHandle,
                 trackingDataHandle = m_trackingDataHandle,
             }.Schedule(m_query, Dependency);
@@ -220,7 +224,11 @@ namespace Latios.Authoring
 
                     if (disposedBlobs.Contains(td.hash))
                     {
+#if ENTITIES_1_4
+                        if (!blobAssetStore.TryGet<TBlobType>(td.hash, out var storedBlob))
+#else
                         if (!blobAssetStore.TryGetBlobAssetWithBurstHash<TBlobType>(td.hash, burstTypeHash, out var storedBlob))
+#endif
                         {
                             UnityEngine.Debug.LogError($"Blob hash {td.hash} was lost in BlobAssetStore. This is likely a Unity bug. Please report!");
                             blobs[i] = default;
@@ -232,7 +240,11 @@ namespace Latios.Authoring
                     {
                         var blob       = blobs[i].Reinterpret<TBlobType>();
                         var backupBlob = blob;
+#if ENTITIES_1_4
+                        if (!blobAssetStore.TryAdd(td.hash, ref blob) && backupBlob != blob)
+#else
                         if (!blobAssetStore.TryAddBlobAssetWithBurstHash(td.hash, burstTypeHash, ref blob) && backupBlob != blob)
+#endif
                         {
                             blobs[i] = UnsafeUntypedBlobAssetReference.Create(blob);
                             disposedBlobs.Add(td.hash);

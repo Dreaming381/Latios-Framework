@@ -26,6 +26,7 @@ namespace Unity.Entities.Exposed
         }
     }
 
+#if !ENTITIES_1_4
     public static class BlobAssetStoreExposedExtensions
     {
         public static uint GetTypeHashForBurst<T>(this BlobAssetStore bas) => BlobAssetStore.ComputeTypeHash(typeof(T));
@@ -36,6 +37,7 @@ namespace Unity.Entities.Exposed
         public static bool TryGetBlobAssetWithBurstHash<T>(this BlobAssetStore bas, Hash128 customHash, uint typeHash,
                                                            out BlobAssetReference<T> blob) where T : unmanaged => bas.TryGet(customHash, typeHash, out blob);
     }
+#endif
 
     /// <summary>
     /// Overrides the global list of bakers either adding new ones or replacing old ones.

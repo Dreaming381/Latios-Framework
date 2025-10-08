@@ -65,7 +65,11 @@ namespace Latios.Kinemation.Systems
             state.Dependency = JobHandle.CombineDependencies(skeletonJh, blendShapeJh, meshJh);
         }
 
+#if LATIOS_BURST_DETERMINISM
+        [BurstCompile(FloatMode = FloatMode.Deterministic)]
+#else
         [BurstCompile]
+#endif
         struct InitSkeletonJob : IJobChunk
         {
             public BufferTypeHandle<OptimizedBoneTransform>                                                     bonesWriteHandle;
