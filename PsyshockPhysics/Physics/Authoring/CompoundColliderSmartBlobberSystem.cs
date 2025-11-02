@@ -266,18 +266,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 mathex.DiagonalizeSymmetricApproximation(root.inertiaTensor, out var inertiaTensorOrientation, out root.unscaledInertiaTensorDiagonal);
                 root.unscaledInertiaTensorOrientation = new quaternion(inertiaTensorOrientation);
 
-                using var tsa       = ThreadStackAllocator.GetAllocator();
-                var       sortables = tsa.AllocateAsSpan<XSortable>(blobTransforms.Length);
-                for (int i = 0; i < sortables.Length; i++)
-                    sortables[i] = new XSortable { index = i, x = blobTransforms[i].pos.x };
-                sortables.Sort();
-                var boundingSphereCenters = builder.Allocate(ref root.boundingSphereCenterXs, blobTransforms.Length);
-                var sourceIndices         = builder.Allocate(ref root.sourceIndices, blobTransforms.Length);
-                for (int i = 0; i < sortables.Length; i++)
-                {
-                    boundingSphereCenters[i] = sortables[i].x;
-                    sourceIndices[i]         = sortables[i].index;
-                }
+                CompoundColliderBlob.BuildMidPhase(ref builder, ref root, blobTransforms);
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<CompoundColliderBlob>(Allocator.Persistent));
             }
@@ -287,20 +276,6 @@ namespace Latios.Psyshock.Authoring.Systems
                 public float3x3 inertiaMatrixUnshifted;
                 public float3   centerOfMassInCompound;
                 public float    volume;
-            }
-
-            struct XSortable : IComparable<XSortable>
-            {
-                public float x;
-                public int   index;
-
-                public int CompareTo(XSortable other)
-                {
-                    var result = x.CompareTo(other.x);
-                    if (result == 0)
-                        return index.CompareTo(other.index);
-                    return result;
-                }
             }
         }
     }

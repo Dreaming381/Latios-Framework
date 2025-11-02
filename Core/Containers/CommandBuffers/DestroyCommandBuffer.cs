@@ -1,9 +1,12 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
+using Unity.Entities.Exposed;
 using Unity.Jobs;
+using Unity.Mathematics;
 
 namespace Latios
 {
@@ -68,11 +71,37 @@ namespace Latios
         /// Plays back the DestroyCommandBuffer.
         /// </summary>
         /// <param name="entityManager">The EntityManager with which to play back the DestroyCommandBuffer</param>
-        /// <param name="linkedFEReadOnly">A ReadOnly accessor to the entities' LinkedEntityGroup</param>
         public void Playback(EntityManager entityManager)
         {
             CheckDidNotPlayback();
             Playbacker.Playback((DestroyCommandBuffer*)UnsafeUtility.AddressOf(ref this), (EntityManager*)UnsafeUtility.AddressOf(ref entityManager));
+        }
+        /// <summary>
+        /// Plays back the DestroyCommandBuffer using a custom batching strategy.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the DestroyCommandBuffer</param>
+        /// <param name="legLookup">A ReadWrite lookup of LinkedEntityGroup dynamic buffers</param>
+        /// <param name="esil">A lookup for info about a given entity's chunk and position in it</param>
+        public void Playback(EntityManager entityManager, BufferLookup<LinkedEntityGroup> legLookup, EntityStorageInfoLookup esil)
+        {
+            CheckDidNotPlayback();
+            Playbacker.Playback(ref this, ref entityManager, ref legLookup, ref esil);
+        }
+
+        /// <summary>
+        /// Performs the DestroyCommandBuffer custom batching algorithm on a provided array of entities.
+        /// In some cases, this can be faster than calling EntityManager.DestroyEntity() directly.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager that the entities to be destroyed belong to</param>
+        /// <param name="entities">The entities to be destroyed</param>
+        /// <param name="legLookup">A ReadWrite lookup of LinkedEntityGroup dynamic buffers</param>
+        /// <param name="esil">A lookup for info about a given entity's chunk and position in it</param>
+        public static void DestroyEntitiesWithBatching(EntityManager entityManager,
+                                                       NativeArray<Entity>             entities,
+                                                       BufferLookup<LinkedEntityGroup> legLookup,
+                                                       EntityStorageInfoLookup esil)
+        {
+            Playbacker.PlaybackArray(ref entities, ref entityManager, ref legLookup, ref esil);
         }
 
         /// <summary>
@@ -108,8 +137,494 @@ namespace Latios
             [BurstCompile]
             public static unsafe void Playback(DestroyCommandBuffer* dcb, EntityManager* em)
             {
-                em->DestroyEntity(dcb->m_entityOperationCommandBuffer.GetEntities(Allocator.Temp));
+                var entities = dcb->m_entityOperationCommandBuffer.GetEntities(Allocator.Temp);
+                //using (new Unity.Profiling.ProfilerMarker($"Destroying_{entities.Length}_root_entities").Auto())
+                {
+                    em->DestroyEntity(entities);
+                }
                 dcb->m_playedBack.Value = true;
+            }
+
+            static readonly Unity.Profiling.ProfilerMarker sBatchEntities = new Unity.Profiling.ProfilerMarker("Batch_entities");
+
+            [BurstCompile]
+            public static unsafe void Playback(ref DestroyCommandBuffer dcb, ref EntityManager em, ref BufferLookup<LinkedEntityGroup> legLookup, ref EntityStorageInfoLookup esil)
+            {
+                var entities = dcb.m_entityOperationCommandBuffer.GetEntities(Allocator.Temp);
+
+                if (entities.Length < 512)
+                {
+                    PlaybackOnThread(ref entities, ref em, ref legLookup);
+                }
+                else
+                {
+                    PlaybackWithJobs(ref entities, ref em, ref legLookup, ref esil);
+                }
+                entities.Dispose();
+            }
+
+            [BurstCompile]
+            public static unsafe void PlaybackArray(ref NativeArray<Entity>             entities,
+                                                    ref EntityManager em,
+                                                    ref BufferLookup<LinkedEntityGroup> legLookup,
+                                                    ref EntityStorageInfoLookup esil)
+            {
+                if (entities.Length < 512)
+                    PlaybackOnThread(ref entities, ref em, ref legLookup);
+                else
+                {
+                    // Copy the array, because we don't know what it was allocated with
+                    var array = new NativeArray<Entity>(entities, Allocator.TempJob);
+                    PlaybackWithJobs(ref array, ref em, ref legLookup, ref esil);
+                    array.Dispose();
+                }
+            }
+
+            static unsafe void PlaybackOnThread(ref NativeArray<Entity> entities, ref EntityManager em, ref BufferLookup<LinkedEntityGroup> legLookup)
+            {
+                sBatchEntities.Begin();
+                // Collect LEGs and count LEG entities
+                var legs           = new UnsafeList<DynamicBuffer<LinkedEntityGroup> >(entities.Length, Allocator.Temp);
+                int legEntityCount = 0;
+                foreach (var entity in entities)
+                {
+                    if (legLookup.TryGetBuffer(entity, out var leg))
+                    {
+                        var toAdd = leg.Length - 1;
+                        if (toAdd > 0)
+                        {
+                            legEntityCount += toAdd;
+                            legs.AddNoResize(leg);
+                        }
+                        else if (toAdd == 0)
+                        {
+                            leg.Clear();
+                        }
+                    }
+                }
+
+                // Find chunks for entities and deduplicate
+                var maxChunkCount      = entities.Length + legEntityCount;
+                var chunks             = new UnsafeList<ChunkData>(maxChunkCount, Allocator.Temp);
+                var chunkMap           = new UnsafeHashMap<int, int>(maxChunkCount, Allocator.Temp);
+                var entityWithInfoList = new UnsafeList<EntityWithInfo>(entities.Length + legEntityCount, Allocator.Temp);
+                foreach (var entity in entities)
+                {
+                    if (!em.Exists(entity))
+                        continue;
+                    var esi = em.GetStorageInfo(entity);
+                    if (!chunkMap.TryGetValue(esi.Chunk.GetHashCode(), out var chunkIndex))
+                    {
+                        chunkIndex                                         = chunks.Length;
+                        chunks.AddNoResize(new ChunkData { chunkTotalCount = (byte)esi.Chunk.Count });
+                        chunkMap.Add(esi.Chunk.GetHashCode(), chunkIndex);
+                    }
+                    entityWithInfoList.AddNoResize(new EntityWithInfo { entity = entity, chunkIndex = chunkIndex, indexInChunk = esi.IndexInChunk });
+
+                    ref var chunk = ref chunks.ElementAt(chunkIndex);
+                    if (esi.IndexInChunk >= 64)
+                        chunk.upper.SetBits(esi.IndexInChunk - 64, true);
+                    else
+                        chunk.lower.SetBits(esi.IndexInChunk, true);
+                }
+                foreach (var leg in legs)
+                {
+                    var legArray = leg.AsNativeArray();
+                    for (int i = 1; i < legArray.Length; i++)
+                    {
+                        var entity = legArray[i].Value;
+                        if (!em.Exists(entity))
+                            continue;
+                        var esi = em.GetStorageInfo(entity);
+                        if (!chunkMap.TryGetValue(esi.Chunk.GetHashCode(), out var chunkIndex))
+                        {
+                            chunkIndex                                         = chunks.Length;
+                            chunks.AddNoResize(new ChunkData { chunkTotalCount = (byte)esi.Chunk.Count });
+                            chunkMap.Add(esi.Chunk.GetHashCode(), chunkIndex);
+                        }
+                        entityWithInfoList.AddNoResize(new EntityWithInfo { entity = entity, chunkIndex = chunkIndex, indexInChunk = esi.IndexInChunk });
+                        ref var chunk                                                                                              = ref chunks.ElementAt(chunkIndex);
+                        if (esi.IndexInChunk >= 64)
+                            chunk.upper.SetBits(esi.IndexInChunk - 64, true);
+                        else
+                            chunk.lower.SetBits(esi.IndexInChunk, true);
+                    }
+                    leg.Clear();
+                }
+                // Prefix sum chunks
+                int sum = 0;
+                for (int i = 0; i < chunks.Length; i++)
+                {
+                    ref var chunk     = ref chunks.ElementAt(i);
+                    chunk.prefixSum   = sum;
+                    chunk.lowerCount  = (byte)chunk.lower.CountBits();
+                    chunk.count       = (byte)(chunk.lowerCount + chunk.upper.CountBits());
+                    sum              += chunk.count;
+                }
+                // Assign
+                var destroyArray = new NativeArray<Entity>(sum, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                foreach (var entity in entityWithInfoList)
+                {
+                    var chunk = chunks[entity.chunkIndex];
+                    if (entity.indexInChunk < 64)
+                    {
+                        var offset                             = math.countbits(chunk.lower.Value & ((1ul << entity.indexInChunk) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                    else
+                    {
+                        var offset                             = chunk.lowerCount + math.countbits(chunk.upper.Value & ((1ul << (entity.indexInChunk - 64)) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                }
+                //foreach (var chunk in chunks)
+                //{
+                //    var span = destroyArray.AsSpan().Slice(chunk.prefixSum, chunk.count);
+                //    ReorderChunk(chunk, span);
+                //}
+                sBatchEntities.End();
+                em.DestroyEntity(destroyArray);
+            }
+
+            static unsafe void PlaybackWithJobs(ref NativeArray<Entity>             entities,
+                                                ref EntityManager em,
+                                                ref BufferLookup<LinkedEntityGroup> legLookup,
+                                                ref EntityStorageInfoLookup esil)
+            {
+                sBatchEntities.Begin();
+                var rootsWithInfo = new NativeArray<EntityWithInfo>(entities.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var legPrefixSum  = new NativeArray<int>(entities.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+
+                var rootsJh = new FindRootsJob
+                {
+                    roots         = entities,
+                    esil          = esil,
+                    legLookup     = legLookup,
+                    rootsWithInfo = rootsWithInfo,
+                    legCounts     = legPrefixSum,
+                }.ScheduleParallel(entities.Length, 16, default);
+
+                var legTotal     = new NativeReference<int>(Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
+                var legsWithInfo = new NativeList<EntityWithInfo>(Allocator.TempJob);
+                rootsJh          = new PrefixSumLegsJob
+                {
+                    legPrefixSums = legPrefixSum,
+                    legTotal      = legTotal,
+                    legsWithInfo  = legsWithInfo
+                }.Schedule(rootsJh);
+                var legsJh = new FindLegsJob
+                {
+                    roots         = entities,
+                    esil          = esil,
+                    legLookup     = legLookup,
+                    legsWithInfo  = legsWithInfo.AsDeferredJobArray(),
+                    legPrefixSums = legPrefixSum,
+                }.ScheduleParallel(entities.Length, 16, rootsJh);
+
+                rootsJh.Complete();
+                var maxChunkCount = entities.Length + legTotal.Value;
+                var chunks        = new UnsafeList<ChunkData>(maxChunkCount, Allocator.Temp);
+                var chunkMap      = new UnsafeHashMap<int, int>(maxChunkCount, Allocator.Temp);
+                for (int i = 0; i < rootsWithInfo.Length; i++)
+                {
+                    var entity = rootsWithInfo[i];
+                    if (entity.entity == Entity.Null)
+                        continue;
+                    if (!chunkMap.TryGetValue(entity.chunkIndex, out var chunkIndex))
+                    {
+                        chunkIndex                                         = chunks.Length;
+                        chunks.AddNoResize(new ChunkData { chunkTotalCount = (byte)em.GetChunkCountFromChunkHashcode(entity.chunkIndex) });
+                        chunkMap.Add(entity.chunkIndex, chunkIndex);
+                    }
+                    entity.chunkIndex = chunkIndex;
+                    rootsWithInfo[i]  = entity;
+                    ref var chunk     = ref chunks.ElementAt(chunkIndex);
+                    if (entity.indexInChunk >= 64)
+                        chunk.upper.SetBits(entity.indexInChunk - 64, true);
+                    else
+                        chunk.lower.SetBits(entity.indexInChunk, true);
+                }
+
+                legsJh.Complete();
+                for (int i = 0; i < legsWithInfo.Length; i++)
+                {
+                    var entity = legsWithInfo[i];
+                    if (entity.entity == Entity.Null)
+                        continue;
+                    if (!chunkMap.TryGetValue(entity.chunkIndex, out var chunkIndex))
+                    {
+                        chunkIndex                                         = chunks.Length;
+                        chunks.AddNoResize(new ChunkData { chunkTotalCount = (byte)em.GetChunkCountFromChunkHashcode(entity.chunkIndex) });
+                        chunkMap.Add(entity.chunkIndex, chunkIndex);
+                    }
+                    entity.chunkIndex = chunkIndex;
+                    legsWithInfo[i]   = entity;
+                    ref var chunk     = ref chunks.ElementAt(chunkIndex);
+                    if (entity.indexInChunk >= 64)
+                        chunk.upper.SetBits(entity.indexInChunk - 64, true);
+                    else
+                        chunk.lower.SetBits(entity.indexInChunk, true);
+                }
+
+                int sum = 0;
+                for (int i = 0; i < chunks.Length; i++)
+                {
+                    ref var chunk     = ref chunks.ElementAt(i);
+                    chunk.prefixSum   = sum;
+                    chunk.lowerCount  = (byte)chunk.lower.CountBits();
+                    chunk.count       = (byte)(chunk.lowerCount + chunk.upper.CountBits());
+                    sum              += chunk.count;
+                }
+                // Assign
+                var destroyArray = new NativeArray<Entity>(sum, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                foreach (var entity in rootsWithInfo)
+                {
+                    if (entity.entity == Entity.Null)
+                        continue;
+                    var chunk = chunks[entity.chunkIndex];
+                    if (entity.indexInChunk < 64)
+                    {
+                        var offset                             = math.countbits(chunk.lower.Value & ((1ul << entity.indexInChunk) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                    else
+                    {
+                        var offset                             = chunk.lowerCount + math.countbits(chunk.upper.Value & ((1ul << (entity.indexInChunk - 64)) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                }
+                foreach (var entity in legsWithInfo)
+                {
+                    if (entity.entity == Entity.Null)
+                        continue;
+                    var chunk = chunks[entity.chunkIndex];
+                    if (entity.indexInChunk < 64)
+                    {
+                        var offset                             = math.countbits(chunk.lower.Value & ((1ul << entity.indexInChunk) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                    else
+                    {
+                        var offset                             = chunk.lowerCount + math.countbits(chunk.upper.Value & ((1ul << (entity.indexInChunk - 64)) - 1));
+                        destroyArray[chunk.prefixSum + offset] = entity.entity;
+                    }
+                }
+                //foreach (var chunk in chunks)
+                //{
+                //    var span = destroyArray.AsSpan().Slice(chunk.prefixSum, chunk.count);
+                //    ReorderChunk(chunk, span);
+                //}
+                rootsWithInfo.Dispose();
+                legPrefixSum.Dispose();
+                legTotal.Dispose();
+                legsWithInfo.Dispose();
+                sBatchEntities.End();
+                em.DestroyEntity(destroyArray);
+            }
+
+            static void ReorderChunk(ChunkData chunk, Span<Entity> toDestroy)
+            {
+                var last      = FindLastSetIndex(chunk.lower, chunk.upper);
+                var moveCount = chunk.chunkTotalCount - (last + 1);
+                if (chunk.count <= chunk.chunkTotalCount - moveCount)
+                    return;
+
+                var          indexFromStart  = 0;
+                var          indicesFilled   = 0;
+                int          chunkTotalCount = chunk.chunkTotalCount;
+                Span<Entity> reorder         = stackalloc Entity[chunk.count];
+                while (indicesFilled < chunk.count)
+                {
+                    for (int i = 0; i < moveCount; i++)
+                    {
+                        reorder[indicesFilled] = toDestroy[indexFromStart];
+                        indicesFilled++;
+                        indexFromStart++;
+                    }
+                    if (indicesFilled == chunk.count)
+                        break;
+                    chunkTotalCount -= moveCount;
+
+                    var tailStart         = FindFirstSetIndexInEndRange(last, chunk.lower, chunk.upper);
+                    var indicesRequested  = last - tailStart + 1;
+                    var indicesRemaining  = chunk.count - indicesFilled;
+                    var overshoot         = math.max(0, indicesRequested - indicesRemaining);
+                    indicesRequested     += overshoot;
+                    tailStart            += overshoot;
+                    var tailDestroyIndex  = toDestroy.Length - indicesRequested;
+
+                    var tailSlice = toDestroy[tailDestroyIndex..];
+                    for (int i = 0; i < tailSlice.Length; i++)
+                    {
+                        reorder[indicesFilled] = tailSlice[i];
+                        indicesFilled++;
+                    }
+                    toDestroy = toDestroy[..tailDestroyIndex];
+                    ClearMsbBits(tailDestroyIndex, ref chunk.lower, ref chunk.upper);
+                    chunkTotalCount -= indicesRequested;
+                    last             = FindLastSetIndex(chunk.lower, chunk.upper);
+                    moveCount        = chunkTotalCount - (last + 1);
+                    moveCount        = math.min(moveCount, chunk.count - indicesFilled);
+                }
+                reorder.CopyTo(toDestroy);
+            }
+
+            static int FindLastSetIndex(BitField64 lower, BitField64 upper)
+            {
+                var lzcnt = upper.CountLeadingZeros();
+                if (lzcnt == 64)
+                    lzcnt += lower.CountLeadingZeros();
+                return 127 - lzcnt;
+            }
+
+            static void ClearMsbBits(int startIndex, ref BitField64 lower, ref BitField64 upper)
+            {
+                if (startIndex <= 64)
+                {
+                    upper        = default;
+                    lower.Value &= (1ul << startIndex) - 1;
+                }
+                else
+                    upper.Value &= (1ul << (startIndex - 64)) - 1;
+            }
+
+            static int FindFirstSetIndexInEndRange(int lastSetIndex, BitField64 lower, BitField64 upper)
+            {
+                var inverseLower   = lower;
+                var inverseUpper   = upper;
+                inverseLower.Value = ~inverseLower.Value;
+                inverseUpper.Value = ~inverseUpper.Value;
+                ClearMsbBits(lastSetIndex, ref inverseLower, ref inverseUpper);
+                return FindLastSetIndex(inverseLower, inverseUpper) + 1;
+            }
+
+            struct ChunkData
+            {
+                public BitField64 lower;
+                public BitField64 upper;
+                public int        prefixSum;
+                public byte       count;
+                public byte       lowerCount;
+                public byte       chunkTotalCount;
+            }
+
+            struct EntityWithInfo
+            {
+                public Entity entity;
+                int           packed;
+                public int chunkIndex
+                {
+                    get => Bits.GetBits(packed, 0, 25);
+                    set => Bits.SetBits(ref packed, 0, 25, value);
+                }
+                public int indexInChunk
+                {
+                    get => Bits.GetBits(packed, 25, 7);
+                    set => Bits.SetBits(ref packed, 25, 7, value);
+                }
+            }
+
+            [BurstCompile]
+            struct FindRootsJob : IJobFor
+            {
+                [ReadOnly] public NativeArray<Entity>             roots;
+                [ReadOnly] public EntityStorageInfoLookup         esil;
+                [ReadOnly] public BufferLookup<LinkedEntityGroup> legLookup;
+                public NativeArray<EntityWithInfo>                rootsWithInfo;
+                public NativeArray<int>                           legCounts;
+
+                public void Execute(int i)
+                {
+                    var entity = roots[i];
+                    if (!esil.Exists(entity))
+                    {
+                        rootsWithInfo[i] = default;
+                        legCounts[i]     = default;
+                        return;
+                    }
+
+                    if (legLookup.TryGetBuffer(entity, out var buffer))
+                        legCounts[i] = math.max(0, buffer.Length - 1);
+                    else
+                        legCounts[i] = 0;
+
+                    var esi          = esil[entity];
+                    rootsWithInfo[i] = new EntityWithInfo
+                    {
+                        entity       = entity,
+                        chunkIndex   = esi.Chunk.GetHashCode(),
+                        indexInChunk = esi.IndexInChunk,
+                    };
+                }
+            }
+
+            [BurstCompile]
+            struct PrefixSumLegsJob : IJob
+            {
+                public NativeArray<int>           legPrefixSums;
+                public NativeReference<int>       legTotal;
+                public NativeList<EntityWithInfo> legsWithInfo;
+
+                public void Execute()
+                {
+                    int sum = 0;
+                    for (int i = 0; i < legPrefixSums.Length; i++)
+                    {
+                        var legCount      = legPrefixSums[i];
+                        legPrefixSums[i]  = sum;
+                        sum              += legCount;
+                    }
+                    legTotal.Value = sum;
+                    legsWithInfo.ResizeUninitialized(sum);
+                }
+            }
+
+            [BurstCompile]
+            struct FindLegsJob : IJobFor
+            {
+                [ReadOnly] public NativeArray<Entity>                                        roots;
+                [ReadOnly] public EntityStorageInfoLookup                                    esil;
+                [ReadOnly] public NativeArray<int>                                           legPrefixSums;
+                [NativeDisableParallelForRestriction] public BufferLookup<LinkedEntityGroup> legLookup;
+                [NativeDisableParallelForRestriction] public NativeArray<EntityWithInfo>     legsWithInfo;
+
+                public void Execute(int index)
+                {
+                    if (index < roots.Length - 1)
+                    {
+                        var count = legPrefixSums[index + 1] - legPrefixSums[index];
+                        if (count == 0)
+                            return;
+                    }
+                    else
+                    {
+                        var count = legsWithInfo.Length - legPrefixSums[index];
+                        if (count == 0)
+                            return;
+                    }
+
+                    var buffer = legLookup[roots[index]];
+                    var start  = legPrefixSums[index];
+                    var legs   = buffer.AsNativeArray();
+                    for (int i = 0; i < legs.Length; i++)
+                    {
+                        var entity = legs[i].Value;
+                        if (!esil.Exists(entity))
+                        {
+                            legsWithInfo[start + i] = default;
+                            return;
+                        }
+
+                        var esi                 = esil[entity];
+                        legsWithInfo[start + i] = new EntityWithInfo
+                        {
+                            entity       = entity,
+                            chunkIndex   = esi.Chunk.GetHashCode(),
+                            indexInChunk = esi.IndexInChunk,
+                        };
+                    }
+                    buffer.Clear();
+                }
             }
         }
         #endregion

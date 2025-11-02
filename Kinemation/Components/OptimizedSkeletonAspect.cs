@@ -262,7 +262,7 @@ namespace Latios.Kinemation
             if (requiredBones == boneCount)
                 return;
 
-            if (boneCount == requiredBones)
+            if (m_boneTransforms.Length == requiredBones)
             {
                 m_boneTransforms.Resize(requiredBones * 6, NativeArrayOptions.UninitializedMemory);
                 var array = m_boneTransforms.AsNativeArray();
@@ -272,7 +272,7 @@ namespace Latios.Kinemation
                 array.GetSubArray(requiredBones * 2, requiredBones * 2).CopyFrom(array.GetSubArray(0, requiredBones * 2));
                 array.GetSubArray(requiredBones * 4, requiredBones * 2).CopyFrom(array.GetSubArray(0, requiredBones * 2));
             }
-            else if (boneCount < requiredBones)
+            else
             {
                 m_boneTransforms.Resize(requiredBones * 6, NativeArrayOptions.ClearMemory);
                 m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.NeedsHistorySync;

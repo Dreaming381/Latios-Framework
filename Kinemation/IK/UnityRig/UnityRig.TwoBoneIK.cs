@@ -70,10 +70,16 @@ namespace Latios.Kinemation
             var cos      = math.cos(a);
             var deltaR   = new quaternion(axis.x * sin, axis.y * sin, axis.z * sin, cos);
             mid.rotation = math.mul(deltaR, mid.rotation);
+            tip.position = math.mul(deltaR, tip.position);
 
             cPosition     = tip.position;
             ac            = cPosition - aPosition;
-            root.rotation = math.mul(FromToRotation(ac, at), root.rotation);
+            var fromTo    = FromToRotation(ac, at);
+            root.rotation = math.mul(fromTo, root.rotation);
+            mid.rotation  = math.mul(fromTo, mid.rotation);
+            mid.position  = math.mul(fromTo, mid.position);
+            tip.rotation  = math.mul(fromTo, tip.rotation);
+            tip.position  = math.mul(fromTo, tip.position);
 
             if (hasHint)
             {

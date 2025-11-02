@@ -234,7 +234,7 @@ namespace Latios.Systems
                     {
                         var dcb = m_destroyCommandBuffers[m_destroyIndex];
                         m_destroyIndex++;
-                        dcb.Playback(state.EntityManager);
+                        dcb.Playback(state.EntityManager, SystemAPI.GetBufferLookup<LinkedEntityGroup>(false), SystemAPI.GetEntityStorageInfoLookup());
                         break;
                     }
                     case PlaybackType.InstantiateNoData:

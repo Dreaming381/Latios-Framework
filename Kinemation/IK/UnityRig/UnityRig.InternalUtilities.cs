@@ -14,7 +14,7 @@ namespace Latios.Kinemation
 
         static quaternion FromToRotation(float3 from, float3 to)
         {
-            var teta = math.dot(math.normalize(from), math.normalize(to));
+            var teta = math.dot(math.normalizesafe(from), math.normalizesafe(to));
             if (teta >= 1f)
                 return quaternion.identity;
 

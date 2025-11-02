@@ -26,7 +26,7 @@ namespace Unity.Entities.Exposed
         }
     }
 
-#if !ENTITIES_1_4
+#if !LATIOS_ENTITIES_1_4
     public static class BlobAssetStoreExposedExtensions
     {
         public static uint GetTypeHashForBurst<T>(this BlobAssetStore bas) => BlobAssetStore.ComputeTypeHash(typeof(T));

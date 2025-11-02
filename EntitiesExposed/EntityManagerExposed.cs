@@ -52,6 +52,8 @@ namespace Unity.Entities.Exposed
             entityManager.AddSharedComponent(entity, scd);
         }
 
+        public static int GetChunkCountFromChunkHashcode(this EntityManager entityManager, int chunkHashcode) => new ChunkIndex(chunkHashcode).Count;
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         private static void CheckComponentTypeIsSharedComponent(ComponentType type)
         {
