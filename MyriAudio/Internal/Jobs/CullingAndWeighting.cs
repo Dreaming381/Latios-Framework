@@ -254,19 +254,22 @@ namespace Latios.Myri
                 var   rangeFadeMargin = emitter.rangeFadeMargin * listener.listener.rangeMultiplier;
                 if (d > innerRange)
                 {
+                    float falloff;
                     if (innerRange <= 0f)
                     {
                         //The offset is the distance from the innerRange minus 1 unit clamped between the innerRange and the margin.
                         //The minus one offset ensures the falloff is always 1 or larger, making the transition betweem the innerRange
                         //and the falloff region continuous (by calculus terminology).
-                        float falloff = math.min(d, outerRange - rangeFadeMargin) - (innerRange - 1f);
-                        atten         = math.saturate(math.rcp(falloff * falloff));
+                        falloff = math.min(d, outerRange - rangeFadeMargin) - (innerRange - 1f);
                     }
                     else
                     {
-                        float falloff = math.min(d, outerRange - rangeFadeMargin) / innerRange;
-                        atten         = math.saturate(math.rcp(falloff * falloff));
+                        falloff = math.min(d, outerRange - rangeFadeMargin) / innerRange;
                     }
+#if LATIOS_MYRI_LEGACY_FALLOFF
+                    falloff = falloff * falloff;
+#endif
+                    atten = math.saturate(math.rcp(falloff));
                 }
                 if (d > outerRange - rangeFadeMargin)
                 {

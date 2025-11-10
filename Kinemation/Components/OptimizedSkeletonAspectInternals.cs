@@ -297,7 +297,7 @@ namespace Latios.Kinemation
                 ref var children = ref childrenIndicesBlob[parentIndex];
                 for (int i = 0; i < children.Length; i++)
                 {
-                    m_queue[m_next + i] = new ParentChild { parent = parent, child = children[i] };
+                    m_queue[m_count + m_next + i] = new ParentChild { parent = parent, child = children[i] };
                 }
                 m_count += children.Length;
             }

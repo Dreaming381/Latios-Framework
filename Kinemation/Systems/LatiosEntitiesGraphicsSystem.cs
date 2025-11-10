@@ -153,7 +153,6 @@ namespace Latios.Kinemation.Systems
         private NativeList<BatchInfo>      m_BatchInfos;
         private NativeArray<ChunkProperty> m_ChunkProperties;
         private NativeParallelHashSet<int> m_ExistingBatchIndices;
-        private ComponentTypeCache         m_ComponentTypeCache;
 
         private SortedSetUnmanaged m_SortedBatchIds;
 
@@ -313,7 +312,7 @@ namespace Latios.Kinemation.Systems
             m_BatchInfos           = NewNativeListResized<BatchInfo>(kInitialMaxBatchCount, Allocator.Persistent);
             m_ChunkProperties      = new NativeArray<ChunkProperty>(kMaxChunkMetadata, Allocator.Persistent);
             m_ExistingBatchIndices = new NativeParallelHashSet<int>(128, Allocator.Persistent);
-            m_ComponentTypeCache   = new ComponentTypeCache(128);
+            var componentTypeCache = new ComponentTypeCache(128);
 
             m_ValueBlits = new NativeList<ValueBlitDescriptor>(Allocator.Persistent);
 
@@ -408,15 +407,15 @@ namespace Latios.Kinemation.Systems
                 m_BatchRendererGroup.SetPickingMaterial(m_PickingMaterial);
             }
 #endif
-            InitializeMaterialProperties();
+            InitializeMaterialProperties(ref componentTypeCache);
             var     uploadMaterialPropertiesSystem      = World.Unmanaged.GetExistingUnmanagedSystem<UploadMaterialPropertiesSystem>();
             ref var uploadMaterialPropertiesSystemState = ref World.Unmanaged.ResolveSystemStateRef(uploadMaterialPropertiesSystem);
-            m_ComponentTypeCache.FetchTypeHandles(ref uploadMaterialPropertiesSystemState);
+            componentTypeCache.FetchTypeHandles(ref uploadMaterialPropertiesSystemState);
             ref var uploadMaterialPropertiesSystemMemory =
                 ref World.Unmanaged.GetUnsafeSystemRef<UploadMaterialPropertiesSystem>(uploadMaterialPropertiesSystem);
-            uploadMaterialPropertiesSystemMemory.m_burstCompatibleTypeArray = m_ComponentTypeCache.ToBurstCompatible(Allocator.Persistent);
-            m_ComponentTypeCache.FetchTypeHandles(ref CheckedStateRef);
-            m_burstCompatibleTypeArray = m_ComponentTypeCache.ToBurstCompatible(Allocator.Persistent);
+            uploadMaterialPropertiesSystemMemory.m_burstCompatibleTypeArray = componentTypeCache.ToBurstCompatible(Allocator.Persistent);
+            componentTypeCache.FetchTypeHandles(ref CheckedStateRef);
+            m_burstCompatibleTypeArray = componentTypeCache.ToBurstCompatible(Allocator.Persistent);
             // This assumes uploadMaterialPropertiesSystem is already fully created from when the KinemationCullingSuperSystem was created.
             m_GPUPersistentInstanceBufferHandle = uploadMaterialPropertiesSystemMemory.m_GPUPersistentInstanceBufferHandle;
 
@@ -424,13 +423,14 @@ namespace Latios.Kinemation.Systems
             // except with the bit flags in the high bits masked off.
             // The HybridRenderer packs ComponentTypeHandles by the order they show up
             // in the value array from the hashmap.
-            var types  = m_ComponentTypeCache.UsedTypes.GetValueArray(Allocator.Temp);
+            var types  = componentTypeCache.UsedTypes.GetValueArray(Allocator.Temp);
             var ctypes = worldBlackboardEntity.GetBuffer<MaterialPropertyComponentType>().Reinterpret<ComponentType>();
             ctypes.ResizeUninitialized(types.Length);
             for (int i = 0; i < types.Length; i++)
                 ctypes[i] = ComponentType.ReadOnly(types[i]);
 
             m_registerMaterialsAndMeshesSystem = World.GetExistingSystemManaged<RegisterMaterialsAndMeshesSystem>();
+            componentTypeCache.Dispose();
         }
 
         /// <inheritdoc/>
@@ -440,7 +440,6 @@ namespace Latios.Kinemation.Systems
                 return;
             CompleteJobs(true);
             Dispose();
-            m_burstCompatibleTypeArray.Dispose(default);
         }
 
         /// <inheritdoc/>
@@ -759,7 +758,7 @@ namespace Latios.Kinemation.Systems
             RegisterMaterialPropertyType(typeof(T), propertyName, overrideTypeSizeGPU);
         }
 
-        private void InitializeMaterialProperties()
+        private void InitializeMaterialProperties(ref ComponentTypeCache componentTypeCache)
         {
             m_NameIDToMaterialProperties.Clear();
 
@@ -795,7 +794,7 @@ namespace Latios.Kinemation.Systems
 #endif
 
                 // We cache all IComponentData types that we know are capable of overriding properties
-                m_ComponentTypeCache.UseType(typeIndex);
+                componentTypeCache.UseType(typeIndex);
             }
         }
 
@@ -932,7 +931,7 @@ namespace Latios.Kinemation.Systems
             m_ChunkProperties.Dispose();
             m_ExistingBatchIndices.Dispose();
             m_ValueBlits.Dispose();
-            m_ComponentTypeCache.Dispose();
+            m_burstCompatibleTypeArray.Dispose(default).Complete();
 
             m_SortedBatchIds.Dispose();
 

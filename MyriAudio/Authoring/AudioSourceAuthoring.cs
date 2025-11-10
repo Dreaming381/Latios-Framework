@@ -34,7 +34,7 @@ namespace Latios.Myri.Authoring
 
         [Header("Falloff")]
         public bool useFalloff = true;
-        [Tooltip("When the listener is within this distance to the source, no falloff attenuation is applied")]
+        [Tooltip("The distance to play the reference volume. When the listener is within this distance to the source, no falloff attenuation is applied")]
         public float innerRange = 5f;
         [Tooltip("When the listener is outside this distance to the source, no audio is heard")]
         public float outerRange = 25f;

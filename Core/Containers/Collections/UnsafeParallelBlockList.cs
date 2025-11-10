@@ -529,7 +529,7 @@ namespace Latios.Unsafe
         {
             for (int i = 0; i < m_indexCount; i++)
             {
-                if (m_perIndexBlockList[i].elementCount > 0)
+                if (m_perIndexBlockList[i].blocks.Length > 0)
                 {
                     for (int j = 0; j < m_perIndexBlockList[i].blocks.Length; j++)
                     {
