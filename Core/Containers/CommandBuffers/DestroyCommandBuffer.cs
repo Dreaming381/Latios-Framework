@@ -150,7 +150,7 @@ namespace Latios
             [BurstCompile]
             public static unsafe void Playback(ref DestroyCommandBuffer dcb, ref EntityManager em, ref BufferLookup<LinkedEntityGroup> legLookup, ref EntityStorageInfoLookup esil)
             {
-                var entities = dcb.m_entityOperationCommandBuffer.GetEntities(Allocator.Temp);
+                var entities = dcb.m_entityOperationCommandBuffer.GetEntities(Allocator.TempJob);
 
                 if (entities.Length < 512)
                 {

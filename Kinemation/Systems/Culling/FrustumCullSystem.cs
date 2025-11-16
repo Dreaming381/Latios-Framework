@@ -763,7 +763,7 @@ namespace Latios.Kinemation.Systems
                 var planeNormalYs  = planeDataSimd.Slice(stride + stride, stride);
                 var planeNormalZs  = planeDataSimd.Slice(stride * 3, stride);
                 var planeDistances = planeDataSimd.Slice(stride * 4, stride);
-                for (int i = 0; i < receiverPlanePaddedCount; i += 4)
+                for (int i = 0; i < stride; i++)
                 {
                     var vdot          = vdots[i];
                     var planeNormalX  = planeNormalXs[i];
@@ -775,7 +775,7 @@ namespace Latios.Kinemation.Systems
                     var distance = ndot / vdot;
                     var isBest   = distance < maxDistances & distance > 0f;
                     maxDistances = math.select(maxDistances, distance, isBest);
-                    planeNumbers = math.select(-1, i + new int4(0, 1, 2, 3), isBest);
+                    planeNumbers = math.select(-1, i * 4 + new int4(0, 1, 2, 3), isBest);
                 }
                 var maxDistance = math.cmin(maxDistances);
                 planeNumber     = math.cmax(planeNumbers);

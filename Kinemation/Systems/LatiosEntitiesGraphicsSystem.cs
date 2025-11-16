@@ -1270,7 +1270,7 @@ namespace Latios.Kinemation.Systems
                     WorldTransform    = state.GetComponentTypeHandle<WorldTransform>(true),
                     PostProcessMatrix = state.GetComponentTypeHandle<PostProcessMatrix>(true),
 #elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
-                    WorldTransform = GetComponentTypeHandle<LocalToWorld>(true),
+                    WorldTransform = state.GetComponentTypeHandle<LocalToWorld>(true),
 #endif
                     RenderFilterSettings      = state.GetSharedComponentTypeHandle<RenderFilterSettings>(),
                     EntitiesGraphicsChunkInfo = state.GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(),
