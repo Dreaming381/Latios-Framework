@@ -591,6 +591,28 @@ namespace Latios.Psyshock
             }
         }
 
+        internal static void EdgeEndpointsFromEdgeFeatureCode(in TriangleCollider triangle, ushort featureCode, out float3 endpointA, out float3 endpointB)
+        {
+            switch (featureCode & 0x3)
+            {
+                case 0:
+                    endpointA = triangle.pointA;
+                    endpointB = triangle.pointB;
+                    break;
+                case 1:
+                    endpointA = triangle.pointB;
+                    endpointB = triangle.pointC;
+                    break;
+                case 2:
+                    endpointA = triangle.pointC;
+                    endpointB = triangle.pointA;
+                    break;
+                default:
+                    endpointA = endpointB = triangle.pointA;
+                    break;
+            }
+        }
+
         internal static void BestFacePlanesAndVertices(in TriangleCollider triangle,
                                                        float3 localDirectionToAlign,
                                                        out simdFloat3 edgePlaneOutwardNormals,

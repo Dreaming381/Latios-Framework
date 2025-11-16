@@ -99,10 +99,10 @@ namespace Latios.Kinemation
                     {
                         var hintR        = FromToRotation(abProj, ahProj);
                         hintR.value.xyz *= hintWeight;
-                        math.normalizesafe(hintR);
-                        root.rotation = math.mul(hintR, root.rotation);
-                        mid           = qvvs.RotateAbout(in mid, hintR, root.position);
-                        tip           = qvvs.RotateAbout(in tip, hintR, root.position);
+                        hintR            = math.normalizesafe(hintR);
+                        root.rotation    = math.mul(hintR, root.rotation);
+                        mid              = qvvs.RotateAbout(in mid, hintR, root.position);
+                        tip              = qvvs.RotateAbout(in tip, hintR, root.position);
                     }
                 }
             }

@@ -529,15 +529,13 @@ namespace Latios.Unsafe
         {
             for (int i = 0; i < m_indexCount; i++)
             {
-                if (m_perIndexBlockList[i].blocks.Length > 0)
+                for (int j = 0; j < m_perIndexBlockList[i].blocks.Length; j++)
                 {
-                    for (int j = 0; j < m_perIndexBlockList[i].blocks.Length; j++)
-                    {
-                        var block = m_perIndexBlockList[i].blocks[j];
-                        AllocatorManager.Free(m_allocator, block.ptr, m_blockSize);
-                    }
-                    m_perIndexBlockList[i].blocks.Dispose();
+                    var block = m_perIndexBlockList[i].blocks[j];
+                    AllocatorManager.Free(m_allocator, block.ptr, m_blockSize);
                 }
+                if (m_perIndexBlockList[i].blocks.IsCreated)
+                    m_perIndexBlockList[i].blocks.Dispose();
             }
             AllocatorManager.Free(m_allocator, m_perIndexBlockList, m_indexCount);
         }

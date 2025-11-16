@@ -32,6 +32,7 @@ namespace Latios.Psyshock
                 featureCodeA = featureCodeA,
                 featureCodeB = featureCodeB
             }, convexTransform);
+            GjkEpa.ValidateGjkEpa(convex, in convexTransform, box, in boxTransform, in result, result.distance <= maxDistance);
             return result.distance <= maxDistance;
         }
 

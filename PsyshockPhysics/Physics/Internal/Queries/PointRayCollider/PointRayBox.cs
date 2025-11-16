@@ -369,6 +369,31 @@ namespace Latios.Psyshock
             }
         }
 
+        internal static void EdgeEndpointsFromEdgeFeatureCode(in BoxCollider box, ushort featureCode, out float3 endpointA, out float3 endpointB)
+        {
+            var offAxisSigns = math.select(1f, -1f, (featureCode & new int2(1, 2)) != 0);
+            switch (featureCode & 0xc)
+            {
+                case 0x0:
+                    endpointA = new float3(-1f, offAxisSigns);
+                    endpointB = new float3(1f, offAxisSigns);
+                    break;
+                case 0x4:
+                    endpointA = new float3(offAxisSigns.x, -1f, offAxisSigns.y);
+                    endpointB = new float3(offAxisSigns.x, 1f, offAxisSigns.y);
+                    break;
+                case 0x8:
+                    endpointA = new float3(offAxisSigns, -1f);
+                    endpointB = new float3(offAxisSigns, 1f);
+                    break;
+                default:
+                    endpointA = endpointB = 0f;
+                    break;
+            }
+            endpointA = box.center + box.halfSize * endpointA;
+            endpointB = box.center + box.halfSize * endpointB;
+        }
+
         internal static void BestFacePlanesAndVertices(in BoxCollider box,
                                                        float3 localDirectionToAlign,
                                                        out simdFloat3 edgePlaneOutwardNormals,

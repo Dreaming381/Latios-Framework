@@ -29,6 +29,7 @@ namespace Latios.Psyshock
                 featureCodeA = featureCodeA,
                 featureCodeB = featureCodeB
             }, aTransform);
+            GjkEpa.ValidateGjkEpa(triangleA, in aTransform, triangleB, in bTransform, in result, result.distance <= maxDistance);
             return result.distance <= maxDistance;
         }
 

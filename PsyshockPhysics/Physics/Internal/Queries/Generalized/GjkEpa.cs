@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Latios.Calci;
+using Unity.Collections;
 using Unity.Mathematics;
 
 // This file contains several heavy general-purpose collision and spatial algorithms for convex shapes borrowed
@@ -409,6 +411,33 @@ namespace Latios.Psyshock
             result.simplexBVertexCount = (byte)math.min(result.simplexBVertexCount, simplex.numVertices);
 
             return result;
+        }
+
+        [Conditional("LATIOS_PSYSHOCK_VALIDATE_GJK")]
+        public static unsafe void ValidateGjkEpa(in Collider colliderA,
+                                                 in RigidTransform transformA,
+                                                 in Collider colliderB,
+                                                 in RigidTransform transformB,
+                                                 in ColliderDistanceResult result,
+                                                 bool hit)
+        {
+            if (!hit)
+                return;
+            var featureTypeA = result.featureCodeA >> 14;
+            var featureTypeB = result.featureCodeB >> 14;
+            if (featureTypeA == 0 || featureTypeB == 0)
+                return;
+            if (featureTypeA == 1 && featureTypeB == 1)
+                return;
+
+            // Face-Face or Face-Edge result, which is undesired
+            var hex =
+                PhysicsDebug.LogDistanceBetween(in colliderA, new Transforms.TransformQvvs(transformA), in colliderB, new Transforms.TransformQvvs(transformB),
+                                                result.distance * 2f);
+            FixedString512Bytes filepath = $"Logs/GJK_degenerate_{featureTypeA}_{featureTypeB}_hex.txt";
+            PhysicsDebug.WriteToFile(hex, filepath);
+
+            UnityEngine.Debug.LogError($"Detected bad GJK result. Please report to the Latios Framework and include the following log: {filepath}");
         }
 
         private struct Simplex

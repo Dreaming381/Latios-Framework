@@ -41,9 +41,11 @@ namespace Latios.Kinemation.Systems
 
         public bool ShouldUpdateSystem(ref SystemState state)
         {
-            m_maximumLODLevel  = UnityEngine.QualitySettings.maximumLODLevel;
-            m_lodBias          = UnityEngine.QualitySettings.lodBias;
+            m_maximumLODLevel = UnityEngine.QualitySettings.maximumLODLevel;
+            m_lodBias         = UnityEngine.QualitySettings.lodBias;
+#if UNITY_6000_2_OR_NEWER
             m_meshLodThreshold = UnityEngine.QualitySettings.meshLodThreshold;
+#endif
             return m_maximumLODLevel < 2;
         }
 
