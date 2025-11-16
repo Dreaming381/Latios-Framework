@@ -765,11 +765,12 @@ namespace Latios.Kinemation.Systems
                 var planeDistances = planeDataSimd.Slice(stride * 4, stride);
                 for (int i = 0; i < receiverPlanePaddedCount; i += 4)
                 {
-                    var vdot          = vdots[i];
-                    var planeNormalX  = planeNormalXs[i];
-                    var planeNormalY  = planeNormalYs[i];
-                    var planeNormalZ  = planeNormalZs[i];
-                    var planeDistance = planeDistances[i];
+                    int idx           = i / 4;
+                    var vdot          = vdots[idx];
+                    var planeNormalX  = planeNormalXs[idx];
+                    var planeNormalY  = planeNormalYs[idx];
+                    var planeNormalZ  = planeNormalZs[idx];
+                    var planeDistance = planeDistances[idx];
 
                     var ndot     = -(rayOriginX * planeNormalX + rayOriginY * planeNormalY + rayOriginZ * planeNormalZ) - planeDistance;
                     var distance = ndot / vdot;
@@ -841,4 +842,3 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
-
