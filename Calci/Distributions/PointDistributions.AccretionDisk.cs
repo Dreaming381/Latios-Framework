@@ -1,6 +1,3 @@
-using Unity.Burst;
-using Unity.Collections;
-using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios.Calci
@@ -42,43 +39,22 @@ namespace Latios.Calci
         }
 
         /// <summary>
-        /// Generates points distributed in an accretion disk pattern.
+        /// Generates the next point in an accretion disk distribution.
         /// Points are arranged in spiral arms radiating from the center, with random scatter.
         /// All points will lie on the XY plane (Z = 0).
         /// </summary>
-        /// <param name="points">Output array to fill with generated points. Must be allocated to the desired size.</param>
-        /// <param name="params">Parameters controlling the disk distribution.</param>
-        public static void GenerateAccretionDisk(NativeArray<float3> points, AccretionDiskParams @params)
-        {
-            var job = new GenerateAccretionDiskJob
-            {
-                points          = points,
-                innerRadius     = @params.innerRadius,
-                outerRadius     = @params.outerRadius,
-                numSpirals      = @params.numSpirals,
-                spiralTightness = @params.spiralTightness,
-                rng             = @params.rng
-            };
-
-            job.Schedule(points.Length, 64).Complete();
-        }
-
-        /// <summary>
-        /// Calculates a single point in an accretion disk distribution.
-        /// This is useful when you need to generate points within a custom job or with additional per-point data.
-        /// </summary>
+        /// <param name="rngSequence">RNG sequence for generating random values. Modified by this call.</param>
         /// <param name="innerRadius">Inner radius of the disk.</param>
         /// <param name="outerRadius">Outer radius of the disk.</param>
         /// <param name="numSpirals">Number of spiral arms.</param>
-        /// <param name="spiralTightness">How tightly the spirals wind.</param>
-        /// <param name="rngSequence">RNG sequence for this point. Use rng.GetSequence(index) for parallel generation.</param>
+        /// <param name="spiralTightness">How tightly the spirals wind. Typical values: 0.5 to 3.0.</param>
         /// <returns>A point on the XY plane (Z = 0) in the accretion disk pattern.</returns>
-        public static float3 CalculateAccretionDiskPoint(
+        public static float3 NextAccretionDiskPoint(
+            ref this Rng.RngSequence rngSequence,
             float innerRadius,
             float outerRadius,
             int numSpirals,
-            float spiralTightness,
-            ref Rng.RngSequence rngSequence)
+            float spiralTightness)
         {
             // Choose which spiral arm this point belongs to
             int   armIndex     = rngSequence.NextInt(0, numSpirals);
@@ -100,30 +76,6 @@ namespace Latios.Calci
             // Convert polar to cartesian
             math.sincos(a, out float sin, out float cos);
             return new float3(cos, sin, 0f) * outerRadius * math.sqrt(r);
-        }
-
-        [BurstCompile]
-        struct GenerateAccretionDiskJob : IJobParallelFor
-        {
-            [WriteOnly]
-            public NativeArray<float3> points;
-
-            public float innerRadius;
-            public float outerRadius;
-            public int   numSpirals;
-            public float spiralTightness;
-            public Rng   rng;
-
-            public void Execute(int index)
-            {
-                var sequence = rng.GetSequence(index);
-                points[index] = CalculateAccretionDiskPoint(
-                    innerRadius,
-                    outerRadius,
-                    numSpirals,
-                    spiralTightness,
-                    ref sequence);
-            }
         }
     }
 }
