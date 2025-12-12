@@ -5,40 +5,6 @@ namespace Latios.Calci
     public static partial class PointDistributions
     {
         /// <summary>
-        /// Parameters for generating an accretion disk distribution.
-        /// Points are distributed in a spiral pattern radiating from a center point,
-        /// simulating the appearance of an accretion disk around a celestial body.
-        /// </summary>
-        public struct AccretionDiskParams
-        {
-            /// <summary>
-            /// Inner radius of the disk. Points will not be generated closer than this distance.
-            /// </summary>
-            public float innerRadius;
-
-            /// <summary>
-            /// Outer radius of the disk. Points will not be generated farther than this distance.
-            /// </summary>
-            public float outerRadius;
-
-            /// <summary>
-            /// Number of spiral arms in the disk. Higher values create more distinct spiral patterns.
-            /// </summary>
-            public int numSpirals;
-
-            /// <summary>
-            /// Controls how tightly the spiral arms wind. Higher values create tighter spirals.
-            /// Typical values range from 0.5 to 3.0.
-            /// </summary>
-            public float spiralTightness;
-
-            /// <summary>
-            /// Random number generator for point distribution.
-            /// </summary>
-            public Rng rng;
-        }
-
-        /// <summary>
         /// Generates the next point in an accretion disk distribution.
         /// Points are arranged in spiral arms radiating from the center, with random scatter.
         /// All points will lie on the XY plane (Z = 0).
