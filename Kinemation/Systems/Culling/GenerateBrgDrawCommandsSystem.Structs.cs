@@ -629,6 +629,10 @@ namespace Latios.Kinemation.Systems
 
             public static T* Malloc<T>(int count) where T : unmanaged
             {
+                // UnsafeUtility.Malloc will reserve a byte for a zero-sized allocation.
+                if (count == 0)
+                    return null;
+
                 return (T*)UnsafeUtility.Malloc(
                     UnsafeUtility.SizeOf<T>() * count,
                     UnsafeUtility.AlignOf<T>(),

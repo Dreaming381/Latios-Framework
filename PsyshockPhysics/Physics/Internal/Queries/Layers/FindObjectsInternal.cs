@@ -74,10 +74,9 @@ namespace Latios.Psyshock
             #endregion
 
             #region ImmediateMethods
-            public static T RunImmediate(in Aabb aabb, in CollisionWorld world, in CollisionWorld.Mask mask, T processor)
+            public static void RunImmediate(in Aabb aabb, in CollisionWorld world, in CollisionWorld.Mask mask, ref T processor)
             {
                 WorldQuerySweepMethods.AabbSweep(in aabb, in world, in mask, ref processor);
-                return processor;
             }
             #endregion
         }

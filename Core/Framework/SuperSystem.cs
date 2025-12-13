@@ -207,6 +207,7 @@ namespace Latios
             // Update all unmanaged and managed systems together, in the correct sort order.
             var world      = lw.latiosWorldUnmanaged;
             var enumerator = group.GetSystemEnumerator();
+            var tracing    = new ComponentSystemGroupTracing(group);
             while (enumerator.MoveNext())
             {
                 if (lw.paused)
@@ -218,24 +219,17 @@ namespace Latios
                     {
                         // Update unmanaged (burstable) code.
                         var handle = enumerator.current;
-                        UpdateUnmanagedSystem(world.m_impl, handle);
+                        UpdateUnmanagedSystem(world.m_impl, handle, tracing);
                     }
                     else
                     {
                         // Update managed code.
-                        UpdateManagedSystem(world.m_impl, enumerator.currentManaged);
+                        UpdateManagedSystem(world.m_impl, enumerator.currentManaged, tracing);
                     }
                 }
                 catch (Exception e)
                 {
                     UnityEngine.Debug.LogException(e);
-#if UNITY_DOTSRUNTIME
-                    // When in a DOTS Runtime build, throw this upstream -- continuing after silently eating an exception
-                    // is not what you'll want, except maybe once we have LiveLink.  If you're looking at this code
-                    // because your LiveLink dots runtime build is exiting when you don't want it to, feel free
-                    // to remove this block, or guard it with something to indicate the player is not for live link.
-                    throw;
-#endif
                 }
 
                 if (group.World.QuitUpdate)
@@ -249,6 +243,7 @@ namespace Latios
         {
             var worldUnmanaged = group.World.Unmanaged;
             var enumerator     = group.GetSystemEnumerator();
+            var tracing        = new ComponentSystemGroupTracing(group);
             while (enumerator.MoveNext())
             {
                 try
@@ -256,11 +251,12 @@ namespace Latios
                     if (!enumerator.IsCurrentManaged)
                     {
                         // Update unmanaged (burstable) code.
-                        enumerator.current.Update(worldUnmanaged);
+                        ref var state = ref worldUnmanaged.ResolveSystemStateRef(enumerator.current);
+                        enumerator.current.UpdateWithTracing(ref state, worldUnmanaged, tracing);
                     }
                     else
                     {
-                        enumerator.currentManaged.Update();
+                        enumerator.currentManaged.UpdateWithTracing(tracing);
                     }
                 }
                 catch (Exception e)
@@ -273,7 +269,7 @@ namespace Latios
             }
         }
 
-        internal static unsafe void UpdateUnmanagedSystem(LatiosWorldUnmanagedImpl* impl, SystemHandle system)
+        internal static unsafe void UpdateUnmanagedSystem(LatiosWorldUnmanagedImpl* impl, SystemHandle system, ComponentSystemGroupTracing tracing = default)
         {
             if (!impl->isAllowedToRun)
                 return;
@@ -290,12 +286,12 @@ namespace Latios
                         if (dispatcher.ShouldUpdateSystem(ref state))
                         {
                             state.Enabled = true;
-                            system.Update(wu);
+                            system.UpdateWithTracing(ref state, wu, tracing);
                         }
                         else if (state.Enabled)
                         {
                             state.Enabled = false;
-                            system.Update(wu);
+                            system.UpdateWithTracing(ref state, wu, tracing);
                         }
                         else
                         {
@@ -303,10 +299,10 @@ namespace Latios
                         }
                     }
                     else
-                        system.Update(wu);
+                        system.UpdateWithTracing(ref state, wu, tracing);
                 }
                 else
-                    system.Update(wu);
+                    system.UpdateWithTracing(ref state, wu, tracing);
             }
             catch
             {
@@ -316,7 +312,7 @@ namespace Latios
             impl->EndDependencyTracking(system, false);
         }
 
-        internal static unsafe void UpdateManagedSystem(LatiosWorldUnmanagedImpl* impl, ComponentSystemBase system)
+        internal static unsafe void UpdateManagedSystem(LatiosWorldUnmanagedImpl* impl, ComponentSystemBase system, ComponentSystemGroupTracing tracing = default)
         {
             if (!impl->isAllowedToRun)
                 return;
@@ -328,13 +324,13 @@ namespace Latios
                     if (latiosSys.ShouldUpdateSystem())
                     {
                         system.Enabled = true;
-                        system.Update();
+                        system.UpdateWithTracing(tracing);
                     }
                     else if (system.Enabled)
                     {
                         system.Enabled = false;
                         //Update to invoke OnStopRunning().
-                        system.Update();
+                        system.UpdateWithTracing(tracing);
                     }
                     else
                     {
@@ -343,7 +339,7 @@ namespace Latios
                 }
                 else
                 {
-                    system.Update();
+                    system.UpdateWithTracing(tracing);
                 }
             }
             catch

@@ -25,6 +25,51 @@ namespace Unity.Entities.Exposed
         }
 
         public static System.Type GetManagedType(this SystemTypeIndex system) => TypeManager.GetSystemType(system);
+
+        public static unsafe void UpdateWithTracing(this SystemHandle handle, ref SystemState state, WorldUnmanaged worldUnmanaged, ComponentSystemGroupTracing tracing)
+        {
+#if UNITY_6000_4_OR_NEWER
+            if (tracing.OnUpdateBefore.IsCreated)
+                tracing.OnUpdateBefore.Invoke(state.m_SystemTypeIndex, ref state);
+            handle.Update(worldUnmanaged);
+            if (tracing.OnUpdateAfter.IsCreated)
+                tracing.OnUpdateAfter.Invoke(state->m_SystemTypeIndex, ref state);
+#else
+            handle.Update(worldUnmanaged);
+#endif
+        }
+
+        public static unsafe void UpdateWithTracing(this ComponentSystemBase system, ComponentSystemGroupTracing tracing)
+        {
+#if UNITY_6000_4_OR_NEWER
+            ref state = ref system.CheckedStateRef;
+            if (tracing.OnUpdateBefore.IsCreated)
+                tracing.OnUpdateBefore.Invoke(state.m_SystemTypeIndex, ref state);
+            system.Update();
+            if (tracing.OnUpdateAfter.IsCreated)
+                tracing.OnUpdateAfter.Invoke(state->m_SystemTypeIndex, ref state);
+#else
+            system.Update();
+#endif
+        }
+    }
+
+    public struct ComponentSystemGroupTracing
+    {
+#if UNITY_6000_4_OR_NEWER
+        internal Burst.FunctionPointer<ComponentSystemGroup.SystemWrapperDelegate> OnUpdateBefore;
+        internal Burst.FunctionPointer<ComponentSystemGroup.SystemWrapperDelegate> OnUpdateAfter;
+
+        public ComponentSystemGroupTracing(ComponentSystemGroup group)
+        {
+            OnUpdateBefore = group.OnUpdateBefore;
+            OnUpdateAfter  = group.OnUpdateAfter;
+        }
+#else
+        public ComponentSystemGroupTracing(ComponentSystemGroup group)
+        {
+        }
+#endif
     }
 
     public struct ComponentSystemGroupSystemEnumerator

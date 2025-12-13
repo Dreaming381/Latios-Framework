@@ -41,13 +41,13 @@ namespace Latios.Psyshock
                 public void Run()
                 {
                     SetScheduleMode(ScheduleMode.Single);
-                    this.Run(1);
+                    this.RunByRef(1);
                 }
 
                 public JobHandle ScheduleSingle(JobHandle inputDeps)
                 {
                     SetScheduleMode(ScheduleMode.Single);
-                    return this.Schedule(1, inputDeps);
+                    return this.ScheduleByRef(1, inputDeps);
                 }
 
                 public JobHandle ScheduleParallel(JobHandle inputDeps, ScheduleMode scheduleMode)
@@ -55,14 +55,14 @@ namespace Latios.Psyshock
                     SetScheduleMode(scheduleMode);
                     if (scheduleMode == ScheduleMode.ParallelPart1)
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                        return this.ScheduleParallel(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 2, 1, inputDeps);
+                        return this.ScheduleParallelByRef(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 2, 1, inputDeps);
 #else
-                        return this.ScheduleParallel(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 1, 1, inputDeps);
+                        return this.ScheduleParallelByRef(IndexStrategies.BucketCountWithNaN(pairStream.data.cellCount) + 1, 1, inputDeps);
 #endif
                     if (scheduleMode == ScheduleMode.ParallelPart2)
-                        return this.ScheduleParallel(IndexStrategies.MixedStreamCount(pairStream.data.cellCount), 1, inputDeps);
+                        return this.ScheduleParallelByRef(IndexStrategies.MixedStreamCount(pairStream.data.cellCount), 1, inputDeps);
                     if (scheduleMode == ScheduleMode.ParallelUnsafe)
-                        return this.ScheduleParallel(pairStream.data.pairHeaders.indexCount, 1, inputDeps);
+                        return this.ScheduleParallelByRef(pairStream.data.pairHeaders.indexCount, 1, inputDeps);
                     return inputDeps;
                 }
 

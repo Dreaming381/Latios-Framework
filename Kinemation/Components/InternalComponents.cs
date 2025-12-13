@@ -345,7 +345,7 @@ namespace Latios.Kinemation
     {
         public NativeList<ValueBlitDescriptor> valueBlits;
 
-        public int                        hybridRenderedChunkCount;
+        public int                        renderersChunkCount;
         public NativeArray<ChunkProperty> chunkProperties;
 
         public JobHandle TryDispose(JobHandle inputDeps)

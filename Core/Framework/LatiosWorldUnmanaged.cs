@@ -356,10 +356,12 @@ namespace Latios
         }
 
         /// <summary>
-        /// Gets the collection component and its dependency.
-        /// If the currently executing system is tracked by a Latios ComponentSystemGroup, then the collection component's dependency
-        /// is automatically updated with the final Dependency of the currently running system, and all necessary JobHandles stored with the
-        /// collection component are merged with the currently executing system's Dependency.
+        /// Gets the collection component.
+        /// If the currently executing system is tracked by a ComponentSystemGroup or disptached by SuperSystem.UpdateSystem(), then the
+        /// collection component's dependency is automatically updated with the final Dependency of the currently running system, and all
+        /// necessary JobHandles stored with the collection component are merged with the currently executing system's Dependency.
+        /// Otherwise, the JobHandles stored with the collection component are completed, and the collection component requires a manual
+        /// update of the final dependency.
         /// </summary>
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         /// <param name="entity">The entity that has the collection component</param>
@@ -387,8 +389,20 @@ namespace Latios
             return collectionRef.collectionRef;
         }
 
-        // Note: Always ReadWrite. This method is not recommended unless you know what you are doing.
-        public T GetCollectionComponent<T>(Entity entity, out JobHandle combinedReadWriteHandle) where T : unmanaged, ICollectionComponent,
+        /// <summary>
+        /// Gets the collection component along with a dependency for use.
+        /// This variant does not combine the JobHandle into the currently executing system's Dependency nor completes it, but instead
+        /// provides the combined JobHandle directly. If the currently executing system is tracked by a ComponentSystemGroup or disptached
+        /// by SuperSystem.UpdateSystem(), then the collection component's dependency is still automatically updated with the final
+        /// Dependency of the currently running system unless it is manually updated. This variant is slightly more error-prone, so only
+        /// use it when you know what you are doing.
+        /// </summary>
+        /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
+        /// <param name="entity">The entity that has the collection component</param>
+        /// <param name="collectionUseDependency">The dependency that must be completed in order to use the collection component with the specified access requirements</param>
+        /// <param name="readOnly">Specifies if the collection component will only be read by the system</param>
+        /// <returns>The collection component instance</returns>
+        public T GetCollectionComponent<T>(Entity entity, out JobHandle collectionUseDependency, bool readOnly = false) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
@@ -401,12 +415,17 @@ namespace Latios
 #endif
             var collectionRef = m_impl->m_collectionComponentStorage.GetOrAddDefaultCollectionComponent<T>(entity);
 
+            if (readOnly)
+            {
+                collectionUseDependency = collectionRef.writeHandle;
+            }
+            else
             {
                 var handleArray = new NativeArray<JobHandle>(collectionRef.readHandles.Length + 1, Allocator.Temp);
                 handleArray[0]  = collectionRef.writeHandle;
                 for (int i = 0; i < collectionRef.readHandles.Length; i++)
                     handleArray[i + 1]  = collectionRef.readHandles[i];
-                combinedReadWriteHandle = JobHandle.CombineDependencies(handleArray);
+                collectionUseDependency = JobHandle.CombineDependencies(handleArray);
             }
 
             m_impl->m_collectionDependencies.Add(new LatiosWorldUnmanagedImpl.CollectionDependency
@@ -414,7 +433,7 @@ namespace Latios
                 handle                    = collectionRef.collectionHandle,
                 extraDisposeDependency    = default,
                 hasExtraDisposeDependency = false,
-                wasReadOnly               = false
+                wasReadOnly               = readOnly
             });
             return collectionRef.collectionRef;
         }

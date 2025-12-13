@@ -393,6 +393,23 @@ namespace Latios.Kinemation
                 throw new System.InvalidOperationException("Failed to set the name for the GraphicsBufferUnmanaged.");
 #endif
         }
+
+        internal static GraphicsBufferHandle GetGraphicsBufferBufferHandle(GraphicsBufferUnmanaged unmanaged)
+        {
+            var context = new GetGraphicsBufferBufferHandleContext
+            {
+                listIndex    = unmanaged.index,
+                bufferHandle = default,
+                success      = false
+            };
+            DoManagedExecute((IntPtr)(&context), 17);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Failed to obtain the bufferHandle from the GraphicsBufferUnmanaged.");
+#endif
+            return context.bufferHandle;
+        }
         #endregion
 
         #region State
@@ -569,6 +586,14 @@ namespace Latios.Kinemation
             public NativeArray<UnityObjectRef<Mesh> > meshes;
             public bool                               success;
         }
+
+        // Code 17
+        struct GetGraphicsBufferBufferHandleContext
+        {
+            public int                  listIndex;
+            public GraphicsBufferHandle bufferHandle;
+            public bool                 success;
+        }
         #endregion
 
         static void DoManagedExecute(IntPtr context, int operation)
@@ -740,6 +765,14 @@ namespace Latios.Kinemation
                         foreach (var mesh in ctx.meshes)
                             mesh.Value.DestroySafelyFromAnywhere();
                         ctx.success = true;
+                        break;
+                    }
+                    case 17:
+                    {
+                        ref var ctx      = ref *(GetGraphicsBufferBufferHandleContext*)context;
+                        var     buffer   = buffers[ctx.listIndex];
+                        ctx.bufferHandle = buffer.bufferHandle;
+                        ctx.success      = true;
                         break;
                     }
                 }

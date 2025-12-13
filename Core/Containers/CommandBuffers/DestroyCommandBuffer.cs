@@ -544,7 +544,13 @@ namespace Latios
                     }
 
                     if (legLookup.TryGetBuffer(entity, out var buffer))
+                    {
                         legCounts[i] = math.max(0, buffer.Length - 1);
+                        if (buffer.Length == 1)
+                        {
+                            CheckFirstLegIsRoot(entity, buffer[0].Value);
+                        }
+                    }
                     else
                         legCounts[i] = 0;
 
@@ -606,17 +612,18 @@ namespace Latios
                     var buffer = legLookup[roots[index]];
                     var start  = legPrefixSums[index];
                     var legs   = buffer.AsNativeArray();
-                    for (int i = 0; i < legs.Length; i++)
+                    CheckFirstLegIsRoot(roots[index], legs[0].Value);
+                    for (int i = 1; i < legs.Length; i++)
                     {
                         var entity = legs[i].Value;
                         if (!esil.Exists(entity))
                         {
                             legsWithInfo[start + i] = default;
-                            return;
+                            continue;
                         }
 
-                        var esi                 = esil[entity];
-                        legsWithInfo[start + i] = new EntityWithInfo
+                        var esi                     = esil[entity];
+                        legsWithInfo[start + i - 1] = new EntityWithInfo
                         {
                             entity       = entity,
                             chunkIndex   = esi.Chunk.GetHashCode(),
@@ -624,6 +631,15 @@ namespace Latios
                         };
                     }
                     buffer.Clear();
+                }
+            }
+
+            [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+            static void CheckFirstLegIsRoot(Entity root, Entity leg)
+            {
+                if (root != leg)
+                {
+                    throw new InvalidOperationException($"The first LinkedEntityGroup of {root.ToFixedString()} is not the root, and is instead {leg.ToFixedString()}.");
                 }
             }
         }

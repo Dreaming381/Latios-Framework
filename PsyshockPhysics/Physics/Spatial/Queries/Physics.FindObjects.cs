@@ -228,12 +228,13 @@ namespace Latios.Psyshock
         /// </summary>
         public void Run()
         {
-            new FindObjectsInternal.SingleJob
+            var job = new FindObjectsInternal.SingleJob
             {
                 layer     = layer,
                 processor = processor,
                 aabb      = aabb
-            }.Run();
+            };
+            job.RunByRef();
         }
 
         /// <summary>
@@ -243,12 +244,13 @@ namespace Latios.Psyshock
         /// <returns>The JobHandle of the scheduled job</returns>
         public JobHandle ScheduleSingle(JobHandle inputDeps = default)
         {
-            return new FindObjectsInternal.SingleJob
+            var job = new FindObjectsInternal.SingleJob
             {
                 layer     = layer,
                 processor = processor,
                 aabb      = aabb
-            }.Schedule(inputDeps);
+            };
+            return job.ScheduleByRef(inputDeps);
         }
         #endregion Schedulers
     }
@@ -282,7 +284,8 @@ namespace Latios.Psyshock
         /// <returns>A modified copy of the processor used to process the results</returns>
         public T RunImmediate(in CollisionWorld.Mask mask)
         {
-            return FindObjectsInternal.RunImmediate(in aabb, in world, in mask, processor);
+            FindObjectsInternal.RunImmediate(in aabb, in world, in mask, ref processor);
+            return processor;
         }
 
         /// <summary>
@@ -291,13 +294,14 @@ namespace Latios.Psyshock
         /// <param name="entityQueryMask">An EntityQueryMask used to prefilter the entities in the CollisionWorld</param>
         public void Run(EntityQueryMask entityQueryMask)
         {
-            new FindObjectsInternal.SingleJob
+            var job = new FindObjectsInternal.SingleJob
             {
                 world     = world,
                 queryMask = entityQueryMask,
                 processor = processor,
                 aabb      = aabb
-            }.Run();
+            };
+            job.RunByRef();
         }
 
         /// <summary>
@@ -308,13 +312,14 @@ namespace Latios.Psyshock
         /// <returns>The JobHandle of the scheduled job</returns>
         public JobHandle ScheduleSingle(EntityQueryMask entityQueryMask, JobHandle inputDeps = default)
         {
-            return new FindObjectsInternal.SingleJob
+            var job = new FindObjectsInternal.SingleJob
             {
                 world     = world,
                 queryMask = entityQueryMask,
                 processor = processor,
                 aabb      = aabb
-            }.Schedule(inputDeps);
+            };
+            return job.ScheduleByRef(inputDeps);
         }
         #endregion Schedulers
     }

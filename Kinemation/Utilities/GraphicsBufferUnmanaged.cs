@@ -118,6 +118,18 @@ namespace Latios.Kinemation
             }
         }
 
+        /// <summary>
+        /// An unmanaged handle used for some Unity APIs such as BatchRendererGroup
+        /// </summary>
+        public GraphicsBufferHandle bufferHandle
+        {
+            get
+            {
+                CheckValid();
+                return GraphicsUnmanaged.GetGraphicsBufferBufferHandle(this);
+            }
+        }
+
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         internal void CheckValid()
         {

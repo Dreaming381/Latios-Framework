@@ -886,9 +886,7 @@ namespace Latios.Kinemation.Systems
 
                 int numSortingPositionFloats              = sortingPositionPrefixSum * 3;
                 output->instanceSortingPositionFloatCount = numSortingPositionFloats;
-                output->instanceSortingPositions          = (sortingPositionPrefixSum == 0) ?
-                                                            null :
-                                                            ChunkDrawCommandOutput.Malloc<float>(numSortingPositionFloats);
+                output->instanceSortingPositions          = ChunkDrawCommandOutput.Malloc<float>(numSortingPositionFloats);
             }
         }
 
