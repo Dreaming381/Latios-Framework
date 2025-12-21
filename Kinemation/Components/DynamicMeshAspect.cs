@@ -7,7 +7,9 @@ namespace Latios.Kinemation
     /// <summary>
     /// An aspect for working with dynamic meshes that abstracts away the rotation mechanisms
     /// </summary>
+#pragma warning disable CS0618
     public readonly partial struct DynamicMeshAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRW<DynamicMeshState>          m_state;
         readonly DynamicBuffer<DynamicMeshVertex> m_vertices;

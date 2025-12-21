@@ -17,7 +17,9 @@ namespace Latios.Kinemation
     /// <summary>
     /// Provides read-only access to skeleton binding data for this skinned mesh entity.
     /// </summary>
+#pragma warning disable CS0618
     public readonly partial struct SkinnedMeshBindingAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRO<SkeletonDependent> m_skeletonDependent;
 
@@ -45,7 +47,9 @@ namespace Latios.Kinemation
         public int meshIndexInSkeleton => m_skeletonDependent.ValueRO.indexInDependentSkinnedMeshesBuffer;
     }
 
+#pragma warning disable CS0618
     public readonly partial struct SkeletonSkinBindingsAspect : IAspect
+#pragma warning restore CS0618
     {
         [ReadOnly] readonly DynamicBuffer<DependentSkinnedMesh> m_meshes;
 

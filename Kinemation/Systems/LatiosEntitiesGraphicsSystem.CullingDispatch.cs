@@ -160,6 +160,18 @@ namespace Latios.Kinemation.Systems
         struct WrappedPickingIncludeExcludeList
         {
 #if ENABLE_PICKING && !DISABLE_INCLUDE_EXCLUDE_LIST_FILTERING
+#if UNITY_6000_3_OR_NEWER
+            public PickingIncludeExcludeEntityIdList includeExcludeList;
+
+            public WrappedPickingIncludeExcludeList(BatchCullingViewType viewType)
+            {
+                includeExcludeList = default;
+                if (viewType == BatchCullingViewType.Picking)
+                    includeExcludeList = HandleUtility.GetPickingIncludeExcludeEntityIdList(Allocator.Temp);
+                else if (viewType == BatchCullingViewType.SelectionOutline)
+                    includeExcludeList = HandleUtility.GetSelectionOutlineIncludeExcludeEntityIdList(Allocator.Temp);
+            }
+#else
             public PickingIncludeExcludeList includeExcludeList;
 
             public WrappedPickingIncludeExcludeList(BatchCullingViewType viewType)
@@ -170,6 +182,7 @@ namespace Latios.Kinemation.Systems
                 else if (viewType == BatchCullingViewType.SelectionOutline)
                     includeExcludeList = HandleUtility.GetSelectionOutlineIncludeExcludeList(Allocator.Temp);
             }
+#endif
 #else
             public WrappedPickingIncludeExcludeList(BatchCullingViewType viewType)
             {
@@ -184,11 +197,15 @@ namespace Latios.Kinemation.Systems
                                                                                                     Allocator allocator)
         {
 #if ENABLE_PICKING && !DISABLE_INCLUDE_EXCLUDE_LIST_FILTERING
+#if UNITY_6000_3_OR_NEWER
+            PickingIncludeExcludeEntityIdList includeExcludeList = wrappedIncludeExcludeList.includeExcludeList;
+            NativeArray<EntityId>             emptyArray         = new NativeArray<EntityId>(0, Allocator.Temp);
+#else
             PickingIncludeExcludeList includeExcludeList = wrappedIncludeExcludeList.includeExcludeList;
+            NativeArray<int>          emptyArray         = new NativeArray<int>(0, Allocator.Temp);
+#endif
 
-            NativeArray<int> emptyArray = new NativeArray<int>(0, Allocator.Temp);
-
-            NativeArray<int> includeEntityIndices = includeExcludeList.IncludeEntities;
+            var includeEntityIndices = includeExcludeList.IncludeEntities;
             if (cullingContext.viewType == BatchCullingViewType.SelectionOutline)
             {
                 // Make sure the include list for the selection outline is never null even if there is nothing in it.
@@ -204,14 +221,19 @@ namespace Latios.Kinemation.Systems
                 includeEntityIndices = default;
             }
 
-            NativeArray<int> excludeEntityIndices = includeExcludeList.ExcludeEntities;
+            var excludeEntityIndices = includeExcludeList.ExcludeEntities;
             if (excludeEntityIndices.Length == 0)
                 excludeEntityIndices = default;
 
             IncludeExcludeListFilter includeExcludeListFilter = new IncludeExcludeListFilter(
                 entityManager,
+#if UNITY_6000_3_OR_NEWER
+                includeEntityIndices.Reinterpret<int>(),
+                excludeEntityIndices.Reinterpret<int>(),
+#else
                 includeEntityIndices,
                 excludeEntityIndices,
+#endif
                 allocator);
 
             return includeExcludeListFilter;

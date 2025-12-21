@@ -10,21 +10,22 @@ namespace Latios.Kinemation.Authoring.Systems
     [DisableAutoCreation]
     public partial class DestroyShadowHierarchiesSystem : SystemBase
     {
-        EntityQuery m_query;
-
         protected override void OnUpdate()
         {
-            int hashmapCapacity = m_query.CalculateEntityCountWithoutFiltering();
+            var query = SystemAPI.QueryBuilder().WithAll<ShadowHierarchyReference>().WithOptions(
+                EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
+            int hashmapCapacity = query.CalculateEntityCountWithoutFiltering();
             var hashset         = new NativeHashSet<int>(hashmapCapacity, WorldUpdateAllocator);
             var list            = new NativeList<ShadowHierarchyReference>(hashmapCapacity, WorldUpdateAllocator);
 
             CompleteDependency();
 
-            Entities.ForEach((in ShadowHierarchyReference reference) =>
+            // Todo: Burst this?
+            foreach (var reference in SystemAPI.Query<ShadowHierarchyReference>().WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities))
             {
                 if (hashset.Add(reference.shadowHierarchyRoot.GetHashCode()))
                     list.Add(in reference);
-            }).WithStoreEntityQueryInField(ref m_query).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
+            }
 
             foreach (var reference in list)
             {

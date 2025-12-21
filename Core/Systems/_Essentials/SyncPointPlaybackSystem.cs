@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
-using Unity.Transforms;
 
 namespace Latios.Systems
 {
@@ -87,6 +84,8 @@ namespace Latios.Systems
         NativeList<JobHandle>                m_jobHandles;
         NativeList<PlaybackInstance>         m_playbackInstances;
         AllocatorHelper<RewindableAllocator> m_commandBufferAllocator;
+
+        internal AllocatorManager.AllocatorHandle allocator => m_commandBufferAllocator.Allocator.Handle;
 
         LatiosWorldUnmanaged m_world;
         bool                 m_hasPendingJobHandlesToAcquire;
@@ -302,6 +301,30 @@ namespace Latios.Systems
             m_commandBufferAllocator.Allocator.Rewind();
         }
 
+        internal void AddInstantiateCommandBufferUntyped(InstantiateCommandBufferUntyped icb)
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.InstantiateUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_instantiateCommandBuffersUntyped.Add(icb);
+        }
+
+        internal void AddAddComponentsCommandBufferUntyped(AddComponentsCommandBufferUntyped accb)
+        {
+            m_hasPendingJobHandlesToAcquire = true;
+            var instance                    = new PlaybackInstance
+            {
+                type             = PlaybackType.AddComponentsUntyped,
+                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
+            };
+            m_playbackInstances.Add(instance);
+            m_addComponentsCommandBuffersUntyped.Add(accb);
+        }
+
         #endregion
 
         #region API
@@ -311,7 +334,7 @@ namespace Latios.Systems
         public EntityCommandBuffer CreateEntityCommandBuffer()
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var ecb                         = new EntityCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator, PlaybackPolicy.SinglePlayback);
+            var ecb                         = new EntityCommandBuffer(allocator, PlaybackPolicy.SinglePlayback);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.Entity,
@@ -328,7 +351,7 @@ namespace Latios.Systems
         public EnableCommandBuffer CreateEnableCommandBuffer()
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var ecb                         = new EnableCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
+            var ecb                         = new EnableCommandBuffer(allocator);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.Enable,
@@ -345,7 +368,7 @@ namespace Latios.Systems
         public DisableCommandBuffer CreateDisableCommandBuffer()
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var dcb                         = new DisableCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
+            var dcb                         = new DisableCommandBuffer(allocator);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.Disable,
@@ -362,7 +385,7 @@ namespace Latios.Systems
         public DestroyCommandBuffer CreateDestroyCommandBuffer()
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var dcb                         = new DestroyCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
+            var dcb                         = new DestroyCommandBuffer(allocator);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.Destroy,
@@ -379,7 +402,7 @@ namespace Latios.Systems
         public InstantiateCommandBuffer CreateInstantiateCommandBuffer()
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
+            var icb                         = new InstantiateCommandBuffer(allocator);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.InstantiateNoData,
@@ -395,15 +418,8 @@ namespace Latios.Systems
         /// </summary>
         public InstantiateCommandBuffer<T0> CreateInstantiateCommandBuffer<T0>() where T0 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer<T0>(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.InstantiateUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
+            var icb = new InstantiateCommandBuffer<T0>(allocator);
+            AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
             return icb;
         }
 
@@ -412,15 +428,8 @@ namespace Latios.Systems
         /// </summary>
         public InstantiateCommandBuffer<T0, T1> CreateInstantiateCommandBuffer<T0, T1>() where T0 : unmanaged, IComponentData where T1 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer<T0, T1>(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.InstantiateUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
+            var icb = new InstantiateCommandBuffer<T0, T1>(allocator);
+            AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
             return icb;
         }
 
@@ -430,15 +439,8 @@ namespace Latios.Systems
         public InstantiateCommandBuffer<T0, T1, T2> CreateInstantiateCommandBuffer<T0, T1, T2>() where T0 : unmanaged, IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer<T0, T1, T2>(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.InstantiateUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
+            var icb = new InstantiateCommandBuffer<T0, T1, T2>(allocator);
+            AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
             return icb;
         }
 
@@ -448,15 +450,8 @@ namespace Latios.Systems
         public InstantiateCommandBuffer<T0, T1, T2, T3> CreateInstantiateCommandBuffer<T0, T1, T2, T3>() where T0 : unmanaged, IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer<T0, T1, T2, T3>(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.InstantiateUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
+            var icb = new InstantiateCommandBuffer<T0, T1, T2, T3>(allocator);
+            AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
             return icb;
         }
 
@@ -466,15 +461,8 @@ namespace Latios.Systems
         public InstantiateCommandBuffer<T0, T1, T2, T3, T4> CreateInstantiateCommandBuffer<T0, T1, T2, T3, T4>() where T0 : unmanaged, IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var icb                         = new InstantiateCommandBuffer<T0, T1, T2, T3, T4>(m_commandBufferAllocator.Allocator.Handle.ToAllocator);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.InstantiateUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_instantiateCommandBuffersUntyped.Add(icb.m_instantiateCommandBufferUntyped);
+            var icb = new InstantiateCommandBuffer<T0, T1, T2, T3, T4>(allocator);
+            AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
             return icb;
         }
 
@@ -484,7 +472,7 @@ namespace Latios.Systems
         public AddComponentsCommandBuffer CreateAddComponentsCommandBuffer(AddComponentsDestroyedEntityResolution destroyedEntityResolution)
         {
             m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
+            var accb                        = new AddComponentsCommandBuffer(allocator, destroyedEntityResolution);
             var instance                    = new PlaybackInstance
             {
                 type             = PlaybackType.AddComponentsNoData,
@@ -501,15 +489,8 @@ namespace Latios.Systems
         public AddComponentsCommandBuffer<T0> CreateAddComponentsCommandBuffer<T0>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 : unmanaged,
         IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer<T0>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.AddComponentsUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            var accb = new AddComponentsCommandBuffer<T0>(allocator, destroyedEntityResolution);
+            AddAddComponentsCommandBufferUntyped(accb.m_addComponentsCommandBufferUntyped);
             return accb;
         }
 
@@ -519,15 +500,8 @@ namespace Latios.Systems
         public AddComponentsCommandBuffer<T0, T1> CreateAddComponentsCommandBuffer<T0, T1>(AddComponentsDestroyedEntityResolution destroyedEntityResolution) where T0 : unmanaged,
         IComponentData where T1 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer<T0, T1>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.AddComponentsUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            var accb = new AddComponentsCommandBuffer<T0, T1>(allocator, destroyedEntityResolution);
+            AddAddComponentsCommandBufferUntyped(accb.m_addComponentsCommandBufferUntyped);
             return accb;
         }
 
@@ -539,15 +513,8 @@ namespace Latios.Systems
         IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.AddComponentsUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            var accb = new AddComponentsCommandBuffer<T0, T1, T2>(allocator, destroyedEntityResolution);
+            AddAddComponentsCommandBufferUntyped(accb.m_addComponentsCommandBufferUntyped);
             return accb;
         }
 
@@ -559,15 +526,8 @@ namespace Latios.Systems
         unmanaged, IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2, T3>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.AddComponentsUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            var accb = new AddComponentsCommandBuffer<T0, T1, T2, T3>(allocator, destroyedEntityResolution);
+            AddAddComponentsCommandBufferUntyped(accb.m_addComponentsCommandBufferUntyped);
             return accb;
         }
 
@@ -579,15 +539,8 @@ namespace Latios.Systems
         unmanaged, IComponentData where T1 : unmanaged,
         IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData
         {
-            m_hasPendingJobHandlesToAcquire = true;
-            var accb                        = new AddComponentsCommandBuffer<T0, T1, T2, T3, T4>(m_commandBufferAllocator.Allocator.Handle.ToAllocator, destroyedEntityResolution);
-            var instance                    = new PlaybackInstance
-            {
-                type             = PlaybackType.AddComponentsUntyped,
-                requestingSystem = m_world.m_impl->m_worldUnmanaged.GetCurrentlyExecutingSystem()
-            };
-            m_playbackInstances.Add(instance);
-            m_addComponentsCommandBuffersUntyped.Add(accb.m_addComponentsCommandBufferUntyped);
+            var accb = new AddComponentsCommandBuffer<T0, T1, T2, T3, T4>(allocator, destroyedEntityResolution);
+            AddAddComponentsCommandBufferUntyped(accb.m_addComponentsCommandBufferUntyped);
             return accb;
         }
 
@@ -613,6 +566,159 @@ namespace Latios.Systems
         }
 
         #endregion
+    }
+
+    public static class SyncPointsInstantiateCommand1Extensions
+    {
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0> CreateInstantiateCommandBuffer<T0>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0, T1> CreateInstantiateCommandBuffer<T0, T1>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0, T1>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0, T1, T2> CreateInstantiateCommandBuffer<T0, T1, T2>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0, T1, T2>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0, T1, T2, T3> CreateInstantiateCommandBuffer<T0, T1, T2, T3>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0, T1, T2, T3>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4> CreateInstantiateCommandBuffer<T0, T1, T2, T3,
+                                                                                                          T4>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4, T5> CreateInstantiateCommandBuffer<T0, T1, T2, T3, T4,
+                                                                                                              T5>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData where T5 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4, T5>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+    }
+
+    public static class SyncPointsInstantiateCommand2Extensions
+    {
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1> CreateInstantiateCommandBuffer<T0, T1>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IInstantiateCommand where T1 : unmanaged,
+        IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1, T2> CreateInstantiateCommandBuffer<T0, T1, T2>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IInstantiateCommand where T2 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1, T2>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1, T2, T3> CreateInstantiateCommandBuffer<T0, T1, T2, T3>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IInstantiateCommand where T3 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1, T2, T3>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4> CreateInstantiateCommandBuffer<T0, T1, T2, T3,
+                                                                                                          T4>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IInstantiateCommand where T4 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5> CreateInstantiateCommandBuffer<T0, T1, T2, T3, T4,
+                                                                                                              T5>(this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged,
+        IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IInstantiateCommand where T5 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
+
+        /// <summary>
+        /// Creates a new InstantiateCommandBuffer that will be played back by this system.
+        /// </summary>
+        public static InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5, T6> CreateInstantiateCommandBuffer<T0, T1, T2, T3, T4, T5, T6>(
+            this SyncPointPlaybackSystem syncPoint) where T0 : unmanaged, IComponentData where T1 : unmanaged,
+        IComponentData where T2 : unmanaged, IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData where T5 : unmanaged,
+        IInstantiateCommand where T6 : unmanaged, IInstantiateCommand
+        {
+            var icb = new InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5, T6>(syncPoint.allocator);
+            syncPoint.AddInstantiateCommandBufferUntyped(icb.m_instantiateCommandBufferUntyped);
+            return icb;
+        }
     }
 }
 

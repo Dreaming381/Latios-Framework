@@ -98,26 +98,26 @@ namespace Latios.Kinemation.Systems
         /// </summary>
         /// <param name="material">The material instance to register</param>
         /// <returns>Returns the batch material ID</returns>
-        public BatchMaterialID RegisterMaterial(Material material) => m_BatchRendererGroup.RegisterMaterial(material);
+        public BatchMaterialID RegisterMaterial(Material material) => m_unityEntitiesGraphicsSystem.RegisterMaterial(material);
 
         /// <summary>
         /// Registers a mesh with the Entities Graphics System.
         /// </summary>
         /// <param name="mesh">Mesh instance to register</param>
         /// <returns>Returns the batch mesh ID</returns>
-        public BatchMeshID RegisterMesh(Mesh mesh) => m_BatchRendererGroup.RegisterMesh(mesh);
+        public BatchMeshID RegisterMesh(Mesh mesh) => m_unityEntitiesGraphicsSystem.RegisterMesh(mesh);
 
         /// <summary>
         /// Unregisters a material from the Entities Graphics System.
         /// </summary>
         /// <param name="material">Material ID received from <see cref="RegisterMaterial"/></param>
-        public void UnregisterMaterial(BatchMaterialID material) => m_BatchRendererGroup.UnregisterMaterial(material);
+        public void UnregisterMaterial(BatchMaterialID material) => m_unityEntitiesGraphicsSystem.UnregisterMaterial(material);
 
         /// <summary>
         /// Unregisters a mesh from the Entities Graphics System.
         /// </summary>
         /// <param name="mesh">A mesh ID received from <see cref="RegisterMesh"/>.</param>
-        public void UnregisterMesh(BatchMeshID mesh) => m_BatchRendererGroup.UnregisterMesh(mesh);
+        public void UnregisterMesh(BatchMeshID mesh) => m_unityEntitiesGraphicsSystem.UnregisterMesh(mesh);
 
         /// <summary>
         /// Returns the <see cref="Mesh"/> that corresponds to the given registered mesh ID, or <c>null</c> if no such mesh exists.

@@ -37,13 +37,19 @@ namespace Latios.LifeFX
             if (GraphicsEventTypeRegistry.IsInitializing())
                 return; // This is a temporary object.
 
-            var sa              = stackalloc Unity.Entities.Hash128[2];
-            var array           = CollectionHelper.ConvertExistingDataToNativeArray<Unity.Entities.Hash128>(sa, 2, Allocator.None, true);
-            var guidArray       = array.GetSubArray(0, 1).Reinterpret<UnityEditor.GUID>();
+            var sa        = stackalloc Unity.Entities.Hash128[2];
+            var array     = CollectionHelper.ConvertExistingDataToNativeArray<Unity.Entities.Hash128>(sa, 2, Allocator.None, true);
+            var guidArray = array.GetSubArray(0, 1).Reinterpret<UnityEditor.GUID>();
+            guidArray[0] = default;
+#if UNITY_6000_3_OR_NEWER
+            var instanceIdArray = array.GetSubArray(1, 1).Reinterpret<EntityId>(16).GetSubArray(0, 1);
+            instanceIdArray[0] = GetEntityId();
+            AssetDatabase.EntityIdsToGUIDs(instanceIdArray, guidArray);
+#else
             var instanceIdArray = array.GetSubArray(1, 1).Reinterpret<int>(16).GetSubArray(0, 1);
-            guidArray[0]       = default;
             instanceIdArray[0] = GetInstanceID();
             AssetDatabase.InstanceIDsToGUIDs(instanceIdArray, guidArray);
+#endif
             if (hash != array[0])
             {
                 hash = array[0];

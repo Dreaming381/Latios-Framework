@@ -8,7 +8,9 @@ using Unity.Properties;
 
 namespace Latios.Transforms
 {
+#pragma warning disable CS0618
     public readonly partial struct TransformAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRW<WorldTransform>                         m_worldTransform;
         [Optional] readonly RefRW<LocalTransform>              m_localTransform;

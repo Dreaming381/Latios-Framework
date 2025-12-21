@@ -17,8 +17,10 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_breadthQueue == null)
                 m_breadthQueue = new Queue<UnityEngine.Transform>();
 
-            Entities.ForEach((ref DynamicBuffer<ImportedSocket> sockets, in DynamicBuffer<ImportedSocketGameObjectRef> gameObjectRefs,
-                              in ShadowHierarchyReference shadowRef) =>
+            // Todo: ImportedSocketGameObjectRef should be read-only
+            foreach ((var sockets, var gameObjectRefs, var shadowRef) in SystemAPI.Query<DynamicBuffer<ImportedSocket>, DynamicBuffer<ImportedSocketGameObjectRef>,
+                                                                                         ShadowHierarchyReference>().WithOptions(EntityQueryOptions.IncludePrefab |
+                                                                                                                                 EntityQueryOptions.IncludeDisabledEntities))
             {
                 m_breadthQueue.Clear();
 
@@ -52,7 +54,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         m_breadthQueue.Enqueue(child);
                     }
                 }
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab).WithoutBurst().Run();
+            }
             m_breadthQueue.Clear();
         }
     }

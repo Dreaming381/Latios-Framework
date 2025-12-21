@@ -16,9 +16,7 @@ namespace Latios.Systems
     //[UpdateBefore(typeof(ManagedComponentsReactiveSystemGroup))] // Constrained in ManagedComponentsReactiveSystemGroup.
     public partial class MergeBlackboardsSystem : SubSystem
     {
-        EntityDataCopyKit m_copyKit;
-        EntityQuery       m_query;
-
+        EntityDataCopyKit         m_copyKit;
         NativeList<ComponentType> m_sceneTypes;
 
         protected override void OnCreate()
@@ -43,11 +41,19 @@ namespace Latios.Systems
         {
             latiosWorld.CreateNewSceneBlackboardEntity();
 
-            if (!m_query.IsEmptyIgnoreFilter)
+            var query = SystemAPI.QueryBuilder().WithAll<BlackboardEntityData>().Build();
+
+            if (!query.IsEmptyIgnoreFilter)
             {
-                Entities.WithStoreEntityQueryInField(ref m_query).WithStructuralChanges().ForEach((Entity entity, ref BlackboardEntityData blackboardEntityData) =>
+                var entities          = query.ToEntityArray(Allocator.Temp);
+                var blackboardTargets = query.ToComponentDataArray<BlackboardEntityData>(Allocator.Temp);
+                //Entities.WithStoreEntityQueryInField(ref m_query).WithStructuralChanges().ForEach((Entity entity, ref BlackboardEntityData blackboardEntityData) =>
+                for (int index = 0; index < entities.Length; index++)
                 {
-                    var types        = EntityManager.GetComponentTypes(entity, Unity.Collections.Allocator.TempJob);
+                    var entity               = entities[index];
+                    var blackboardEntityData = blackboardTargets[index];
+
+                    var types        = EntityManager.GetComponentTypes(entity, Allocator.TempJob);
                     var targetEntity = blackboardEntityData.blackboardScope == BlackboardScope.World ? worldBlackboardEntity : sceneBlackboardEntity;
                     var sceneTypes   = m_sceneTypes;
 
@@ -83,8 +89,8 @@ namespace Latios.Systems
                         throw new InvalidOperationException(
                             $"Entity {entity} could not copy component {errorType.GetManagedType()} onto {(blackboardEntityData.blackboardScope == BlackboardScope.World ? "world" : "scene")} entity because the component already exists and the MergeMethod was set to ErrorOnConflict.");
                     }
-                }).Run();
-                EntityManager.DestroyEntity(m_query);
+                }
+                EntityManager.DestroyEntity(query);
             }
 
             if (!sceneBlackboardEntity.HasComponent<DispatchedNewSceneTag>())

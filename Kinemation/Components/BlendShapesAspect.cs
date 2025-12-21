@@ -7,7 +7,9 @@ namespace Latios.Kinemation
     /// <summary>
     /// An aspect for working with blend shapes that abstracts away the rotation mechanisms.
     /// </summary>
+    #pragma warning disable CS0618
     public readonly partial struct BlendShapesAspect : IAspect
+    #pragma warning restore CS0618
     {
         readonly RefRW<BlendShapeState>          m_state;
         readonly DynamicBuffer<BlendShapeWeight> m_weights;

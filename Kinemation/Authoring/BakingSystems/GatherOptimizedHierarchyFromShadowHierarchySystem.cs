@@ -16,7 +16,9 @@ namespace Latios.Kinemation.Authoring.Systems
             if (m_breadthQueue == null)
                 m_breadthQueue = new Queue<(UnityEngine.Transform, int)>();
 
-            Entities.ForEach((ref DynamicBuffer<OptimizedSkeletonHierarchyParentIndex> parentIndices, in ShadowHierarchyReference shadowRef) =>
+            foreach ((var parentIndices, var shadowRef) in SystemAPI.Query<DynamicBuffer<OptimizedSkeletonHierarchyParentIndex>,
+                                                                           ShadowHierarchyReference>().WithOptions(EntityQueryOptions.IncludePrefab |
+                                                                                                                   EntityQueryOptions.IncludeDisabledEntities))
             {
                 m_breadthQueue.Clear();
 
@@ -34,7 +36,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         m_breadthQueue.Enqueue((child, currentIndex));
                     }
                 }
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludeDisabledEntities | EntityQueryOptions.IncludePrefab).WithoutBurst().Run();
+            }
             m_breadthQueue.Clear();
         }
     }

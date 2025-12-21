@@ -270,6 +270,7 @@ namespace Latios.Psyshock
         }
     }
 
+#pragma warning disable CS0618
     /// <summary>
     /// A struct which wraps an IAspect.Lookup and allows for performing
     /// Read-Write access in parallel using SafeEntity types when it is guaranteed safe to do so.
@@ -390,6 +391,8 @@ namespace Latios.Psyshock
         }
     }
 #endif
+
+#pragma warning restore CS0618
 
     public static class ComponentBrokerPhysicsExtensions
     {

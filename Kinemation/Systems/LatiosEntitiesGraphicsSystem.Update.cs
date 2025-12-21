@@ -28,9 +28,7 @@ namespace Latios.Kinemation.Systems
     {
         protected override void OnUpdate()
         {
-            if (m_unityEntitiesGraphicsSystem == null)
-                m_unityEntitiesGraphicsSystem = World.GetExistingSystemManaged<EntitiesGraphicsSystem>();
-            if (m_unityEntitiesGraphicsSystem != null && m_unityEntitiesGraphicsSystem.Enabled == true)
+            if (m_unityEntitiesGraphicsSystem.Enabled == true)
             {
                 UnityEngine.Debug.Log("Entities Graphics was enabled!");
                 m_unityEntitiesGraphicsSystem.Enabled = false;

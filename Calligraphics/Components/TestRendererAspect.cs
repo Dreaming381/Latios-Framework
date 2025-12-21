@@ -5,9 +5,11 @@ namespace Latios.Calligraphics
     /// <summary>
     /// An aspect for working with renderable text
     /// </summary>
+    #pragma warning disable CS0618
     public readonly partial struct TextRendererAspect : IAspect
+    #pragma warning restore CS0618
     {
-        readonly DynamicBuffer<CalliByte> m_string;
+        readonly DynamicBuffer<CalliByte>     m_string;
         readonly RefRW<TextBaseConfiguration> m_baseConfig;
 
         /// <summary>

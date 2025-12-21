@@ -496,6 +496,19 @@ namespace Latios
         #endregion
 
         #region TypeManager
+        public static bool IsAssemblyReferencingOtherAssembly(Assembly assembly, Assembly otherAssembly)
+        {
+            if (assembly == otherAssembly)
+                return true;
+
+            var referencedAssemblies = assembly.GetReferencedAssemblies();
+            var otherName            = otherAssembly.GetName();
+            foreach (var referenced in referencedAssemblies)
+                if (AssemblyName.ReferenceMatchesDefinition(referenced, otherName))
+                    return true;
+            return false;
+        }
+
         public static bool IsAssemblyReferencingLatios(Assembly assembly)
         {
             return IsAssemblyReferencingSubstring(assembly, "Latios");

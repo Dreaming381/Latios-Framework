@@ -9,6 +9,8 @@ using Unity.Entities.Exposed;
 using Unity.Jobs;
 using Unity.Mathematics;
 
+using CommandFunction = Unity.Burst.FunctionPointer<Latios.IInstantiateCommand.OnPlayback>;
+
 namespace Latios
 {
     [NativeContainer]
@@ -16,13 +18,9 @@ namespace Latios
     internal unsafe struct InstantiateCommandBufferUntyped : INativeDisposable
     {
         #region Structure
-        [NativeDisableUnsafePtrRestriction]
-        private UnsafeParallelBlockList<PrefabSortkey>* m_prefabSortkeyBlockList;
-        [NativeDisableUnsafePtrRestriction]
-        private UnsafeParallelBlockList* m_componentDataBlockList;
-
-        [NativeDisableUnsafePtrRestriction]
-        private State* m_state;
+        [NativeDisableUnsafePtrRestriction] private UnsafeParallelBlockList<PrefabSortkey>* m_prefabSortkeyBlockList;
+        [NativeDisableUnsafePtrRestriction] private UnsafeParallelBlockList*                m_dataBlockList;
+        [NativeDisableUnsafePtrRestriction] private State*                                  m_state;
 
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
         //Unfortunately this name is hardcoded into Unity. No idea how EntityCommandBuffer gets away with multiple safety handles.
@@ -33,11 +31,12 @@ namespace Latios
 
         private struct State
         {
-            public ComponentTypeSet                 tagsToAdd;
-            public FixedList64Bytes<int>            typesWithData;
-            public FixedList64Bytes<int>            typesSizes;
-            public AllocatorManager.AllocatorHandle allocator;
-            public bool                             playedBack;
+            public ComponentTypeSet                  tagsToAdd;
+            public FixedList64Bytes<TypeIndex>       typesWithData;
+            public FixedList64Bytes<CommandFunction> commandFunctions;
+            public FixedList64Bytes<int>             typesSizes;
+            public AllocatorManager.AllocatorHandle  allocator;
+            public bool                              playedBack;
         }
 
         internal struct PrefabSortkey : IRadixSortableInt3, IRadixSortableInt
@@ -48,14 +47,23 @@ namespace Latios
             public int GetKey() => sortKey;
             public int3 GetKey3() => new int3(prefab.Index, prefab.Version, sortKey);
         }
+
+        internal struct CommandMeta
+        {
+            public CommandFunction function;
+            public int             commandSize;
+        }
         #endregion
 
         #region CreateDestroy
-        public InstantiateCommandBufferUntyped(AllocatorManager.AllocatorHandle allocator, FixedList128Bytes<ComponentType> typesWithData) : this(allocator, typesWithData, 1)
+        public InstantiateCommandBufferUntyped(AllocatorManager.AllocatorHandle allocator,
+                                               FixedList128Bytes<ComponentType> typesWithData,
+                                               FixedList64Bytes<CommandMeta>    commands = default) : this(allocator, typesWithData, commands, 1)
         {
         }
 
-        internal InstantiateCommandBufferUntyped(AllocatorManager.AllocatorHandle allocator, FixedList128Bytes<ComponentType> componentTypesWithData, int disposeSentinalStackDepth)
+        internal InstantiateCommandBufferUntyped(AllocatorManager.AllocatorHandle allocator, FixedList128Bytes<ComponentType> componentTypesWithData,
+                                                 FixedList64Bytes<CommandMeta> commands, int disposeSentinalStackDepth)
         {
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             CheckAllocator(allocator);
@@ -65,9 +73,9 @@ namespace Latios
             AtomicSafetyHandle.SetBumpSecondaryVersionOnScheduleWrite(m_Safety, true);
 #endif
 
-            int                   dataPayloadSize = 0;
-            FixedList64Bytes<int> typesSizes      = new FixedList64Bytes<int>();
-            FixedList64Bytes<int> typesWithData   = new FixedList64Bytes<int>();
+            int                         dataPayloadSize = 0;
+            FixedList64Bytes<int>       typesSizes      = new FixedList64Bytes<int>();
+            FixedList64Bytes<TypeIndex> typesWithData   = new FixedList64Bytes<TypeIndex>();
             for (int i = 0; i < componentTypesWithData.Length; i++)
             {
                 var size         = TypeManager.GetTypeInfo(componentTypesWithData[i].TypeIndex).ElementSize;
@@ -76,18 +84,26 @@ namespace Latios
                 typesWithData.Add(componentTypesWithData[i].TypeIndex);
             }
             CheckComponentTypesValid(BuildComponentTypesFromFixedList(typesWithData));
+            FixedList64Bytes<CommandFunction> functions = new FixedList64Bytes<CommandFunction>();
+            for (int i = 0; i < commands.Length; i++)
+            {
+                functions.Add(commands[i].function);
+                typesSizes.Add(commands[i].commandSize);
+                dataPayloadSize += commands[i].commandSize;
+            }
             m_prefabSortkeyBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList<PrefabSortkey> >(allocator, 1);
-            m_componentDataBlockList  = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
+            m_dataBlockList           = AllocatorManager.Allocate<UnsafeParallelBlockList>(allocator, 1);
             m_state                   = AllocatorManager.Allocate<State>(allocator, 1);
             *m_prefabSortkeyBlockList = new UnsafeParallelBlockList<PrefabSortkey>(256, allocator);
-            *m_componentDataBlockList = new UnsafeParallelBlockList(dataPayloadSize, 256, allocator);
+            *m_dataBlockList          = new UnsafeParallelBlockList(dataPayloadSize, 256, allocator);
             *m_state                  = new State
             {
-                typesWithData = typesWithData,
-                tagsToAdd     = default,
-                typesSizes    = typesSizes,
-                allocator     = allocator,
-                playedBack    = false
+                typesWithData    = typesWithData,
+                commandFunctions = functions,
+                tagsToAdd        = default,
+                typesSizes       = typesSizes,
+                allocator        = allocator,
+                playedBack       = false
             };
         }
 
@@ -117,7 +133,7 @@ namespace Latios
             var jobHandle = new DisposeJob
             {
                 prefabSortkeyBlockList = m_prefabSortkeyBlockList,
-                componentDataBlockList = m_componentDataBlockList,
+                componentDataBlockList = m_dataBlockList,
                 state                  = m_state,
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
                 m_Safety = m_Safety
@@ -128,7 +144,7 @@ namespace Latios
             AtomicSafetyHandle.Release(m_Safety);
 #endif
             m_state                  = null;
-            m_componentDataBlockList = null;
+            m_dataBlockList          = null;
             m_prefabSortkeyBlockList = null;
             return jobHandle;
         }
@@ -138,7 +154,7 @@ namespace Latios
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             CollectionHelper.DisposeSafetyHandle(ref m_Safety);
 #endif
-            Deallocate(m_state, m_prefabSortkeyBlockList, m_componentDataBlockList);
+            Deallocate(m_state, m_prefabSortkeyBlockList, m_dataBlockList);
         }
 
         private static void Deallocate(State* state, UnsafeParallelBlockList<PrefabSortkey>* prefabSortkeyBlockList, UnsafeParallelBlockList* componentDataBlockList)
@@ -160,7 +176,7 @@ namespace Latios
             CheckHasNotPlayedBack();
             CheckEntityValid(prefab);
             m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
-            byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
             UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
         }
         [WriteAccessRequired]
@@ -170,7 +186,7 @@ namespace Latios
             CheckHasNotPlayedBack();
             CheckEntityValid(prefab);
             m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
-            byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
             UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
             ptr += m_state->typesSizes[0];
             UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
@@ -182,7 +198,7 @@ namespace Latios
             CheckHasNotPlayedBack();
             CheckEntityValid(prefab);
             m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
-            byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
             UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
             ptr += m_state->typesSizes[0];
             UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
@@ -197,7 +213,7 @@ namespace Latios
             CheckHasNotPlayedBack();
             CheckEntityValid(prefab);
             m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
-            byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
             UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
             ptr += m_state->typesSizes[0];
             UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
@@ -214,7 +230,7 @@ namespace Latios
             CheckHasNotPlayedBack();
             CheckEntityValid(prefab);
             m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
-            byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
             UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
             ptr += m_state->typesSizes[0];
             UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
@@ -224,6 +240,54 @@ namespace Latios
             UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
             ptr += m_state->typesSizes[3];
             UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+        }
+        [WriteAccessRequired]
+        public void Add<T0, T1, T2, T3, T4, T5>(Entity prefab, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5,
+                                                int sortKey =
+                                                    int.MaxValue) where T0 : unmanaged where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5
+        : unmanaged
+        {
+            CheckWriteAccess();
+            CheckHasNotPlayedBack();
+            CheckEntityValid(prefab);
+            m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
+            UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
+            ptr += m_state->typesSizes[0];
+            UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
+            ptr += m_state->typesSizes[1];
+            UnsafeUtility.CopyStructureToPtr(ref c2, ptr);
+            ptr += m_state->typesSizes[2];
+            UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
+            ptr += m_state->typesSizes[3];
+            UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+            ptr += m_state->typesSizes[4];
+            UnsafeUtility.CopyStructureToPtr(ref c5, ptr);
+        }
+        [WriteAccessRequired]
+        public void Add<T0, T1, T2, T3, T4, T5, T6>(Entity prefab, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6,
+                                                    int sortKey =
+                                                        int.MaxValue) where T0 : unmanaged where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where
+        T5 : unmanaged where T6 : unmanaged
+        {
+            CheckWriteAccess();
+            CheckHasNotPlayedBack();
+            CheckEntityValid(prefab);
+            m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, 0);
+            byte* ptr                                                                    = (byte*)m_dataBlockList->Allocate(0);
+            UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
+            ptr += m_state->typesSizes[0];
+            UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
+            ptr += m_state->typesSizes[1];
+            UnsafeUtility.CopyStructureToPtr(ref c2, ptr);
+            ptr += m_state->typesSizes[2];
+            UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
+            ptr += m_state->typesSizes[3];
+            UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+            ptr += m_state->typesSizes[4];
+            UnsafeUtility.CopyStructureToPtr(ref c5, ptr);
+            ptr += m_state->typesSizes[5];
+            UnsafeUtility.CopyStructureToPtr(ref c6, ptr);
         }
 
         public int Count()
@@ -278,7 +342,7 @@ namespace Latios
 
         public ParallelWriter AsParallelWriter()
         {
-            var writer = new ParallelWriter(m_prefabSortkeyBlockList, m_componentDataBlockList, m_state);
+            var writer = new ParallelWriter(m_prefabSortkeyBlockList, m_dataBlockList, m_state);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
             writer.m_Safety = m_Safety;
             CollectionHelper.SetStaticSafetyId<ParallelWriter>(ref writer.m_Safety, ref ParallelWriter.s_staticSafetyId.Data);
@@ -303,9 +367,9 @@ namespace Latios
                 int count              = icb.Count();
                 var prefabSortkeyArray = new NativeArray<PrefabSortkey>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                 icb.m_prefabSortkeyBlockList->GetElementValues(prefabSortkeyArray);
-                // Step 2: Get the componentData pointers
-                var unsortedComponentDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-                icb.m_componentDataBlockList->GetElementPtrs(unsortedComponentDataPtrs);
+                // Step 2: Get the component and command data pointers
+                var unsortedDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                icb.m_dataBlockList->GetElementPtrs(unsortedDataPtrs);
                 // Step 3: Sort the arrays by sort key and collapse unique entities
                 var ranks = new NativeArray<int>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                 RadixSort.RankSortInt(ranks, prefabSortkeyArray);
@@ -331,11 +395,11 @@ namespace Latios
                     u.count    = 0;
                 }
 
-                var sortedComponentDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+                var sortedDataPtrs = new NativeArray<UnsafeIndexedBlockList.ElementPtr>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                 for (int i = 0; i < count; i++)
                 {
-                    ref var u                                  = ref uniquePrefabs.ElementAt(uniquePrefabMap[prefabSortkeyArray[ranks[i]].prefab]);
-                    sortedComponentDataPtrs[u.start + u.count] = unsortedComponentDataPtrs[ranks[i]];
+                    ref var u                         = ref uniquePrefabs.ElementAt(uniquePrefabMap[prefabSortkeyArray[ranks[i]].prefab]);
+                    sortedDataPtrs[u.start + u.count] = unsortedDataPtrs[ranks[i]];
                     u.count++;
                 }
 
@@ -361,7 +425,7 @@ namespace Latios
                 }
 
                 // Step 5: Write the components
-                switch (icb.m_state->typesSizes.Length)
+                switch (icb.m_state->typesWithData.Length)
                 {
                     case 1:
                         var t0Proc = new ChunkExecuteT0
@@ -369,7 +433,7 @@ namespace Latios
                             t0     = em.GetDynamicComponentTypeHandle(ComponentType.ReadWrite(icb.m_state->typesWithData[0])),
                             t0Size = icb.m_state->typesSizes[0]
                         };
-                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedComponentDataPtrs, ref t0Proc);
+                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedDataPtrs, ref t0Proc);
                         break;
                     case 2:
                         var t1Proc = new ChunkExecuteT1
@@ -379,7 +443,7 @@ namespace Latios
                             t0Size = icb.m_state->typesSizes[0],
                             t1Size = icb.m_state->typesSizes[1],
                         };
-                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedComponentDataPtrs, ref t1Proc);
+                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedDataPtrs, ref t1Proc);
                         break;
                     case 3:
                         var t2Proc = new ChunkExecuteT2
@@ -392,7 +456,7 @@ namespace Latios
                             t2Size   = icb.m_state->typesSizes[2],
                             t2Offset = icb.m_state->typesSizes[0] + icb.m_state->typesSizes[1],
                         };
-                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedComponentDataPtrs, ref t2Proc);
+                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedDataPtrs, ref t2Proc);
                         break;
                     case 4:
                         var t3Proc = new ChunkExecuteT3
@@ -408,7 +472,7 @@ namespace Latios
                             t2Offset = icb.m_state->typesSizes[0] + icb.m_state->typesSizes[1],
                             t3Offset = icb.m_state->typesSizes[0] + icb.m_state->typesSizes[1] + icb.m_state->typesSizes[2],
                         };
-                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedComponentDataPtrs, ref t3Proc);
+                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedDataPtrs, ref t3Proc);
                         break;
                     case 5:
                         var t4Proc = new ChunkExecuteT4
@@ -427,8 +491,25 @@ namespace Latios
                             t3Offset = icb.m_state->typesSizes[0] + icb.m_state->typesSizes[1] + icb.m_state->typesSizes[2],
                             t4Offset = icb.m_state->typesSizes[0] + icb.m_state->typesSizes[1] + icb.m_state->typesSizes[2] + icb.m_state->typesSizes[3],
                         };
-                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedComponentDataPtrs, ref t4Proc);
+                        ProcessEntitiesInChunks(em, uniquePrefabs, instantiatedEntities, sortedDataPtrs, ref t4Proc);
                         break;
+                }
+
+                // Step 6: Process the commands
+                int commandOffset = 0;
+                for (int i = 0; i < icb.m_state->typesWithData.Length; i++)
+                    commandOffset += icb.m_state->typesSizes[i];
+                for (int i = 0; i < icb.m_state->commandFunctions.Length; i++)
+                {
+                    var context = new IInstantiateCommand.Context
+                    {
+                        entityManager = em,
+                        entities      = instantiatedEntities,
+                        commandOffset = commandOffset,
+                        dataPtrs      = sortedDataPtrs,
+                        expectedSize  = icb.m_state->typesSizes[icb.m_state->typesWithData.Length + i],
+                    };
+                    icb.m_state->commandFunctions[i].Invoke(ref context);
                 }
 
                 icb.m_state->playedBack = true;
@@ -602,7 +683,7 @@ namespace Latios
             }
         }
 
-        static ComponentTypeSet BuildComponentTypesFromFixedList(FixedList64Bytes<int> types)
+        static ComponentTypeSet BuildComponentTypesFromFixedList(FixedList64Bytes<TypeIndex> types)
         {
             switch (types.Length)
             {
@@ -785,6 +866,50 @@ namespace Latios
                 UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
                 ptr += m_state->typesSizes[3];
                 UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+            }
+            public void Add<T0, T1, T2, T3, T4, T5>(Entity prefab, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5,
+                                                    int sortKey) where T0 : unmanaged where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 :
+            unmanaged
+            {
+                CheckWriteAccess();
+                CheckHasNotPlayedBack();
+                CheckEntityValid(prefab);
+                m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, m_ThreadIndex);
+                byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(m_ThreadIndex);
+                UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
+                ptr += m_state->typesSizes[0];
+                UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
+                ptr += m_state->typesSizes[1];
+                UnsafeUtility.CopyStructureToPtr(ref c2, ptr);
+                ptr += m_state->typesSizes[2];
+                UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
+                ptr += m_state->typesSizes[3];
+                UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+                ptr += m_state->typesSizes[4];
+                UnsafeUtility.CopyStructureToPtr(ref c5, ptr);
+            }
+            public void Add<T0, T1, T2, T3, T4, T5, T6>(Entity prefab, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6,
+                                                        int sortKey) where T0 : unmanaged where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where
+            T5 : unmanaged where T6 : unmanaged
+            {
+                CheckWriteAccess();
+                CheckHasNotPlayedBack();
+                CheckEntityValid(prefab);
+                m_prefabSortkeyBlockList->Write(new PrefabSortkey { prefab = prefab, sortKey = sortKey }, m_ThreadIndex);
+                byte* ptr                                                                    = (byte*)m_componentDataBlockList->Allocate(m_ThreadIndex);
+                UnsafeUtility.CopyStructureToPtr(ref c0, ptr);
+                ptr += m_state->typesSizes[0];
+                UnsafeUtility.CopyStructureToPtr(ref c1, ptr);
+                ptr += m_state->typesSizes[1];
+                UnsafeUtility.CopyStructureToPtr(ref c2, ptr);
+                ptr += m_state->typesSizes[2];
+                UnsafeUtility.CopyStructureToPtr(ref c3, ptr);
+                ptr += m_state->typesSizes[3];
+                UnsafeUtility.CopyStructureToPtr(ref c4, ptr);
+                ptr += m_state->typesSizes[4];
+                UnsafeUtility.CopyStructureToPtr(ref c5, ptr);
+                ptr += m_state->typesSizes[5];
+                UnsafeUtility.CopyStructureToPtr(ref c6, ptr);
             }
 
             [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]

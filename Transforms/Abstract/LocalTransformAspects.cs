@@ -2,7 +2,9 @@ using Unity.Entities;
 
 namespace Latios.Transforms.Abstract
 {
+#pragma warning disable CS0618
     public readonly partial struct LocalTransformQvsReadOnlyAspect : IAspect
+#pragma warning restore CS0618
     {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         readonly RefRO<Latios.Transforms.LocalTransform> m_localTransform;
@@ -19,7 +21,9 @@ namespace Latios.Transforms.Abstract
 #endif
     }
 
+#pragma warning disable CS0618
     public readonly partial struct LocalTransformQvvsReadWriteAspect : IAspect
+#pragma warning restore CS0618
     {
 #if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
         readonly TransformAspect m_transform;

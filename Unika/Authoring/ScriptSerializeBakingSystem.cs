@@ -27,9 +27,6 @@ namespace Latios.Unika.Authoring.Systems
             {
                 blobTarget = blobTarget,
                 blobStore  = m_bakingSystemReference.BlobAssetStore,
-#if !ENTITIES_1_4
-                typeHash = m_bakingSystemReference.BlobAssetStore.GetTypeHashForBurst<UnikaSerializedTypeIdsBlob>()
-#endif
             }.Schedule(Dependency);
             Dependency = new AssignBlobJob
             {
@@ -59,11 +56,7 @@ namespace Latios.Unika.Authoring.Systems
                     array[i] = ScriptTypeInfoManager.GetStableHash((short)i);
                 }
                 var blob = builder.CreateBlobAssetReference<UnikaSerializedTypeIdsBlob>(Allocator.Persistent);
-#if ENTITIES_1_4
                 blobStore.TryAdd(ref blob);
-#else
-                blobStore.TryAddBlobAssetWithBurstHash(typeHash, ref blob);
-#endif
                 blobTarget.Value = new UnikaSerializedTypeIds { blob = blob };
             }
         }

@@ -352,6 +352,7 @@ namespace Latios
         /// required to be enabled
         /// </summary>
         /// <typeparam name="T">The type of IAspect to add to the query</typeparam>
+#pragma warning disable CS0618
         public FluentQuery WithAspect<T>() where T : unmanaged, IAspect, IAspectCreate<T>
         {
             var tempList = new UnsafeList<ComponentType>(8, Allocator.Temp);
@@ -380,6 +381,7 @@ namespace Latios
             }
             return this;
         }
+#pragma warning restore CS0618
 
         /// <summary>
         /// Allows disabled entities to be included in the query

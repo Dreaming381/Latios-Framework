@@ -13,7 +13,9 @@ namespace Latios.Kinemation
     /// An aspect that provides full editing of an optimized skeleton's transforms.
     /// This also provides access to the inertial blending interface built into optimized skeletons.
     /// </summary>
+#pragma warning disable CS0618
     public readonly partial struct OptimizedSkeletonAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly WorldTransformReadOnlyAspect                   m_worldTransform;
         readonly RefRO<OptimizedSkeletonHierarchyBlobReference> m_skeletonHierarchyBlobRef;
@@ -286,7 +288,9 @@ namespace Latios.Kinemation
     /// A handle to the root bone's QVVS in the entity's local space, which is unused in hierarchy calculations and often
     /// contains the root motion delta.
     /// </summary>
+#pragma warning disable CS0618
     public readonly partial struct OptimizedRootDeltaROAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRO<OptimizedSkeletonState>                    m_skeletonState;
         [ReadOnly] readonly DynamicBuffer<OptimizedBoneTransform> m_boneTransforms;

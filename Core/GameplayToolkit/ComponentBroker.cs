@@ -787,6 +787,67 @@ namespace Latios
                 }
             }
         }
+
+        /// <summary>
+        /// Attempts to write the data at the specified address into the component of the specified type for the specified entity.
+        /// This method ignores parallel safety checks as if [NativeDisableParallelForRestriction] was used. This method is
+        /// commonly used for deserialization tasks.
+        /// </summary>
+        /// <param name="entity">The entity containing the component to write to</param>
+        /// <param name="typeIndex">The type index of the component to write to</param>
+        /// <param name="dataPtrToWrite">The component data to copy from</param>
+        /// <returns>True if the entity had the component and was able to write to it, false if it didn't and nothing happened</returns>
+        public bool TryWriteComponentIgnoreParallelSafety(Entity entity, TypeIndex typeIndex, void* dataPtrToWrite)
+        {
+            var dst = GetUnsafeComponentPtrRWIgnoreParallelSafety(entity, typeIndex);
+            if (dst == null)
+                return false;
+            var typeSize = TypeManager.GetTypeInfo(typeIndex).TypeSize;
+            UnsafeUtility.MemCpy(dst, dataPtrToWrite, typeSize);
+            return true;
+        }
+
+        /// <summary>
+        /// Attempts to replace the dynamic buffer of the specified type for the specified entity with the array of elements provided.
+        /// This method ignores parallel safety checks as if [NativeDisableParallelForRestriction] was used. This method is commonly
+        /// used for deserialization tasks.
+        /// </summary>
+        /// <param name="entity">The entity containing the DynamicBuffer to replace</param>
+        /// <param name="typeIndex">The type of IBufferElementData to replace</param>
+        /// <param name="dataArrayPtrToWrite">A pointer to an array of elements that should be written to the DynamicBuffer</param>
+        /// <param name="elementCountToWrite">The number of elements (not necessarily bytes) that should be written to the DynamicBuffer
+        /// The DynamicBuffer is resized to this size.</param>
+        /// <returns>True if the entity had the DyanmicBuffer and was able to replace its contents, false if it didn't and nothing happened</returns>
+        public bool TryWriteBufferIgnoreParallelSafety(Entity entity, TypeIndex typeIndex, void* dataArrayPtrToWrite, int elementCountToWrite)
+        {
+            CheckTypeIndexIsInComponentList(typeIndex);
+            CheckTypeIsBuffer(typeIndex);
+            fixed (DynamicComponentTypeHandle* c0Ptr = &c0)
+            {
+                ref var handle = ref c0Ptr[handleIndices[typeIndex].index];
+                if (entity == currentEntity)
+                {
+                    var access = currentChunk.GetUntypedBufferAccessor(ref handle);
+                    if (access.Length == 0)
+                        return false;
+                    access.ResizeUninitialized(currentIndexInChunk, elementCountToWrite);
+                    var dst = access.GetUnsafePtr(currentIndexInChunk);
+                    UnsafeUtility.MemCpy(dst, dataArrayPtrToWrite, elementCountToWrite * access.ElementSize);
+                    return true;
+                }
+                else
+                {
+                    var info   = esil[entity];
+                    var access = info.Chunk.GetUntypedBufferAccessor(ref handle);
+                    if (access.Length == 0)
+                        return false;
+                    access.ResizeUninitialized(info.IndexInChunk, elementCountToWrite);
+                    var dst = access.GetUnsafePtr(info.IndexInChunk);
+                    UnsafeUtility.MemCpy(dst, dataArrayPtrToWrite, elementCountToWrite * access.ElementSize);
+                    return true;
+                }
+            }
+        }
         #endregion
 
         #region Constructor, Update, and Dispose

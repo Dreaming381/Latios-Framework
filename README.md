@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.14.5]
+# Latios Framework for Unity ECS – [0.14.6]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -28,8 +28,8 @@ adaptations of top-class solutions in the industry (see [Third Party
 Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
-This version targets Entities 1.3.14 with ENTITY_STORE_V1 and a minimum editor
-version of 6000.0.23f1. Entities 1.4.2 compatibility is experimental.
+This version targets Entities 1.4.3 with ENTITY_STORE_V1 and a minimum editor
+version of 6000.0.23f1. Entities 6.4.0 compatibility is experimental.
 
 *[0.13.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*

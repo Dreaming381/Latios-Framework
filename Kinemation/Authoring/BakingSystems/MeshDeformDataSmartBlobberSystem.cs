@@ -111,6 +111,7 @@ namespace Latios.Kinemation.Authoring.Systems
         protected override void OnCreate()
         {
             new SmartBlobberTools<MeshDeformDataBlob>().Register(World);
+            m_query = CheckedStateRef.Fluent().With<MeshReference, MeshFeatures>().IncludePrefabs().IncludeDisabledEntities().Build();
         }
 
         struct BlobAndFeatures
@@ -130,7 +131,9 @@ namespace Latios.Kinemation.Authoring.Systems
             m_meshCache.Clear();
             int count   = m_query.CalculateEntityCountWithoutFiltering();
             var hashmap = new NativeParallelHashMap<MeshReference, BlobAndFeatures>(count, WorldUpdateAllocator);
-            Entities.WithStoreEntityQueryInField(ref m_query).ForEach((in MeshReference meshRef, in MeshFeatures features) =>
+            // Todo: Burst
+            foreach ((var meshRef, var features) in SystemAPI.Query<MeshReference,
+                                                                    MeshFeatures>().WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities))
             {
                 //Debug.Log($"Adding MeshRef key: {meshRef.GetHashCode()}");
                 if (!hashmap.TryAdd(meshRef, new BlobAndFeatures { features = features.features }))
@@ -139,7 +142,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     v.features       |= features.features;
                     hashmap[meshRef]  = v;
                 }
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Run();
+            }
 
             var builders                 = CollectionHelper.CreateNativeArray<MeshDeformDataBuilder>(hashmap.Count(), WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
             var blendShapeRequestBuffers = CollectionHelper.CreateNativeArray<NativeArray<uint> >(builders.Length, WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
@@ -282,23 +285,18 @@ namespace Latios.Kinemation.Authoring.Systems
 #endif
             };
 
-            new BuildJob { builders = builders, context = context }.ScheduleParallel(builders.Length, 1, default).Complete();
+            var buildJob = new BuildJob { builders = builders, context = context }.ScheduleParallel(builders.Length, 1, default);
 
+            Dependency = new AssignToMapJob
+            {
+                builders = builders,
+                hashmap  = hashmap,
+            }.Schedule(JobHandle.CombineDependencies(Dependency, buildJob));
+
+            new AssignToResultsJob { hashmap = hashmap }.ScheduleParallel();
+
+            buildJob.Complete();
             context.meshes.Dispose();
-
-            Job.WithCode(() =>
-            {
-                foreach (var builder in builders)
-                {
-                    //Debug.Log($"Setting MeshRef blob: {builder.reference.GetHashCode()}");
-                    hashmap[builder.reference] = new BlobAndFeatures { blob = builder.resultBlob, features = builder.features };
-                }
-            }).Schedule();
-
-            Entities.ForEach((ref SmartBlobberResult result, in MeshReference reference) =>
-            {
-                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[reference].blob);
-            }).WithReadOnly(hashmap).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
         }
 
         struct MeshDeformDataBuilder
@@ -932,6 +930,34 @@ namespace Latios.Kinemation.Authoring.Systems
                 var builder = builders[i];
                 builder.BuildBlob(i, ref context);
                 builders[i] = builder;
+            }
+        }
+
+        [BurstCompile]
+        struct AssignToMapJob : IJob
+        {
+            [ReadOnly] public NativeArray<MeshDeformDataBuilder>         builders;
+            public NativeParallelHashMap<MeshReference, BlobAndFeatures> hashmap;
+
+            public void Execute()
+            {
+                foreach (var builder in builders)
+                {
+                    //Debug.Log($"Setting MeshRef blob: {builder.reference.GetHashCode()}");
+                    hashmap[builder.reference] = new BlobAndFeatures { blob = builder.resultBlob, features = builder.features };
+                }
+            }
+        }
+
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [BurstCompile]
+        partial struct AssignToResultsJob : IJobEntity
+        {
+            [ReadOnly] public NativeParallelHashMap<MeshReference, BlobAndFeatures> hashmap;
+
+            public void Execute(ref SmartBlobberResult result, in MeshReference reference)
+            {
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[reference].blob);
             }
         }
     }

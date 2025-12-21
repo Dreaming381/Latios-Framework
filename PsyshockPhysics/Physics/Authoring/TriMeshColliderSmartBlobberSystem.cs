@@ -72,6 +72,7 @@ namespace Latios.Psyshock.Authoring.Systems
             new SmartBlobberTools<TriMeshColliderBlob>().Register(World);
         }
 
+#pragma warning disable CS0618
         protected override void OnUpdate()
         {
             int count = m_query.CalculateEntityCountWithoutFiltering();
@@ -152,6 +153,7 @@ namespace Latios.Psyshock.Authoring.Systems
                 result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
             }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
         }
+#pragma warning restore CS0618
 
         struct TriMeshBuilder
         {

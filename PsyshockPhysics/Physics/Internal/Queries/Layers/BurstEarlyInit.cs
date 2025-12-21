@@ -22,7 +22,8 @@ namespace Latios.Psyshock
         }
 #else
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
-        static void InitRuntime()
+#endif
+        internal static void InitRuntime()
         {
             var pairsTypes   = new List<Type>();
             var objectsTypes = new List<Type>();
@@ -66,7 +67,6 @@ namespace Latios.Psyshock
 
             InitProcessors(pairsTypes, objectsTypes, foreachTypes);
         }
-#endif
 
         static void InitProcessors(IEnumerable<Type> findPairsTypes, IEnumerable<Type> findObjectsTypes, IEnumerable<Type> foreachTypes)
         {

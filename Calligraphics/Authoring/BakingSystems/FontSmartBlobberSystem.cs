@@ -90,13 +90,15 @@ namespace Latios.Calligraphics.Authoring.Systems
 
         protected override void OnUpdate()
         {
-            Entities.ForEach((ref FontBlobRequest request, ref SmartBlobberResult result) =>
+            foreach ((var request, var result) in SystemAPI.Query<RefRW<FontBlobRequest>,
+                                                                  RefRW<SmartBlobberResult> >().WithOptions(EntityQueryOptions.IncludePrefab |
+                                                                                                            EntityQueryOptions.IncludeDisabledEntities))
             {
-                var font = request.font.Value;
+                var font = request.ValueRW.font.Value;
                 font.ReadFontAssetDefinition();
-                var FontBlob = BakeFont(font, request.material.Value);
-                result.blob  = UnsafeUntypedBlobAssetReference.Create(FontBlob);
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).WithoutBurst().Run();
+                var FontBlob        = BakeFont(font, request.ValueRW.material.Value);
+                result.ValueRW.blob = UnsafeUntypedBlobAssetReference.Create(FontBlob);
+            }
         }
 
         public static unsafe BlobAssetReference<FontBlob> BakeFont(FontAsset font, Material material)
@@ -138,15 +140,15 @@ namespace Latios.Calligraphics.Authoring.Systems
             hashCounts.Clear();
             // Todo: Currently, we allocate a glyph per character and leave characters with null glyphs uninitialized.
             // We should rework that to only allocate glyphs to save memory.
-            var characterLookupTable = font.characterLookupTable;
-            BlobBuilderArray<GlyphBlob>      glyphBuilder    = builder.Allocate(ref fontBlobRoot.characters, characterLookupTable.Count);
-            BlobBuilderArray<AdjustmentPair> adjustmentPairs = builder.Allocate(ref fontBlobRoot.adjustmentPairs, glyphPairAdjustmentsSource.Count);
-      
+            var                              characterLookupTable = font.characterLookupTable;
+            BlobBuilderArray<GlyphBlob>      glyphBuilder         = builder.Allocate(ref fontBlobRoot.characters, characterLookupTable.Count);
+            BlobBuilderArray<AdjustmentPair> adjustmentPairs      = builder.Allocate(ref fontBlobRoot.adjustmentPairs, glyphPairAdjustmentsSource.Count);
+
             for (int i = 0; i < glyphPairAdjustmentsSource.Count; i++)
             {
                 var kerningPair = glyphPairAdjustmentsSource[i];
                 if (GlyphIndexToUnicode(kerningPair.firstAdjustmentRecord.glyphIndex, characterLookupTable, out int firstUnicode) &&
-                    GlyphIndexToUnicode(kerningPair.secondAdjustmentRecord.glyphIndex, characterLookupTable, out int secondUnicode))                    
+                    GlyphIndexToUnicode(kerningPair.secondAdjustmentRecord.glyphIndex, characterLookupTable, out int secondUnicode))
                 {
                     adjustmentPairs[i] = new AdjustmentPair
                     {
@@ -173,8 +175,8 @@ namespace Latios.Calligraphics.Authoring.Systems
 
             int characterCount = 0;
             foreach (var character in characterLookupTable.Values)
-            { 
-                var glyph 	  = character.glyph;
+            {
+                var glyph = character.glyph;
                 if (glyph == null)
                     continue;
                 var unicode = math.asint(character.unicode);

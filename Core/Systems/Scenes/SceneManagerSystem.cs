@@ -21,7 +21,6 @@ namespace Latios.Systems
     [UpdateAfter(typeof(SyncPointPlaybackSystemDispatch))]
     public partial class SceneManagerSystem : SubSystem
     {
-        private EntityQuery m_rlsQuery;
         private EntityQuery m_unitySubsceneLoadQuery;
         private EntityQuery m_dontDestroyOnSceneChangeQuery;
         private EntityQuery m_newSubsceneReferenceQuery;
@@ -46,12 +45,14 @@ namespace Latios.Systems
 
         protected override void OnUpdate()
         {
-            if (!m_rlsQuery.IsEmptyIgnoreFilter)
+            var rlsQuery = SystemAPI.QueryBuilder().WithAll<RequestLoadScene>().Build();
+            if (!rlsQuery.IsEmptyIgnoreFilter)
             {
                 FixedString128Bytes targetScene = new FixedString128Bytes();
                 bool                isInvalid   = false;
 
-                Entities.WithStoreEntityQueryInField(ref m_rlsQuery).ForEach((ref RequestLoadScene rls) =>
+                //Entities.WithStoreEntityQueryInField(ref m_rlsQuery).ForEach((ref RequestLoadScene rls) =>
+                foreach (var rls in SystemAPI.Query<RequestLoadScene>())
                 {
                     if (rls.newScene.Length == 0)
                         return;
@@ -59,14 +60,14 @@ namespace Latios.Systems
                         targetScene = rls.newScene;
                     else if (rls.newScene != targetScene)
                         isInvalid = true;
-                }).Run();
+                }
 
                 if (targetScene.Length > 0)
                 {
                     if (isInvalid)
                     {
                         UnityEngine.Debug.LogError("Multiple scenes were requested to load during the previous frame.");
-                        EntityManager.RemoveComponent<RequestLoadScene>(m_rlsQuery);
+                        EntityManager.RemoveComponent<RequestLoadScene>(rlsQuery);
                     }
                     else
                     {
@@ -80,7 +81,7 @@ namespace Latios.Systems
                         curr.currentScene      = targetScene;
                         curr.isSceneFirstFrame = true;
                         worldBlackboardEntity.SetComponentData(curr);
-                        EntityManager.RemoveComponent<RequestLoadScene>(m_rlsQuery);
+                        EntityManager.RemoveComponent<RequestLoadScene>(rlsQuery);
                         return;
                     }
                 }

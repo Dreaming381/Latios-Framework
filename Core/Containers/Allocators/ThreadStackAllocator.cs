@@ -25,6 +25,8 @@ namespace Latios.Unsafe
             set => s_settings.Data.defaultBlockSize = value;
         }
 
+        public bool isCreated => m_statePtr != null;
+
         public static ThreadStackAllocator GetAllocator()
         {
             return s_states.Data[JobsUtility.ThreadIndex]->CreateAllocator();

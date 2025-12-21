@@ -26,8 +26,8 @@ namespace Latios.Kinemation.Systems
     {
         protected override void OnCreate()
         {
-            var entitiesGraphicsSystem     = World.GetExistingSystemManaged<EntitiesGraphicsSystem>();
-            entitiesGraphicsSystem.Enabled = false;
+            m_unityEntitiesGraphicsSystem         = World.GetExistingSystemManaged<EntitiesGraphicsSystem>();
+            m_unityEntitiesGraphicsSystem.Enabled = false;
 
             // We steal the BRG to avoid duplicating the Mesh and Material registration system.
             // Ideally, we want to remain compatible with plugins that register custom meshes and materials.
@@ -39,11 +39,11 @@ namespace Latios.Kinemation.Systems
                 finishedCullingCallback = this.OnFinishedCulling,
                 userContext             = IntPtr.Zero
             });
-            var brgField = entitiesGraphicsSystem.GetType().GetField("m_BatchRendererGroup",
-                                                                     System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            var oldBrg = brgField.GetValue(entitiesGraphicsSystem) as BatchRendererGroup;
+            var brgField = m_unityEntitiesGraphicsSystem.GetType().GetField("m_BatchRendererGroup",
+                                                                            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var oldBrg = brgField.GetValue(m_unityEntitiesGraphicsSystem) as BatchRendererGroup;
             oldBrg.Dispose();
-            brgField.SetValue(entitiesGraphicsSystem, m_BatchRendererGroup);
+            brgField.SetValue(m_unityEntitiesGraphicsSystem, m_BatchRendererGroup);
             // Hybrid Renderer supports all view types
             m_BatchRendererGroup.SetEnabledViewTypes(new BatchCullingViewType[]
             {

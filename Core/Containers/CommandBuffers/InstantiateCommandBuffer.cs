@@ -5,6 +5,8 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs;
 
+using CommandFunction = Unity.Burst.FunctionPointer<Latios.IInstantiateCommand.OnPlayback>;
+
 namespace Latios
 {
     /// <summary>
@@ -702,7 +704,7 @@ namespace Latios
 
     /// <summary>
     /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
-    /// This variant initializes the four specified component types with specified values per instance.
+    /// This variant initializes the five specified component types with specified values per instance.
     /// </summary>
     public struct InstantiateCommandBuffer<T0, T1, T2, T3, T4> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged, IComponentData where T2 : unmanaged,
                                                                  IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IComponentData
@@ -840,6 +842,1811 @@ namespace Latios
             public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, int sortKey)
             {
                 m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant processes a command per instance after instantiation.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand1<T0> : INativeDisposable where T0 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types        = new FixedList128Bytes<ComponentType>();
+            var                              commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T0>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T0>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant processes two commands per instance after instantiation.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1> : INativeDisposable where T0 : unmanaged, IInstantiateCommand where T1 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types        = new FixedList128Bytes<ComponentType>();
+            var                              commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T0>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T0>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T1>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T1>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c1">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c1">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the specified component type with specified values per instance,
+    /// as well as processes an extra command per instance.
+    public struct InstantiateCommandBufferCommand1<T0, T1> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T1>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T1>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the specified component type with specified values per instance,
+    /// as well as processes two extra commands per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1, T2> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                 IInstantiateCommand where T2 : unmanaged,
+                                                                 IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T1>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T1>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T2>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T2>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c2">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c2">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the two specified component types with specified values per instance,
+    /// as well as processes an extra command per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand1<T0, T1, T2> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged, IComponentData where T2 : unmanaged,
+                                                                 IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T2>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T2>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the two specified component types with specified values per instance,
+    /// as well as processes two extra commands per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1, T2, T3> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                     IComponentData where T2 : unmanaged,
+                                                                     IInstantiateCommand where T3 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T2>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T2>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T3>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T3>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c3">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c3">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the three specified component types with specified values per instance,
+    /// as well as processes an extra command per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand1<T0, T1, T2, T3> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                     IComponentData where T2 : unmanaged,
+                                                                     IComponentData where T3 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T3>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T3>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the three specified component types with specified values per instance,
+    /// as well as processes two extra commands per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                         IComponentData where T2 : unmanaged,
+                                                                         IComponentData where T3 : unmanaged, IInstantiateCommand where T4 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T3>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T3>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T4>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T4>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c4">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c4">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the four specified component types with specified values per instance,
+    /// as well as processes an extra command per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                         IComponentData where T2 : unmanaged,
+                                                                         IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            types.Add(ComponentType.ReadWrite<T3>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T4>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T4>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+        /// <param name="c4">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+            /// <param name="c4">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the four specified component types with specified values per instance,
+    /// as well as processes two extra commands per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                             IComponentData where T2 : unmanaged,
+                                                                             IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged,
+                                                                             IInstantiateCommand where T5 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            types.Add(ComponentType.ReadWrite<T3>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T4>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T4>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T5>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T5>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+        /// <param name="c4">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c5">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+            /// <param name="c4">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c5">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the five specified component types with specified values per instance,
+    /// as well as processes an extra command per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand1<T0, T1, T2, T3, T4, T5> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                             IComponentData where T2 : unmanaged,
+                                                                             IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged,
+                                                                             IComponentData where T5 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand1(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            types.Add(ComponentType.ReadWrite<T3>());
+            types.Add(ComponentType.ReadWrite<T4>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T5>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T5>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+        /// <param name="c4">The fifth component value to initialize for the instantiated entity</param>
+        /// <param name="c5">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+            /// <param name="c4">The fifth component value to initialize for the instantiated entity</param>
+            /// <param name="c5">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, sortKey);
+            }
+        }
+        #endregion
+    }
+
+    /// <summary>
+    /// A specialized variant of the EntityCommandBuffer exclusively for instantiating entities.
+    /// This variant initializes the five specified component types with specified values per instance,
+    /// as well as processes two extra commands per instance.
+    /// </summary>
+    public struct InstantiateCommandBufferCommand2<T0, T1, T2, T3, T4, T5, T6> : INativeDisposable where T0 : unmanaged, IComponentData where T1 : unmanaged,
+                                                                                 IComponentData where T2 : unmanaged,
+                                                                                 IComponentData where T3 : unmanaged, IComponentData where T4 : unmanaged,
+                                                                                 IComponentData where T5 : unmanaged, IInstantiateCommand where T6 : unmanaged, IInstantiateCommand
+    {
+        #region Structure
+        internal InstantiateCommandBufferUntyped m_instantiateCommandBufferUntyped { get; private set; }
+        #endregion
+
+        #region CreateDestroy
+        /// <summary>
+        /// Create an InstantiateCommandBuffer which can be used to instantiate entities and play them back later.
+        /// </summary>
+        /// <param name="allocator">The type of allocator to use for allocating the buffer</param>
+        public InstantiateCommandBufferCommand2(AllocatorManager.AllocatorHandle allocator)
+        {
+            FixedList128Bytes<ComponentType> types = new FixedList128Bytes<ComponentType>();
+            types.Add(ComponentType.ReadWrite<T0>());
+            types.Add(ComponentType.ReadWrite<T1>());
+            types.Add(ComponentType.ReadWrite<T2>());
+            types.Add(ComponentType.ReadWrite<T3>());
+            types.Add(ComponentType.ReadWrite<T4>());
+            var commandMetas = new FixedList64Bytes<InstantiateCommandBufferUntyped.CommandMeta>();
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T5>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T5>()
+            });
+            commandMetas.Add(new InstantiateCommandBufferUntyped.CommandMeta
+            {
+                function    = InstantiateCommandRegistry.TypeToPointer<T6>.functionPtr.Data,
+                commandSize = UnsafeUtility.SizeOf<T6>()
+            });
+            m_instantiateCommandBufferUntyped = new InstantiateCommandBufferUntyped(allocator, types, commandMetas);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer after the jobs which use it have finished.
+        /// </summary>
+        /// <param name="inputDeps">The JobHandle for any jobs previously using this InstantiateCommandBuffer</param>
+        /// <returns></returns>
+        public JobHandle Dispose(JobHandle inputDeps)
+        {
+            return m_instantiateCommandBufferUntyped.Dispose(inputDeps);
+        }
+
+        /// <summary>
+        /// Disposes the InstantiateCommandBuffer
+        /// </summary>
+        public void Dispose()
+        {
+            m_instantiateCommandBufferUntyped.Dispose();
+        }
+        #endregion
+
+        #region PublicAPI
+        /// <summary>
+        /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+        /// </summary>
+        /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+        /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+        /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+        /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+        /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+        /// <param name="c4">The fifth component value to initialize for the instantiated entity</param>
+        /// <param name="c5">The first post-process command data to be applied to the instantiated entity</param>
+        /// <param name="c6">The second post-process command data to be applied to the instantiated entity</param>
+        /// <param name="sortKey">The sort key for deterministic playback if interleaving single and parallel writes</param>
+        public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6, int sortKey = int.MaxValue)
+        {
+            m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, c6, sortKey);
+        }
+
+        /// <summary>
+        /// Plays back the InstantiateCommandBuffer.
+        /// </summary>
+        /// <param name="entityManager">The EntityManager with which to play back the InstantiateCommandBuffer</param>
+        public void Playback(EntityManager entityManager)
+        {
+            m_instantiateCommandBufferUntyped.Playback(entityManager);
+        }
+
+        /// <summary>
+        /// Get the number of entities stored in this InstantiateCommandBuffer. This method performs a summing operation on every invocation.
+        /// </summary>
+        /// <returns>The number of elements stored in this InstantiateCommandBuffer</returns>
+        public int Count() => m_instantiateCommandBufferUntyped.Count();
+
+        /// <summary>
+        /// Set additional component types to be added to the instantiated entities. These components will be default-initialized.
+        /// </summary>
+        /// <param name="tags">The types to add to each instantiated entity</param>
+        public void SetComponentTags(ComponentTypeSet tags)
+        {
+            m_instantiateCommandBufferUntyped.SetTags(tags);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <param name="tag">The type to add to each instantiated entity</param>
+        public void AddComponentTag(ComponentType tag)
+        {
+            m_instantiateCommandBufferUntyped.AddTag(tag);
+        }
+
+        /// <summary>
+        /// Adds an additional component type to the list of types to add to the instantiated entities. This type will be default-initialized.
+        /// </summary>
+        /// <typeparam name="T">The type to add to each instantiated entity</typeparam>
+        public void AddComponentTag<T>() where T : struct, IComponentData
+        {
+            AddComponentTag(ComponentType.ReadOnly<T>());
+        }
+
+        /// <summary>
+        /// Gets the ParallelWriter for this InstantiateCommandBuffer.
+        /// </summary>
+        /// <returns>The ParallelWriter which shares this InstantiateCommandBuffer's backing storage.</returns>
+        public ParallelWriter AsParallelWriter()
+        {
+            return new ParallelWriter(m_instantiateCommandBufferUntyped);
+        }
+        #endregion
+
+        #region ParallelWriter
+        /// <summary>
+        /// The parallelWriter implementation of InstantiateCommandBuffer. Use AsParallelWriter to obtain one from an InstantiateCommandBuffer
+        /// </summary>
+        public struct ParallelWriter
+        {
+            private InstantiateCommandBufferUntyped.ParallelWriter m_instantiateCommandBufferUntyped;
+
+            internal ParallelWriter(InstantiateCommandBufferUntyped icb)
+            {
+                m_instantiateCommandBufferUntyped = icb.AsParallelWriter();
+            }
+
+            /// <summary>
+            /// Adds an Entity to the InstantiateCommandBuffer which should be instantiated
+            /// </summary>
+            /// <param name="entity">The entity to be instantiated, including its LinkedEntityGroup at the time of playback if it has one</param>
+            /// <param name="c0">The first component value to initialize for the instantiated entity</param>
+            /// <param name="c1">The second component value to initialize for the instantiated entity</param>
+            /// <param name="c2">The third component value to initialize for the instantiated entity</param>
+            /// <param name="c3">The fourth component value to initialize for the instantiated entity</param>
+            /// <param name="c4">The fifth component value to initialize for the instantiated entity</param>
+            /// <param name="c5">The first post-process command data to be applied to the instantiated entity</param>
+            /// <param name="c6">The second post-process command data to be applied to the instantiated entity</param>
+            /// <param name="sortKey">The sort key for deterministic playback</param>
+            public void Add(Entity entity, T0 c0, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6, int sortKey = int.MaxValue)
+            {
+                m_instantiateCommandBufferUntyped.Add(entity, c0, c1, c2, c3, c4, c5, c6, sortKey);
             }
         }
         #endregion

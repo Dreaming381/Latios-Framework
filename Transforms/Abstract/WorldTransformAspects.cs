@@ -5,7 +5,9 @@ using Unity.Mathematics;
 
 namespace Latios.Transforms.Abstract
 {
+#pragma warning disable CS0618
     public readonly partial struct WorldTransformReadOnlyAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRO<WorldTransform> worldTransform;
 
@@ -58,7 +60,9 @@ using Unity.Transforms;
 
 namespace Latios.Transforms.Abstract
 {
+#pragma warning disable CS0618
     public readonly partial struct WorldTransformReadOnlyAspect : IAspect
+#pragma warning restore CS0618
     {
         readonly RefRO<LocalToWorld> localToWorld;
 

@@ -82,7 +82,11 @@ namespace Latios.Transforms.Systems
                             indexAndInstance.transformAccessArrayIndex = m_entities.Length;
                             indexAndInstance.instanceID                = link.CompanionTransform.InstanceID();
                             m_entitiesMap.Add(entity, indexAndInstance);
+#if UNITY_6000_3_OR_NEWER
+                            m_transformAccessArray.Add(link.CompanionTransform.EntityId());
+#else
                             m_transformAccessArray.Add(link.CompanionTransform.InstanceID());
+#endif
                             m_entities.Add(entity);
                         }
                     }
@@ -121,7 +125,11 @@ namespace Latios.Transforms.Systems
                         // 1. ABCD + X = ABCDX
                         // 2. ABCDX - B = AXCD
                         // -> the transform is updated, but the index remains unchanged
+#if UNITY_6000_3_OR_NEWER
+                        m_transformAccessArray.Add(link.CompanionTransform.EntityId());
+#else
                         m_transformAccessArray.Add(link.CompanionTransform.InstanceID());
+#endif
                         m_transformAccessArray.RemoveAtSwapBack(cached.transformAccessArrayIndex);
                         cached.instanceID     = currentID;
                         m_entitiesMap[entity] = cached;

@@ -18,8 +18,11 @@ namespace Latios.Kinemation.Authoring.Systems
 
             var textCache = new NativeText(Allocator.Temp);
 
-            Entities.ForEach((ref DynamicBuffer<MeshPathByte> meshPathBytes, ref DynamicBuffer<MeshPathByteOffsetForPath> offsets,
-                              in SkinnedMeshRenderererReferenceForMeshPaths smrRef, in ShadowHierarchyReference shadowRef) =>
+            foreach ((var meshPathBytes, var offsets, var smrRef, var shadowRef) in SystemAPI.Query<DynamicBuffer<MeshPathByte>, DynamicBuffer<MeshPathByteOffsetForPath>,
+                                                                                                    SkinnedMeshRenderererReferenceForMeshPaths,
+                                                                                                    ShadowHierarchyReference>().WithOptions(EntityQueryOptions.IncludePrefab |
+                                                                                                                                            EntityQueryOptions.
+                                                                                                                                            IncludeDisabledEntities))
             {
                 m_smrCache.Clear();
                 shadowRef.shadowHierarchyRoot.Value.GetComponentsInChildren(true,
@@ -28,8 +31,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 var                             sourceSmr = smrRef.skinnedMeshRenderer.Value.gameObject;
                 foreach (var smr in m_smrCache)
                 {
-                    var link = smr.GetComponent<HideThis.ShadowCloneSkinnedMeshTracker>();
-                    if (link == null)
+                    if (!smr.TryGetComponent<HideThis.ShadowCloneSkinnedMeshTracker>(out var link))
                         continue;
 
                     if (link.source == sourceSmr)
@@ -43,7 +45,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 {
                     UnityEngine.Debug.LogError(
                         $"Kinemation failed to bake mesh binding paths for {sourceSmr.gameObject.name}. The SkinnedMeshRenderer could not be found in the shadow hierarchy. This is an internal Kinemation bug. Please report!");
-                    return;
+                    continue;
                 }
 
                 var bones = shadowSmr.bones;
@@ -51,7 +53,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 {
                     UnityEngine.Debug.LogWarning(
                         $"Kinemation failed to bake mesh binding paths for {sourceSmr.gameObject.name}. The bones array could not be extracted. Please ensure your avatar is configured correctly.");
-                    return;
+                    continue;
                 }
 
                 foreach (var bone in bones)
@@ -60,7 +62,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     {
                         UnityEngine.Debug.LogWarning(
                             $"Kinemation failed to bake mesh binding paths for {sourceSmr.gameObject.name}. One of the bones was null. Please ensure your avatar is configured correctly.");
-                        return;
+                        continue;
                     }
                 }
 
@@ -69,7 +71,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 int i = 0;
                 foreach (var bone in bones)
                 {
-                    offsets[i] = new MeshPathByteOffsetForPath { offset = textCache.Length };
+                    offsets.ElementAt(i) = new MeshPathByteOffsetForPath { offset = textCache.Length };
 
                     var tf = bone;
                     while (tf.parent != null)
@@ -85,7 +87,7 @@ namespace Latios.Kinemation.Authoring.Systems
                 meshPathBytes.ResizeUninitialized(textCache.Length);
                 UnsafeUtility.MemCpy(meshPathBytes.GetUnsafePtr(), textCache.GetUnsafePtr(), textCache.Length);
                 textCache.Clear();
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).WithoutBurst().Run();
+            }
             m_smrCache.Clear();
         }
     }
