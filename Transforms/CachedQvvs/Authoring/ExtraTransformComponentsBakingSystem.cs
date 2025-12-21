@@ -1,4 +1,4 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
 using System.Collections.Generic;
 using Latios;
 using Unity.Burst;

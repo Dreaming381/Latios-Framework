@@ -15,7 +15,9 @@
     "overrideReferences": false,
     "precompiledReferences": [],
     "autoReferenced": true,
-    "defineConstraints": [],
+    "defineConstraints": [
+        "!LATIOS_DISABLE_CALLIGRAPHICS"
+    ],
     "versionDefines": [],
     "noEngineReferences": false
 }

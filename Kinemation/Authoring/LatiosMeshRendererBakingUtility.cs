@@ -276,7 +276,7 @@ namespace Latios.Kinemation.Authoring
             for (int i = 0; i < componentSet.Length; i++)
             {
                 // Todo: What to do for Unity Transforms?
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                 if (componentSet.GetTypeIndex(i) == TypeManager.GetTypeIndex<PreviousTransform>())
                     baker.AddComponent<RequestPreviousTag>(entity);
 #endif

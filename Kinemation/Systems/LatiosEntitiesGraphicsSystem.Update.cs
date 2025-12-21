@@ -17,6 +17,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Profiling;
 using Unity.Rendering;
+using Unity.Transforms;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;

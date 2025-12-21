@@ -72,9 +72,9 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
             GetOrCreateAndAddSystem<ParameterClipSetSmartBlobberSystem>();  // async
 #endif
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             GetOrCreateAndAddSystem<Latios.Transforms.Authoring.Systems.TransformHierarchySyncBakingSystem>();  // async | Needed for correcting children of sockets.
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             // Todo: How do we set LTWs correctly for sockets in Unity Transforms?
 #endif
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync

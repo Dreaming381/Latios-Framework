@@ -142,9 +142,9 @@ namespace Latios.Kinemation
     [InternalBufferCapacity(0)]
     public struct BoneReference : IBufferElementData
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         public EntityWith<WorldTransform> bone;
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
         public EntityWith<LocalToWorld> bone;
 #endif
     }

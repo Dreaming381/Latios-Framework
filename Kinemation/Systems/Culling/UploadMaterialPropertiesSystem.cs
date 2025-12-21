@@ -127,10 +127,10 @@ namespace Latios.Kinemation.Systems
                 WorldTransformInverseType         = TypeManager.GetTypeIndex<WorldToLocal_Tag>(),
                 postProcessMatrixHandle           = SystemAPI.GetComponentTypeHandle<PostProcessMatrix>(true),
                 previousPostProcessMatrixHandle   = SystemAPI.GetComponentTypeHandle<PreviousPostProcessMatrix>(true),
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                 WorldTransformType    = TypeManager.GetTypeIndex<WorldTransform>(),
                 PreviousTransformType = TypeManager.GetTypeIndex<PreviousTransform>(),
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                 WorldTransformType    = TypeManager.GetTypeIndex<Unity.Transforms.LocalToWorld>(),
                 PreviousTransformType = TypeManager.GetTypeIndex<BuiltinMaterialPropertyUnity_MatrixPreviousM>(),
 #endif
@@ -324,7 +324,7 @@ namespace Latios.Kinemation.Systems
                             if (isLocalToWorld || isPrevLocalToWorld)
                             {
                                 void* extraPtr = null;
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                                 var numQvvs = sizeBytes / sizeof(TransformQvvs);
                                 if (isLocalToWorld)
                                     extraPtr = chunk.GetComponentDataPtrRO(ref postProcessMatrixHandle);
@@ -338,7 +338,7 @@ namespace Latios.Kinemation.Systems
                                     isLocalToWorld ? dstOffsetWorldToLocal : dstOffsetPrevWorldToLocal,
                                     extraPtr
                                     );
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                                 var numMatrices = sizeBytes / sizeof(float4x4);
                                 AddMatrixUpload(
                                     srcPtr,

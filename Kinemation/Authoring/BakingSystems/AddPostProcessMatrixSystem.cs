@@ -15,7 +15,7 @@ namespace Latios.Kinemation.Authoring.Systems
     [RequireMatchingQueriesForUpdate]
     [WorldSystemFilter(WorldSystemFilterFlags.BakingSystem)]
     [UpdateInGroup(typeof(TransformBakingSystemGroup))]
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
     [UpdateAfter(typeof(Latios.Transforms.Authoring.Systems.TransformBakingSystem))]
 #endif
     [DisableAutoCreation]

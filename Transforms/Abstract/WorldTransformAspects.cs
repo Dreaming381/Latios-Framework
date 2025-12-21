@@ -1,4 +1,4 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
 
 using Unity.Entities;
 using Unity.Mathematics;
@@ -53,7 +53,7 @@ namespace Latios.Transforms.Abstract
     }
 }
 
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -122,9 +122,9 @@ namespace Latios.Transforms.Abstract
     {
         public static FluentQuery WithoutWorldTransform(this FluentQuery query)
         {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             return query.Without<WorldTransform>();
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             return query.Without<LocalToWorld>();
 #else
             throw new System.NotImplementedException();
@@ -133,9 +133,9 @@ namespace Latios.Transforms.Abstract
 
         public static FluentQuery WithWorldTransformReadOnly(this FluentQuery query)
         {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             return query.With<WorldTransform>(true);
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             return query.With<LocalToWorld>(true);
 #else
             throw new System.NotImplementedException();
@@ -144,9 +144,9 @@ namespace Latios.Transforms.Abstract
 
         public static void AddWorldTranformChangeFilter(this EntityQuery query)
         {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             query.AddChangedVersionFilter(ComponentType.ReadOnly<WorldTransform>());
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             query.AddChangedVersionFilter(ComponentType.ReadOnly<LocalToWorld>());
 #else
             throw new System.NotImplementedException();
@@ -155,9 +155,9 @@ namespace Latios.Transforms.Abstract
 
         public static ComponentType GetAbstractWorldTransformROComponentType()
         {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             return ComponentType.ReadOnly<WorldTransform>();
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             return ComponentType.ReadOnly<LocalToWorld>();
 #else
             throw new System.NotImplementedException();
@@ -166,9 +166,9 @@ namespace Latios.Transforms.Abstract
 
         public static ComponentType GetAbstractWorldTransformRWComponentType()
         {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             return ComponentType.ReadWrite<WorldTransform>();
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             return ComponentType.ReadWrite<LocalToWorld>();
 #else
             throw new System.NotImplementedException();

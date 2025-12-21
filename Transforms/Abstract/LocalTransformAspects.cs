@@ -6,13 +6,13 @@ namespace Latios.Transforms.Abstract
     public readonly partial struct LocalTransformQvsReadOnlyAspect : IAspect
 #pragma warning restore CS0618
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         readonly RefRO<Latios.Transforms.LocalTransform> m_localTransform;
 
         public TransformQvs localTransform => m_localTransform.ValueRO.localTransform;
 
         public ComponentType componentType => ComponentType.ReadOnly<Latios.Transforms.LocalTransform>();
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
         readonly RefRO<Unity.Transforms.LocalTransform> m_localTransform;
 
         public TransformQvs localTransform => new TransformQvs(m_localTransform.ValueRO.Position, m_localTransform.ValueRO.Rotation, m_localTransform.ValueRO.Scale);
@@ -25,7 +25,7 @@ namespace Latios.Transforms.Abstract
     public readonly partial struct LocalTransformQvvsReadWriteAspect : IAspect
 #pragma warning restore CS0618
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         readonly TransformAspect m_transform;
 
         public TransformQvvs localTransform
@@ -33,7 +33,7 @@ namespace Latios.Transforms.Abstract
             get => m_transform.localTransformQvvs;
             set => m_transform.localTransformQvvs = value;
         }
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
         readonly RefRW<Unity.Transforms.LocalTransform> m_localTransform;
 
         public TransformQvvs localTransform

@@ -122,9 +122,9 @@ namespace Latios.Kinemation.Systems
                 speedTreeCrossfadeTagHandle  = GetComponentTypeHandle<SpeedTreeCrossfadeTag>(true),
                 splitsAreValid               = cullingContext.viewType == BatchCullingViewType.Light,
                 useMmiRangeLodTagHandle      = GetComponentTypeHandle<UseMmiRangeLodTag>(true),
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<WorldTransform>(true),
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<Unity.Transforms.LocalToWorld>(true),
 #endif
             };

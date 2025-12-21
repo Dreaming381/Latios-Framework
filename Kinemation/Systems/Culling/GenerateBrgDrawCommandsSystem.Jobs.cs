@@ -78,9 +78,9 @@ namespace Latios.Kinemation.Systems
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
             [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>          MaterialMeshInfo;
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             [ReadOnly] public ComponentTypeHandle<WorldTransform> WorldTransform;
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> WorldTransform;
 #endif
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
@@ -214,9 +214,9 @@ namespace Latios.Kinemation.Systems
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c1, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c2, 0f),
                                                              new float4(postProcessMatrices[index].postProcessMatrix.c3, 1f));
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                                     var position = math.transform(f4x4, worldTransforms[index].position);
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                                     var position = math.transform(f4x4, worldTransforms[index].Position);
 #endif
                                     depthSortingTransformsPtr[3 * index]     = position.x;
@@ -228,11 +228,11 @@ namespace Latios.Kinemation.Systems
                         else if (isDepthSorted)
                         {
                             depthSortingTransformsPtr = (float*)worldTransforms;
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                             transformStrideInFloats = 12;
                             positionOffsetInFloats  = 4;
 
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                             transformStrideInFloats = 16;
                             positionOffsetInFloats  = 12;
 #endif

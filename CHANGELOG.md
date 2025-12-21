@@ -10,6 +10,15 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.14.7] – 2025-12-21
+
+Officially supports Entities [1.4.3]
+
+### Changed
+
+-   Updated Kinemation to v0.14.7
+-   Updated Calligraphics to v0.14.7
+
 ## [0.14.6] – 2025-12-20
 
 Officially supports Entities [1.4.3]

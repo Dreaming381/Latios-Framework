@@ -17,7 +17,7 @@ namespace Latios.Transforms.Systems
     {
         LatiosWorldUnmanaged latiosWorld;
 
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         TransformAspect.Lookup transformLookup;
 #endif
 
@@ -25,7 +25,7 @@ namespace Latios.Transforms.Systems
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             transformLookup = new TransformAspect.Lookup(ref state);
 #endif
             state.Fluent().With<GameObjectEntity.ExistComponent>(true).With<CopyTransformToEntity>(true).With<CopyTransformToEntityCleanupTag>(true)
@@ -41,16 +41,16 @@ namespace Latios.Transforms.Systems
         public void OnUpdate(ref SystemState state)
         {
             var mapping = latiosWorld.worldBlackboardEntity.GetCollectionComponent<CopyTransformToEntityMapping>();
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             transformLookup.Update(ref state);
 #endif
             state.Dependency = new Job
             {
                 indexToEntityMap = mapping.indexToEntityMap,
                 copyLookup       = GetComponentLookup<CopyTransformToEntity>(true),
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
                 transformLookup = transformLookup,
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
                 ltwLookup = GetComponentLookup<LocalToWorld>(false),
 #endif
             }.Schedule(mapping.transformAccessArray, state.Dependency);
@@ -61,7 +61,7 @@ namespace Latios.Transforms.Systems
         {
             [ReadOnly] public NativeHashMap<int, Entity>             indexToEntityMap;
             [ReadOnly] public ComponentLookup<CopyTransformToEntity> copyLookup;
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             [NativeDisableParallelForRestriction] public TransformAspect.Lookup transformLookup;
 
             public void Execute(int index, TransformAccess transform)
@@ -78,7 +78,7 @@ namespace Latios.Transforms.Systems
                 else
                     entityTransform.worldTransform = new TransformQvvs(position, rotation, entityTransform.worldScale, transform.localScale, entityTransform.worldIndex);
             }
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
             [NativeDisableParallelForRestriction] public ComponentLookup<LocalToWorld> ltwLookup;
 
             public void Execute(int index, TransformAccess transform)

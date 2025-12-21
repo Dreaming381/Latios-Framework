@@ -8,7 +8,7 @@ namespace Latios.Kinemation
 {
     internal static class RenderMeshUtilityReplacer
     {
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         static ComponentTypeSet ReplaceTransforms(in ComponentTypeSet original)
         {
             FixedList128Bytes<ComponentType> newTypes = default;
@@ -56,7 +56,7 @@ namespace Latios.Kinemation
                 UnityEngine.Debug.LogException(e);
             }
         }
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
         public static void PatchRenderMeshUtility()
         {
         }

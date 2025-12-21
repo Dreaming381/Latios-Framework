@@ -30,7 +30,7 @@ namespace Latios.Kinemation.Authoring
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberBakingGroup>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<KinemationSmartBlobberResolverBakingGroup>());
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddMasksBakingSystem>());
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
             context.bakingSystemTypesToInject.Add(TypeManager.GetSystemTypeIndex<AddPostProcessMatrixSystem>());
 #endif
 

@@ -327,7 +327,7 @@ namespace Latios.Psyshock
         }
     }
 
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
     /// <summary>
     /// A lookup struct for performing read/write access on a TransformAspect via SafeEntity
     /// when it is safe to do so.
@@ -439,7 +439,7 @@ namespace Latios.Psyshock
             return broker.GetBufferIgnoreParallelSafety<T>(entity);
         }
 
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
         /// <summary>
         /// Tries to get a TransformAspect on the specified entity represented by safeEntity.
         /// When safety checks are enabled, this throws when parallel safety cannot

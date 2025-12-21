@@ -1,4 +1,4 @@
-#if !LATIOS_TRANSFORMS_UNCACHED_QVVS && !LATIOS_TRANSFORMS_UNITY
+#if !LATIOS_TRANSFORMS_UNITY
 using Latios.Transforms;
 using Latios.Transforms.Systems;
 using Unity.Burst;
@@ -103,7 +103,7 @@ namespace Latios.Kinemation.Systems
         }
     }
 }
-#elif !LATIOS_TRANSFORMS_UNCACHED_QVVS && LATIOS_TRANSFORMS_UNITY
+#elif LATIOS_TRANSFORMS_UNITY
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
