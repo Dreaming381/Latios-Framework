@@ -66,7 +66,7 @@ namespace Latios.Psyshock
                     // all inside, hit plane
                     result.hitpoint    = projectedPoint;
                     result.distance    = math.abs(projectionDot);
-                    result.normal      = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
+                    result.normal      = math.select(planeNormal, -planeNormal, math.dot(point - result.hitpoint, planeNormal) < 0);
                     result.featureCode = 0x8000;
                     break;
                 }
@@ -258,7 +258,7 @@ namespace Latios.Psyshock
                 }
             }
 
-            result.normal      = math.select(planeNormal, -planeNormal, math.dot(result.hitpoint - point, planeNormal) < 0);
+            result.normal      = math.select(planeNormal, -planeNormal, math.dot(point - result.hitpoint, planeNormal) < 0);
             result.featureCode = 0;  // Unusable for quads
             return result.distance <= maxDistance;
         }

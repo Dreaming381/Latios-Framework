@@ -263,10 +263,12 @@ namespace Latios.Psyshock
 
                             for (int quadInRow = 0; quadInRow < 8; quadInRow++)
                             {
-                                var     quadInPatch    = 8 * quadRow + quadInRow;
-                                var     quadOffset     = (patch.startY + quadRow) * previousPerRow + math.min(patch.startX + quadInRow, previousPerRow - 1);
-                                ref var lowerQuadPatch = ref previousLevel[quadOffset];
-                                bool    valid          = patch.startX + quadInRow < previousPerRow;
+                                var     quadInPatch      = 8 * quadRow + quadInRow;
+                                var     clampedQuadRow   = math.min(patch.startY + quadRow, previousRows - 1);
+                                var     clampedQuadInRow = math.min(patch.startX + quadInRow, previousPerRow - 1);
+                                var     quadOffset       = clampedQuadRow * previousPerRow + clampedQuadInRow;
+                                ref var lowerQuadPatch   = ref previousLevel[quadOffset];
+                                bool    valid            = quadRow == clampedQuadRow && quadInRow == clampedQuadInRow;
 
                                 Bits.SetBit(ref patch.isFirstTriangleOrChildPatchValid, quadInPatch,
                                             valid && (lowerQuadPatch.isFirstTriangleOrChildPatchValid | lowerQuadPatch.isSecondTriangleValid) != 0);
@@ -560,6 +562,11 @@ namespace Latios.Psyshock
 
         internal int3 GetTriangle(int triangleIndex)
         {
+            return GetTriangle(triangleIndex, out _);
+        }
+
+        internal int3 GetTriangle(int triangleIndex, out bool valid)
+        {
             var     quadIndex             = triangleIndex / 2;
             var     quadRow               = quadIndex / quadsPerRow;
             var     quadIndexInRow        = quadIndex % quadsPerRow;
@@ -574,16 +581,32 @@ namespace Latios.Psyshock
             if ((patch.triangleSplitParity & (1ul << bitInPatch)) != 0)
             {
                 if ((triangleIndex & 1) == 0)
-                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 0)), ToHeight1D(baseCoordinates + new int2(0, 1)));
+                {
+                    valid = (patch.isFirstTriangleOrChildPatchValid & (1ul << bitInPatch)) != 0;
+                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 0)),
+                                    ToHeight1D(baseCoordinates + new int2(0, 1)));
+                }
                 else
-                    return new int3(ToHeight1D(baseCoordinates + new int2(1, 0)), ToHeight1D(baseCoordinates + new int2(1, 1)), ToHeight1D(baseCoordinates + new int2(0, 1)));
+                {
+                    valid = (patch.isSecondTriangleValid & (1ul << bitInPatch)) != 0;
+                    return new int3(ToHeight1D(baseCoordinates + new int2(1, 0)),
+                                    ToHeight1D(baseCoordinates + new int2(1, 1)), ToHeight1D(baseCoordinates + new int2(0, 1)));
+                }
             }
             else
             {
                 if ((triangleIndex & 1) == 0)
-                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 1)), ToHeight1D(baseCoordinates + new int2(0, 1)));
+                {
+                    valid = (patch.isFirstTriangleOrChildPatchValid & (1ul << bitInPatch)) != 0;
+                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 1)),
+                                    ToHeight1D(baseCoordinates + new int2(0, 1)));
+                }
                 else
-                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 0)), ToHeight1D(baseCoordinates + new int2(1, 1)));
+                {
+                    valid = (patch.isSecondTriangleValid & (1ul << bitInPatch)) != 0;
+                    return new int3(ToHeight1D(baseCoordinates), ToHeight1D(baseCoordinates + new int2(1, 0)),
+                                    ToHeight1D(baseCoordinates + new int2(1, 1)));
+                }
             }
         }
 
@@ -612,7 +635,7 @@ namespace Latios.Psyshock
             for (var i = math.tzcnt(quadMask); i < 64; quadMask ^= 1ul << i, i = math.tzcnt(quadMask))
             {
                 int2 baseCoordinates    = new int2(patch.startX + (i & 0x7), patch.startY + (i >> 3));
-                int  firstTriangleIndex = baseCoordinates.y * quadsPerRow + baseCoordinates.x;
+                int  firstTriangleIndex = (baseCoordinates.y * quadsPerRow + baseCoordinates.x) * 2;
 
                 if ((patch.triangleSplitParity & (1ul << i)) != 0)
                 {

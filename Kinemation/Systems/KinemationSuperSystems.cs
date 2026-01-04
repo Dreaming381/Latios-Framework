@@ -78,13 +78,13 @@ namespace Latios.Kinemation.Systems
         {
             EnableSystemSorting = false;
 
-            GetOrCreateAndAddUnmanagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
             GetOrCreateAndAddUnmanagedSystem<ClearPerFrameCullingMasksSystem>();
             GetOrCreateAndAddUnmanagedSystem<InitializeAndClassifyPerFrameDeformMetadataSystem>();
-            GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateDeformedMeshBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<UpdateSkeletonBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosRenderBoundsUpdateSystem>();
+            GetOrCreateAndAddUnmanagedSystem<LatiosLightProbeUpdateSystem>();
+            GetOrCreateAndAddUnmanagedSystem<EndPerFrameMeshDeformBuffersUploadSystem>();
             GetOrCreateAndAddUnmanagedSystem<AllocateUniqueMeshesSystem>();
             GetOrCreateAndAddManagedSystem<KinemationCustomGraphicsSuperSystem>();
 #if UNITY_EDITOR

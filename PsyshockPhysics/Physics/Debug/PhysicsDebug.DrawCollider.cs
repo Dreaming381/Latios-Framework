@@ -3,6 +3,8 @@ using Color = UnityEngine.Color;
 using Latios.Calci;
 using Latios.Transforms;
 using Latios.Unsafe;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -381,13 +383,6 @@ namespace Latios.Psyshock
             }
             edges.Sort(new EdgeComparer());
 
-            for (int i = 0; i < edges.Length; i++)
-            {
-                var edge = edges[i];
-                edge.c0  = math.transform(transform, edge.c0 * triMesh.scale);
-                edge.c1  = math.transform(transform, edge.c1 * triMesh.scale);
-            }
-
             var previousEdge = edges[0];
             var drawEdge     = previousEdge;
             drawEdge.c0      = math.transform(transform, drawEdge.c0 * triMesh.scale);
@@ -541,43 +536,80 @@ namespace Latios.Psyshock
         /// <param name="terrain">The terrain to draw</param>
         /// <param name="transform">The transform of the terrain in world space</param>
         /// <param name="color">The color of the wireframe</param>
-        public static void DrawCollider<T>(ref this T drawer, in TerrainCollider terrain, in RigidTransform transform, Color color) where T : unmanaged, ILineDrawer
+        public static unsafe void DrawCollider<T>(ref this T drawer, in TerrainCollider terrain, in RigidTransform transform, Color color) where T : unmanaged, ILineDrawer
         {
             ref var blob = ref terrain.terrainColliderBlob.Value;
-
-            for (int row = 0; row <= blob.quadRows; row++)
+            
+            using var allocator = ThreadStackAllocator.GetAllocator();
+            var maxTriangleCount = blob.quadRows * blob.quadsPerRow * 2;
+            var edgeList = new UnsafeList<int2>(allocator.Allocate<int2>(maxTriangleCount * 3), maxTriangleCount * 3);
+            edgeList.Clear();
+            for (int i = 0; i < maxTriangleCount; i++)
             {
-                var previous = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(0, row), terrain.baseHeightOffset, terrain.scale));
-                for (int indexInRow = 1; indexInRow <= blob.quadsPerRow; indexInRow++)
+                var triangleVertIndices = blob.GetTriangle(i, out var valid);
+                if (valid)
                 {
-                    var current = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row), terrain.baseHeightOffset, terrain.scale));
-                    drawer.DrawLine(previous, current, color);
-                    previous = current;
+                    edgeList.Add(new int2(math.min(triangleVertIndices.x, triangleVertIndices.y), math.max(triangleVertIndices.x, triangleVertIndices.y)));
+                    edgeList.Add(new int2(math.min(triangleVertIndices.y, triangleVertIndices.z), math.max(triangleVertIndices.y, triangleVertIndices.z)));
+                    edgeList.Add(new int2(math.min(triangleVertIndices.z, triangleVertIndices.x), math.max(triangleVertIndices.z, triangleVertIndices.x)));
                 }
             }
+            
+            edgeList.Sort(new EdgeIndexComparer());
 
-            for (int row = 1; row <= blob.quadRows; row++)
+            var previousEdge = new int2(-1, -1);
+            foreach (var edge in edgeList)
             {
-                float3 previousBottom = default;
-                float3 previousTop    = default;
-                for (int indexInRow = 0; indexInRow <= blob.quadsPerRow; indexInRow++)
-                {
-                    var currentTop    = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row), terrain.baseHeightOffset, terrain.scale));
-                    var currentBottom = math.transform(transform,
-                                                       PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row - 1), terrain.baseHeightOffset, terrain.scale));
-                    drawer.DrawLine(currentBottom, currentTop, color);
-
-                    if (indexInRow > 0)
-                    {
-                        if (blob.GetSplitParity(indexInRow - 1))
-                            drawer.DrawLine(currentBottom, previousTop, color);
-                        else
-                            drawer.DrawLine(previousBottom, currentTop, color);
-                    }
-                    previousBottom = currentBottom;
-                    previousTop    = currentTop;
-                }
+                if (edge.Equals(previousEdge))
+                    continue;
+                previousEdge = edge;
+                var rows = edge / (blob.quadsPerRow + 1);
+                var indicesInRow = edge % (blob.quadsPerRow + 1);
+                var vertexA = PointRayTerrain.CreateLocalVertex(ref blob, new int2(indicesInRow.x, rows.x), terrain.baseHeightOffset, terrain.scale);
+                var vertexB = PointRayTerrain.CreateLocalVertex(ref blob, new int2(indicesInRow.y, rows.y), terrain.baseHeightOffset, terrain.scale);
+                vertexA = math.transform(transform, vertexA);
+                vertexB = math.transform(transform, vertexB);
+                drawer.DrawLine(vertexA, vertexB, color);
             }
+
+//            for (int row = 0; row <= blob.quadRows; row++)
+//            {
+//                var previous = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(0, row), terrain.baseHeightOffset, terrain.scale));
+//                for (int indexInRow = 1; indexInRow <= blob.quadsPerRow; indexInRow++)
+//                {
+//                    var current = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row), terrain.baseHeightOffset, terrain.scale));
+//                    drawer.DrawLine(previous, current, color);
+//                    previous = current;
+//                }
+//            }
+//
+//            for (int row = 1; row <= blob.quadRows; row++)
+//            {
+//                float3 previousBottom = default;
+//                float3 previousTop    = default;
+//                for (int indexInRow = 0; indexInRow <= blob.quadsPerRow; indexInRow++)
+//                {
+//                    var currentTop    = math.transform(transform, PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row), terrain.baseHeightOffset, terrain.scale));
+//                    var currentBottom = math.transform(transform,
+//                                                       PointRayTerrain.CreateLocalVertex(ref blob, new int2(indexInRow, row - 1), terrain.baseHeightOffset, terrain.scale));
+//                    drawer.DrawLine(currentBottom, currentTop, color);
+//
+//                    if (indexInRow > 0)
+//                    {
+//                        if (blob.GetSplitParity(indexInRow - 1))
+//                            drawer.DrawLine(currentBottom, previousTop, color);
+//                        else
+//                            drawer.DrawLine(previousBottom, currentTop, color);
+//                    }
+//                    previousBottom = currentBottom;
+//                    previousTop    = currentTop;
+//                }
+//            }
+        }
+
+        struct EdgeIndexComparer : IComparer<int2>
+        {
+            public int Compare(int2 x, int2 y) => x.x.CompareTo(y.x);
         }
 
         /// <summary>

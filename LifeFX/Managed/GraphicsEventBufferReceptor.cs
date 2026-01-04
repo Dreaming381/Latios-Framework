@@ -18,14 +18,64 @@ namespace Latios.LifeFX
         public event OnGraphicsEventPublishedDelegate                 OnGraphicsEventPublished;
         [SerializeField] private UnityEvent<GraphicsBuffer, int, int> OnGraphicsEventPublishedSerialized;
 
+        bool initializedOnce = false;
+
         // Called from an ECS system
         public virtual void Publish(GraphicsBuffer graphicsBuffer, int startIndex, int count)
         {
         }
 
+        /// <summary>
+        /// Call this method to set the tunnel, either initially after adding the component at runtime,
+        /// or to change the value at runtime.
+        /// </summary>
+        /// <param name="newTunnel"></param>
+        public void SetTunnel(GraphicsEventTunnelBase newTunnel)
+        {
+            tunnel = newTunnel;
+            if (!initializedOnce)
+            {
+                return;
+            }
+
+            var managedEntity = GetComponent<GameObjectEntityAuthoring>();
+            var world         = World.DefaultGameObjectInjectionWorld as LatiosWorld;
+
+            DynamicBuffer<GraphicsEventTunnelDestination> buffer;
+            if (world.EntityManager.HasBuffer<GraphicsEventTunnelDestination>(managedEntity.entity))
+            {
+                buffer                                                = world.EntityManager.GetBuffer<GraphicsEventTunnelDestination>(managedEntity.entity);
+                var                                         array     = buffer.AsNativeArray();
+                UnityObjectRef<GraphicsEventBufferReceptor> thisAsRef = this;
+                for (int i = 0; i < array.Length; i++)
+                {
+                    var dst = array[i];
+                    if (dst.requestor.Equals(thisAsRef))
+                    {
+                        array[i] = new GraphicsEventTunnelDestination
+                        {
+                            tunnel         = GraphicsEventTypeRegistry.s_eventHashManager.Data[tunnel],
+                            requestor      = thisAsRef,
+                            eventTypeIndex = tunnel.GetEventIndex(),
+                        };
+                        return;
+                    }
+                }
+            }
+            else
+                buffer = world.EntityManager.AddBuffer<GraphicsEventTunnelDestination>(managedEntity.entity);
+            buffer.Add(new GraphicsEventTunnelDestination
+            {
+                tunnel         = GraphicsEventTypeRegistry.s_eventHashManager.Data[tunnel],
+                requestor      = this,
+                eventTypeIndex = tunnel.GetEventIndex(),
+            });
+        }
+
         // IInitializeGameObjectEntity method, automatically called.
         public void Initialize(LatiosWorld latiosWorld, Entity gameObjectEntity)
         {
+            initializedOnce = true;
             if (tunnel == null)
                 return;
             DynamicBuffer<GraphicsEventTunnelDestination> buffer;

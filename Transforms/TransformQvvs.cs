@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Transforms
@@ -52,6 +53,11 @@ namespace Latios.Transforms
         public float3 forwardDirection => math.rotate(rotation, math.forward());
         public float3 rightDirection => math.rotate(rotation, math.right());
         public float3 upDirection => math.rotate(rotation, math.up());
+
+        public bool Equals(TransformQvvs other)
+        {
+            return UnsafeUtility.As<TransformQvvs, uint4x3>(ref this).Equals(UnsafeUtility.As<TransformQvvs, uint4x3>(ref other));
+        }
     }
 
     [System.Serializable]

@@ -33,7 +33,7 @@ namespace Latios.Psyshock
                 point            = point,
                 maxDistance      = maxDistance,
                 minHeight        = (short)minInt.y,
-                maxHeight        = (short)minInt.y,
+                maxHeight        = (short)maxInt.y,
                 heightOffset     = terrain.baseHeightOffset,
                 scale            = terrain.scale,
                 terrainTransform = terrainTransform,
@@ -80,7 +80,7 @@ namespace Latios.Psyshock
             {
                 ray              = ray,
                 minHeight        = (short)minInt.y,
-                maxHeight        = (short)minInt.y,
+                maxHeight        = (short)maxInt.y,
                 heightOffset     = terrain.baseHeightOffset,
                 scale            = terrain.scale,
                 terrainTransform = terrainTransform,

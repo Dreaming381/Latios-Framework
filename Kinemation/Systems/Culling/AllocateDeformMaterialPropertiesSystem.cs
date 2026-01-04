@@ -230,11 +230,14 @@ namespace Latios.Kinemation.Systems
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var prefixSums   = chunk.GetChunkComponentData(ref metaHandle);
                 var dispatchMask = chunk.GetChunkComponentData(ref perDispatchMaskHandle);
                 var frameMask    = chunk.GetChunkComponentData(ref perFrameMaskHandle);
                 var lower        = dispatchMask.lower.Value & (~frameMask.lower.Value);
                 var upper        = dispatchMask.upper.Value & (~frameMask.upper.Value);
+                if ((upper | lower) == 0)
+                    return;
+
+                var prefixSums = chunk.GetChunkComponentData(ref metaHandle);
 
                 var meshArray      = chunk.GetNativeArray(ref meshHandle);
                 var classification = deformClassificationMap[chunk];

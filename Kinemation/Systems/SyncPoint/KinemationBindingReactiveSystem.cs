@@ -248,7 +248,7 @@ namespace Latios.Kinemation.Systems
                     disabledLookup                    = GetComponentLookup<Disabled>(true)
                 };
 
-                if (haveNewMeshes)
+                if (haveNewDeformMeshes)
                 {
                     state.Dependency = newMeshJob.ScheduleParallel(m_newDeformMeshesQuery, state.Dependency);
                 }

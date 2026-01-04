@@ -84,6 +84,13 @@ namespace Unity.Entities.Exposed
             return query._GetImpl()->_QueryData->HasEnableableComponents != 0;
         }
 
+        public static unsafe bool IsCreated(in this EntityStorageInfoLookup entityStorageInfoLookup)
+        {
+            var                     esil = entityStorageInfoLookup;
+            EntityStorageInfoLookup def  = default;
+            return UnsafeUtility.MemCmp(&esil, &def, UnsafeUtility.SizeOf<EntityStorageInfoLookup>()) == 0;
+        }
+
         // The following do not check safety. Always check some safety handle such as EntityStorageInfoLookup.Exists() before use.
         public static unsafe ulong GetBloomMask(in this EntityArchetype archetype) => archetype.Archetype->BloomFilterMask;
         public static unsafe bool HasChunkHeader(in this EntityArchetype archetype) => archetype.Archetype->HasChunkHeader;

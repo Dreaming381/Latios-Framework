@@ -356,19 +356,40 @@ namespace Latios.Psyshock
                     if (result.featureCodeA == 0x8000)
                     {
                         // Even though our axis ray test missed, our point test is registering a triangle face hit.
-                        var bestEdge   = math.select(math.select(triEdges.a, triEdges.b, bIsBetter), triEdges.c, cIsBetter);
-                        var edgeNormal = math.cross(math.normalizesafe(math.cross(triEdges.a, triEdges.c)), bestEdge);
-                        var capNormal  = math.normalize(math.cross(capEdge, math.cross(capEdge, edgeNormal)));
-                        result         = new ColliderDistanceResultInternal
+                        // This could be because our radius and max distance clip into the triangle face. If both
+                        // endpoints also hit and share the same normal direction, then we know this is the case.
+                        if (hitA && hitB &&
+                            (math.dot(aResult.normalA, bResult.normalA) > 0.9f || math.abs(aResult.distance) < math.EPSILON || math.abs(bResult.distance) < math.EPSILON))
                         {
-                            distance     = -math.distance(closestAxisPoint, closestEdgePoint) - capsule.radius,
-                            hitpointA    = closestEdgePoint,
-                            hitpointB    = closestAxisPoint + capNormal * capsule.radius,
-                            normalA      = edgeNormal,
-                            normalB      = capNormal,
-                            featureCodeA = (ushort)(0x4000 + math.select(math.select(0, 1, bIsBetter), 2, cIsBetter)),
-                            featureCodeB = 0x4000
-                        };
+                            if (bResult.distance < aResult.distance)
+                            {
+                                result              = bResult;
+                                result.featureCodeB = 1;
+                            }
+                            else
+                            {
+                                result              = aResult;
+                                result.featureCodeB = 0;
+                            }
+                        }
+                        else
+                        {
+                            // We either intersect, or our radius and max distance catch a triangle edge. In either case,
+                            // our closest point should be the edge.
+                            var bestEdge   = math.select(math.select(triEdges.a, triEdges.b, bIsBetter), triEdges.c, cIsBetter);
+                            var edgeNormal = math.cross(math.normalizesafe(math.cross(triEdges.a, triEdges.c)), bestEdge);
+                            var capNormal  = math.normalize(math.cross(capEdge, math.cross(capEdge, edgeNormal)));
+                            result         = new ColliderDistanceResultInternal
+                            {
+                                distance     = -math.distance(closestAxisPoint, closestEdgePoint) - capsule.radius,
+                                hitpointA    = closestEdgePoint,
+                                hitpointB    = closestAxisPoint + capNormal * capsule.radius,
+                                normalA      = edgeNormal,
+                                normalB      = capNormal,
+                                featureCodeA = (ushort)(0x4000 + math.select(math.select(0, 1, bIsBetter), 2, cIsBetter)),
+                                featureCodeB = 0x4000
+                            };
+                        }
                     }
                 }
                 bool capDegenerate = capsule.pointA.Equals(capsule.pointB);
