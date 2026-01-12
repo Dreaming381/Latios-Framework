@@ -500,20 +500,20 @@ namespace Latios.Kinemation.Authoring
             {
                 if (lodAppend.lod1Mesh == null)
                     lodAppend1Null = true;
-                else if (lodAppend.useOverrideMaterialsForLod1 && (lodAppend.overrideMaterialsForLod1 == null || lodAppend.overrideMaterialsForLod1.Count == 0))
-                    lodAppend1Null = true;
+                else if (lodAppend.useOverrideMaterialsForLod1)
+                    totalMms += lodAppend.overrideMaterialsForLod1.Count;
                 else
-                    totalMms    += lodAppend.useOverrideMaterialsForLod1 ? lodAppend.overrideMaterialsForLod1.Count : m_materialsCache.Count;
+                    totalMms += m_materialsCache.Count;
                 lodAppend1Count  = totalMms - m_materialsCache.Count;
 
                 if (!lodAppend.enableLod2)
                     lodAppend2Null = true;
                 else if (lodAppend.lod2Mesh == null)
                     lodAppend2Null = true;
-                else if (lodAppend.useOverrideMaterialsForLod2 && (lodAppend.overrideMaterialsForLod2 == null || lodAppend.overrideMaterialsForLod2.Count == 0))
-                    lodAppend2Null = true;
+                else if (lodAppend.useOverrideMaterialsForLod2)
+                    totalMms += lodAppend.overrideMaterialsForLod2.Count;
                 else
-                    totalMms += lodAppend.useOverrideMaterialsForLod2 ? lodAppend.overrideMaterialsForLod2.Count : m_materialsCache.Count;
+                    totalMms += m_materialsCache.Count;
             }
             Span<MeshMaterialSubmeshSettings> mms = stackalloc MeshMaterialSubmeshSettings[totalMms];
             if (lodAppend != null)

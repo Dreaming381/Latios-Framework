@@ -12,7 +12,8 @@
         "Unity.Entities.Graphics",
         "Latios.Transforms",
         "Unity.Entities.Editor",
-        "Latios.Core"
+        "Latios.Core",
+        "Unity.ShaderGraph.Editor"
     ],
     "includePlatforms": [
         "Editor"

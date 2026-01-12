@@ -56,8 +56,8 @@ namespace Latios.Calligraphics.Rendering.Authoring
 
         #region Mesh Building
 #if UNITY_EDITOR
-        [UnityEditor.MenuItem("Assets/Create/Latios/Text BackendMesh")]
-        static void CreateMeshAsset()
+        //[UnityEditor.MenuItem("Assets/Create/Latios/Text BackendMesh")]
+        internal static void CreateMeshAsset()
         {
             var glyphCounts = new NativeArray<int>(5, Allocator.Temp);
             glyphCounts[0] = 8;

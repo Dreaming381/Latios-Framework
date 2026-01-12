@@ -18,7 +18,7 @@ public static class TextCoreExtensions
     public static List<GlyphPairAdjustmentRecord> GetGlyphPairAdjustmentRecords(this FontAsset font)
     {
 #if UNITY_6000_3_OR_NEWER
-        return font.fontFeatureTable.GetType().GetRuntimeProperty("glyphPairAdjustmentRecords")
+        return font.fontFeatureTable.GetType().GetProperty("glyphPairAdjustmentRecords", BindingFlags.Instance | BindingFlags.NonPublic)
                .GetValue(font.fontFeatureTable, BindingFlags.NonPublic | BindingFlags.Instance, null, null, null)
                as List<GlyphPairAdjustmentRecord>;
 #else
@@ -29,7 +29,13 @@ public static class TextCoreExtensions
     public static float GetPaddingForText(this Material material, bool enableExtraPadding, bool isBold)
     {
 #if UNITY_6000_3_OR_NEWER
-        return (float)typeof(TextShaderUtilities).GetMethod("GetPadding", BindingFlags.Static | BindingFlags.NonPublic)
+        var types = new System.Type[]
+        {
+            typeof(Material),
+            typeof(bool),
+            typeof(bool)
+        };
+        return (float)typeof(TextShaderUtilities).GetMethod("GetPadding", BindingFlags.Static | BindingFlags.NonPublic, null, types, null)
                .Invoke(null, new object[] { material, enableExtraPadding, isBold });
 #else
         return TextShaderUtilities.GetPadding(material, enableExtraPadding, isBold);

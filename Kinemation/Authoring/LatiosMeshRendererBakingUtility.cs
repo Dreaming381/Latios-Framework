@@ -143,7 +143,7 @@ namespace Latios.Kinemation.Authoring
                     AddRendererComponents(renderer.targetEntity, baker, in renderer, flags);
 
                     bool requireCrossfade = renderer.requireLodCrossfade;
-                    if (meshLodLevelCount != 0 && meshLodLevelCount != int.MaxValue)
+                    if (meshLodLevelCount > 1 && meshLodLevelCount != int.MaxValue)
                     {
                         requireCrossfade = true;
                         if (renderer.overrideMeshLod >= 0)
