@@ -72,6 +72,19 @@ namespace Unity.Entities.Exposed
 #endif
         }
 
+        public static RefRW<T> GetComponentDataRW<T>(this EntityManager em, Entity entity) where T : unmanaged, IComponentData
+        {
+            var access = em.GetCheckedEntityDataAccess();
+
+            var typeIndex = TypeManager.GetTypeIndex<T>();
+            var data      = access->GetComponentDataRW_AsBytePointer(entity, typeIndex);
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            return new RefRW<T>(data, access->DependencyManager->Safety.GetSafetyHandle(typeIndex, false));
+#else
+            return new RefRW<T>(data);
+#endif
+        }
+
         public static EntityStorageInfoLookup GetEntityStorageInfoLookup(this EntityManager em)
         {
             return em.GetEntityStorageInfoLookup();

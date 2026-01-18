@@ -28,14 +28,16 @@
 // Begin shared helper functions
 void SetupProjectedDecalVertex_float(in float3 positionObjectSpace, in float3 normalObjectSpace, in float nearClipPlane, out float3 outPositionObjectSpace, out float3 outNormalObjectSpace, out float3 outTangentObjectSpace)
 {
-    float3 posVS = mul(UNITY_MATRIX_V, mul(UNITY_MATRIX_M, float4(positionObjectSpace, 1.0))).xyz;
-    float3 normalVS = mul(UNITY_MATRIX_V, mul(UNITY_MATRIX_M, float4(normalObjectSpace, 0.0))).xyz;
-    float distanceBehindPlane = -posVS.z - nearClipPlane;
-    if (distanceBehindPlane < 0.00001 && normalVS.z > 0.00001)
+    float3 nearClipNormalOS = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(0, 0, 1, 0))).xyz;
+    float3 nearClipPositionOS = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(0, 0, 0, 1))).xyz;
+    float distanceToPlaneOS = abs(dot(float3(0, 0, 0.5) - nearClipPositionOS, nearClipNormalOS));
+    const float centerToCornerDistance = 0.9086; // Cube root of 3 * (0.5^2) rounded up
+    if (distanceToPlaneOS < centerToCornerDistance)
     {
-        distanceBehindPlane -= 0.00001;
-        float distanceAgainstNormal = abs(distanceBehindPlane / normalVS.z);
-        posVS -= distanceAgainstNormal * normalVS;
+        // The bounding cube is intersecting the clip plane.
+        // Flatten the vertex against the clip plane.
+        float3 posVS = mul(UNITY_MATRIX_V, mul(UNITY_MATRIX_M, float4(positionObjectSpace, 1.0))).xyz;
+        posVS.z = -nearClipPlane - 0.00001;
         outPositionObjectSpace = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(posVS, 1.0))).xyz;
     }
     else

@@ -8,6 +8,7 @@ using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using Unity.Rendering;
+using UnityEngine.Rendering;
 
 namespace Latios.Kinemation.Systems
 {
@@ -178,6 +179,17 @@ namespace Latios.Kinemation.Systems
             // This is a different update, so we need to resecure this collection component.
             // Also, this time we write to it.
             var context = latiosWorld.worldBlackboardEntity.GetCollectionComponent<MaterialPropertiesUploadContext>(false);
+            // Since we have it, now is as good of a time as any to dispatch a resize if needed.
+            //if (context.requiredPersistentInstanceDataSize > m_persistentInstanceDataSize)
+            //{
+            //    SetBufferSize(context.requiredPersistentInstanceDataSize, out m_GPUPersistentInstanceBufferHandle);
+            //    // Todo: Schedule a job for this?
+            //    foreach (var id in context.existingBatchIndices)
+            //        context.threadedBatchContext.SetBatchBuffer(new BatchID { value = (uint)id }, m_GPUPersistentInstanceBufferHandle);
+            //    context.gpuPersistentInstanceBufferHandle                           = m_GPUPersistentInstanceBufferHandle;
+            //    latiosWorld.worldBlackboardEntity.SetCollectionComponentAndDisposeOld(context);
+            //    UnityEngine.Debug.Log("Resized buffer during first OnFinishedCulling");
+            //}
 
             var writeJh = new ExecuteGpuUploads
             {
@@ -185,7 +197,7 @@ namespace Latios.Kinemation.Systems
                 ThreadedSparseUploader = m_ThreadedGPUUploader,
             }.Schedule(numGpuUploadOperations, 1, state.Dependency);
 
-            // Todo: Do only on first culling pass?
+            // Todo: Do only on first dispatch pass?
             UploadBlitJob uploadJob = new UploadBlitJob()
             {
                 BlitList               = context.valueBlits,

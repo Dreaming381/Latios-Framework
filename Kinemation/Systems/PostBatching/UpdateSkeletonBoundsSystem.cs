@@ -228,6 +228,7 @@ namespace Latios.Kinemation.Systems
                         startFrom             = i + 1;
                         perThreadBitArrays[0] = perThreadBitArrays[i];
                         perThreadBitArrays[i] = default;
+                        ulongCount.Value      = (perThreadBitArrays[0].Length + 63) / 64;
                         break;
                     }
                 }

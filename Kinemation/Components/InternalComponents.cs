@@ -347,6 +347,11 @@ namespace Latios.Kinemation
 
         public int                        renderersChunkCount;
         public NativeArray<ChunkProperty> chunkProperties;
+        public ThreadedBatchContext       threadedBatchContext;
+        public NativeParallelHashSet<int> existingBatchIndices;
+        public long                       requiredPersistentInstanceDataSize;
+
+        public UnityEngine.GraphicsBufferHandle gpuPersistentInstanceBufferHandle;
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {

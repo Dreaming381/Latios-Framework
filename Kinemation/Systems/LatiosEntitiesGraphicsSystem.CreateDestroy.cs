@@ -120,7 +120,6 @@ namespace Latios.Kinemation.Systems
                 latiosWorld.worldBlackboardEntity.AddBuffer<CullingSplitElement>();
                 latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new BrgCullingContext());
                 latiosWorld.worldBlackboardEntity.AddBuffer<MaterialPropertyComponentType>();
-                latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new MaterialPropertiesUploadContext());
                 m_cullingCallbackFinalJobHandles = new NativeList<JobHandle>(Allocator.Persistent);
 
                 m_needsFirstUpdate = true;
@@ -252,6 +251,12 @@ namespace Latios.Kinemation.Systems
                 m_burstCompatibleTypeArray = componentTypeCache.ToBurstCompatible(Allocator.Persistent);
                 // This assumes uploadMaterialPropertiesSystem is already fully created from when the KinemationCullingSuperSystem was created.
                 m_GPUPersistentInstanceBufferHandle = uploadMaterialPropertiesSystemMemory.m_GPUPersistentInstanceBufferHandle;
+                latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new MaterialPropertiesUploadContext
+                {
+                    gpuPersistentInstanceBufferHandle  = m_GPUPersistentInstanceBufferHandle,
+                    requiredPersistentInstanceDataSize = m_PersistentInstanceDataSize,
+                    threadedBatchContext               = m_ThreadedBatchContext,
+                });
 
                 // UsedTypes values are the ComponentType values while the keys are the same
                 // except with the bit flags in the high bits masked off.

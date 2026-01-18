@@ -283,6 +283,10 @@ namespace AclUnity
                 NoExtensions.sampleBone(compressedTransformsClip, compressedScalesClip, (float*)(&qvv), boneIndex, time, (byte)keyframeInterpolationMode);
             }
 
+            // Work around bug in AclUnity for the meantime.
+            if (header.offsetToUniformScalesStartInBytes == 0)
+                qvv.stretchScale.w = 1f;
+
             return qvv;
         }
 

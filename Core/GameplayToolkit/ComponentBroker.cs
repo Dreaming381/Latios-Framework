@@ -219,6 +219,11 @@ namespace Latios
         public bool Exists(Entity entity) => esil.Exists(entity);
 
         /// <summary>
+        /// Returns true if the entity exists and is not in a cleanup state
+        /// </summary>
+        public bool IsAlive(Entity entity) => esil.IsAlive(entity);
+
+        /// <summary>
         /// Checks if the entity has the specific component type. The type does not necessarily need to be a type
         /// in the ComponentBroker, but checking such a type may be slower.
         /// </summary>

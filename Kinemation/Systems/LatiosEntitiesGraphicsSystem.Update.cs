@@ -106,8 +106,11 @@ namespace Latios.Kinemation.Systems
             {
                 m_reuploadAllData = EntitiesGraphicsEditorTools.DebugSettings.ForceInstanceDataUpload;
 
-                if (!m_cullingCallbackFinalJobHandles.IsEmpty)
-                    JobHandle.CompleteAll(m_cullingCallbackFinalJobHandles.AsArray());
+                // Make sure any release culling jobs that have stored pointers in temp allocated
+                // memory have finished before we rewind
+                latiosWorld.GetCollectionComponent<BrgCullingContext>(latiosWorld.worldBlackboardEntity, out var jh, false);
+                m_cullingCallbackFinalJobHandles.Add(jh);
+                JobHandle.CompleteAll(m_cullingCallbackFinalJobHandles.AsArray());
                 m_cullingCallbackFinalJobHandles.Clear();
 
                 // Todo: The implementation of this is not Burst-compatible.
@@ -118,17 +121,15 @@ namespace Latios.Kinemation.Systems
             {
                 JobHandle inputDeps = state.Dependency;
 
-                // Make sure any release culling jobs that have stored pointers in temp allocated
-                // memory have finished before we rewind
-                state.Dependency = default;
-                latiosWorld.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(false);
-                state.CompleteDependency();
-
                 latiosWorld.worldBlackboardEntity.UpdateJobDependency<BrgCullingContext>(default, false);
+                //var materialsContext = latiosWorld.GetCollectionComponent<MaterialPropertiesUploadContext>(latiosWorld.worldBlackboardEntity, out var jh, false);
+                latiosWorld.GetCollectionComponent<MaterialPropertiesUploadContext>(latiosWorld.worldBlackboardEntity, out var jh, false);
+                jh.Complete();
 
                 m_cullPassIndexThisFrame       = 0;
                 m_dispatchPassIndexThisFrame   = 0;
                 m_cullPassIndexForLastDispatch = -1;
+                //m_GPUPersistentInstanceBufferHandle = materialsContext.gpuPersistentInstanceBufferHandle;
 
                 if (latiosWorld.worldBlackboardEntity.HasComponent<EnableCustomGraphicsTag>())
                 {
@@ -164,9 +165,13 @@ namespace Latios.Kinemation.Systems
 
                 latiosWorld.worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new MaterialPropertiesUploadContext
                 {
-                    chunkProperties     = m_ChunkProperties,
-                    valueBlits          = m_ValueBlits,
-                    renderersChunkCount = renderersChunkCount,
+                    chunkProperties                    = m_ChunkProperties,
+                    valueBlits                         = m_ValueBlits,
+                    renderersChunkCount                = renderersChunkCount,
+                    existingBatchIndices               = m_ExistingBatchIndices,
+                    threadedBatchContext               = m_ThreadedBatchContext,
+                    requiredPersistentInstanceDataSize = m_PersistentInstanceDataSize,
+                    gpuPersistentInstanceBufferHandle  = m_GPUPersistentInstanceBufferHandle
                 });
 
                 state.Dependency   = finalJh;
@@ -762,6 +767,7 @@ namespace Latios.Kinemation.Systems
                         Debug.LogError(
                             "Entities Graphics: Current loaded scenes need more than 1GiB of persistent GPU memory. This is more than some GPU backends can allocate. Try to reduce amount of loaded data.");
 
+                    // Todo: We can't move this yet, because Unity has a bug/behavior issue that prevents us from updating the batch handles in OnFinishedCulling.
                     ref var uploadSystem = ref state.WorldUnmanaged.GetUnsafeSystemRef<UploadMaterialPropertiesSystem>(
                         state.WorldUnmanaged.GetExistingUnmanagedSystem<UploadMaterialPropertiesSystem>());
                     if (uploadSystem.SetBufferSize(m_PersistentInstanceDataSize, out var newHandle))
@@ -778,6 +784,7 @@ namespace Latios.Kinemation.Systems
                 {
                     m_ThreadedBatchContext.SetBatchBuffer(new BatchID { value = (uint)b }, m_GPUPersistentInstanceBufferHandle);
                 }
+                //UnityEngine.Debug.Log("Resized buffer before culling.");
             }
         }
     }
