@@ -233,14 +233,14 @@ namespace Latios.Psyshock
 
             mesh.GetVertices(vector3Cache);
 
-            int trisSoFar = 0;
+            int indicesSoFar = 0;
             for (int i = 0; i < mesh.subMeshCount; i++)
             {
                 var descriptor = mesh.GetSubMesh(i);
                 if (descriptor.topology != UnityEngine.MeshTopology.Triangles)
                     continue;
-                mesh.GetIndices(indicesCache.GetSubArray(trisSoFar * 3, descriptor.indexCount), i);
-                trisSoFar += descriptor.indexCount;
+                mesh.GetIndices(indicesCache.GetSubArray(indicesSoFar, descriptor.indexCount), i);
+                indicesSoFar += descriptor.indexCount;
             }
 
             return BuildBlob(ref builder, vector3Cache.Reinterpret<float3>().AsReadOnlySpan(), indicesCache.Reinterpret<int3>(4).AsReadOnlySpan(), in name, allocator);
