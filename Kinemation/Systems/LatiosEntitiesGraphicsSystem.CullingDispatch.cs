@@ -34,10 +34,14 @@ namespace Latios.Kinemation.Systems
             var               wrappedIncludeExcludeList = new WrappedPickingIncludeExcludeList(batchCullingContext.viewType);
             fixed (Unmanaged* unmanaged                 = &m_unmanaged)
             {
-                DoOnPerformCullingBegin(unmanaged, ref CheckedStateRef, ref batchCullingContext, ref cullingOutput, ref wrappedIncludeExcludeList);
-                SuperSystem.UpdateSystem(latiosWorldUnmanaged, m_cullingSuperSystem.SystemHandle);
-                DoOnPerformCullingEnd(unmanaged, out var result);
-                return result;
+                if (DoOnPerformCullingBegin(unmanaged, ref CheckedStateRef, ref batchCullingContext, ref cullingOutput, ref wrappedIncludeExcludeList))
+                {
+                    SuperSystem.UpdateSystem(latiosWorldUnmanaged, m_cullingSuperSystem.SystemHandle);
+                    DoOnPerformCullingEnd(unmanaged, out var result);
+                    return result;
+                }
+                else
+                    return default;
             }
         }
 
