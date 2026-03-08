@@ -371,7 +371,6 @@ namespace Latios.Psyshock
             bool4  insidesX           =
                 (math.abs(edgesClosestAsX.x) <= box.halfSize.x) & (math.abs(edgesClosestAsX.y) <= box.halfSize.y) & (math.abs(edgesClosestAsX.z) <= box.halfSize.z);
             signedDistancesSqX = math.select(signedDistancesSqX, -signedDistancesSqX, insidesX);
-            signedDistancesSqX = math.select(float.MaxValue, signedDistancesSqX, validsX);
 
             // y-axis
             simdFloat3 boxPointsY = new simdFloat3(new float3(box.halfSize.x, -box.halfSize.y, box.halfSize.z),
@@ -391,7 +390,6 @@ namespace Latios.Psyshock
             bool4  insidesY           =
                 (math.abs(edgesClosestAsY.x) <= box.halfSize.x) & (math.abs(edgesClosestAsY.y) <= box.halfSize.y) & (math.abs(edgesClosestAsY.z) <= box.halfSize.z);
             signedDistancesSqY = math.select(signedDistancesSqY, -signedDistancesSqY, insidesY);
-            signedDistancesSqY = math.select(float.MaxValue, signedDistancesSqY, validsY);
 
             // z-axis
             simdFloat3 boxPointsZ = new simdFloat3(new float3(box.halfSize.x, box.halfSize.y, -box.halfSize.z),
@@ -411,37 +409,43 @@ namespace Latios.Psyshock
             bool4  insidesZ           =
                 (math.abs(edgesClosestAsZ.x) <= box.halfSize.x) & (math.abs(edgesClosestAsZ.y) <= box.halfSize.y) & (math.abs(edgesClosestAsZ.z) <= box.halfSize.z);
             signedDistancesSqZ = math.select(signedDistancesSqZ, -signedDistancesSqZ, insidesZ);
-            signedDistancesSqZ = math.select(float.MaxValue, signedDistancesSqZ, validsZ);
 
             //Step 3: Find best result
-            float4     bestAxisSignedDistancesSq = signedDistancesSqX;
-            simdFloat3 bestAxisPointsOnSegment   = edgesClosestAsX;
-            simdFloat3 bestAxisPointsOnBox       = edgesClosestBsX;
-            bool4      yWins                     = (signedDistancesSqY < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqY < 0f));
-            bestAxisSignedDistancesSq            = math.select(bestAxisSignedDistancesSq, signedDistancesSqY, yWins);
-            bestAxisPointsOnSegment              = simd.select(bestAxisPointsOnSegment, edgesClosestAsY, yWins);
-            bestAxisPointsOnBox                  = simd.select(bestAxisPointsOnBox, edgesClosestBsY, yWins);
-            bool4 zWins                          = (signedDistancesSqZ < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqZ < 0f));
-            bestAxisSignedDistancesSq            = math.select(bestAxisSignedDistancesSq, signedDistancesSqZ, zWins);
-            bestAxisPointsOnSegment              = simd.select(bestAxisPointsOnSegment, edgesClosestAsZ, zWins);
-            bestAxisPointsOnBox                  = simd.select(bestAxisPointsOnBox, edgesClosestBsZ, zWins);
-            bool   bBeatsA                       = (bestAxisSignedDistancesSq.y < bestAxisSignedDistancesSq.x) ^ (math.any(bestAxisSignedDistancesSq.xy < 0f));
-            bool   dBeatsC                       = (bestAxisSignedDistancesSq.w < bestAxisSignedDistancesSq.z) ^ (math.any(bestAxisSignedDistancesSq.zw < 0f));
-            float  bestAbSignedDistanceSq        = math.select(bestAxisSignedDistancesSq.x, bestAxisSignedDistancesSq.y, bBeatsA);
-            float  bestCdSignedDistanceSq        = math.select(bestAxisSignedDistancesSq.z, bestAxisSignedDistancesSq.w, dBeatsC);
-            float3 bestAbPointOnSegment          = math.select(bestAxisPointsOnSegment.a, bestAxisPointsOnSegment.b, bBeatsA);
-            float3 bestCdPointOnSegment          = math.select(bestAxisPointsOnSegment.c, bestAxisPointsOnSegment.d, dBeatsC);
-            float3 bestAbPointOnBox              = math.select(bestAxisPointsOnBox.a, bestAxisPointsOnBox.b, bBeatsA);
-            float3 bestCdPointOnBox              = math.select(bestAxisPointsOnBox.c, bestAxisPointsOnBox.d, dBeatsC);
-            bool   cdBeatsAb                     = (bestCdSignedDistanceSq < bestAbSignedDistanceSq) ^ ((bestCdSignedDistanceSq < 0f) | (bestAbSignedDistanceSq < 0f));
-            float  bestSignedDistanceSq          = math.select(bestAbSignedDistanceSq, bestCdSignedDistanceSq, cdBeatsAb);
-            float3 bestPointOnSegment            = math.select(bestAbPointOnSegment, bestCdPointOnSegment, cdBeatsAb);
-            float3 bestPointOnBox                = math.select(bestAbPointOnBox, bestCdPointOnBox, cdBeatsAb);
-            bool   pointsBeatEdges               = (signedDistanceSq <= bestSignedDistanceSq) ^ ((signedDistanceSq < 0f) | (bestSignedDistanceSq < 0f));
-            var    oldBestSignedDistanceSq       = bestSignedDistanceSq;
-            bestSignedDistanceSq                 = math.select(bestSignedDistanceSq, signedDistanceSq, pointsBeatEdges);
-            bestPointOnSegment                   = math.select(bestPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
-            bestPointOnBox                       = math.select(bestPointOnBox, pointsPointOnBox, pointsBeatEdges);
+            float4     bestAxisSignedDistancesSq  = signedDistancesSqX;
+            simdFloat3 bestAxisPointsOnSegment    = edgesClosestAsX;
+            simdFloat3 bestAxisPointsOnBox        = edgesClosestBsX;
+            bool4      yWins                      = (signedDistancesSqY < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqY < 0f));
+            yWins                                &= validsY;
+            bestAxisSignedDistancesSq             = math.select(bestAxisSignedDistancesSq, signedDistancesSqY, yWins);
+            bestAxisPointsOnSegment               = simd.select(bestAxisPointsOnSegment, edgesClosestAsY, yWins);
+            bestAxisPointsOnBox                   = simd.select(bestAxisPointsOnBox, edgesClosestBsY, yWins);
+            bool4 zWins                           = (signedDistancesSqZ < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqZ < 0f));
+            zWins                                &= validsZ;
+            bestAxisSignedDistancesSq             = math.select(bestAxisSignedDistancesSq, signedDistancesSqZ, zWins);
+            bestAxisPointsOnSegment               = simd.select(bestAxisPointsOnSegment, edgesClosestAsZ, zWins);
+            bestAxisPointsOnBox                   = simd.select(bestAxisPointsOnBox, edgesClosestBsZ, zWins);
+            var  validsAxes                       = validsX | validsY | validsZ;
+            bool bBeatsA                          = (bestAxisSignedDistancesSq.y < bestAxisSignedDistancesSq.x) ^ (math.any(bestAxisSignedDistancesSq.xy < 0f));
+            bBeatsA                              &= validsAxes.y;
+            bool dBeatsC                          = (bestAxisSignedDistancesSq.w < bestAxisSignedDistancesSq.z) ^ (math.any(bestAxisSignedDistancesSq.zw < 0f));
+            dBeatsC                              &= validsAxes.w;
+            float  bestAbSignedDistanceSq         = math.select(bestAxisSignedDistancesSq.x, bestAxisSignedDistancesSq.y, bBeatsA);
+            float  bestCdSignedDistanceSq         = math.select(bestAxisSignedDistancesSq.z, bestAxisSignedDistancesSq.w, dBeatsC);
+            float3 bestAbPointOnSegment           = math.select(bestAxisPointsOnSegment.a, bestAxisPointsOnSegment.b, bBeatsA);
+            float3 bestCdPointOnSegment           = math.select(bestAxisPointsOnSegment.c, bestAxisPointsOnSegment.d, dBeatsC);
+            float3 bestAbPointOnBox               = math.select(bestAxisPointsOnBox.a, bestAxisPointsOnBox.b, bBeatsA);
+            float3 bestCdPointOnBox               = math.select(bestAxisPointsOnBox.c, bestAxisPointsOnBox.d, dBeatsC);
+            bool   cdBeatsAb                      = (bestCdSignedDistanceSq < bestAbSignedDistanceSq) ^ ((bestCdSignedDistanceSq < 0f) | (bestAbSignedDistanceSq < 0f));
+            cdBeatsAb                            &= math.any(validsAxes.zw);
+            float  bestSignedDistanceSq           = math.select(bestAbSignedDistanceSq, bestCdSignedDistanceSq, cdBeatsAb);
+            float3 bestPointOnSegment             = math.select(bestAbPointOnSegment, bestCdPointOnSegment, cdBeatsAb);
+            float3 bestPointOnBox                 = math.select(bestAbPointOnBox, bestCdPointOnBox, cdBeatsAb);
+            bool   pointsBeatEdges                = (signedDistanceSq <= bestSignedDistanceSq) ^ ((signedDistanceSq < 0f) | (bestSignedDistanceSq < 0f));
+            pointsBeatEdges                      |= !math.any(validsAxes);
+            var oldBestSignedDistanceSq           = bestSignedDistanceSq;
+            bestSignedDistanceSq                  = math.select(bestSignedDistanceSq, signedDistanceSq, pointsBeatEdges);
+            bestPointOnSegment                    = math.select(bestPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
+            bestPointOnBox                        = math.select(bestPointOnBox, pointsPointOnBox, pointsBeatEdges);
 
             // Step 4: Create result
             float3 boxNormal         = math.normalize(math.select(0f, 1f, bestPointOnBox == box.halfSize) + math.select(0f, -1f, bestPointOnBox == -box.halfSize));
