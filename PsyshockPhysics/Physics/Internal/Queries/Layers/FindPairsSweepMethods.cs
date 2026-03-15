@@ -934,9 +934,9 @@ namespace Latios.Psyshock
                     var index = indicesA[i];
                     if (cellAabb.xmax < bucketA.xmins[index])
                         break;
-                    if (bucketA.xmaxs[i] < cellAabb.xmin)
+                    if (bucketA.xmaxs[index] < cellAabb.xmin)
                         continue;
-                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketA.yzminmaxs[i]) & cellAabb.finiteMask) == 0)
+                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketA.yzminmaxs[index]) & cellAabb.finiteMask) == 0)
                     {
                         xminsA[newCount]     = bucketA.xmins[index];
                         xmaxsA[newCount]     = bucketA.xmaxs[index];
@@ -971,9 +971,9 @@ namespace Latios.Psyshock
                     var index = indicesB[i];
                     if (cellAabb.xmax < bucketB.xmins[index])
                         break;
-                    if (bucketB.xmaxs[i] < cellAabb.xmin)
+                    if (bucketB.xmaxs[index] < cellAabb.xmin)
                         continue;
-                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketB.yzminmaxs[i]) & cellAabb.finiteMask) == 0)
+                    if (math.bitmask((cellAabb.yzMinMaxFlipped < bucketB.yzminmaxs[index]) & cellAabb.finiteMask) == 0)
                     {
                         xminsB[newCount]     = bucketB.xmins[index];
                         xmaxsB[newCount]     = bucketB.xmaxs[index];
