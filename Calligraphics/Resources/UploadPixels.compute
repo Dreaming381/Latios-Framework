@@ -1,0 +1,136 @@
+#pragma kernel UploadPixels
+
+RWTexture2DArray<float> _tmdSdf8;
+RWTexture2DArray<float> _tmdSdf16;
+RWTexture2DArray<float4> _tmdBitmap;
+
+ByteAddressBuffer _src;
+ByteAddressBuffer _meta;
+uint _startOffset;
+uint _flipOffset;
+
+
+[numthreads(64, 1, 1)]
+void UploadPixels(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+{
+    uint4 m = _meta.Load4((groupIds.x + _startOffset) * 16);
+    uint dstZ = m.x & 0xffffu;
+    uint target = m.x >> 30u;
+    uint srcStart = m.y;
+    uint dstX = m.z & 0xffffu;
+    uint dstY = m.z >> 16u;
+    uint width = m.w & 0xffffu;
+    uint height = m.w >>16u;
+    
+    bool flip = _flipOffset != 0u;
+    uint pixelCount = width * height;
+    if (pixelCount == 0)
+        return;
+    
+    if (target == 0)
+    {
+        uint i = 0;
+        for (i = threadId * 4; i < pixelCount; i += 64 * 4)
+        {
+            // Load 4 pixels
+            uint packed4Pixels = _src.Load(srcStart * 4 + i);
+            uint pixelA = packed4Pixels & 0xffu;
+            uint pixelB = (packed4Pixels >> 8u) & 0xffu;
+            uint pixelC = (packed4Pixels >> 16u) & 0xffu;
+            uint pixelD = (packed4Pixels >> 24u);
+
+            float a = pixelA / 255.0;
+            float b = pixelB / 255.0;
+            float c = pixelC / 255.0;
+            float d = pixelD / 255.0;
+            
+            uint x = dstX + (i % width);
+            uint y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf8[uint3(x, y, dstZ)] = a;
+            i++;
+            if (i >= pixelCount)
+                continue;
+            
+            x = dstX + (i % width);
+            y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf8[uint3(x, y, dstZ)] = b;
+            i++;
+            if (i >= pixelCount)
+                continue;
+            
+            x = dstX + (i % width);
+            y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf8[uint3(x, y, dstZ)] = c;
+            i++;
+            if (i >= pixelCount)
+                continue;
+            
+            x = dstX + (i % width);
+            y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf8[uint3(x, y, dstZ)] = d;
+            i -= 3;
+        }
+    }
+    else if (target == 1)
+    {
+        uint i = 0;
+        for (i = threadId * 2; i < pixelCount; i += 64 * 2)
+        {
+            // Load 2 pixels
+            uint packed2Pixels = _src.Load(srcStart * 4 + i * 2);
+            uint pixelA = packed2Pixels & 0xffffu;
+            uint pixelB = packed2Pixels >> 16u;
+            
+            float a = pixelA / 65535.0;
+            float b = pixelB / 65535.0;
+            
+            uint x = dstX + (i % width);
+            uint y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf16[uint3(x, y, dstZ)] = a;
+            i++;
+            if (i >= pixelCount)
+                continue;
+            
+            x = dstX + (i % width);
+            y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdSdf16[uint3(x, y, dstZ)] = b;
+            i--;
+        }
+    }
+    else if (target == 2)
+    {
+        uint i = 0;
+        for (i = threadId; i < pixelCount; i += 64)
+        {
+            // Load pixel
+            uint pixel = _src.Load(srcStart * 4 + i * 4);
+            uint pixelR = pixel & 0xffu;
+            uint pixelG = (pixel >> 8u) & 0xffu;
+            uint pixelB = (pixel >> 16u) & 0xffu;
+            uint pixelA = (pixel >> 24u);
+
+            float r = pixelR / 255.0;
+            float g = pixelG / 255.0;
+            float b = pixelB / 255.0;
+            float a = pixelA / 255.0;
+            
+            uint x = dstX + (i % width);
+            uint y = (i / width) + dstY;
+            if (flip)
+                y = _flipOffset - y;
+            _tmdBitmap[uint3(x, y, dstZ)] = float4(r, g, b, a);
+        }
+    }
+}

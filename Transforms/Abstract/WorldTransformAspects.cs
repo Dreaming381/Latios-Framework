@@ -50,6 +50,13 @@ namespace Latios.Transforms.Abstract
             result.Length                                         = chunk.Count;
             return result;
         }
+
+        public struct HasChecker
+        {
+            HasChecker<WorldTransform> checker;
+
+            public bool this[ArchetypeChunk chunk] => checker[chunk];
+        }
     }
 }
 
@@ -111,6 +118,13 @@ namespace Latios.Transforms.Abstract
             result.WorldTransformReadOnlyAspect_localToWorldNaC = chunk.GetNativeArray(ref ltwHandle);
             result.Length                                       = chunk.Count;
             return result;
+        }
+
+        public struct HasChecker
+        {
+            HasChecker<LocalToWorld> checker;
+
+            public bool this[ArchetypeChunk chunk] => checker[chunk];
         }
     }
 }

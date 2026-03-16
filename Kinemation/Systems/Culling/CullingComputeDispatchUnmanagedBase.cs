@@ -100,6 +100,54 @@ namespace Latios.Kinemation
             previousUpdateJH = state.Dependency;
 #endif
         }
+
+        /// <summary>
+        /// Perform the OnUpdate() routine of the system, which will then call one of the callbacks specified by the ICullingComputeDispatchSystem interface.
+        /// </summary>
+        /// <typeparam name="TSystem">The type of system that owns this instance</typeparam>
+        /// <param name="state">The SystemState of the system that owns this instance</param>
+        /// <param name="system">The system that owns this instance</param>
+        public void DoUpdateManaged<TSystem>(ref SystemState state, TSystem system) where TSystem : ICullingComputeDispatchSystem<TCollect, TWrite>
+        {
+            var activeState = worldBlackboardEntity.GetComponentData<CullingComputeDispatchActiveState>();
+            if (activeState.state != nextExpectedState)
+            {
+                UnityEngine.Debug.LogError("The CullingComputeDispatch expected state does not match the current state. Behavior may not be correct.");
+            }
+#if LATIOS_BL_FORK
+            previousUpdateJH.Complete();
+#endif
+            switch (activeState.state)
+            {
+                case CullingComputeDispatchState.Collect:
+                    collected         = system.Collect(ref state);
+                    nextExpectedState = CullingComputeDispatchState.Write;
+                    break;
+                case CullingComputeDispatchState.Write:
+                    written           = system.Write(ref state, ref collected);
+                    nextExpectedState = CullingComputeDispatchState.Dispatch;
+                    break;
+                case CullingComputeDispatchState.Dispatch:
+                    system.Dispatch(ref state, ref written);
+                    nextExpectedState = CullingComputeDispatchState.Collect;
+                    break;
+            }
+#if LATIOS_BL_FORK
+            previousUpdateJH = state.Dependency;
+#endif
+        }
+    }
+
+    public enum CullingComputeDispatchState : byte
+    {
+        Collect,
+        Write,
+        Dispatch,
+    }
+
+    public struct CullingComputeDispatchActiveState : IComponentData
+    {
+        public CullingComputeDispatchState state;
     }
 }
 

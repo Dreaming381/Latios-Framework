@@ -255,6 +255,27 @@ namespace Latios.Kinemation
                 throw new System.InvalidOperationException("Dispatching the Compute Shader failed.");
 #endif
         }
+
+        /// <summary>
+        /// Sets the requestMipMapLevel value for the texture after performing a null check.
+        /// </summary>
+        /// <param name="texture">The texture to set the mipmap level for</param>
+        /// <param name="mipMapLevel">The mipmap level to set, where 0 is the highest resolution</param>
+        public static void RequestMipMapLevelIfValid(this UnityObjectRef<Texture2D> texture, int mipMapLevel)
+        {
+            var context = new RequestMipMapLevelContext
+            {
+                texture     = texture,
+                mipMapLevel = mipMapLevel,
+                success     = false
+            };
+            DoManagedExecute((IntPtr)(&context), 18);
+
+#if ENABLE_UNITY_COLLECTIONS_CHECKS
+            if (!context.success)
+                throw new System.InvalidOperationException("Setting the mipmap level failed.");
+#endif
+        }
         #endregion
 
         #region Internal
@@ -594,6 +615,14 @@ namespace Latios.Kinemation
             public GraphicsBufferHandle bufferHandle;
             public bool                 success;
         }
+
+        // Code 18
+        struct RequestMipMapLevelContext
+        {
+            public UnityObjectRef<Texture2D> texture;
+            public int                       mipMapLevel;
+            public bool                      success;
+        }
         #endregion
 
         static void DoManagedExecute(IntPtr context, int operation)
@@ -773,6 +802,15 @@ namespace Latios.Kinemation
                         var     buffer   = buffers[ctx.listIndex];
                         ctx.bufferHandle = buffer.bufferHandle;
                         ctx.success      = true;
+                        break;
+                    }
+                    case 18:
+                    {
+                        ref var ctx     = ref *(RequestMipMapLevelContext*)context;
+                        var     texture = ctx.texture.Value;
+                        if (texture != null)
+                            texture.requestedMipmapLevel = ctx.mipMapLevel;
+                        ctx.success                      = true;
                         break;
                     }
                 }

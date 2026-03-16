@@ -1,5 +1,6 @@
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Jobs;
 using Unity.Mathematics;
 
 namespace Latios
@@ -12,6 +13,20 @@ namespace Latios
     /// </summary>
     public interface IAutoDestroyExpirable : IEnableableComponent
     {
+    }
+
+    public partial struct AutoDestroyExpirationJournal : ICollectionComponent
+    {
+        public struct RemovedFromLinkedEntityGroup
+        {
+            public Entity linkedEntityGroupOwner;
+            public Entity entityRemoved;
+        }
+
+        public NativeStream destroyedEntitiesStream;  // Contains Entity instances
+        public NativeStream removedFromLinkedEntityGroupStream;  // Contains RemovedFromLinkedEntityGroup instances
+
+        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;  // Uses WorldUpdateAllocator
     }
 }
 

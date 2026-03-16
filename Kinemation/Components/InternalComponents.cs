@@ -1,5 +1,5 @@
 using System;
-using Latios.Kinemation.InternalSourceGen;
+using System.Collections.Generic;
 using Latios.Psyshock;
 using Unity.Collections;
 using Unity.Entities;
@@ -11,18 +11,6 @@ using UnityEngine.Rendering;
 namespace Latios.Kinemation
 {
     #region Meshes
-    namespace InternalSourceGen
-    {
-        public struct SkeletonDependent : ICleanupComponentData
-        {
-            public EntityWith<SkeletonRootTag>                  root;
-            public BlobAssetReference<MeshBindingPathsBlob>     meshBindingBlob;
-            public BlobAssetReference<SkeletonBindingPathsBlob> skeletonBindingBlob;
-            public int                                          boneOffsetEntryIndex;
-            public int                                          indexInDependentSkinnedMeshesBuffer;
-        }
-    }
-
     internal struct BoundMesh : ICleanupComponentData
     {
         public BlobAssetReference<MeshDeformDataBlob> meshBlob;
@@ -76,22 +64,6 @@ namespace Latios.Kinemation
     #endregion
 
     #region Skeletons
-    namespace InternalSourceGen
-    {
-        // This is system state to prevent copies on instantiate
-        [InternalBufferCapacity(1)]
-        public struct DependentSkinnedMesh : ICleanupBufferElementData
-        {
-            public EntityWith<SkeletonDependent> skinnedMesh;
-            // Todo: Store entry indices instead?
-            public uint meshVerticesStart;
-            public uint meshWeightsStart;
-            public uint meshBindPosesStart;
-            public uint boneOffsetsCount;
-            public uint boneOffsetsStart;
-        }
-    }
-
     internal struct SkeletonWorldBoundsOffsetsFromPosition : IComponentData
     {
         public float3 minOffset;
@@ -397,8 +369,6 @@ namespace Latios.Kinemation
         public NativeList<UnityObjectRef<UnityEngine.Mesh> > unusedMeshes;
         public NativeList<UnityObjectRef<UnityEngine.Mesh> > allMeshes;
         // int = BatchMeshID as int, which is MaterialMeshInfo.Mesh. MaterialMeshInfo.MeshID asserts when using ranges with a mesh override.
-        public NativeHashSet<int>                                    invalidMeshesToCull;
-        public NativeHashSet<int>                                    meshesPrevalidatedThisFrame;
         public NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, int>  meshToIdMap;
         public NativeHashMap<int, UnityObjectRef<UnityEngine.Mesh> > idToMeshMap;
 
@@ -410,14 +380,27 @@ namespace Latios.Kinemation
                 GraphicsUnmanaged.DestroyMeshes(allMeshes.AsArray());
                 unusedMeshes.Dispose();
                 allMeshes.Dispose();
-                invalidMeshesToCull.Dispose();
-                meshesPrevalidatedThisFrame.Dispose();
                 meshToIdMap.Dispose();
                 idToMeshMap.Dispose();
                 return default;
             }
             return inputDeps;
         }
+    }
+
+    [InternalBufferCapacity(0)]
+    internal struct MipMapStreamingAssignment : IBufferElementData
+    {
+        public UnityObjectRef<UnityEngine.Texture2D> texture;
+        public int                                   level;
+    }
+
+    [InternalBufferCapacity(0)]
+    internal struct MipMapCameraParameters : IBufferElementData
+    {
+        public float3 position;
+        public float  cameraFactor;
+        public bool   isPerspective;
     }
     #endregion
 }

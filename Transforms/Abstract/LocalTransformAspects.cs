@@ -1,4 +1,4 @@
-using Unity.Entities;
+/*using Unity.Entities;
 
 namespace Latios.Transforms.Abstract
 {
@@ -43,5 +43,6 @@ namespace Latios.Transforms.Abstract
         }
 #endif
     }
-}
+   }
+ */
 

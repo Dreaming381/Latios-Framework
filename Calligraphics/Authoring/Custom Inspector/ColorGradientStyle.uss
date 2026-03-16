@@ -1,0 +1,24 @@
+.unity-color-field__input {
+    flex-shrink: 0;
+    min-width: 40px;
+}
+
+.unity-color-field__label {
+    min-width: 20px;
+    flex-wrap: wrap;
+}
+
+.unity-color-field {
+}
+
+.unity-label {
+    -unity-text-align: upper-right;
+    min-width: 20px;
+}
+
+.color-panel {
+    flex-direction: row;
+    align-self: flex-end;
+    justify-content: space-evenly;
+    min-width: 120px;
+}

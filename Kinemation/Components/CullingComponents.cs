@@ -15,11 +15,55 @@ namespace Latios.Kinemation
     public struct RenderVisibilityFeedbackFlag : IComponentData, IEnableableComponent { }
 
     /// <summary>
-    /// Add to the WorldBlackboardEntity to enable the custom graphics systems which update before all culling.
-    /// This has the negative effect of forcing several jobs to complete prior to engine code updates,
-    /// potentially starving worker threads.
+    /// A struct which defines features that can be optionally enabled to run prior to culling in
+    /// order to support custom graphics operations which require the outputs of these features.
+    /// By default, all of these features are disabled during custom graphics for performance reasons.
+    /// These features are still (additionally) ran after culling for normal rendering purposes.
     /// </summary>
-    public struct EnableCustomGraphicsTag : IComponentData { }
+    public struct EnableUpdatingInCustomGraphics : IComponentData
+    {
+        byte packed;
+        /// <summary>
+        /// Enable the system that uploads Dynamic Meshes to also run during the custom graphics phase
+        /// </summary>
+        public bool dynamicMeshes
+        {
+            get => Bits.GetBit(packed, 0);
+            set => Bits.SetBit(ref packed, 0, value);
+        }
+        /// <summary>
+        /// Enable the system that processes blend shapes to also run during the custom graphics phase
+        /// </summary>
+        public bool blendShapes
+        {
+            get => Bits.GetBit(packed, 1);
+            set => Bits.SetBit(ref packed, 1, value);
+        }
+        /// <summary>
+        /// Enable the system that processes skinned mesh skeletal deformations to also run during the custom graphics phase
+        /// </summary>
+        public bool skinning
+        {
+            get => Bits.GetBit(packed, 2);
+            set => Bits.SetBit(ref packed, 2, value);
+        }
+        /// <summary>
+        /// Enable the system that uploads material properties to also run during the custom graphics phase
+        /// </summary>
+        public bool materialProperties
+        {
+            get => Bits.GetBit(packed, 3);
+            set => Bits.SetBit(ref packed, 3, value);
+        }
+        /// <summary>
+        /// Enable the system that processes Calligraphics text to also run during the custom graphics phase
+        /// </summary>
+        public bool text
+        {
+            get => Bits.GetBit(packed, 3);
+            set => Bits.SetBit(ref packed, 3, value);
+        }
+    }
 
     /// <summary>
     /// Add to a rendered entity such as a deforming mesh if you only intend to use it for custom graphics rendering.
@@ -149,13 +193,15 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
-    /// Useful GPU dispatch parameters for the current dispatch pass (OnPerformCulling in 2022 LTS, OnFinishedCulling in Unity 6)
+    /// Useful GPU dispatch parameters for the current dispatch pass
     /// </summary>
     public struct DispatchContext : IComponentData
     {
         public uint globalSystemVersionOfLatiosEntitiesGraphics;
         public uint lastSystemVersionOfLatiosEntitiesGraphics;
         public int  dispatchIndexThisFrame;
+
+        public bool isCustomGraphicsDispatch => dispatchIndexThisFrame == 0;
     }
 
     /// <summary>

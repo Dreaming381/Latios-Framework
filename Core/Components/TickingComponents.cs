@@ -1,4 +1,3 @@
-#if false
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -20,9 +19,8 @@ namespace Latios
     internal struct TickLocalTiming : IComponentData
     {
         public double elapsedTime;
-        public float deltaTime;
-        public int ticksThisFrame;
+        public float  deltaTime;
+        public int    ticksThisFrame;
     }
 }
-#endif
 

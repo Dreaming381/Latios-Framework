@@ -93,12 +93,16 @@ namespace Latios.Kinemation.Authoring.Systems
 
             var renderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo>().WithAllRW<BakingMaterialMeshSubmesh>()
                                                 .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
-            var meshMap       = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, WorldUpdateAllocator);
-            var materialMap   = new NativeHashMap<UnityObjectRef<Material>, int>(128, WorldUpdateAllocator);
-            var meshList      = new NativeList<UnityObjectRef<Mesh> >(WorldUpdateAllocator);
-            var materialList  = new NativeList<UnityObjectRef<Material> >(WorldUpdateAllocator);
-            var rangesList    = new NativeList<MaterialMeshIndex>(WorldUpdateAllocator);
-            var duplicatesMap = new NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>(128, WorldUpdateAllocator);
+            var mipmapRenderablesWithLightmapsQuery = QueryBuilder().WithAll<LightMaps, MaterialMeshInfo, BakingMaterialMeshSubmesh>()
+                                                      .WithAll<BakingStreamingTexture, BakingStreamingTextureMeshUv0Metric, StreamingMipMapArray>()
+                                                      .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
+            var meshMap               = new NativeHashMap<UnityObjectRef<Mesh>, int>(128, WorldUpdateAllocator);
+            var materialMap           = new NativeHashMap<UnityObjectRef<Material>, int>(128, WorldUpdateAllocator);
+            var meshList              = new NativeList<UnityObjectRef<Mesh> >(WorldUpdateAllocator);
+            var materialList          = new NativeList<UnityObjectRef<Material> >(WorldUpdateAllocator);
+            var rangesList            = new NativeList<MaterialMeshIndex>(WorldUpdateAllocator);
+            var duplicatesMap         = new NativeParallelMultiHashMap<PossiblyUniqueMMI, Entity>(128, WorldUpdateAllocator);
+            var streamingTexturesList = new NativeList<StreamingMipMapArray.StreamingTextureInMaterial>(WorldUpdateAllocator);
             if (!renderablesWithLightmapsQuery.IsEmptyIgnoreFilter)
             {
                 new CollectUniqueMeshesAndMaterialsJob
@@ -120,15 +124,54 @@ namespace Latios.Kinemation.Authoring.Systems
                 var rma = CreateRenderMeshArrayFromRefArrays(meshList.AsArray(), materialList.AsArray(), rangesList.AsArray());
                 state.EntityManager.SetSharedComponentManaged(renderablesWithLightmapsQuery, rma);
 
+                if (!mipmapRenderablesWithLightmapsQuery.IsEmptyIgnoreFilter)
+                {
+                    var mipmapRanges = CollectionHelper.CreateNativeArray<StreamingMipMapArray.RangeByMaterial>(materialList.Length,
+                                                                                                                WorldUpdateAllocator,
+                                                                                                                NativeArrayOptions.ClearMemory);
+                    var meshMetrics = CollectionHelper.CreateNativeArray<StreamingMipMapArray.MeshMetric>(meshList.Length, WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+                    new CollectStreamingTexturesJob
+                    {
+                        materialMap = materialMap,
+                        meshMap     = meshMap,
+                        meshMetrics = meshMetrics,
+                        ranges      = mipmapRanges,
+                    }.Run(mipmapRenderablesWithLightmapsQuery);
+                    new PrefixSumStreamingTextureRangesJob
+                    {
+                        ranges   = mipmapRanges,
+                        textures = streamingTexturesList
+                    }.Run();
+                    new AssignStreamingTexturesJob
+                    {
+                        materialMap = materialMap,
+                        ranges      = mipmapRanges,
+                        textures    = streamingTexturesList.AsArray()
+                    }.Run(mipmapRenderablesWithLightmapsQuery);
+                    var smma = new StreamingMipMapArray
+                    {
+                        ranges              = mipmapRanges.ToArray(),
+                        streamingTextures   = streamingTexturesList.AsArray().ToArray(),
+                        meshMetrics         = meshMetrics.ToArray(),
+                        renderMeshArrayHash = rma.GetHash128(),
+                        metadataHash        = StreamingMipMapArray.ComputeMetadataHash(streamingTexturesList.AsArray().AsSpan(), mipmapRanges.AsSpan(), meshMetrics.AsSpan())
+                    };
+                    state.EntityManager.SetSharedComponentManaged(mipmapRenderablesWithLightmapsQuery, smma);
+                }
+
                 meshMap.Clear();
                 meshList.Clear();
                 materialMap.Clear();
                 materialList.Clear();
                 rangesList.Clear();
                 duplicatesMap.Clear();
+                streamingTexturesList.Clear();
             }
             var renderablesWithoutLightmapsQuery = QueryBuilder().WithAll<MaterialMeshInfo>().WithAllRW<BakingMaterialMeshSubmesh>().WithAbsent<LightMaps>()
                                                    .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
+            var mipmapRenderablesWithoutLightmapsQuery = QueryBuilder().WithAll<MaterialMeshInfo, BakingMaterialMeshSubmesh, BakingStreamingTexture>()
+                                                         .WithAll<BakingStreamingTextureMeshUv0Metric, StreamingMipMapArray>().WithAbsent<LightMaps>()
+                                                         .WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).Build();
             if (!renderablesWithoutLightmapsQuery.IsEmptyIgnoreFilter)
             {
                 new CollectUniqueMeshesAndMaterialsJob
@@ -149,6 +192,41 @@ namespace Latios.Kinemation.Authoring.Systems
                 }.Run(renderablesWithoutLightmapsQuery);
                 var rma = CreateRenderMeshArrayFromRefArrays(meshList.AsArray(), materialList.AsArray(), rangesList.AsArray());
                 state.EntityManager.SetSharedComponentManaged(renderablesWithoutLightmapsQuery, rma);
+
+                if (!mipmapRenderablesWithoutLightmapsQuery.IsEmptyIgnoreFilter)
+                {
+                    var mipmapRanges = CollectionHelper.CreateNativeArray<StreamingMipMapArray.RangeByMaterial>(materialList.Length,
+                                                                                                                WorldUpdateAllocator,
+                                                                                                                NativeArrayOptions.ClearMemory);
+                    var meshMetrics = CollectionHelper.CreateNativeArray<StreamingMipMapArray.MeshMetric>(meshList.Length, WorldUpdateAllocator, NativeArrayOptions.ClearMemory);
+                    new CollectStreamingTexturesJob
+                    {
+                        materialMap = materialMap,
+                        meshMap     = meshMap,
+                        meshMetrics = meshMetrics,
+                        ranges      = mipmapRanges,
+                    }.Run(mipmapRenderablesWithoutLightmapsQuery);
+                    new PrefixSumStreamingTextureRangesJob
+                    {
+                        ranges   = mipmapRanges,
+                        textures = streamingTexturesList
+                    }.Run();
+                    new AssignStreamingTexturesJob
+                    {
+                        materialMap = materialMap,
+                        ranges      = mipmapRanges,
+                        textures    = streamingTexturesList.AsArray()
+                    }.Run(mipmapRenderablesWithoutLightmapsQuery);
+                    var smma = new StreamingMipMapArray
+                    {
+                        ranges              = mipmapRanges.ToArray(),
+                        streamingTextures   = streamingTexturesList.AsArray().ToArray(),
+                        meshMetrics         = meshMetrics.ToArray(),
+                        renderMeshArrayHash = rma.GetHash128(),
+                        metadataHash        = StreamingMipMapArray.ComputeMetadataHash(streamingTexturesList.AsArray().AsSpan(), mipmapRanges.AsSpan(), meshMetrics.AsSpan())
+                    };
+                    state.EntityManager.SetSharedComponentManaged(mipmapRenderablesWithoutLightmapsQuery, smma);
+                }
             }
 
             m_lightmapBakingContext.EndConversion();
@@ -337,6 +415,130 @@ namespace Latios.Kinemation.Authoring.Systems
 
                     mmi = MaterialMeshInfo.FromMaterialMeshIndexRange(rangesStartIndex, math.min(buffer.Length, 127));
                     duplicateRangesFilterMap.Add(key, entity);
+                }
+            }
+        }
+
+        [BurstCompile]
+        partial struct CollectStreamingTexturesJob : IJobEntity
+        {
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Mesh>, int>     meshMap;
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Material>, int> materialMap;
+            public NativeArray<StreamingMipMapArray.RangeByMaterial>       ranges;
+            public NativeArray<StreamingMipMapArray.MeshMetric>            meshMetrics;
+
+            public void Execute(in DynamicBuffer<BakingStreamingTexture> textureBuffer, in DynamicBuffer<BakingStreamingTextureMeshUv0Metric> metricBuffer)
+            {
+                bool                     isAdding              = false;
+                UnityObjectRef<Material> previousMaterial      = default;
+                int                      previousMaterialIndex = -1;
+                foreach (var texture in textureBuffer)
+                {
+                    if (texture.material != previousMaterial)
+                    {
+                        previousMaterial = texture.material;
+                        isAdding         = false;
+                        if (materialMap.TryGetValue(texture.material, out previousMaterialIndex))
+                        {
+                            if (ranges[previousMaterialIndex].count == 0)
+                            {
+                                var range = ranges[previousMaterialIndex];
+                                range.count++;
+                                ranges[previousMaterialIndex] = range;
+                                isAdding                      = true;
+                            }
+                        }
+                    }
+                    else if (isAdding)
+                    {
+                        var range = ranges[previousMaterialIndex];
+                        range.count++;
+                        ranges[previousMaterialIndex] = range;
+                    }
+                }
+
+                foreach (var metric in metricBuffer)
+                {
+                    if (meshMap.TryGetValue(metric.mesh, out var meshIndex))
+                        meshMetrics[meshIndex] = new StreamingMipMapArray.MeshMetric
+                        {
+                            uv0Metric       = metric.uv0Metric,
+                            meshLocalBounds = metric.localBoundsExtents,
+                        };
+                }
+            }
+        }
+
+        [BurstCompile]
+        struct PrefixSumStreamingTextureRangesJob : IJob
+        {
+            public NativeArray<StreamingMipMapArray.RangeByMaterial>           ranges;
+            public NativeList<StreamingMipMapArray.StreamingTextureInMaterial> textures;
+
+            public void Execute()
+            {
+                int running = 0;
+                for (int i = 0; i < ranges.Length; i++)
+                {
+                    var range    = ranges[i];
+                    range.start  = running;
+                    running     += range.count;
+                    range.count  = 0;
+                    ranges[i]    = range;
+                }
+                textures.Resize(running, NativeArrayOptions.ClearMemory);
+            }
+        }
+
+        [BurstCompile]
+        partial struct AssignStreamingTexturesJob : IJobEntity
+        {
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Material>, int>      materialMap;
+            public NativeArray<StreamingMipMapArray.RangeByMaterial>            ranges;
+            public NativeArray<StreamingMipMapArray.StreamingTextureInMaterial> textures;
+
+            public void Execute(in DynamicBuffer<BakingStreamingTexture> textureBuffer)
+            {
+                bool                     isAdding              = false;
+                UnityObjectRef<Material> previousMaterial      = default;
+                int                      previousMaterialIndex = -1;
+                foreach (var texture in textureBuffer)
+                {
+                    if (texture.material != previousMaterial)
+                    {
+                        previousMaterial = texture.material;
+                        isAdding         = false;
+                        if (materialMap.TryGetValue(texture.material, out previousMaterialIndex))
+                        {
+                            if (ranges[previousMaterialIndex].count == 0)
+                            {
+                                var range                           = ranges[previousMaterialIndex];
+                                textures[range.start + range.count] = new StreamingMipMapArray.StreamingTextureInMaterial
+                                {
+                                    streamingTexture = texture.texture,
+                                    texelCount       = texture.texelCount,
+                                    textureScale     = texture.uvScale,
+                                    mipmapCount      = texture.mipmapCount,
+                                };
+                                range.count++;
+                                ranges[previousMaterialIndex] = range;
+                                isAdding                      = true;
+                            }
+                        }
+                    }
+                    else if (isAdding)
+                    {
+                        var range                           = ranges[previousMaterialIndex];
+                        textures[range.start + range.count] = new StreamingMipMapArray.StreamingTextureInMaterial
+                        {
+                            streamingTexture = texture.texture,
+                            texelCount       = texture.texelCount,
+                            textureScale     = texture.uvScale,
+                            mipmapCount      = texture.mipmapCount,
+                        };
+                        range.count++;
+                        ranges[previousMaterialIndex] = range;
+                    }
                 }
             }
         }

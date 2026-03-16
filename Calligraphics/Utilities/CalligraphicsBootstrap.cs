@@ -20,23 +20,10 @@ namespace Latios.Calligraphics
             if (world.Flags.HasFlag(WorldFlags.Conversion))
                 throw new System.InvalidOperationException("Cannot install Calligraphics runtime in a conversion world.");
 
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.GenerateGlyphsSystem>(),                    world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingUpdateSystem>(),     world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.TextRenderingDispatchSystem>(),   world);
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Rendering.Systems.GpuResidentTextDispatchSystem>(), world);
-        }
-
-        /// <summary>
-        /// Installs Calligraphics into the World in the PresentationSystemGroup.
-        /// Install this only in Runtime Worlds.
-        /// </summary>
-        /// <param name="world">The world in which Calligraphics should be installed</param>
-        public static void InstallCalligraphicsAnimations(World world)
-        {
-            if (world.Flags.HasFlag(WorldFlags.Conversion))
-                throw new System.InvalidOperationException("Cannot install Calligraphics runtime in a conversion world.");
-
-            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.AnimateTextTransitionSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.CalligraphicsFrameSyncPointSuperSystem>(),  world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.CalligraphicsRenderSyncPointSuperSystem>(), world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.CalligraphicsPresentationSuperSystem>(),    world);
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<Systems.DispatchGlyphsSystem>(),                    world);
         }
     }
 }

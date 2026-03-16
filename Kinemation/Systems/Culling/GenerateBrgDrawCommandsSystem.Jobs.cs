@@ -62,18 +62,14 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         unsafe struct EmitDrawCommandsJob : IJobParallelForDefer
         {
-            [ReadOnly] public NativeArray<ArchetypeChunk>                                              chunksToProcess;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>                           chunkPerCameraCullingMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask>                     chunkPerCameraCullingSplitsMaskHandle;
-            [ReadOnly] public ComponentTypeHandle<LodCrossfade>                                        lodCrossfadeHandle;
-            [ReadOnly] public ComponentTypeHandle<SpeedTreeCrossfadeTag>                               speedTreeCrossfadeTagHandle;
-            [ReadOnly] public ComponentTypeHandle<UseMmiRangeLodTag>                                   useMmiRangeLodTagHandle;
-            [ReadOnly] public ComponentTypeHandle<OverrideMeshInRangeTag>                              overrideMeshInRangeTagHandle;
-            [ReadOnly] public ComponentTypeHandle<RendererPriority>                                    rendererPriorityHandle;
-            [ReadOnly] public ComponentTypeHandle<MeshLod>                                             meshLodHandle;
-            [ReadOnly] public ComponentTypeHandle<PromiseAllEntitiesInChunkUseSameMaterialMeshInfoTag> promiseHandle;
-            [ReadOnly] public EntityQueryMask                                                          motionVectorDeformQueryMask;
-            public bool                                                                                splitsAreValid;
+            [ReadOnly] public NativeArray<ArchetypeChunk>                          chunksToProcess;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingMask>       chunkPerCameraCullingMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkPerCameraCullingSplitsMask> chunkPerCameraCullingSplitsMaskHandle;
+            [ReadOnly] public ComponentTypeHandle<LodCrossfade>                    lodCrossfadeHandle;
+            [ReadOnly] public ComponentTypeHandle<RendererPriority>                rendererPriorityHandle;
+            [ReadOnly] public ComponentTypeHandle<MeshLod>                         meshLodHandle;
+            [ReadOnly] public EntityQueryMask                                      motionVectorDeformQueryMask;
+            public bool                                                            splitsAreValid;
 
             //[ReadOnly] public IndirectList<ChunkVisibilityItem> VisibilityItems;
             [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
@@ -84,8 +80,6 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> WorldTransform;
 #endif
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>          PostProcessMatrix;
-            [ReadOnly] public ComponentTypeHandle<DepthSorted_Tag>            DepthSorted;
-            [ReadOnly] public ComponentTypeHandle<PerVertexMotionVectors_Tag> ProceduralMotion;
             [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>      RenderMeshArray;
             [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> RenderFilterSettings;
             [ReadOnly] public SharedComponentTypeHandle<LightMaps>            LightMaps;
@@ -103,6 +97,13 @@ namespace Latios.Kinemation.Systems
 #if UNITY_EDITOR
             [ReadOnly] public SharedComponentTypeHandle<EditorRenderData> EditorDataComponentHandle;
 #endif
+
+            HasChecker<DepthSorted_Tag>                                     depthSortedChecker;
+            HasChecker<UseMmiRangeLodTag>                                   useMmiRangeLodChecker;
+            HasChecker<OverrideMeshInRangeTag>                              overrideMeshInRangeChecker;
+            HasChecker<PromiseAllEntitiesInChunkUseSameMaterialMeshInfoTag> promiseChecker;
+            HasChecker<PerVertexMotionVectors_Tag>                          vertexMotionVectorsChecker;
+            HasChecker<SpeedTreeCrossfadeTag>                               speedTreeChecker;
 
             public void Execute(int i)
             {
@@ -144,11 +145,11 @@ namespace Latios.Kinemation.Systems
                     var  meshLods            = chunk.GetComponentDataPtrRO(ref meshLodHandle);
                     var  meshLodCrossfades   = chunk.GetEnabledMask(ref meshLodHandle);
                     bool hasPostProcess      = postProcessMatrices != null;
-                    bool isDepthSorted       = chunk.Has(ref DepthSorted);
+                    bool isDepthSorted       = depthSortedChecker[chunk];
                     bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
                     bool hasLodCrossfade     = lodCrossfades != null;
-                    bool useMmiRangeLod      = chunk.Has(ref useMmiRangeLodTagHandle);
-                    bool hasOverrideMesh     = chunk.Has(ref overrideMeshInRangeTagHandle);
+                    bool useMmiRangeLod      = useMmiRangeLodChecker[chunk];
+                    bool hasOverrideMesh     = overrideMeshInRangeChecker[chunk];
 
                     BatchDrawCommandFlags chunkFlags = default;
 
@@ -168,7 +169,7 @@ namespace Latios.Kinemation.Systems
                         if (hasPostProcess)
                             transformChanged     |= chunk.DidChange(ref PostProcessMatrix, LastSystemVersion);
                         bool isDeformed           = motionVectorDeformQueryMask.MatchesIgnoreFilter(chunk);
-                        bool hasProceduralMotion  = chunk.Has(ref ProceduralMotion);
+                        bool hasProceduralMotion  = vertexMotionVectorsChecker[chunk];
                         hasMotion                 = orderChanged || transformChanged || isDeformed || hasProceduralMotion;
                         if (hasMotion)
                             chunkFlags |= BatchDrawCommandFlags.HasMotion;
@@ -179,7 +180,7 @@ namespace Latios.Kinemation.Systems
                     var mask              = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingMaskHandle).ValueRO;
                     var splitsMask        = chunk.GetChunkComponentRefRO(ref chunkPerCameraCullingSplitsMaskHandle);
                     var crossFadeEnableds = hasLodCrossfade ? chunk.GetEnabledMask(ref lodCrossfadeHandle) : default;
-                    var isSpeedTree       = hasLodCrossfade && chunk.Has(ref speedTreeCrossfadeTagHandle);
+                    var isSpeedTree       = hasLodCrossfade && speedTreeChecker[chunk];
 
                     float* depthSortingTransformsPtr = null;
                     int    transformStrideInFloats   = 0;
@@ -254,7 +255,7 @@ namespace Latios.Kinemation.Systems
                         positionOffsetInFloats  = positionOffsetInFloats,
                     };
 
-                    if (chunk.Has(ref promiseHandle))
+                    if (promiseChecker[chunk])
                     {
                         if (ExecuteBatched(in chunk, ref mask, in splitsMask.ValueRO, ref drawCommandSettings, in entityDrawSettings, useMmiRangeLod, meshLods, rendererPriorities,
                                            in entitiesGraphicsChunkInfo, materialMeshInfos, in brgRenderMeshArray, chunkFlags))

@@ -182,6 +182,14 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            var dispatchContext = latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>();
+            if (dispatchContext.isCustomGraphicsDispatch)
+            {
+                var features = latiosWorld.worldBlackboardEntity.GetComponentData<EnableUpdatingInCustomGraphics>();
+                if (!features.dynamicMeshes && !features.blendShapes && !features.skinning)
+                    return;
+            }
+
             var chunkList = new NativeList<ArchetypeChunk>(m_metaQuery.CalculateEntityCountWithoutFiltering(), state.WorldUpdateAllocator);
 
             state.Dependency = new FindChunksNeedingCopyingJob

@@ -159,6 +159,33 @@ namespace Latios.Kinemation
     /// </summary>
     public struct DualQuaternionSkinningDeformTag : IComponentData { }
 
+    /// <summary>
+    /// A component used to track the binding of a skinned mesh to a skeleton.
+    /// Usage: ReadOnly, do not modify in any way.
+    /// </summary>
+    public struct SkeletonDependent : ICleanupComponentData
+    {
+        /// <summary>
+        /// The Skeleton entity this skinned mesh is currently bound to
+        /// </summary>
+        public EntityWith<SkeletonRootTag> root;
+        /// <summary>
+        /// The binding paths that the mesh used, for ref-counting purposes
+        /// </summary>
+        public BlobAssetReference<MeshBindingPathsBlob> meshBindingBlob;
+        /// <summary>
+        /// The binding paths of the skeleton bound to, for ref-counting purposes
+        /// </summary>
+        public BlobAssetReference<SkeletonBindingPathsBlob> skeletonBindingBlob;
+        /// <summary>
+        /// The index into an internal table which defines the relationship between skeleton bones and mesh bone influences
+        /// </summary>
+        public int boneOffsetEntryIndex;
+        /// <summary>
+        /// The index of this mesh in the skeleton's DynamicBuffer<DependentSkinnedMesh>
+        /// </summary>
+        public int indexInDependentSkinnedMeshesBuffer;
+    }
     #endregion
 
     #region Other Mesh Deformations
@@ -254,7 +281,9 @@ namespace Latios.Kinemation
     #region Unique Meshes
     /// <summary>
     /// When present, this component specifies that this entity has a UniqueMesh.
-    /// Enable this component to mark the mesh as dirty.
+    /// Enable this component to mark the mesh as dirty. In the editor, this component will be enabled
+    /// for all entities in the chunk in which one entity had at least one UniqueMesh component or buffer
+    /// modification, or experienced any kind of archetype change.
     /// </summary>
     public struct UniqueMeshConfig : IComponentData, IEnableableComponent
     {
@@ -282,29 +311,12 @@ namespace Latios.Kinemation
         }
         /// <summary>
         /// Commands Kinemation to clear and deallocate all Unique Mesh dynamic buffers after writing to the backing Mesh object.
-        /// This can be used to save memory. This setting is ignored if the mesh is determined to be invalid.
+        /// This can be used to save memory. This setting is ignored if the mesh is determined to be invalid or if it is live baked.
         /// </summary>
         public bool reclaimDynamicBufferMemoryAfterUpload
         {
             get => Bits.GetBit(packed, 2);
             set => Bits.SetBit(ref packed, 2, value);
-        }
-        /// <summary>
-        /// Commands Kinemation to ignore the fact that a mesh may be empty or invalid and to generate a draw command anyways if the
-        /// entity otherwise passes culling. In Unity 6 and newer, you must set this if you modify the mesh during DispatchRoundRobinEarlyExtensionsSuperSystem.
-        /// </summary>
-        public bool disableEmptyAndInvalidMeshCulling
-        {
-            get => Bits.GetBit(packed, 3);
-            set => Bits.SetBit(ref packed, 3, value);
-        }
-        /// <summary>
-        /// Commands Kinemation to upload the mesh, even if the entity is culled from rendering.
-        /// </summary>
-        public bool forceUpload
-        {
-            get => Bits.GetBit(packed, 4);
-            set => Bits.SetBit(ref packed, 4, value);
         }
     }
     /// <summary>

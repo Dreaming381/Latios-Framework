@@ -33,6 +33,14 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
+            var dispatchContext = latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>();
+            if (dispatchContext.isCustomGraphicsDispatch)
+            {
+                var features = latiosWorld.worldBlackboardEntity.GetComponentData<EnableUpdatingInCustomGraphics>();
+                if (!features.dynamicMeshes && !features.blendShapes && !features.skinning)
+                    return;
+            }
+
             var map            = latiosWorld.worldBlackboardEntity.GetCollectionComponent<DeformClassificationMap>(true).deformClassificationMap;
             var meshGpuEntries = latiosWorld.worldBlackboardEntity.GetCollectionComponent<MeshGpuManager>(true).entries.AsDeferredJobArray();
 

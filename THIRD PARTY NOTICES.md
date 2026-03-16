@@ -1,6 +1,7 @@
 # Third Party Software Notices
 
-This package contains third-party software components governed by the license(s) indicated below:
+This package contains third-party software components governed by the license(s)
+indicated below:
 
 Component Name: SquirrelNoise5 - Squirrel's Raw Noise utilities (version 5)
 
@@ -18,7 +19,9 @@ License Type: MIT
 
 <https://github.com/nfrechette/acl/blob/v2.0.4/LICENSE>
 
-Notes: This library is distributed in this package in binary form. However, the source code for the wrapper can be found here: <https://github.com/Dreaming381/AclUnity>
+Notes: This library is distributed in this package in binary form. However, the
+source code for the wrapper can be found here:
+<https://github.com/Dreaming381/AclUnity>
 
 \--------
 
@@ -28,7 +31,8 @@ License Type: Creative Commons Attribution 4.0 International License (CC BY 4.0)
 
 <https://github.com/patmorin/arraylayout/blob/master/src/LICENSE.md>
 
-Notes: Some of the algorithms presented in this repository have been adapted for use in interval trees
+Notes: Some of the algorithms presented in this repository have been adapted for
+use in interval trees
 
 \--------
 
@@ -38,7 +42,8 @@ License Type: MIT
 
 <https://github.com/Maligan/unity-guid/blob/main/LICENSE>
 
-Notes: This has been heavily modified and repurposed for the GameObjectEntity mechanism in QVVS Transforms.
+Notes: This has been heavily modified and repurposed for the GameObjectEntity
+mechanism in QVVS Transforms.
 
 \--------
 
@@ -54,7 +59,8 @@ License Type: MIT
 
 <https://github.com/EGjoni/Everything-Will-Be-IK/blob/master/LICENSE>
 
-Notes: Aspects of both versions have been reassembled into a new performance-sensitive API.
+Notes: Aspects of both versions have been reassembled into a new
+performance-sensitive API.
 
 \--------
 
@@ -64,7 +70,9 @@ License Type: MIT
 
 <https://github.com/EGjoni/Everything-Will-Be-IK/blob/master/LICENSE>
 
-Notes: The algorithms sequence has been loosely preserved, but the actual implementation has been rewritten from scratch to support a Burst-friendly modular constraint system and generally be high-performance.
+Notes: The algorithms sequence has been loosely preserved, but the actual
+implementation has been rewritten from scratch to support a Burst-friendly
+modular constraint system and generally be high-performance.
 
 \--------
 
@@ -84,4 +92,40 @@ License Type: MIT
 
 <https://github.com/dtecta/motion-toolkit/blob/master/COPYING>
 
-Notes: The algorithm provided in <https://github.com/dtecta/motion-toolkit/blob/master/jointlimits/SwingTwistJointLimits.cpp> has been adapted and modified for performance and flexibility.
+Notes: The algorithm provided in
+<https://github.com/dtecta/motion-toolkit/blob/master/jointlimits/SwingTwistJointLimits.cpp>
+has been adapted and modified for performance and flexibility.
+
+\--------
+
+Component Name: Clipper2
+
+License Type: BSL-1.0
+
+<https://github.com/AngusJohnson/Clipper2/blob/main/LICENSE>
+
+Notes: The C\# implementation was adapted to be Burst-compatible in the
+TextMeshDOTS project, and then was re-adapted to Calci in the framework.
+
+\--------
+
+Component Name: HarfBuzz
+
+License Type: MIT
+
+<https://github.com/harfbuzz/harfbuzz/blob/main/COPYING>
+
+Notes: This library is distributed in this package in binary form. However, the
+build pipeline used to generate these binaries can be found here:
+<https://github.com/Dreaming381/HarfbuzzUnity>
+
+\--------
+
+Component Name: TextMeshDOTS
+
+License Type: Unity Companion License
+
+<https://github.com/Fribur/TextMeshDOTS/blob/harfbuzz/LICENSE.md>
+
+Notes: This is a fork of Calligraphics which evolved to include new inventions
+re-integrated into Calligraphics proper.

@@ -4,6 +4,7 @@ using BurstRuntime = Unity.Burst.BurstRuntime;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using UnityEngine.LowLevel;
 
 namespace Unity.Entities.Exposed
@@ -39,6 +40,8 @@ namespace Unity.Entities.Exposed
         {
             return SystemBaseRegistry.GetSystemTypeMetaIndex(BurstRuntime.GetHashCode64(t));
         }
+
+        public static unsafe JobHandle GetLastScheduledJobHandle(this ref SystemState state) => state.m_JobHandle;
 
         public static event Action<World> DefaultWorldInitialized
         {

@@ -1,5 +1,6 @@
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
+using Latios.Transforms.Authoring;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -16,24 +17,12 @@ namespace Latios.Kinemation.Authoring.Systems
     [BurstCompile]
     public partial struct SetupSocketsSystem : ISystem
     {
-        LocalTransformQvvsReadWriteAspect.Lookup m_localTransformLookup;
-        ParentReadOnlyAspect.Lookup              m_parentROLookup;
-
-        [BurstCompile]
-        public void OnCreate(ref SystemState state)
-        {
-            m_localTransformLookup = new LocalTransformQvvsReadWriteAspect.Lookup(ref state);
-            m_parentROLookup       = new ParentReadOnlyAspect.Lookup(ref state);
-        }
-
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            m_localTransformLookup.Update(ref state);
-            m_parentROLookup.Update(ref state);
-
             var componentsToAdd = new ComponentTypeSet(ComponentType.ReadWrite<Socket>(),
-                                                       ComponentType.ReadWrite<BoneOwningSkeletonReference>());
+                                                       ComponentType.ReadWrite<BoneOwningSkeletonReference>(),
+                                                       ComponentType.ReadWrite<BakedLocalTransformOverride>());
 
             new FindSocketByNameJob { socketLookup = GetComponentLookup<Socket>(false) }.ScheduleParallel();
 
@@ -42,13 +31,11 @@ namespace Latios.Kinemation.Authoring.Systems
             var ecbAdd = new EntityCommandBuffer(state.WorldUpdateAllocator);
             new ApplySkeletonsToImportedSocketsJob
             {
-                componentTypesToAdd      = componentsToAdd,
-                ecb                      = ecbAdd.AsParallelWriter(),
-                skeletonReferenceLookup  = GetComponentLookup<BoneOwningSkeletonReference>(false),
-                socketLookup             = GetComponentLookup<Socket>(false),
-                parentLookup             = m_parentROLookup,
-                transformAuthoringLookup = GetComponentLookup<TransformAuthoring>(true),
-                localTransformLookup     = m_localTransformLookup
+                componentTypesToAdd     = componentsToAdd,
+                ecb                     = ecbAdd.AsParallelWriter(),
+                skeletonReferenceLookup = GetComponentLookup<BoneOwningSkeletonReference>(false),
+                socketLookup            = GetComponentLookup<Socket>(false),
+                localTransformLookup    = GetComponentLookup<BakedLocalTransformOverride>(false)
             }.ScheduleParallel();
             new ApplySkeletonsToAuthoredSocketsJob
             {
@@ -115,14 +102,11 @@ namespace Latios.Kinemation.Authoring.Systems
         [BurstCompile]
         partial struct ApplySkeletonsToImportedSocketsJob : IJobEntity
         {
-            [NativeDisableParallelForRestriction] public LocalTransformQvvsReadWriteAspect.Lookup     localTransformLookup;
+            [NativeDisableParallelForRestriction] public ComponentLookup<BakedLocalTransformOverride> localTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<Socket>                      socketLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<BoneOwningSkeletonReference> skeletonReferenceLookup;
-            [ReadOnly] public ParentReadOnlyAspect.Lookup                                             parentLookup;
             public EntityCommandBuffer.ParallelWriter                                                 ecb;
             public ComponentTypeSet                                                                   componentTypesToAdd;
-
-            [ReadOnly] public ComponentLookup<TransformAuthoring> transformAuthoringLookup;
 
             public void Execute(Entity entity, [ChunkIndexInQuery] int chunkIndexInQuery, ref DynamicBuffer<ImportedSocket> importedSockets,
                                 in DynamicBuffer<OptimizedBoneTransform> boneTransforms)
@@ -139,18 +123,21 @@ namespace Latios.Kinemation.Authoring.Systems
 
                 foreach (var socket in importedSockets)
                 {
-                    var localTransformAspect            = localTransformLookup[socket.boneEntity];
-                    localTransformAspect.localTransform = ComputeRootTransformOfBone(socket.boneIndex, in boneTransforms);
+                    var localTransform = ComputeRootTransformOfBone(socket.boneIndex, in boneTransforms);
                     if (socketLookup.HasComponent(socket.boneEntity))
                     {
                         skeletonReferenceLookup[socket.boneEntity] = new BoneOwningSkeletonReference { skeletonRoot = entity };
                         socketLookup[socket.boneEntity]                                                             = new Socket { boneIndex = (short)socket.boneIndex };
+                        localTransformLookup[socket.boneEntity]                                                     = new BakedLocalTransformOverride {
+                            localTransform                                                                          = localTransform
+                        };
                     }
                     else
                     {
                         ecb.AddComponent(chunkIndexInQuery, socket.boneEntity, componentTypesToAdd);
-                        ecb.SetComponent(chunkIndexInQuery, socket.boneEntity, new BoneOwningSkeletonReference { skeletonRoot = entity });
-                        ecb.SetComponent(chunkIndexInQuery, socket.boneEntity, new Socket { boneIndex                         = (short)socket.boneIndex });
+                        ecb.SetComponent(chunkIndexInQuery, socket.boneEntity, new BoneOwningSkeletonReference { skeletonRoot   = entity });
+                        ecb.SetComponent(chunkIndexInQuery, socket.boneEntity, new Socket { boneIndex                           = (short)socket.boneIndex });
+                        ecb.SetComponent(chunkIndexInQuery, socket.boneEntity, new BakedLocalTransformOverride { localTransform = localTransform });
                     }
                 }
             }
@@ -163,7 +150,7 @@ namespace Latios.Kinemation.Authoring.Systems
         {
             [ReadOnly] public BufferLookup<OptimizedBoneTransform> skeletonLookup;
 
-            public void Execute(LocalTransformQvvsReadWriteAspect localTransform, ref Socket socket, in BoneOwningSkeletonReference skeletonReference)
+            public void Execute(ref BakedLocalTransformOverride localTransform, ref Socket socket, in BoneOwningSkeletonReference skeletonReference)
             {
                 if (!skeletonLookup.TryGetBuffer(skeletonReference.skeletonRoot, out var bones))
                 {
@@ -183,11 +170,11 @@ namespace Latios.Kinemation.Authoring.Systems
         static TransformQvvs ComputeRootTransformOfBone(int index, in DynamicBuffer<OptimizedBoneTransform> transforms)
         {
             var result = transforms[index].boneTransform;
-            var parent = result.worldIndex;
+            var parent = result.context32;
             while (parent > 0)
             {
                 var parentTransform = transforms[parent].boneTransform;
-                parent              = parentTransform.worldIndex;
+                parent              = parentTransform.context32;
                 result              = qvvs.mul(parentTransform, result);
             }
             return result;

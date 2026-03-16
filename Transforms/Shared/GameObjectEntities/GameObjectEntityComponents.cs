@@ -36,22 +36,6 @@ namespace Latios.Transforms
     }
 
     /// <summary>
-    /// When this component is present, the GameObject's world transform is copied to the entity's world transform.
-    ///
-    /// QVVS Transforms: When useUniformScale is set, the GameObject's world-space scale is applied to the uniform scale
-    /// of the entity. Otherwise, the GameObject's local-space non-uniform scale is applied to the stretch of the the entity.
-    ///
-    /// Unity Transforms: When useUniformScale is set, the GameObject's position, rotation, and uniform scale are extracted and converted
-    /// into a new LocalToWorld matrix. Otherwise, the GameObject's localToWorldMatrix is copied directly to the LocalToWorld of the entity.
-    ///
-    /// Usage: Add/Remove and modify as needed
-    /// </summary>
-    public struct CopyTransformToEntity : IComponentData
-    {
-        public bool useUniformScale;
-    }
-
-    /// <summary>
     /// When this component is present, the entity's world transform is copied to the GameObject's world transform.
     ///
     /// QVVS Transforms: The entity's world-space position and rotation are copied, and scale is multiplied by stretch and
@@ -82,25 +66,7 @@ namespace Latios.Transforms
         public Unity.Entities.Hash128 guid;
     }
 
-    internal struct CopyTransformToEntityCleanupTag : ICleanupComponentData { }
-
     internal struct CopyTransformFromEntityCleanupTag : ICleanupComponentData { }
-
-    internal partial struct CopyTransformToEntityMapping : ICollectionComponent
-    {
-        public NativeHashMap<Entity, int>            entityToIndexMap;
-        public NativeHashMap<int, Entity>            indexToEntityMap;
-        public UnityEngine.Jobs.TransformAccessArray transformAccessArray;
-
-        public JobHandle TryDispose(JobHandle handle)
-        {
-            if (!entityToIndexMap.IsCreated)
-                return handle;
-            handle.Complete();
-            transformAccessArray.Dispose();
-            return JobHandle.CombineDependencies(entityToIndexMap.Dispose(default), indexToEntityMap.Dispose(default));
-        }
-    }
 
     internal partial struct CopyTransformFromEntityMapping : ICollectionComponent
     {

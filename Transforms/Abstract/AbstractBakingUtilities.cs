@@ -32,22 +32,22 @@ namespace Latios.Transforms.Authoring.Abstract
 #endif
         }
 
-#if !LATIOS_TRANSFORMS_UNITY
-        public static Latios.Transforms.LocalTransform CreateLocalTransform(in TransformQvs qvs)
-        {
-            return new Latios.Transforms.LocalTransform { localTransform = qvs };
-        }
-#elif LATIOS_TRANSFORMS_UNITY
-        public static Unity.Transforms.LocalTransform CreateLocalTransform(in TransformQvs qvs)
-        {
-            return new LocalTransform
-            {
-                Position = qvs.position,
-                Rotation = qvs.rotation,
-                Scale    = qvs.scale,
-            };
-        }
-#endif
+        //#if !LATIOS_TRANSFORMS_UNITY
+        //        public static Latios.Transforms.LocalTransform CreateLocalTransform(in TransformQvs qvs)
+        //        {
+        //            return new Latios.Transforms.LocalTransform { localTransform = qvs };
+        //        }
+        //#elif LATIOS_TRANSFORMS_UNITY
+        //        public static Unity.Transforms.LocalTransform CreateLocalTransform(in TransformQvs qvs)
+        //        {
+        //            return new LocalTransform
+        //            {
+        //                Position = qvs.position,
+        //                Rotation = qvs.rotation,
+        //                Scale    = qvs.scale,
+        //            };
+        //        }
+        //#endif
     }
 }
 

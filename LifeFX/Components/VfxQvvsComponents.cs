@@ -13,7 +13,7 @@ namespace Latios.LifeFX
     /// GraphicsGlobalBufferReceptor or a VfxGraphGlobalBufferProvider.
     /// This component will be enabled if this is considered a new entity to be tracked, so that you can send the
     /// index to the GPU via a Graphics Event. To do this, update your system within KinemationCustomGraphicsSetupSuperSystem
-    /// (and after UpdateTrackedWorldTransformSystem if you use OrderFirst = true). Note that the bits 30 and 31 of worldIndex
+    /// (and after UpdateTrackedWorldTransformSystem if you use OrderFirst = true). Note that the bits 30 and 31 of context32
     /// are overwritten. Bit 31 specifies the entity is alive, and bit 30 is the value of TrackedWorldTransformEnableFlag if
     /// present, or 1 otherwise.
     /// </summary>

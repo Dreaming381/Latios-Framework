@@ -23,6 +23,14 @@ namespace Latios
             return result;
         }
 
+        public static BlobBuilderArray<T> ConstructFromList<T>(this BlobBuilder blobBuilder, ref BlobArray<T> ptr, System.Collections.Generic.List<T> list) where T : struct
+        {
+            var result = blobBuilder.Allocate(ref ptr, list.Count);
+            for (int i = 0; i < list.Count; i++)
+                result[i] = list[i];
+            return result;
+        }
+
         unsafe public static void AllocateFixedString<T>(ref this BlobBuilder builder, ref BlobString blobStr, T fixedString) where T : INativeList<byte>, IUTF8Bytes
         {
             var res = builder.Allocate(ref UnsafeUtility.As<BlobString, BlobArray<byte> >(ref blobStr), fixedString.Length);

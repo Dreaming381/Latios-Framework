@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using Unity.Collections;
-using Unity.Entities;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Unsafe
@@ -22,11 +22,13 @@ namespace Latios.Unsafe
         /// <param name="gaps">All gaps in any order</param>
         /// <param name="oldSize">The old size of the buffer (or used portion of it)</param>
         /// <returns>The new size of the buffer (or used portion of it)</returns>
-        public static uint CoellesceGaps(NativeList<uint2> gaps, uint oldSize)
+        public static uint CoalesceGaps(ref UnsafeList<uint2> gaps, uint oldSize)
         {
+            if (gaps.IsEmpty)
+                return oldSize;
             gaps.Sort(new GapSorter());
             int dst   = 1;
-            var array = gaps.AsArray();
+            var array = gaps;
             for (int j = 1; j < array.Length; j++)
             {
                 array[dst] = array[j];
@@ -44,7 +46,7 @@ namespace Latios.Unsafe
 
             if (!gaps.IsEmpty)
             {
-                var backItem = gaps[gaps.Length - 1];
+                var backItem = gaps[^ 1];
                 if (backItem.x + backItem.y == oldSize)
                 {
                     gaps.Length--;
@@ -53,6 +55,23 @@ namespace Latios.Unsafe
             }
 
             return oldSize;
+        }
+        /// <summary>
+        /// A virtual allocator for large buffers (typically graphics buffers) which must be packed
+        /// with small arrays which are added and removed infrequently. This algorithm uses a best-fit
+        /// search and is not constant time for allocations and deallocations. If speed is preferred
+        /// over entropy reduction, a different allocator should be used.
+        ///
+        /// For this allocator, the strategy is to append all deallocated ranges to the end of the list,
+        /// then call CoellesceGaps. And finally, make new allocations.
+        /// </summary>
+        public static uint CoalesceGaps(NativeList<uint2> gaps, uint oldSize)
+        {
+            unsafe
+            {
+                ref var gapsUnsafe = ref *(UnsafeList<uint2>*)NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref gaps);
+                return CoalesceGaps(ref gapsUnsafe, oldSize);
+            }
         }
 
         /// <summary>
@@ -64,10 +83,10 @@ namespace Latios.Unsafe
         /// <param name="newLocation">The index of the buffer where the first element of the new allocation should go</param>
         /// <param name="bufferMaxSize">The max size of the buffer</param>
         /// <returns>True if the allocation was successful, false if it resulted in an overflow of the buffer's max size</returns>
-        public static bool TryAllocate(NativeList<uint2> gaps, uint countNeeded, ref uint bufferUsedSize, out uint newLocation, uint bufferMaxSize = uint.MaxValue)
+        public static bool TryAllocate(ref UnsafeList<uint2> gaps, uint countNeeded, ref uint bufferUsedSize, out uint newLocation, uint bufferMaxSize = uint.MaxValue)
         {
             bool overflow = false;
-            if (!AllocateInGap(gaps, countNeeded, out var result))
+            if (!AllocateInGap(ref gaps, countNeeded, out var result))
             {
                 result          = bufferUsedSize;
                 bufferUsedSize += countNeeded;
@@ -80,8 +99,25 @@ namespace Latios.Unsafe
             newLocation = result;
             return !overflow;
         }
+        /// <summary>
+        /// Tries to allocate into the buffer using the best-fit algorithm.
+        /// </summary>
+        /// <param name="gaps">The gaps, after coellescing</param>
+        /// <param name="countNeeded">The number of elements needed in the buffer to allocate</param>
+        /// <param name="bufferUsedSize">The amount of buffer used, which may increase with the allocation</param>
+        /// <param name="newLocation">The index of the buffer where the first element of the new allocation should go</param>
+        /// <param name="bufferMaxSize">The max size of the buffer</param>
+        /// <returns>True if the allocation was successful, false if it resulted in an overflow of the buffer's max size</returns>
+        public static bool TryAllocate(NativeList<uint2> gaps, uint countNeeded, ref uint bufferUsedSize, out uint newLocation, uint bufferMaxSize = uint.MaxValue)
+        {
+            unsafe
+            {
+                ref var gapsUnsafe = ref *(UnsafeList<uint2>*)NativeListUnsafeUtility.GetInternalListDataPtrUnchecked(ref gaps);
+                return TryAllocate(ref gapsUnsafe, countNeeded, ref bufferUsedSize, out newLocation, bufferMaxSize);
+            }
+        }
 
-        static bool AllocateInGap(NativeList<uint2> gaps, uint countNeeded, out uint foundIndex)
+        static bool AllocateInGap(ref UnsafeList<uint2> gaps, uint countNeeded, out uint foundIndex)
         {
             int  bestIndex = -1;
             uint bestCount = uint.MaxValue;

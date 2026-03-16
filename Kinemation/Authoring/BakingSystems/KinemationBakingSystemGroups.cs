@@ -26,6 +26,15 @@ namespace Latios.Kinemation.Authoring.Systems
 
             GetOrCreateAndAddSystem<BindSkinnedMeshesToSkeletonsSystem>();  // async -> sync
             GetOrCreateAndAddSystem<FindExposedBonesBakingSystem>();  // async -> sync
+            GetOrCreateAndAddManagedSystem<CreateShadowHierarchiesSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<GatherMeshBindingPathsFromShadowHierarchySystem>();  // sync
+            GetOrCreateAndAddManagedSystem<PruneShadowHierarchiesSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<BuildOptimizedBoneTransformsSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<GatherSkeletonBindingPathsFromShadowHierarchySystem>();  // sync
+            GetOrCreateAndAddManagedSystem<AssignSocketIndicesSystem>();  // sync
+            GetOrCreateAndAddManagedSystem<GatherOptimizedHierarchyFromShadowHierarchySystem>();  // sync -> async
+            GetOrCreateAndAddSystem<SetupSocketsSystem>();  // async -> sync
+            // Todo: How do we set LTWs correctly for sockets in Unity Transforms?
         }
     }
 
@@ -51,13 +60,6 @@ namespace Latios.Kinemation.Authoring.Systems
             EnableSystemSorting = false;
 
 #if UNITY_EDITOR
-            GetOrCreateAndAddManagedSystem<CreateShadowHierarchiesSystem>();  // sync
-            GetOrCreateAndAddManagedSystem<GatherMeshBindingPathsFromShadowHierarchySystem>();  // sync
-            GetOrCreateAndAddManagedSystem<PruneShadowHierarchiesSystem>();  // sync
-            GetOrCreateAndAddManagedSystem<BuildOptimizedBoneTransformsSystem>();  // sync
-            GetOrCreateAndAddManagedSystem<GatherSkeletonBindingPathsFromShadowHierarchySystem>();  // sync
-            GetOrCreateAndAddManagedSystem<AssignSocketIndicesSystem>();  // sync
-            GetOrCreateAndAddManagedSystem<GatherOptimizedHierarchyFromShadowHierarchySystem>();  // sync -> async
 
             // Todo: Need new async -> sync
             GetOrCreateAndAddManagedSystem<MeshDeformDataSmartBlobberSystem>();  // sync -> async
@@ -65,17 +67,11 @@ namespace Latios.Kinemation.Authoring.Systems
             GetOrCreateAndAddSystem<MeshPathsSmartBlobberSystem>();  // async
             GetOrCreateAndAddSystem<SkeletonPathsSmartBlobberSystem>();  // async
             GetOrCreateAndAddSystem<SkeletonHierarchySmartBlobberSystem>();  // async
-
             GetOrCreateAndAddSystem<SkeletonBoneMaskSetSmartBlobberSystem>();  // async -> sync -> async
-            GetOrCreateAndAddSystem<SetupSocketsSystem>();  // async -> sync
+
 #if !LATIOS_DISABLE_ACL
             GetOrCreateAndAddManagedSystem<SkeletonClipSetSmartBlobberSystem>();  // sync -> async
             GetOrCreateAndAddSystem<ParameterClipSetSmartBlobberSystem>();  // async
-#endif
-#if !LATIOS_TRANSFORMS_UNITY
-            GetOrCreateAndAddSystem<Latios.Transforms.Authoring.Systems.TransformHierarchySyncBakingSystem>();  // async | Needed for correcting children of sockets.
-#elif LATIOS_TRANSFORMS_UNITY
-            // Todo: How do we set LTWs correctly for sockets in Unity Transforms?
 #endif
             GetOrCreateAndAddManagedSystem<DestroyShadowHierarchiesSystem>();  // sync
 #endif

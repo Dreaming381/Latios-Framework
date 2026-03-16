@@ -112,7 +112,7 @@ namespace Latios.Kinemation
             {
                 rotation   = qvv.rotation,
                 position   = qvv.translation.xyz,
-                worldIndex = math.asint(1f),
+                context32 = math.asint(1f),
                 stretch    = qvv.stretchScale.xyz,
                 scale      = qvv.stretchScale.w
             };
@@ -226,7 +226,7 @@ namespace Latios.Kinemation
 
         /// <summary>
         /// Samples the animation clip for the entire set of transforms at the given time raw into a buffer without any blending.
-        /// worldIndex values are undefined. This method uses a special fast-path.
+        /// context32 values are undefined. This method uses a special fast-path.
         /// </summary>
         /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
         /// <param name="time">The time value to sample the the clip in seconds.</param>

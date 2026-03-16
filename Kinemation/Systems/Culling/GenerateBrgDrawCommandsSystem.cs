@@ -12,6 +12,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Kinemation.Systems
 {
+    [DontSyncPreviousUpdatesThisFrame(32)]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
@@ -98,30 +99,24 @@ namespace Latios.Kinemation.Systems
                 chunkPerCameraCullingSplitsMaskHandle = GetComponentTypeHandle<ChunkPerCameraCullingSplitsMask>(true),
                 chunksToProcess                       = chunkList.AsDeferredJobArray(),
                 CullingLayerMask                      = cullingContext.cullingLayerMask,
-                DepthSorted                           = GetComponentTypeHandle<DepthSorted_Tag>(true),
                 DrawCommandOutput                     = chunkDrawCommandOutput,
 #if UNITY_EDITOR
                 EditorDataComponentHandle = GetSharedComponentTypeHandle<EditorRenderData>(),
 #endif
-                EntitiesGraphicsChunkInfo    = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                LastSystemVersion            = state.LastSystemVersion,
-                LightMaps                    = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
-                lodCrossfadeHandle           = GetComponentTypeHandle<LodCrossfade>(true),
-                motionVectorDeformQueryMask  = m_motionVectorDeformQueryMask,
-                PostProcessMatrix            = GetComponentTypeHandle<PostProcessMatrix>(true),
-                MaterialMeshInfo             = GetComponentTypeHandle<MaterialMeshInfo>(true),
-                meshLodHandle                = GetComponentTypeHandle<MeshLod>(true),
-                ProceduralMotion             = GetComponentTypeHandle<PerVertexMotionVectors_Tag>(true),
-                ProfilerEmitChunk            = m_profilerEmitChunk,
-                promiseHandle                = GetComponentTypeHandle<PromiseAllEntitiesInChunkUseSameMaterialMeshInfoTag>(true),
-                RenderFilterSettings         = GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                RenderMeshArray              = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
-                rendererPriorityHandle       = GetComponentTypeHandle<RendererPriority>(true),
-                overrideMeshInRangeTagHandle = GetComponentTypeHandle<OverrideMeshInRangeTag>(true),
-                SceneCullingMask             = cullingContext.sceneCullingMask,
-                speedTreeCrossfadeTagHandle  = GetComponentTypeHandle<SpeedTreeCrossfadeTag>(true),
-                splitsAreValid               = cullingContext.viewType == BatchCullingViewType.Light,
-                useMmiRangeLodTagHandle      = GetComponentTypeHandle<UseMmiRangeLodTag>(true),
+                EntitiesGraphicsChunkInfo   = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                LastSystemVersion           = state.LastSystemVersion,
+                LightMaps                   = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                lodCrossfadeHandle          = GetComponentTypeHandle<LodCrossfade>(true),
+                motionVectorDeformQueryMask = m_motionVectorDeformQueryMask,
+                PostProcessMatrix           = GetComponentTypeHandle<PostProcessMatrix>(true),
+                MaterialMeshInfo            = GetComponentTypeHandle<MaterialMeshInfo>(true),
+                meshLodHandle               = GetComponentTypeHandle<MeshLod>(true),
+                ProfilerEmitChunk           = m_profilerEmitChunk,
+                RenderFilterSettings        = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                RenderMeshArray             = ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
+                rendererPriorityHandle      = GetComponentTypeHandle<RendererPriority>(true),
+                SceneCullingMask            = cullingContext.sceneCullingMask,
+                splitsAreValid              = cullingContext.viewType == BatchCullingViewType.Light,
 #if !LATIOS_TRANSFORMS_UNITY
                 WorldTransform = GetComponentTypeHandle<WorldTransform>(true),
 #elif LATIOS_TRANSFORMS_UNITY

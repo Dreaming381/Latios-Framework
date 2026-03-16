@@ -1,9 +1,6 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel UploadGlyphs
 
-static const uint kConvertColorGammaToLinear = 1 << 1;
-static const uint kApplyShearToPositions = 1 << 2;
-
 uniform ByteAddressBuffer _src;
 uniform RWByteAddressBuffer _dst;
 
@@ -11,68 +8,42 @@ uniform ByteAddressBuffer _meta;
 
 uint _startOffset;
 
-uint convertGammaToLinear(uint gamma)
+void processGlyph(uint src, uint dst)
 {
-    float3 color = float3(gamma & 0xff, (gamma >> 8) & 0xff, (gamma >> 16) & 0xff);
-    color = round(255 * saturate(pow(abs(color / 255.0), 2.2)));
-    uint red = (uint)color.x & 0xff;
-    uint green = ((uint)color.y & 0xff) << 8;
-    uint blue = ((uint)color.z & 0xff) << 16;
-    uint alpha = gamma & 0xff000000;
-    return red | green | blue | alpha;
-}
-
-void processGlyph(uint src, uint dst, uint options)
-{
-    uint4 glyphMeta = _src.Load4(src + 80);
-    uint4 positions = _src.Load4(src);
-    if ((options & kApplyShearToPositions) != 0)
-    {
-        float4 fpositions = asfloat(positions);
-        float h = glyphMeta.y * 0.5;
-        fpositions.x -= h;
-        fpositions.z += h;
-        positions = asuint(fpositions);
-    }
-    _dst.Store4(dst, positions);
+    _dst.Store4(dst, _src.Load4(src));
     _dst.Store4(dst + 16, _src.Load4(src + 16));
     _dst.Store4(dst + 32, _src.Load4(src + 32));
     _dst.Store4(dst + 48, _src.Load4(src + 48));
-
-    uint4 colors = _src.Load4(src + 64);
-    if ((options & kConvertColorGammaToLinear) != 0)
-    {
-        colors.x = convertGammaToLinear(colors.x);
-        colors.y = convertGammaToLinear(colors.y);
-        colors.z = convertGammaToLinear(colors.z);
-        colors.w = convertGammaToLinear(colors.w);
-    }
-    _dst.Store4(dst + 64, colors);
-    _dst.Store4(dst + 80, glyphMeta);
+    _dst.Store4(dst + 64, _src.Load4(src + 64));
+    _dst.Store4(dst + 80, _src.Load4(src + 80));
+    _dst.Store4(dst + 96, _src.Load4(src + 96));
+    uint4 lastLoad = _src.Load4(src + 112);
+    float arrayIndex = (float) lastLoad.x;
+    lastLoad.x = asuint(arrayIndex);
+    _dst.Store4(dst + 112, lastLoad);
 }
 
 [numthreads(64, 1, 1)]
-void UploadGlyphs (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
+void UploadGlyphs(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
 {
-    uint4 m = _meta.Load4((groupIds.x + _startOffset) * 16);
+    uint3 m = _meta.Load3((groupIds.x + _startOffset) * 12);
 
     uint srcBase = m.x;
     uint dstBase = m.y;
     uint elementCount = m.z;
-    uint options = m.w;
 
     uint i = 0;
     for (i = 0; i + 64 < elementCount; i += 64)
     {
-        uint src = (srcBase + i + threadId) * 96;
-        uint dst = (dstBase + i + threadId) * 96;
-        processGlyph(src, dst, options);
+        uint src = (srcBase + i + threadId) * 128;
+        uint dst = (dstBase + i + threadId) * 128;
+        processGlyph(src, dst);
     }
 
     if (i + threadId < elementCount)
     {
-        uint src = (srcBase + i + threadId) * 96;
-        uint dst = (dstBase + i + threadId) * 96;
-        processGlyph(src, dst, options);
+        uint src = (srcBase + i + threadId) * 128;
+        uint dst = (dstBase + i + threadId) * 128;
+        processGlyph(src, dst);
     }
 }

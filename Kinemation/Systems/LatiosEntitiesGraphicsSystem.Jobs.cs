@@ -1,5 +1,6 @@
 #region Header
 using Latios.Transforms;
+using Latios.Transforms.Abstract;
 using Unity.Assertions;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -97,11 +98,12 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         internal struct UpdateOldEntitiesGraphicsChunksJob : IJobChunk
         {
-            public ComponentTypeHandle<EntitiesGraphicsChunkInfo>   EntitiesGraphicsChunkInfo;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>      ChunkHeader;
-            [ReadOnly] public DynamicComponentTypeHandle            WorldTransform;
-            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo> MaterialMeshInfo;
-            public EntitiesGraphicsChunkUpdater                     EntitiesGraphicsChunkUpdater;
+            public ComponentTypeHandle<EntitiesGraphicsChunkInfo> EntitiesGraphicsChunkInfo;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>    ChunkHeader;
+            public EntitiesGraphicsChunkUpdater                   EntitiesGraphicsChunkUpdater;
+
+            WorldTransformReadOnlyTypeHandle.HasChecker worldTransformChecker;
+            HasChecker<MaterialMeshInfo>                mmiChecker;
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -122,8 +124,8 @@ namespace Latios.Kinemation.Systems
                     // Skip chunks that for some reason have EntitiesGraphicsChunkInfo, but don't have the
                     // other required components. This should normally not happen, but can happen
                     // if the user manually deletes some components after the fact.
-                    bool hasMaterialMeshInfo = chunk.Has(ref MaterialMeshInfo);
-                    bool hasWorldTransform   = chunk.Has(ref WorldTransform);
+                    bool hasMaterialMeshInfo = mmiChecker[chunk];
+                    bool hasWorldTransform   = worldTransformChecker[chunk];
 
                     if (!math.all(new bool2(hasMaterialMeshInfo, hasWorldTransform)))
                         continue;

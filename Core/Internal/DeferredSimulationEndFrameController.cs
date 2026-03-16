@@ -6,7 +6,8 @@ namespace Latios
 {
     internal class DeferredSimulationEndFrameController : MonoBehaviour
     {
-        internal bool                  done = false;
+        internal bool                  needsUpdate = false;
+        internal bool                  done        = false;
         internal SimulationSystemGroup simGroup;
 
         IEnumerator Start()
@@ -16,17 +17,18 @@ namespace Latios
             while (!done)
             {
                 simGroup.Update();
+                needsUpdate = false;
                 yield return endOfFrame;
             }
         }
     }
 
-    [UpdateInGroup(typeof(PresentationSystemGroup))]
     [DisableAutoCreation]
     internal partial class DeferredSimulationEndFrameControllerSystem : SystemBase
     {
-        GameObject            m_controllerObject      = null;
-        SimulationSystemGroup m_simulationSystemGroup = null;
+        GameObject                           m_controllerObject      = null;
+        DeferredSimulationEndFrameController m_controller            = null;
+        SimulationSystemGroup                m_simulationSystemGroup = null;
 
         protected override void OnCreate()
         {
@@ -39,10 +41,15 @@ namespace Latios
             if (m_controllerObject == null)
             {
                 m_controllerObject           = new GameObject();
-                var controller               = m_controllerObject.AddComponent<DeferredSimulationEndFrameController>();
-                controller.simGroup          = m_simulationSystemGroup;
+                m_controller                 = m_controllerObject.AddComponent<DeferredSimulationEndFrameController>();
+                m_controller.simGroup        = m_simulationSystemGroup;
                 m_controllerObject.hideFlags = HideFlags.HideAndDontSave;
             }
+            else if (m_controller.needsUpdate)
+            {
+                m_simulationSystemGroup.Update();
+            }
+            m_controller.needsUpdate = true;
         }
 
         protected override void OnDestroy()

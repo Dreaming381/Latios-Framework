@@ -5,7 +5,7 @@ struct TransformQvvs
 {
 	quaternion rotation;
 	float3 position;
-	int worldIndex;
+	int context32;
 	float3 stretch;
 	float scale;
 	
@@ -64,7 +64,7 @@ TransformQvvs new_TransformQvvs(float3 position, quaternion rotation)
 	TransformQvvs result;
 	result.position = position;
 	result.rotation = rotation;
-	result.worldIndex = 0;
+	result.context32 = 0;
 	result.stretch = float3(1.0, 1.0, 1.0);
 	result.scale = 1.0;
 	return result;
@@ -75,18 +75,18 @@ TransformQvvs new_TransformQvvs(float3 position, quaternion rotation, float scal
 	TransformQvvs result;
 	result.position = position;
 	result.rotation = rotation;
-	result.worldIndex = 0;
+	result.context32 = 0;
 	result.stretch = stretch;
 	result.scale = scale;
 	return result;
 }
 
-TransformQvvs new_TransformQvvs(float3 position, quaternion rotation, float scale, float3 stretch, int worldIndex)
+TransformQvvs new_TransformQvvs(float3 position, quaternion rotation, float scale, float3 stretch, int context32)
 {
 	TransformQvvs result;
 	result.position = position;
 	result.rotation = rotation;
-	result.worldIndex = worldIndex;
+	result.context32 = context32;
 	result.stretch = stretch;
 	result.scale = scale;
 	return result;
@@ -132,14 +132,14 @@ TransformQvvs mul(in TransformQvvs a, in TransformQvvs b)
 							 mul(a.rotation, b.rotation),
 							 a.scale * b.scale,
 							 b.stretch,
-							 b.worldIndex);
+							 b.context32);
 }
 
 void mul(inout TransformQvvs bWorld, in TransformQvvs a, in TransformQvs b)
 {
 	bWorld.rotation = mul(a.rotation, b.rotation);
 	bWorld.position = a.position + rotate(a.rotation, b.position * a.stretch * a.scale);
-    // bWorld.worldIndex is preserved
+    // bWorld.context32 is preserved
     // bWorld.stretch is preserved
 	bWorld.scale = a.scale * b.scale;
 }
@@ -161,7 +161,7 @@ TransformQvvs inversemulqvvs(in TransformQvvs a, in TransformQvvs b)
 							 mul(inverseRotation, b.rotation),
 							 rcps.w * b.scale,
 							 b.stretch,
-                             b.worldIndex);
+                             b.context32);
 }
 
 float3 TransformPoint(in TransformQvvs qvvs, float3 p)
@@ -240,6 +240,6 @@ TransformQvvs RotateAbout(in TransformQvvs qvvs, quaternion rotation, float3 piv
         mul(rotation, qvvs.rotation),
         qvvs.scale,
         qvvs.stretch,
-        qvvs.worldIndex
+        qvvs.context32
     );
 }

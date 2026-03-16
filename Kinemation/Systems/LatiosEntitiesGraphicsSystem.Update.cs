@@ -127,20 +127,16 @@ namespace Latios.Kinemation.Systems
                 jh.Complete();
 
                 m_cullPassIndexThisFrame       = 0;
-                m_dispatchPassIndexThisFrame   = 0;
+                m_dispatchPassIndexThisFrame   = 1;
                 m_cullPassIndexForLastDispatch = -1;
                 //m_GPUPersistentInstanceBufferHandle = materialsContext.gpuPersistentInstanceBufferHandle;
 
-                if (latiosWorld.worldBlackboardEntity.HasComponent<EnableCustomGraphicsTag>())
+                latiosWorld.worldBlackboardEntity.SetComponentData(new DispatchContext
                 {
-                    m_dispatchPassIndexThisFrame = 1;
-                    latiosWorld.worldBlackboardEntity.SetComponentData(new DispatchContext
-                    {
-                        dispatchIndexThisFrame                      = 0,
-                        lastSystemVersionOfLatiosEntitiesGraphics   = state.LastSystemVersion,
-                        globalSystemVersionOfLatiosEntitiesGraphics = state.GlobalSystemVersion
-                    });
-                }
+                    dispatchIndexThisFrame                      = 0,
+                    lastSystemVersionOfLatiosEntitiesGraphics   = state.LastSystemVersion,
+                    globalSystemVersionOfLatiosEntitiesGraphics = state.GlobalSystemVersion
+                });
 
                 m_LastSystemVersionAtLastUpdate   = state.LastSystemVersion;
                 m_globalSystemVersionAtLastUpdate = state.GlobalSystemVersion;
@@ -301,8 +297,6 @@ namespace Latios.Kinemation.Systems
                 {
                     EntitiesGraphicsChunkInfo    = entitiesGraphicsRenderedChunkType,
                     ChunkHeader                  = chunkHeadersRO,
-                    WorldTransform               = state.GetDynamicComponentTypeHandle(QueryExtensions.GetAbstractWorldTransformROComponentType()),
-                    MaterialMeshInfo             = materialMeshInfosRO,
                     EntitiesGraphicsChunkUpdater = entitiesGraphicsChunkUpdater,
                 };
 
@@ -438,12 +432,7 @@ namespace Latios.Kinemation.Systems
 
                 Assert.IsTrue(newChunks.Length > 0, "Attempted to add new chunks, but list of new chunks was empty");
 
-                var batchCreationTypeHandles = new BatchCreationTypeHandles
-                {
-                    perInstanceCullingHandle                       = state.GetComponentTypeHandle<PerInstanceCullingTag>(true),
-                    lodHeightPercentagesHandle                     = state.GetComponentTypeHandle<LodHeightPercentages>(true),
-                    lodHeightPercentagesWithCrossfadeMarginsHandle = state.GetComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins>(true),
-                };
+                BatchCreationTypeHandles batchCreationTypeHandles = default;
 
                 // Sort new chunks by RenderMesh so we can put
                 // all compatible chunks inside one batch.
@@ -712,12 +701,12 @@ namespace Latios.Kinemation.Systems
 
             static byte ComputeCullingFlags(ArchetypeChunk chunk, BatchCreationTypeHandles typeHandles)
             {
-                bool hasLodData = chunk.Has(ref typeHandles.lodHeightPercentagesHandle) || chunk.Has(ref typeHandles.lodHeightPercentagesWithCrossfadeMarginsHandle);
+                bool hasLodData = typeHandles.lodHeightPercentagesChecker[chunk] || typeHandles.lodHeightPercentagesWithCrossfadeMarginsChecker[chunk];
 
                 // TODO: Do we need non-per-instance culling anymore? It seems to always be added
                 // for converted objects, and doesn't seem to be removed ever, so the only way to
                 // not have it is to manually remove it or create entities from scratch.
-                bool hasPerInstanceCulling = !hasLodData || chunk.Has(ref typeHandles.perInstanceCullingHandle);
+                bool hasPerInstanceCulling = !hasLodData || typeHandles.perInstanceCullingTagChecker[chunk];
 
                 byte flags = 0;
 

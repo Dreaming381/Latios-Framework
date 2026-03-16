@@ -1,24 +1,24 @@
 #include "QvvsHelpers.hlsl"
 
-void GetQvvsProperties(float4 qvvsA, float4 qvvsB, float4 qvvsC, out bool isAlive, out bool isEnabled, out float4 quaternion, out float3 position, out float scale, out float3 stretch, out int worldIndexWithoutFlags, out float3 forward, out float3 up, out float3 right, out float4x4 toMatrix)
+void GetQvvsProperties(float4 qvvsA, float4 qvvsB, float4 qvvsC, out bool isAlive, out bool isEnabled, out float4 quaternion, out float3 position, out float scale, out float3 stretch, out int context32WithoutFlags, out float3 forward, out float3 up, out float3 right, out float4x4 toMatrix)
 {
 	TransformQvvs transform = ConvertToTransformQvvs(qvvsA, qvvsB, qvvsC);
-	isAlive = (transform.worldIndex & 0x80000000) != 0;
-	isEnabled = (transform.worldIndex & 0x40000000) != 0;
+	isAlive = (transform.context32 & 0x80000000) != 0;
+	isEnabled = (transform.context32 & 0x40000000) != 0;
 	quaternion = transform.rotation.value;
 	position = transform.position;
 	scale = transform.scale;
 	stretch = transform.stretch;
-	worldIndexWithoutFlags = transform.worldIndex & 0x3fffffff;
+	context32WithoutFlags = transform.context32 & 0x3fffffff;
 	forward = rotate(transform.rotation, float3(0.0, 0.0, 1.0));
 	up = rotate(transform.rotation, float3(0.0, 1.0, 0.0));
 	right = rotate(transform.rotation, float3(1.0, 0.0, 0.0));
 	toMatrix = transform.ToMatrix4x4();
 }
 
-void ConstructQvvs(float3 position, float4 rotation, float scale, float3 stretch, int worldIndex, out float4 qvvsA, out float4 qvvsB, out float4 qvvsC)
+void ConstructQvvs(float3 position, float4 rotation, float scale, float3 stretch, int context32, out float4 qvvsA, out float4 qvvsB, out float4 qvvsC)
 {
-	TransformQvvs transform = new_TransformQvvs(position, new_quaternion(rotation), scale, stretch, worldIndex);
+	TransformQvvs transform = new_TransformQvvs(position, new_quaternion(rotation), scale, stretch, context32);
 	ConvertToVfxQvvs(transform, qvvsA, qvvsB, qvvsC);
 }
 

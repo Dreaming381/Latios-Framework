@@ -27,9 +27,9 @@ namespace Latios.Kinemation.Systems
 
             internal struct BatchCreationTypeHandles
             {
-                public ComponentTypeHandle<LodHeightPercentages>                     lodHeightPercentagesHandle;
-                public ComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins> lodHeightPercentagesWithCrossfadeMarginsHandle;
-                public ComponentTypeHandle<PerInstanceCullingTag>                    perInstanceCullingHandle;
+                public HasChecker<LodHeightPercentages>                     lodHeightPercentagesChecker;
+                public HasChecker<LodHeightPercentagesWithCrossfadeMargins> lodHeightPercentagesWithCrossfadeMarginsChecker;
+                public HasChecker<PerInstanceCullingTag>                    perInstanceCullingTagChecker;
             }
         }
 

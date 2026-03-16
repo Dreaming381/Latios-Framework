@@ -1,0 +1,230 @@
+//using System;
+//using System.IO;
+//using Latios.Calligraphics.HarfBuzz;
+//using Unity.Collections;
+//using Unity.Collections.LowLevel.Unsafe;
+//using Unity.Entities;
+//using Unity.Jobs;
+//using Unity.Jobs.LowLevel.Unsafe;
+//using Unity.Scenes;
+//using UnityEngine;
+//using Font = Latios.Calligraphics.HarfBuzz.Font;
+
+//namespace Latios.Calligraphics
+//{
+
+//    // To-Do: re-design to be able to load collection fonts (contains multiple subfamilies),
+//    // and variable fonts in response the requested variation axis (width, weight etc)
+//    // of TextRenderer (e.g. generate FontRequests after XML tag extraction)
+
+//    //[DisableAutoCreation]
+//    [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
+//    [RequireMatchingQueriesForUpdate]
+//    [UpdateInGroup(typeof(InitializationSystemGroup))]
+//    [UpdateAfter(typeof(SceneSystemGroup))]
+//    partial struct NativeFontLoaderSystem : ISystem
+//    {
+//        EntityQuery changedFontRequestQ;
+//        NativeArray<FixedString512Bytes> systemFontsNative;
+//        NativeList<FontLoadDescription> systemFontReferences;
+//        JobHandle getFontMetadataJob;
+
+//        public void OnCreate(ref SystemState state)
+//        {
+//            //schedule fetching of metadata for installed system fonts
+//            var systemFonts = UnityEngine.Font.GetPathsToOSFonts();
+
+//            systemFontsNative = new NativeArray<FixedString512Bytes>(systemFonts.Length, Allocator.Persistent);
+//            for (int i = 0, ii = systemFonts.Length; i < ii; i++)
+//                systemFontsNative[i] = new FixedString512Bytes(systemFonts[i]);
+
+//            systemFontReferences = new NativeList<FontLoadDescription>(systemFonts.Length, Allocator.Persistent);
+//            getFontMetadataJob = new GetFontMetadataJob()
+//            {
+//                systemFonts = systemFontsNative,
+//                fontReferences = systemFontReferences,
+//            }.Schedule();
+
+//            //setup FontTable
+//            var perThreadFontCaches = new NativeArray<UnsafeList<Font>>(JobsUtility.ThreadIndexCount, Allocator.Persistent);
+//            for (int i = 0; i < perThreadFontCaches.Length; i++)
+//                perThreadFontCaches[i] = new UnsafeList<Font>(64, Allocator.Persistent);
+
+//            state.EntityManager.CreateSingleton(new FontTable
+//            {
+//                faces = new NativeList<Face>(Allocator.Persistent),
+//                perThreadFontCaches = perThreadFontCaches,
+//                fontAssetRefs = new NativeList<FontLookupKey>(Allocator.Persistent),
+//                fontAssetRefToFaceIndexMap = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
+//                fontAssetRefToNamedVariationIndexMap = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
+//            });
+
+//            changedFontRequestQ = SystemAPI.QueryBuilder()
+//                .WithAll<FontLoadDescription>()
+//                .Build();
+//            changedFontRequestQ.SetChangedVersionFilter(ComponentType.ReadWrite<FontLoadDescription>());
+
+//            state.RequireForUpdate(changedFontRequestQ);
+//        }
+
+//        //[BurstCompile]
+//        public void OnUpdate(ref SystemState state)
+//        {
+//            if (changedFontRequestQ.IsEmpty)
+//                return;
+
+//            getFontMetadataJob.Complete();
+
+//            var changedFontRequestBuffer = changedFontRequestQ.GetSingletonBuffer<FontLoadDescription>();
+//            var fontTable = SystemAPI.GetSingletonRW<FontTable>().ValueRW;
+//            state.CompleteDependency();
+
+//            //copy to nativeArray because LoadFont would invalidate DynamicBuffer due to structural changes
+//            var fontRequests = CollectionHelper.CreateNativeArray<FontLoadDescription>(changedFontRequestBuffer.AsNativeArray(), state.WorldUpdateAllocator);
+//            for (int i = 0, ii = fontRequests.Length; i < ii; i++)
+//            {
+//                var fontRequest = fontRequests[i];
+//                if (!fontTable.fontAssetRefToFaceIndexMap.ContainsKey(fontRequest.lookupKey))
+//                    LoadFont(fontRequest, ref state, ref fontTable);
+//            }
+//        }
+
+//        public void OnDestroy(ref SystemState state)
+//        {
+//            SystemAPI.GetSingletonRW<FontTable>().ValueRW.TryDispose(state.Dependency).Complete();
+//            systemFontsNative.Dispose();
+//            systemFontReferences.Dispose();
+//        }
+
+//        void LoadFont(FontLoadDescription sFontReference, ref SystemState state, ref FontTable fontTable)
+//        {
+//            Blob blob;
+//            string fontAssetPath;
+//            if (sFontReference.isSystemFont)
+//            {
+//                //loading rules: https://www.high-logic.com/fontcreator/manual15/fonttype.html
+//                if (!TryGetSystemFontReference(sFontReference, out FontLoadDescription systemFontReference))
+//                {
+//                    //Debug.Log($"Could not find system font {sFontReference.fontFamily} {sFontReference.fontSubFamily}");
+//                    return;
+//                }
+//                //Debug.Log($"Found system font {systemFontReference.fontFamily} {systemFontReference.fontSubFamily} {systemFontReference.filePath}");
+//                fontAssetPath = systemFontReference.filePath.ToString();
+//            }
+//            else
+//            {
+//                if (sFontReference.streamingAssetLocationValidated)
+//                    fontAssetPath = Path.Combine(Application.streamingAssetsPath, sFontReference.filePath.ToString());
+//                else
+//                    fontAssetPath = sFontReference.filePath.ToString();
+
+//                if (!File.Exists(fontAssetPath))
+//                {
+//                    //Debug.Log($"Could not find font in {fontAssetPath}");
+//                    return;
+//                }
+//            }
+
+//            //Debug.Log($"Load {sFontReference.fontFamily} {sFontReference.fontSubFamily} {File.Exists(fontAssetPath)}");
+//            blob = new Blob(fontAssetPath);
+//            blob.MakeImmutable();//is this neccessary considering we dispose the blob in next instruction?
+
+//            // in case font file is a collection font, chances are that none of the faces have been loaded yet
+//            // while file is open, load them all to avoid opening file again
+//            var tempFontReferences = new NativeList<FontLoadDescription>(blob.FaceCount, Allocator.Temp);
+//            var language = Language.English;
+//            TextHelper.GetFaceInfo(blob, language, sFontReference, tempFontReferences);
+
+//            for (int i = 0, ii = tempFontReferences.Length; i < ii; i++)
+//            {
+//                var tempFontReference = tempFontReferences[i];
+//                var tempFontAssetRef = tempFontReference.lookupKey;
+//                if (!fontTable.fontAssetRefToFaceIndexMap.ContainsKey(tempFontAssetRef))
+//                {
+//                    var id = fontTable.fontAssetRefToFaceIndexMap.Count;
+//                    fontTable.fontAssetRefs.Add(tempFontAssetRef);
+//                    fontTable.fontAssetRefToFaceIndexMap.Add(tempFontAssetRef, id);
+//                    var face = new Face(blob, tempFontReference.faceIndexInFile);
+//                    face.MakeImmutable();
+//                    fontTable.faces.Add(face);
+
+//                    for (int k = 0, kk = fontTable.perThreadFontCaches.Length; k < kk; k++)
+//                    {
+//                        var list = fontTable.perThreadFontCaches[k];
+//                        list.Add(default);
+//                        fontTable.perThreadFontCaches[k] = list;
+//                    }
+
+//                    //setup lookup of named variable instance
+//                    if (face.HasVarData)
+//                    {
+//                        var axisCount = (int)face.AxisCount;
+
+//                        //fetch a list of all variation axis
+//                        Span<AxisInfo> axisInfos = stackalloc AxisInfo[axisCount];
+//                        face.GetAxisInfos(0, 0, ref axisInfos, out _);
+//                        AxisInfo axisInfo;
+//                        float coord;
+
+//                        //fetch a list of named variants
+//                        //Debug.Log($"found {axisCount} variation axis for font {sFontReference.fontFamily} {sFontReference.fontSubFamily}, {face.NamedInstanceCount} named instances");
+//                        Span<float> coords = stackalloc float[axisCount];
+//                        for (int k = 0, kk = (int)face.NamedInstanceCount; k < kk; k++)
+//                        {
+//                            face.GetNamedInstanceDesignCoords(k, ref coords, out uint coordLength);
+//                            var variableFontAssetRef = tempFontAssetRef;
+//                            for (int f = 0, ff = (int)coordLength; f < ff; f++)
+//                            {
+//                                //axisInfos and coords should be aligned in length and order
+//                                axisInfo = axisInfos[f];
+//                                coord = coords[f];
+//                                switch (axisInfo.axisTag)
+//                                {
+//                                    case AxisTag.WIDTH:
+//                                        variableFontAssetRef.width = coord; break;
+//                                    case AxisTag.WEIGHT:
+//                                        variableFontAssetRef.weight = coord; break;
+//                                    case AxisTag.ITALIC:
+//                                        variableFontAssetRef.isItalic = (int)coord == 1; break;
+//                                    case AxisTag.SLANT:
+//                                        variableFontAssetRef.slant = coord; break;
+//                                }
+//                                //Debug.Log($"Add FontLookupKey {tempFontAssetRef} for variation axis: {axisInfo.axisTag} {face.GetName(axisInfo.nameID, language)}, value = {coord}");
+//                            }
+//                            fontTable.fontAssetRefToNamedVariationIndexMap.Add(variableFontAssetRef, k);
+//                        }
+//                    }
+//                }
+//            }
+
+//            //blob can be disposed here, face and font are disposed at world shutdown via FontTable.TryDispose
+//            blob.Dispose();
+//        }
+
+//        bool TryGetSystemFontReference(FontLoadDescription query, out FontLoadDescription sFontReference)
+//        {
+//            int index;
+//            if ((index = systemFontReferences.IndexOf(query)) != -1)
+//            {
+//                sFontReference = systemFontReferences[index];
+//                return true;
+//            }
+//            sFontReference = default;
+//            return false;
+//        }
+
+//        struct GetFontMetadataJob : IJob
+//        {
+//            [ReadOnly] public NativeArray<FixedString512Bytes> systemFonts;
+//            public NativeList<FontLoadDescription> fontReferences;
+
+//            public void Execute()
+//            {
+//                var language = Language.English;
+//                for (int i = 0, ii = systemFonts.Length; i < ii; i++)
+//                    TextHelper.GetFontInfo(systemFonts[i].ToString(), true, language, fontReferences);
+//            }
+//        }
+//    }
+//}
+

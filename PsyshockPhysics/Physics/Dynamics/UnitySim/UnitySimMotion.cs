@@ -157,7 +157,7 @@ namespace Latios.Psyshock
                 rotation   = newTransform.rot,
                 scale      = oldWorldTransform.scale,
                 stretch    = oldWorldTransform.stretch,
-                worldIndex = oldWorldTransform.worldIndex
+                context32 = oldWorldTransform.context32
             };
         }
 
@@ -165,7 +165,7 @@ namespace Latios.Psyshock
         /// Computes a new world transform for an entity based on the local and world transforms of the inertia tensor diagonal
         /// and center of mass
         /// </summary>
-        /// <param name="oldWorldTransform">The original world transform (only scale, stretch, and worldIndex are used)</param>
+        /// <param name="oldWorldTransform">The original world transform (only scale, stretch, and context32 are used)</param>
         /// <param name="inertialPoseWorldTransform">The world space transform of the center of mass and inertia tensor diagonal</param>
         /// <param name="localTensorOrientation">The local-space inertia tensor diagonal orientation relative to the entity</param>
         /// <param name="localCenterOfMassUnscaled">The local-space center of mass relative to the entity</param>
@@ -177,7 +177,7 @@ namespace Latios.Psyshock
         {
             var localInertial     = new RigidTransform(localTensorOrientation, localCenterOfMassUnscaled * oldWorldTransform.stretch * oldWorldTransform.scale);
             var newWorldTransform = math.mul(inertialPoseWorldTransform, math.inverse(localInertial));
-            return new TransformQvvs(newWorldTransform.pos, newWorldTransform.rot, oldWorldTransform.scale, oldWorldTransform.stretch, oldWorldTransform.worldIndex);
+            return new TransformQvvs(newWorldTransform.pos, newWorldTransform.rot, oldWorldTransform.scale, oldWorldTransform.stretch, oldWorldTransform.context32);
         }
     }
 }

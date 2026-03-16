@@ -70,48 +70,42 @@ namespace Latios.Psyshock.Authoring.Systems
         protected override void OnCreate()
         {
             new SmartBlobberTools<ConvexColliderBlob>().Register(World);
+
+            m_query = CheckedStateRef.Fluent().With<ConvexColliderBlobBakeData>().IncludePrefabs().IncludeDisabledEntities().Build();
         }
 
 #pragma warning disable CS0618
         protected override void OnUpdate()
         {
-            int count = m_query.CalculateEntityCountWithoutFiltering();
+            int count   = m_query.CalculateEntityCountWithoutFiltering();
+            var hashmap = new NativeParallelHashMap<int, UniqueItem>(count * 2, WorldUpdateAllocator);
 
-            var hashmap   = new NativeParallelHashMap<int, UniqueItem>(count * 2, WorldUpdateAllocator);
-            var mapWriter = hashmap.AsParallelWriter();
-
-            Entities.WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ForEach((in ConvexColliderBlobBakeData data) =>
+            new AddToMapJob
             {
-                mapWriter.TryAdd(data.mesh.GetHashCode(), new UniqueItem { bakeData = data });
-            }).WithStoreEntityQueryInField(ref m_query).ScheduleParallel();
+                hashmap = hashmap.AsParallelWriter()
+            }.ScheduleParallel();
 
             var meshes   = new NativeList<UnityObjectRef<Mesh> >(WorldUpdateAllocator);
             var builders = new NativeList<ConvexBuilder>(WorldUpdateAllocator);
+            CompleteDependency();
 
-            Job.WithCode(() =>
+            int uniqueCount = hashmap.Count();
+            meshes.ResizeUninitialized(uniqueCount);
+            builders.ResizeUninitialized(uniqueCount);
+
+            int i = 0;
+            foreach (var pair in hashmap)
             {
-                int count = hashmap.Count();
-                if (count == 0)
-                    return;
-
-                meshes.ResizeUninitialized(count);
-                builders.ResizeUninitialized(count);
-
-                int i = 0;
-                foreach (var pair in hashmap)
-                {
-                    meshes[i]   = pair.Value.bakeData.mesh;
-                    builders[i] = default;
-                    i++;
-                }
-            }).Schedule();
+                meshes[i]   = pair.Value.bakeData.mesh;
+                builders[i] = default;
+                i++;
+            }
 
             if (m_meshCache == null)
                 m_meshCache = new List<Mesh>();
             m_meshCache.Clear();
-            CompleteDependency();
 
-            for (int i = 0; i < meshes.Length; i++)
+            for (i = 0; i < meshes.Length; i++)
             {
                 var mesh         = meshes[i].Value;
                 var builder      = builders[i];
@@ -136,20 +130,14 @@ namespace Latios.Psyshock.Authoring.Systems
             CompleteDependency();
             meshDataArray.Dispose();
 
-            Job.WithCode(() =>
+            Dependency = new WriteBlobsToHashmapsJob
             {
-                for (int i = 0; i < meshes.Length; i++)
-                {
-                    var element                      = hashmap[meshes[i].GetHashCode()];
-                    element.blob                     = builders[i].result;
-                    hashmap[meshes[i].GetHashCode()] = element;
-                }
-            }).Schedule();
+                builders = builders,
+                hashmap  = hashmap,
+                meshes   = meshes
+            }.Schedule(Dependency);
 
-            Entities.WithReadOnly(hashmap).ForEach((ref SmartBlobberResult result, in ConvexColliderBlobBakeData data) =>
-            {
-                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
-            }).WithEntityQueryOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities).ScheduleParallel();
+            new AssignBlobsJob { hashmap = hashmap }.ScheduleParallel();
         }
 #pragma warning restore CS0618
 
@@ -172,6 +160,14 @@ namespace Latios.Psyshock.Authoring.Systems
         }
 
         [BurstCompile]
+        partial struct AddToMapJob : IJobEntity
+        {
+            public NativeParallelHashMap<int, UniqueItem>.ParallelWriter hashmap;
+
+            public void Execute(in ConvexColliderBlobBakeData data) => hashmap.TryAdd(data.mesh.GetHashCode(), new UniqueItem { bakeData = data });
+        }
+
+        [BurstCompile]
         struct BuildBlobsJob : IJobFor
         {
             public NativeArray<ConvexBuilder>    builders;
@@ -182,6 +178,36 @@ namespace Latios.Psyshock.Authoring.Systems
                 var builder = builders[i];
                 builder.BuildBlob(meshes[i]);
                 builders[i] = builder;
+            }
+        }
+
+        [BurstCompile]
+        struct WriteBlobsToHashmapsJob : IJob
+        {
+            public NativeParallelHashMap<int, UniqueItem>       hashmap;
+            [ReadOnly] public NativeList<ConvexBuilder>         builders;
+            [ReadOnly] public NativeList<UnityObjectRef<Mesh> > meshes;
+
+            public void Execute()
+            {
+                for (int i = 0; i < meshes.Length; i++)
+                {
+                    var element                      = hashmap[meshes[i].GetHashCode()];
+                    element.blob                     = builders[i].result;
+                    hashmap[meshes[i].GetHashCode()] = element;
+                }
+            }
+        }
+
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
+        [BurstCompile]
+        partial struct AssignBlobsJob : IJobEntity
+        {
+            [ReadOnly] public NativeParallelHashMap<int, UniqueItem> hashmap;
+
+            public void Execute(ref SmartBlobberResult result, in ConvexColliderBlobBakeData data)
+            {
+                result.blob = UnsafeUntypedBlobAssetReference.Create(hashmap[data.mesh.GetHashCode()].blob);
             }
         }
     }

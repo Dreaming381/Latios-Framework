@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Latios.Authoring;
 using Latios.Transforms;
 using Unity.Collections;
 using Unity.Entities;
-using Unity.Entities.Exposed;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -116,7 +114,7 @@ namespace Latios.Kinemation.Authoring
     }
     #endregion
 
-    #region Entities Graphics Baking Replacements
+    #region Entities Graphics Baking Replacements and General Rendering
     [BakingType]
     [InternalBufferCapacity(1)]
     internal struct BakingMaterialMeshSubmesh : IBufferElementData
@@ -130,6 +128,26 @@ namespace Latios.Kinemation.Authoring
     internal struct BakingLightmapIndex : IComponentData
     {
         public int lightmapIndex;
+    }
+
+    [BakingType]
+    [InternalBufferCapacity(0)]
+    internal struct  BakingStreamingTexture : IBufferElementData
+    {
+        public UnityObjectRef<Texture2D> texture;
+        public UnityObjectRef<Material>  material;
+        public float2                    uvScale;
+        public int                       texelCount;
+        public int                       mipmapCount;
+    }
+
+    [BakingType]
+    [InternalBufferCapacity(1)]
+    internal struct BakingStreamingTextureMeshUv0Metric : IBufferElementData
+    {
+        public UnityObjectRef<Mesh> mesh;
+        public float                uv0Metric;
+        public float3               localBoundsExtents;
     }
     #endregion
 }

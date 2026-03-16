@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Entities.Exposed;
-using Unity.Entities.Exposed.Dangerous;
 using Unity.Jobs;
 
 namespace Latios
@@ -26,11 +26,113 @@ namespace Latios
         public bool ShouldUpdateSystem(ref SystemState state);
     }
 
+    /// <summary>
+    /// Allows a system to update multiple times without synchronizing the JobHandle from the system's previous update in a frame.
+    /// This can be useful for fixed update loops where packing the job chain can increase throughput.
+    /// Warning: Dependency may not always account for the jobs from the previous update, as it only relies upon ECS dependency
+    /// managedment as if the second run belonged to a separate system. However, when the max number of updates is reached, or during
+    /// the first update of the new frame, the JobHandles of the previous unsynced updates are forced to complete.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = false)]
+    public class DontSyncPreviousUpdatesThisFrameAttribute : Attribute
+    {
+        public int maxUpdatesWithoutSync;
+        /// <summary>
+        /// Commands a system to not complete its previous jobs if this is not the first time this system has updated in a frame.
+        /// </summary>
+        /// <param name="maxUpdatesWithoutSync">The maximum number of updates this system can go without syncing.</param>
+        public DontSyncPreviousUpdatesThisFrameAttribute(int maxUpdatesWithoutSync)
+        {
+            this.maxUpdatesWithoutSync = maxUpdatesWithoutSync;
+        }
+    }
+
+    internal struct SystemChainUpdatesManager : IDisposable
+    {
+        struct SyncState
+        {
+            public int       frameCounter;
+            public int       maxUpdatesPerFrame;
+            public int       updateCountThisFrame;
+            public JobHandle accumulatedJobHandle;
+        }
+
+        UnsafeHashMap<int, SyncState> metaIdToSyncStateMap;
+
+        public SystemChainUpdatesManager(bool dummy)
+        {
+            // The following line is bugged and does not include systems with [DisableAutoCreation].
+            //var systems         = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.All);
+
+            // Use reflection instead.
+            var systems = typeof(TypeManager).GetField("s_SystemTypes", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null) as List<Type>;
+
+            metaIdToSyncStateMap = new UnsafeHashMap<int, SyncState>(systems.Count, Allocator.Persistent);
+            foreach (var system in systems)
+            {
+                DontSyncPreviousUpdatesThisFrameAttribute syncAttribute = null;
+                try
+                {
+                    syncAttribute = system.GetCustomAttribute<DontSyncPreviousUpdatesThisFrameAttribute>();
+                }
+                catch (Exception)
+                {
+                    //UnityEngine.Debug.LogException(ex);
+                }
+                if (syncAttribute != null)
+                {
+                    int metaId = -1;
+                    try
+                    {
+                        metaId = WorldExposedExtensions.GetMetaIdForType(system);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        UnityEngine.Debug.LogWarning(
+                            $"A meta ID was not found for system of type {system.Name}. Unity.Entities Error: {e.Message}");
+                        continue;
+                    }
+                    metaIdToSyncStateMap.Add(metaId, new SyncState { maxUpdatesPerFrame = syncAttribute.maxUpdatesWithoutSync });
+                }
+            }
+        }
+
+        public unsafe void BeforeOnUpdate(ref SystemState state, int frameCounter)
+        {
+            if (!metaIdToSyncStateMap.TryGetValue(state.UnmanagedMetaIndex, out var syncState))
+                return;
+            if (frameCounter != syncState.frameCounter || syncState.updateCountThisFrame >= syncState.maxUpdatesPerFrame)
+            {
+                if (!syncState.accumulatedJobHandle.Equals(default))
+                    syncState.accumulatedJobHandle.Complete();
+                syncState.accumulatedJobHandle = default;
+                syncState.updateCountThisFrame = 1;
+            }
+            else
+            {
+                syncState.accumulatedJobHandle = JobHandle.CombineDependencies(syncState.accumulatedJobHandle, state.GetLastScheduledJobHandle());
+                state.Dependency               = default;
+                syncState.updateCountThisFrame++;
+            }
+            syncState.frameCounter                         = frameCounter;
+            metaIdToSyncStateMap[state.UnmanagedMetaIndex] = syncState;
+        }
+
+        public void Dispose()
+        {
+            foreach (var pair in metaIdToSyncStateMap)
+            {
+                pair.Value.accumulatedJobHandle.Complete();
+            }
+            metaIdToSyncStateMap.Dispose();
+        }
+    }
+
     internal class UnmanagedExtraInterfacesDispatcher : IDisposable
     {
         List<DispatchBase> m_dispatches;
 
-        UnsafeParallelHashMap<int, int> m_metaId2DispatchMapping;
+        UnsafeHashMap<int, int> m_metaId2DispatchMapping;
 
         public DispatchBase GetDispatch(ref SystemState state)
         {
@@ -52,8 +154,7 @@ namespace Latios
             //var systems         = DefaultWorldInitialization.GetAllSystems(WorldSystemFilterFlags.All);
 
             // Use reflection instead.
-            var systems = typeof(TypeManager).GetField("s_SystemTypes",
-                                                       System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic).GetValue(null) as List<Type>;
+            var systems = typeof(TypeManager).GetField("s_SystemTypes", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null) as List<Type>;
 
             var filteredIndices = new NativeList<int>(Allocator.Temp);
             for (int i = 0; i < systems.Count; i++)
@@ -61,6 +162,7 @@ namespace Latios
                 var type = systems[i];
                 if (type == null)
                     continue;
+
                 if (typeof(ISystem).IsAssignableFrom(type))
                 {
                     if (typeof(ISystemNewScene).IsAssignableFrom(type) || typeof(ISystemShouldUpdate).IsAssignableFrom(type))
@@ -71,7 +173,7 @@ namespace Latios
             }
 
             m_dispatches             = new List<DispatchBase>(filteredIndices.Length);
-            m_metaId2DispatchMapping = new UnsafeParallelHashMap<int, int>(filteredIndices.Length, Allocator.Persistent);
+            m_metaId2DispatchMapping = new UnsafeHashMap<int, int>(filteredIndices.Length + 1, Allocator.Persistent);
 
             var NewSceneType             = typeof(DispatchNewScene<>);
             var ShouldUpdateType         = typeof(DispatchShouldUpdate<>);
@@ -160,7 +262,7 @@ namespace Latios
     internal static class BurstLookupUtility
     {
         [BurstCompile]
-        public static bool BurstLookup(in UnsafeParallelHashMap<int, int> map, int key, out int value)
+        public static bool BurstLookup(in UnsafeHashMap<int, int> map, int key, out int value)
         {
             return map.TryGetValue(key, out value);
         }

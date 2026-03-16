@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Latios.Kinemation.InternalSourceGen;
 using Latios.Transforms;
-using Latios.Transforms.Abstract;
 using Latios.Unsafe;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
@@ -52,8 +50,6 @@ namespace Latios.Kinemation.Systems
 
         LatiosWorldUnmanaged latiosWorld;
 
-        ParentReadWriteAspect.Lookup m_parentLookup;
-
 #if LATIOS_TRANSFORMS_UNITY
         // Dummy for Unity Transforms
         struct PreviousTransform : IComponentData
@@ -64,8 +60,6 @@ namespace Latios.Kinemation.Systems
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
-
-            m_parentLookup = new ParentReadWriteAspect.Lookup(ref state);
 
             m_newMeshesQuery                    = state.Fluent().With<MaterialMeshInfo>(true).Without<ChunkPerFrameCullingMask>(true).Build();
             m_deadMeshesQuery                   = state.Fluent().With<ChunkPerFrameCullingMask>(false, true).Without<MaterialMeshInfo>().Build();
@@ -263,7 +257,6 @@ namespace Latios.Kinemation.Systems
                         skinnedMeshRemoveOpsBlockList = skinnedMeshRemoveOpsBlockList,
                         needsBindingHandle            = GetComponentTypeHandle<NeedsBindingFlag>(false),
                         newMeshesJob                  = newMeshJob,
-                        needsReinitHandle             = GetComponentTypeHandle<BoundMeshNeedsReinit>(true)
                     }.ScheduleParallel(m_bindableMeshesQuery, state.Dependency);
                 }
             }
@@ -361,20 +354,16 @@ namespace Latios.Kinemation.Systems
                                                                                                                          ComponentType.ChunkComponent<ChunkDeformPrefixSums>()));
 
                 // If Socket somehow gets added by accident, we might as well remove it.
-                // Also, we remove the LocalTransform and ParentToWorldTransform now to possibly prevent a structural change later.
-#if !LATIOS_TRANSFORMS_UNITY
-                state.EntityManager.RemoveComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(ComponentType.ReadWrite<Socket>(),
-                                                                                                  ComponentType.ReadWrite<LocalTransform>(),
-                                                                                                  ComponentType.ReadWrite<ParentToWorldTransform>()));
-#elif LATIOS_TRANSFORMS_UNITY
                 state.EntityManager.RemoveComponent<Socket>(m_newSkinnedMeshesQuery);
-#endif
+
                 var skinnedMeshAddTypes = new FixedList128Bytes<ComponentType>();
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<BoundMesh>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<SkeletonDependent>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadOnly<CopyParentWorldTransformTag>());
-                skinnedMeshAddTypes.Add(ParentReadWriteAspect.componentType);
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformPrefixSums>());
+#if LATIOS_TRANSFORMS_UNITY
+                skinnedMeshAddTypes.Add(ComponentType.ReadWrite<Unity.Transforms.Parent>());
+#endif
 
                 state.EntityManager.AddComponent(m_newSkinnedMeshesQuery, new ComponentTypeSet(in skinnedMeshAddTypes));
 
@@ -431,23 +420,41 @@ namespace Latios.Kinemation.Systems
 
             if (haveNewDeformMeshes | haveBindableMeshes)
             {
+#if LATIOS_TRANSFORMS_UNITY
+                state.Dependency = new ProcessSkinnedMeshStateOpsJob
+                {
+                    failedBindingEntity  = m_failedSkeletonMeshBindingEntity,
+                    ops                  = skinnedMeshBindingsStatesToWrite.AsDeferredJobArray(),
+                    parentLookup         = GetComponentLookup<Unity.Transforms.Parent>(false),
+                    stateLookup          = GetComponentLookup<SkeletonDependent>(false),
+                    localTransformLookup = GetComponentLookup<Unity.Transforms.LocalTransform>(false)
+                }.Schedule(skinnedMeshBindingsStatesToWrite, 16, state.Dependency);
+#else
+                meshBindingsJH.Complete();
+                foreach (var op in skinnedMeshBindingsStatesToWrite)
+                {
+                    state.EntityManager.SetComponentData(op.meshEntity, op.skinnedState);
+                    if (op.skinnedState.root == Entity.Null)
+                        state.EntityManager.SetParent(op.meshEntity, m_failedSkeletonMeshBindingEntity, InheritanceFlags.CopyParent, SetParentOptions.TransferLinkedEntityGroup);
+                    else
+                    {
+                        bool reparent = true;
+                        if (state.EntityManager.HasComponent<RootReference>(op.meshEntity))
+                        {
+                            var rootRef = state.EntityManager.GetComponentData<RootReference>(op.meshEntity);
+                            reparent    = rootRef.ToHandle(state.EntityManager).bloodParent.entity != op.skinnedState.root;
+                        }
+                        if (reparent)
+                            state.EntityManager.SetParent(op.meshEntity, op.skinnedState.root, InheritanceFlags.CopyParent, SetParentOptions.TransferLinkedEntityGroup);
+                    }
+                }
+#endif
+
                 state.Dependency = new ProcessMeshStateOpsJob
                 {
                     ops         = meshBindingStatesToWrite.AsDeferredJobArray(),
                     stateLookup = GetComponentLookup<BoundMesh>(false)
                 }.Schedule(meshBindingStatesToWrite, 16, state.Dependency);
-
-                m_parentLookup.Update(ref state);
-                state.Dependency = new ProcessSkinnedMeshStateOpsJob
-                {
-                    failedBindingEntity = m_failedSkeletonMeshBindingEntity,
-                    ops                 = skinnedMeshBindingsStatesToWrite.AsDeferredJobArray(),
-                    parentLookup        = m_parentLookup,
-                    stateLookup         = GetComponentLookup<SkeletonDependent>(false),
-#if LATIOS_TRANSFORMS_UNITY
-                    localTransformLookup = GetComponentLookup<Unity.Transforms.LocalTransform>(false)
-#endif
-                }.Schedule(skinnedMeshBindingsStatesToWrite, 16, state.Dependency);
             }
 
             if (haveNewDeformMeshes | haveBindableMeshes | haveDeadDeformMeshes)
@@ -930,8 +937,6 @@ namespace Latios.Kinemation.Systems
             public ComponentTypeHandle<SkeletonDependent> depsHandle;
             public ComponentTypeHandle<NeedsBindingFlag>  needsBindingHandle;
 
-            [ReadOnly] public ComponentTypeHandle<BoundMeshNeedsReinit> needsReinitHandle;
-
             public UnsafeParallelBlockList<MeshRemoveOperation>        meshRemoveOpsBlockList;
             public UnsafeParallelBlockList<SkinnedMeshRemoveOperation> skinnedMeshRemoveOpsBlockList;
 
@@ -939,9 +944,11 @@ namespace Latios.Kinemation.Systems
 
             [NativeSetThreadIndex] int m_nativeThreadIndex;
 
+            HasChecker<BoundMeshNeedsReinit> needsReinitChecker;
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                bool needsReinint     = chunk.Has(ref needsReinitHandle);
+                bool needsReinint     = needsReinitChecker[chunk];
                 bool hasNeedsBindings = chunk.Has(ref needsBindingHandle);
 
                 // The general strategy here is to unbind anything requesting a rebind
@@ -1636,32 +1643,30 @@ namespace Latios.Kinemation.Systems
             }
         }
 
+#if LATIOS_TRANSFORMS_UNITY
         [BurstCompile]
         struct ProcessSkinnedMeshStateOpsJob : IJobParallelForDefer
         {
             [NativeDisableParallelForRestriction] public ComponentLookup<SkeletonDependent> stateLookup;
-            [NativeDisableParallelForRestriction] public ParentReadWriteAspect.Lookup       parentLookup;
-            [ReadOnly] public NativeArray<SkinnedMeshWriteStateOperation>                   ops;
-            public Entity                                                                   failedBindingEntity;
-
-#if LATIOS_TRANSFORMS_UNITY
+            [NativeDisableParallelForRestriction] public ComponentLookup<Unity.Transforms.Parent> parentLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<Unity.Transforms.LocalTransform> localTransformLookup;
-#endif
+            [ReadOnly] public NativeArray<SkinnedMeshWriteStateOperation> ops;
+            public Entity failedBindingEntity;
+
             public void Execute(int index)
             {
-                var op                     = ops[index];
+                var op = ops[index];
                 stateLookup[op.meshEntity] = op.skinnedState;
-                var parentAspect           = parentLookup[op.meshEntity];
-                if (op.skinnedState.root == Entity.Null)
-                    parentAspect.parent = failedBindingEntity;
-                else
-                    parentAspect.parent = op.skinnedState.root;
 
-#if LATIOS_TRANSFORMS_UNITY
+                if (op.skinnedState.root == Entity.Null)
+                    parentLookup[op.meshEntity] = new Unity.Transforms.Parent { Value = failedBindingEntity };
+                else
+                    parentLookup[op.meshEntity] = new Unity.Transforms.Parent { Value = op.skinnedState.root };
+
                 localTransformLookup[op.meshEntity] = Unity.Transforms.LocalTransform.Identity;
-#endif
             }
         }
+#endif
 
         [BurstCompile]
         struct ProcessBindingOpsJob : IJobParallelForDefer

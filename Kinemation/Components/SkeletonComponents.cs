@@ -107,6 +107,41 @@ namespace Latios.Kinemation
         public ReadOnlySpan<ulong> this[int maskIndex] => masks[maskIndex].AsSpan();
     }
 
+    /// <summary>
+    /// A buffer used to track skinned meshes bound to this skeleton.
+    /// Usage: ReadOnly, do not modify in any way.
+    /// </summary>
+    [InternalBufferCapacity(1)]
+    public struct DependentSkinnedMesh : ICleanupBufferElementData
+    {
+        /// <summary>
+        /// The skinned mesh entity bound to this skeleton
+        /// </summary>
+        public EntityWith<SkeletonDependent> skinnedMesh;
+        // Todo: Store entry indices instead?
+        /// <summary>
+        /// The index of the first vertex in the global undeformed mesh vertices buffer.
+        /// The buffer can be obtained via GraphicsBufferBroker.GetMeshVerticesBuffer().
+        /// The buffer is bound to "_latiosDeformBuffer"
+        /// </summary>
+        public uint meshVerticesStart;
+        /// <summary>
+        /// The index of the first bone weight in the global bone weights buffer.
+        /// </summary>
+        public uint meshWeightsStart;
+        /// <summary>
+        /// The index of the first bindpose of the mesh in the global bindposes buffer.
+        /// </summary>
+        public uint meshBindPosesStart;
+        /// <summary>
+        /// The number of bone influences the mesh uses
+        /// </summary>
+        public uint boneOffsetsCount;
+        /// <summary>
+        /// The index of the first bone offset, remapping a mesh bone influence index to a skeleton bone index.
+        /// </summary>
+        public uint boneOffsetsStart;
+    }
     #endregion
     #region Exposed skeleton
 

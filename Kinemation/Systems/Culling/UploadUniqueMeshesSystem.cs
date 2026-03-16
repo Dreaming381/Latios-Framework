@@ -27,7 +27,7 @@ namespace Latios.Kinemation
         public void OnCreate(ref SystemState state)
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
-            m_query     = state.Fluent().With<UniqueMeshConfig>(false).Build();
+            m_query     = state.Fluent().With<MaterialMeshInfo>(false).WithEnabled<UniqueMeshConfig>(false).Build();
             m_data      = new CullingComputeDispatchData<CollectState, WriteState>(latiosWorld);
         }
 
@@ -39,37 +39,32 @@ namespace Latios.Kinemation
             var chunkCount      = m_query.CalculateChunkCountWithoutFiltering();
             var collectedChunks = new NativeList<CollectedChunk>(chunkCount, state.WorldUpdateAllocator);
             collectedChunks.Resize(chunkCount, NativeArrayOptions.ClearMemory);
-            var meshIDsToInvalidate = new UnsafeParallelBlockList<int>(256, state.WorldUpdateAllocator);
-            var meshPool            = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
+            var meshPool = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
 
             state.Dependency = new FindAndValidateMeshesJob
             {
-                collectedChunks         = collectedChunks,
-                colorHandle             = GetBufferTypeHandle<UniqueMeshColor>(true),
-                configHandle            = GetComponentTypeHandle<UniqueMeshConfig>(false),
-                entityHandle            = GetEntityTypeHandle(),
-                indexHandle             = GetBufferTypeHandle<UniqueMeshIndex>(true),
-                maskHandle              = GetComponentTypeHandle<ChunkPerDispatchCullingMask>(true),
-                meshIDsToInvalidate     = meshIDsToInvalidate,
-                meshPool                = meshPool,
-                mmiHandle               = GetComponentTypeHandle<MaterialMeshInfo>(true),
-                normalHandle            = GetBufferTypeHandle<UniqueMeshNormal>(true),
-                positionHandle          = GetBufferTypeHandle<UniqueMeshPosition>(true),
-                submeshHandle           = GetBufferTypeHandle<UniqueMeshSubmesh>(true),
-                tangentHandle           = GetBufferTypeHandle<UniqueMeshTangent>(true),
-                trackedUniqueMeshHandle = GetComponentTypeHandle<TrackedUniqueMesh>(true),
-                uv0xyHandle             = GetBufferTypeHandle<UniqueMeshUv0xy>(true),
-                uv3xyzHandle            = GetBufferTypeHandle<UniqueMeshUv3xyz>(true),
+                collectedChunks = collectedChunks,
+                colorHandle     = GetBufferTypeHandle<UniqueMeshColor>(true),
+                configHandle    = GetComponentTypeHandle<UniqueMeshConfig>(false),
+                entityHandle    = GetEntityTypeHandle(),
+                indexHandle     = GetBufferTypeHandle<UniqueMeshIndex>(true),
+                meshPool        = meshPool,
+                mmiHandle       = GetComponentTypeHandle<MaterialMeshInfo>(false),
+                normalHandle    = GetBufferTypeHandle<UniqueMeshNormal>(true),
+                positionHandle  = GetBufferTypeHandle<UniqueMeshPosition>(true),
+                submeshHandle   = GetBufferTypeHandle<UniqueMeshSubmesh>(true),
+                tangentHandle   = GetBufferTypeHandle<UniqueMeshTangent>(true),
+                uv0xyHandle     = GetBufferTypeHandle<UniqueMeshUv0xy>(true),
+                uv3xyzHandle    = GetBufferTypeHandle<UniqueMeshUv3xyz>(true),
             }.ScheduleParallel(m_query, state.Dependency);
 
             var meshesNeeded = new NativeReference<int>(state.WorldUpdateAllocator, NativeArrayOptions.UninitializedMemory);
 
             state.Dependency = new OrganizeMeshesJob
             {
-                collectedChunks     = collectedChunks,
-                meshIDsToInvalidate = meshIDsToInvalidate,
-                meshPool            = meshPool,
-                meshesNeeded        = meshesNeeded
+                collectedChunks = collectedChunks,
+                meshPool        = meshPool,
+                meshesNeeded    = meshesNeeded
             }.Schedule(state.Dependency);
 
             return new CollectState
@@ -150,22 +145,20 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct FindAndValidateMeshesJob : IJobChunk
         {
-            [ReadOnly] public EntityTypeHandle                                 entityHandle;
-            [ReadOnly] public ComponentTypeHandle<MaterialMeshInfo>            mmiHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshPosition>             positionHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshNormal>               normalHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshTangent>              tangentHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshColor>                colorHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshUv0xy>                uv0xyHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshUv3xyz>               uv3xyzHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshIndex>                indexHandle;
-            [ReadOnly] public BufferTypeHandle<UniqueMeshSubmesh>              submeshHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkPerDispatchCullingMask> maskHandle;
-            [ReadOnly] public ComponentTypeHandle<TrackedUniqueMesh>           trackedUniqueMeshHandle;
-            [ReadOnly] public UniqueMeshPool                                   meshPool;
+            [ReadOnly] public EntityTypeHandle                       entityHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshPosition>   positionHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshNormal>     normalHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshTangent>    tangentHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshColor>      colorHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshUv0xy>      uv0xyHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshUv3xyz>     uv3xyzHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshIndex>      indexHandle;
+            [ReadOnly] public BufferTypeHandle<UniqueMeshSubmesh>    submeshHandle;
+            [ReadOnly] public ComponentTypeHandle<TrackedUniqueMesh> trackedHandle;
+            [ReadOnly] public UniqueMeshPool                         meshPool;
 
             public ComponentTypeHandle<UniqueMeshConfig>                            configHandle;
-            public UnsafeParallelBlockList<int>                                     meshIDsToInvalidate;
+            public ComponentTypeHandle<MaterialMeshInfo>                            mmiHandle;
             [NativeDisableParallelForRestriction] public NativeList<CollectedChunk> collectedChunks;  // Preallocated to query chunk count without filtering
 
             [NativeSetThreadIndex]
@@ -173,100 +166,82 @@ namespace Latios.Kinemation
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                // 1) Only consider meshes that have a MaterialMeshInfo or a TrackedUniqueMesh.
-                if (!(chunk.Has(ref mmiHandle) || chunk.Has(ref trackedUniqueMeshHandle)))
-                    return;
-
+                // 1) Get config info
                 var configurations = (UniqueMeshConfig*)chunk.GetRequiredComponentDataPtrRO(ref configHandle);
-
-                // 2) Only consider dirty visible meshes or meshes with forced uploads
-                ChunkPerDispatchCullingMask maskToProcess = default;
-                if (chunk.HasChunkComponent(ref maskHandle))
-                    maskToProcess  = chunk.GetChunkComponentData(ref maskHandle);
                 var configuredBits = chunk.GetEnabledMask(ref configHandle);
+                var mmis           = chunk.GetComponentDataPtrRO(ref mmiHandle);
+                var tracked        = chunk.GetComponentDataPtrRO(ref trackedHandle);
+                var entities       = chunk.GetEntityDataPtrRO(entityHandle);
 
-                var enumerator = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
+                // 2) Validate meshes
+                BitField64 lowerToProcess = default;
+                BitField64 upperToProcess = default;
+                var        validator      = new UniqueMeshValidator
+                {
+                    configurations  = configurations,
+                    entities        = chunk.GetEntityDataPtrRO(entityHandle),
+                    positionBuffers = chunk.GetBufferAccessor(ref positionHandle),
+                    normalBuffers   = chunk.GetBufferAccessor(ref normalHandle),
+                    tangentBuffers  = chunk.GetBufferAccessor(ref tangentHandle),
+                    colorBuffers    = chunk.GetBufferAccessor(ref colorHandle),
+                    uv0xyBuffers    = chunk.GetBufferAccessor(ref uv0xyHandle),
+                    uv3xyzBuffers   = chunk.GetBufferAccessor(ref uv3xyzHandle),
+                    indexBuffers    = chunk.GetBufferAccessor(ref indexHandle),
+                    submeshBuffers  = chunk.GetBufferAccessor(ref submeshHandle),
+                };
+                validator.Init();
+
+                bool reservedMmiWrite = false;
+                var  enumerator       = new ChunkEntityEnumerator(useEnabledMask, chunkEnabledMask, chunk.Count);
                 while (enumerator.NextEntityIndex(out var entityIndex))
                 {
-                    if (!configuredBits[entityIndex])
+                    if (!validator.IsEntityIndexValidMesh(entityIndex))
                     {
-                        if (entityIndex < 64)
-                            maskToProcess.lower.SetBits(entityIndex, false);
-                        else
-                            maskToProcess.upper.SetBits(entityIndex - 64, false);
-                        continue;
-                    }
+                        // Mark the entity as configured now so that we don't try to process it again until the user fixes the problem.
+                        configuredBits[entityIndex] = false;
+                        // Mark the entity as invalid so that we can cull it in future updates, but only if the status changed.
 
-                    if (configurations[entityIndex].forceUpload)
-                    {
-                        if (entityIndex < 64)
-                            maskToProcess.lower.SetBits(entityIndex, true);
-                        else
-                            maskToProcess.upper.SetBits(entityIndex - 64, true);
-                    }
-                }
-                if ((maskToProcess.lower.Value | maskToProcess.upper.Value) == 0)
-                    return;
-
-                // 3) Identify which meshes still need validation.
-                var        mmis          = chunk.GetComponentDataPtrRO(ref mmiHandle);
-                BitField64 validateLower = default, validateUpper = default;
-                enumerator               = new ChunkEntityEnumerator(true, new v128(maskToProcess.lower.Value, maskToProcess.upper.Value), chunk.Count);
-                while (enumerator.NextEntityIndex(out var entityIndex))
-                {
-                    if (!meshPool.meshesPrevalidatedThisFrame.Contains(mmis[entityIndex].Mesh))
-                    {
-                        if (entityIndex < 64)
-                            validateLower.SetBits(entityIndex, true);
-                        else
-                            validateUpper.SetBits(entityIndex - 64, true);
-                    }
-                }
-
-                // 4) Validate meshes still needing validation if necessary
-                if ((validateLower.Value | validateUpper.Value) != 0)
-                {
-                    var validator = new UniqueMeshValidator
-                    {
-                        configurations  = configurations,
-                        entities        = chunk.GetEntityDataPtrRO(entityHandle),
-                        positionBuffers = chunk.GetBufferAccessor(ref positionHandle),
-                        normalBuffers   = chunk.GetBufferAccessor(ref normalHandle),
-                        tangentBuffers  = chunk.GetBufferAccessor(ref tangentHandle),
-                        colorBuffers    = chunk.GetBufferAccessor(ref colorHandle),
-                        uv0xyBuffers    = chunk.GetBufferAccessor(ref uv0xyHandle),
-                        uv3xyzBuffers   = chunk.GetBufferAccessor(ref uv3xyzHandle),
-                        indexBuffers    = chunk.GetBufferAccessor(ref indexHandle),
-                        submeshBuffers  = chunk.GetBufferAccessor(ref submeshHandle),
-                    };
-                    validator.Init();
-
-                    enumerator = new ChunkEntityEnumerator(true, new v128(validateLower.Value, validateUpper.Value), chunk.Count);
-                    while (enumerator.NextEntityIndex(out var entityIndex))
-                    {
-                        if (!validator.IsEntityIndexValidMesh(entityIndex))
+                        if (mmis[entityIndex].Mesh != 0)
                         {
-                            // Mark the entity as configured now so that we don't try to process it again until the user fixes the problem.
-                            configuredBits[entityIndex] = false;
-                            // Mark the entity as invalid so that we can cull it in future updates, but only if the status changed.
-                            if (meshPool.invalidMeshesToCull.Contains(mmis[entityIndex].Mesh))
+                            if (!reservedMmiWrite)
                             {
-                                meshIDsToInvalidate.Write(mmis[entityIndex].Mesh, threadIndex);
+                                chunk.GetComponentDataPtrRW(ref mmiHandle);
+                                reservedMmiWrite = true;
                             }
-                            // Mark the entity as non-processable
-                            maskToProcess.ClearBitAtIndex(entityIndex);
+                            mmis[entityIndex].Mesh = 0;
+                        }
+                    }
+                    else
+                    {
+                        if (entityIndex < 64)
+                            lowerToProcess.SetBits(entityIndex, true);
+                        else
+                            upperToProcess.SetBits(entityIndex - 64, true);
+                        if (mmis[entityIndex].Mesh == 0)
+                        {
+                            if (!reservedMmiWrite)
+                            {
+                                chunk.GetComponentDataPtrRW(ref mmiHandle);
+                                reservedMmiWrite = true;
+                            }
+                            // All of these checks should pass at this point, but I don't really want to crash Unity if they fail for some reason.
+                            if (tracked != null)
+                            {
+                                if (meshPool.meshToIdMap.TryGetValue(tracked[entityIndex].mesh, out var id))
+                                    mmis[entityIndex].Mesh = id;
+                            }
                         }
                     }
                 }
-                if ((maskToProcess.lower.Value | maskToProcess.upper.Value) == 0)
+                if ((lowerToProcess.Value | upperToProcess.Value) == 0)
                     return;
 
                 // 5) Export chunk
                 collectedChunks[unfilteredChunkIndex] = new CollectedChunk
                 {
                     chunk = chunk,
-                    lower = maskToProcess.lower,
-                    upper = maskToProcess.upper,
+                    lower = lowerToProcess,
+                    upper = upperToProcess,
                 };
             }
         }
@@ -274,16 +249,12 @@ namespace Latios.Kinemation
         [BurstCompile]
         struct OrganizeMeshesJob : IJob
         {
-            public NativeList<CollectedChunk>   collectedChunks;
-            public UniqueMeshPool               meshPool;
-            public UnsafeParallelBlockList<int> meshIDsToInvalidate;
-            public NativeReference<int>         meshesNeeded;
+            public NativeList<CollectedChunk> collectedChunks;
+            public UniqueMeshPool             meshPool;
+            public NativeReference<int>       meshesNeeded;
 
             public void Execute()
             {
-                foreach (var id in meshIDsToInvalidate)
-                    meshPool.invalidMeshesToCull.Add(id);
-
                 int prefixSum  = 0;
                 int writeIndex = 0;
                 for (int i = 0; i < collectedChunks.Length; i++)
@@ -327,12 +298,15 @@ namespace Latios.Kinemation
             [NativeDisableContainerSafetyRestriction] NativeList<float4>                    tempTangents;
             [NativeDisableContainerSafetyRestriction] NativeList<VertexAttributeDescriptor> tempDescriptors;
 
+            public HasChecker<LiveBakedTag> liveBakedChecker;
+
             public unsafe void Execute(int chunkIndex)
             {
                 if (!tempDescriptors.IsCreated)
                     tempDescriptors = new NativeList<VertexAttributeDescriptor>(8, Allocator.Temp);
 
-                var chunk = collectedChunks[chunkIndex];
+                var  chunk     = collectedChunks[chunkIndex];
+                bool liveBaked = liveBakedChecker[chunk.chunk];
 
                 // Assign all the meshes now for a little better cache coherency.
                 var mask    = chunk.chunk.GetEnabledMask(ref configHandle);
@@ -567,7 +541,7 @@ namespace Latios.Kinemation
                     }
 
                     // Process buffer clearing option
-                    if (config.reclaimDynamicBufferMemoryAfterUpload)
+                    if (config.reclaimDynamicBufferMemoryAfterUpload && !liveBaked)
                     {
                         if (positionBuffers.Length > 0)
                         {
@@ -657,6 +631,203 @@ namespace Latios.Kinemation
                 stream[writeIndex++] = value.y;
                 stream[writeIndex++] = value.z;
                 stream[writeIndex++] = value.w;
+            }
+        }
+
+        internal unsafe struct UniqueMeshValidator
+        {
+            public UniqueMeshConfig*                  configurations;
+            public Entity*                            entities;
+            public BufferAccessor<UniqueMeshPosition> positionBuffers;
+            public BufferAccessor<UniqueMeshNormal>   normalBuffers;
+            public BufferAccessor<UniqueMeshTangent>  tangentBuffers;
+            public BufferAccessor<UniqueMeshColor>    colorBuffers;
+            public BufferAccessor<UniqueMeshUv0xy>    uv0xyBuffers;
+            public BufferAccessor<UniqueMeshUv3xyz>   uv3xyzBuffers;
+            public BufferAccessor<UniqueMeshIndex>    indexBuffers;
+            public BufferAccessor<UniqueMeshSubmesh>  submeshBuffers;
+
+            bool hasPositions;
+            bool hasNormals;
+            bool hasTangents;
+            bool hasColors;
+            bool hasUv0xys;
+            bool hasUv3xyzs;
+            bool hasIndices;
+            bool hasSubmehes;
+
+            public void Init()
+            {
+                hasPositions = positionBuffers.Length > 0;
+                hasNormals   = normalBuffers.Length > 0;
+                hasTangents  = tangentBuffers.Length > 0;
+                hasColors    = colorBuffers.Length > 0;
+                hasUv0xys    = uv0xyBuffers.Length > 0;
+                hasUv3xyzs   = uv3xyzBuffers.Length > 0;
+                hasIndices   = indexBuffers.Length > 0;
+                hasSubmehes  = submeshBuffers.Length > 0;
+            }
+
+            public bool IsEntityIndexValidMesh(int entityIndex)
+            {
+                var  config = configurations[entityIndex];
+                bool failed = false;
+
+                // Validate buffer size matches
+                int vertexCode  = -1;
+                int vertexCount = -1;
+                if (hasPositions)
+                {
+                    vertexCode  = 0;
+                    vertexCount = positionBuffers[entityIndex].Length;
+                }
+                if (!config.calculateNormals && hasNormals)
+                {
+                    if (vertexCode < 0)
+                    {
+                        vertexCode  = 1;
+                        vertexCount = normalBuffers[entityIndex].Length;
+                    }
+                    else if (vertexCount != normalBuffers[entityIndex].Length)
+                    {
+                        UnityEngine.Debug.LogError(
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} positions and {normalBuffers[entityIndex].Length} tangents. These must match.");
+                        failed = true;
+                    }
+                }
+                if (!config.calculateTangents && hasTangents)
+                {
+                    if (vertexCode < 0)
+                    {
+                        vertexCode  = 2;
+                        vertexCount = tangentBuffers[entityIndex].Length;
+                    }
+                    else if (vertexCount != tangentBuffers[entityIndex].Length)
+                    {
+                        UnityEngine.Debug.LogError(
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} {GetNameFromVertexCode(vertexCode)} and {tangentBuffers[entityIndex].Length} tangents. These must match.");
+                        failed = true;
+                    }
+                }
+                if (hasColors)
+                {
+                    if (vertexCode < 0)
+                    {
+                        vertexCode  = 3;
+                        vertexCount = colorBuffers[entityIndex].Length;
+                    }
+                    else if (vertexCount != colorBuffers[entityIndex].Length)
+                    {
+                        UnityEngine.Debug.LogError(
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} {GetNameFromVertexCode(vertexCode)} and {colorBuffers[entityIndex].Length} colors. These must match.");
+                        failed = true;
+                    }
+                }
+                if (hasUv0xys)
+                {
+                    if (vertexCode < 0)
+                    {
+                        vertexCode  = 4;
+                        vertexCount = uv0xyBuffers[entityIndex].Length;
+                    }
+                    else if (vertexCount != uv0xyBuffers[entityIndex].Length)
+                    {
+                        UnityEngine.Debug.LogError(
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} {GetNameFromVertexCode(vertexCode)} and {uv0xyBuffers[entityIndex].Length} UV0 xy values. These must match.");
+                        failed = true;
+                    }
+                }
+                if (hasUv3xyzs)
+                {
+                    if (vertexCode < 0)
+                    {
+                        vertexCode  = 4;
+                        vertexCount = uv3xyzBuffers[entityIndex].Length;
+                    }
+                    else if (vertexCount != uv3xyzBuffers[entityIndex].Length)
+                    {
+                        UnityEngine.Debug.LogError(
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} {GetNameFromVertexCode(vertexCode)} and {uv3xyzBuffers[entityIndex].Length} UV3 xyz values. These must match.");
+                        failed = true;
+                    }
+                }
+
+                // Validate config options
+                if (config.calculateNormals && !hasPositions)
+                {
+                    UnityEngine.Debug.LogError($"Cannot calculate normals without positions for {entities[entityIndex].ToFixedString()}.");
+                    failed = true;
+                }
+                if (config.calculateTangents && !hasPositions && !hasUv0xys && !(hasNormals || config.calculateNormals))
+                {
+                    UnityEngine.Debug.LogError($"Cannot calculate tangents without positions, normals, and UV0 values for {entities[entityIndex].ToFixedString()}.");
+                    failed = true;
+                }
+
+                // Validate submeshes
+                if (hasSubmehes)
+                {
+                    int indexCount   = hasIndices ? indexBuffers[entityIndex].Length : vertexCount;
+                    int submeshIndex = 0;
+                    foreach (var submesh in submeshBuffers[entityIndex])
+                    {
+                        if (submesh.indexStart + submesh.indexCount > indexCount)
+                        {
+                            UnityEngine.Debug.LogError(
+                                $"In {entities[entityIndex].ToFixedString()}, submesh {submeshIndex} with indexStart {submesh.indexStart} and indexCount {submesh.indexCount} exceeds {indexCount} total indices in the mesh.");
+                            failed = true;
+                        }
+                        if (submesh.topology == UniqueMeshSubmesh.Topology.Triangles && submesh.indexCount % 3 != 0)
+                        {
+                            UnityEngine.Debug.LogError(
+                                $"In {entities[entityIndex].ToFixedString()}, submesh has triangle topology and indexCount {submesh.indexCount} which is not divisible by 3.");
+                            failed = true;
+                        }
+                        if (submesh.topology == UniqueMeshSubmesh.Topology.Lines && submesh.indexCount % 2 != 0)
+                        {
+                            UnityEngine.Debug.LogError(
+                                $"In {entities[entityIndex].ToFixedString()}, submesh has line topology and indexCount {submesh.indexCount} which is not divisible by 2. Did you intend to use LineStrip instead?");
+                            failed = true;
+                        }
+                        submeshIndex++;
+                    }
+                }
+
+                // Validate indices only if we haven't failed already
+                int totalIndexCount = 0;
+                if (!failed && hasIndices)
+                {
+                    foreach (var index in indexBuffers[entityIndex])
+                    {
+                        if (index.index < 0 || index.index >= vertexCount)
+                        {
+                            UnityEngine.Debug.LogError(
+                                $"In {entities[entityIndex].ToFixedString()}, index value {index.index} at position {totalIndexCount} in the index buffer is outside the vertex range [0, {vertexCount})");
+                            failed = true;
+                            break;
+                        }
+                        totalIndexCount++;
+                    }
+                }
+                // If the mesh is just empty, silently fail.
+                if (vertexCount == 0 && totalIndexCount == 0)
+                    failed = true;
+
+                return !failed;
+            }
+
+            FixedString32Bytes GetNameFromVertexCode(int code)
+            {
+                switch (code)
+                {
+                    case 0: return "positions";
+                    case 1: return "normals";
+                    case 2: return "tangents";
+                    case 3: return "colors";
+                    case 4: return "UV0 xy values";
+                    case 5: return "UV3 xyz values";
+                    default: return default;
+                }
             }
         }
     }

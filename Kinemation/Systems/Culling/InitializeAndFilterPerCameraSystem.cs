@@ -13,6 +13,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Kinemation.Systems
 {
+    [DontSyncPreviousUpdatesThisFrame(32)]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]
@@ -55,14 +56,13 @@ namespace Latios.Kinemation.Systems
             var cullingContext = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
             state.Dependency   = new Job
             {
-                chunkInfoHandle                    = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
-                headerHandle                       = GetComponentTypeHandle<ChunkHeader>(true),
-                perCameraMaskHandle                = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
-                filterHandle                       = GetSharedComponentTypeHandle<RenderFilterSettings>(),
-                lightMapsHandle                    = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
-                usedOnlyForCustomGraphicsTagHandle = GetComponentTypeHandle<UsedOnlyForCustomGraphicsTag>(true),
-                materialMeshInfoHandle             = m_materialMeshInfoHandle,
-                cullingContext                     = cullingContext
+                chunkInfoHandle        = GetComponentTypeHandle<EntitiesGraphicsChunkInfo>(true),
+                headerHandle           = GetComponentTypeHandle<ChunkHeader>(true),
+                perCameraMaskHandle    = GetComponentTypeHandle<ChunkPerCameraCullingMask>(false),
+                filterHandle           = GetSharedComponentTypeHandle<RenderFilterSettings>(),
+                lightMapsHandle        = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
+                materialMeshInfoHandle = m_materialMeshInfoHandle,
+                cullingContext         = cullingContext
             }.ScheduleParallel(m_metaQuery, state.Dependency);
 
 #if UNITY_EDITOR
@@ -90,17 +90,18 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         struct Job : IJobChunk
         {
-            public ComponentTypeHandle<ChunkPerCameraCullingMask>               perCameraMaskHandle;
-            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings>   filterHandle;
-            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                  headerHandle;
-            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>    chunkInfoHandle;
-            [ReadOnly] public SharedComponentTypeHandle<LightMaps>              lightMapsHandle;
-            [ReadOnly] public DynamicComponentTypeHandle                        materialMeshInfoHandle;
-            [ReadOnly] public ComponentTypeHandle<UsedOnlyForCustomGraphicsTag> usedOnlyForCustomGraphicsTagHandle;
+            public ComponentTypeHandle<ChunkPerCameraCullingMask>             perCameraMaskHandle;
+            [ReadOnly] public SharedComponentTypeHandle<RenderFilterSettings> filterHandle;
+            [ReadOnly] public ComponentTypeHandle<ChunkHeader>                headerHandle;
+            [ReadOnly] public ComponentTypeHandle<EntitiesGraphicsChunkInfo>  chunkInfoHandle;
+            [ReadOnly] public SharedComponentTypeHandle<LightMaps>            lightMapsHandle;
+            [ReadOnly] public DynamicComponentTypeHandle                      materialMeshInfoHandle;
 
             public CullingContext cullingContext;
 
             public bool clearDispatch;
+
+            HasChecker<UsedOnlyForCustomGraphicsTag> usedOnlyForCustomGraphicsChecker;
 
             public unsafe void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -118,7 +119,7 @@ namespace Latios.Kinemation.Systems
 
                     ref var chunk = ref chunkHeaders[i].ArchetypeChunk;
 
-                    if (chunk.Has(ref usedOnlyForCustomGraphicsTagHandle))
+                    if (usedOnlyForCustomGraphicsChecker[chunk])
                         continue;
 
                     var filter = chunk.Has(filterHandle) ? chunk.GetSharedComponent(filterHandle) : RenderFilterSettings.Default;

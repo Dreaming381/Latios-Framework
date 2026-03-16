@@ -1,0 +1,3 @@
+.narrow .unity-base-field__input {
+    min-width: 40px;
+}

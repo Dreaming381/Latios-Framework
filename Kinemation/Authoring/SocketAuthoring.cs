@@ -1,3 +1,4 @@
+using Latios.Transforms.Authoring;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -31,11 +32,12 @@ namespace Latios.Kinemation.Authoring
                 return;
             }
 
-            var entity                                                  = GetEntity(TransformUsageFlags.Renderable);
-            var index                                                   = authoring.useReversePath ? 0 : math.max(0, authoring.boneIndex);
-            AddComponent(                entity, new Socket { boneIndex = (short)index });
-            AddComponent<AuthoredSocket>(entity);
-            AddComponent(                entity, new BoneOwningSkeletonReference { skeletonRoot = GetEntity(skeleton, TransformUsageFlags.Renderable) });
+            var entity                                                               = GetEntity(TransformUsageFlags.Renderable);
+            var index                                                                = authoring.useReversePath ? 0 : math.max(0, authoring.boneIndex);
+            AddComponent(                             entity, new Socket { boneIndex = (short)index });
+            AddComponent<AuthoredSocket>(             entity);
+            AddComponent(                             entity, new BoneOwningSkeletonReference { skeletonRoot = GetEntity(skeleton, TransformUsageFlags.Renderable) });
+            AddComponent<BakedLocalTransformOverride>(entity);
 
             if (authoring.useReversePath)
             {

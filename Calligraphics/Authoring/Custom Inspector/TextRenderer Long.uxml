@@ -1,0 +1,20 @@
+<engine:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <engine:VisualElement data-source-type="Calligraphics.Authoring.TextRendererAuthoring, Latios.Calligraphics">
+        <editor:PropertyField binding-path="text" name="Text"/>
+        <editor:PropertyField binding-path="fontCollectionAsset" name="fontCollectionAsset"/>
+        <engine:DropdownField label="Default Font" binding-path="defaultFont"/>
+        <editor:PropertyField binding-path="fontStyles" name="FontStyles"/>
+        <editor:PropertyField name="fontSize" binding-path="fontSize"/>
+        <editor:PropertyField binding-path="color" name="color"/>
+        <editor:PropertyField binding-path="maxLineWidth" name="maxLineWidth"/>
+        <editor:PropertyField name="wordSpacing" binding-path="wordSpacing"/>
+        <editor:PropertyField binding-path="lineSpacing" name="lineSpacing"/>
+        <editor:PropertyField binding-path="paragraphSpacing" name="paragraphSpacing"/>
+        <editor:PropertyField binding-path="wordWrap" name="wordWrap"/>
+        <editor:PropertyField binding-path="isOrthographic" name="isOrthographic"/>
+        <editor:PropertyField name="language" binding-path="language"/>
+        <editor:PropertyField name="script" binding-path="script"/>
+        <editor:PropertyField name="fontTextureSize" binding-path="fontTextureSize"/>
+        <editor:PropertyField name="material" binding-path="material"/>
+    </engine:VisualElement>
+</engine:UXML>

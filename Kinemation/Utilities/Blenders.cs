@@ -104,7 +104,7 @@ namespace Latios.Kinemation
     {
         public static void NormalizeBone(ref this TransformQvvs localTransform)
         {
-            var w = math.asfloat(localTransform.worldIndex);
+            var w = math.asfloat(localTransform.context32);
             w     = 1f / w;
 #if LATIOS_DISABLE_ACL
             localTransform.rotation   = math.normalize(localTransform.rotation);

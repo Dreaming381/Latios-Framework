@@ -482,10 +482,13 @@ namespace Latios
 
             if (world != null)
             {
-                InjectSystem(TypeManager.GetSystemTypeIndex<DeferredSimulationEndFrameControllerSystem>(), world);
+                //InjectSystem(TypeManager.GetSystemTypeIndex<DeferredSimulationEndFrameControllerSystem>(), world);
+                var system                         = world.GetOrCreateSystemManaged<DeferredSimulationEndFrameControllerSystem>();
+                var initializeationSystem          = world.GetExistingSystemManaged<InitializationSystemGroup>();
+                var manager                        = initializeationSystem.RateManager as LatiosInitializationSystemGroupManager;
+                manager.m_deferredSimulationSystem = system;
 
-                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<InitializationSystemGroup>(), ref playerLoop,
-                                                                    typeof(Initialization));
+                ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(initializeationSystem, ref playerLoop, typeof(Initialization));
                 // We add it here for visibility in tools. But really we don't update until EndOfFrame
                 WorldExposedExtensions.AddDummyRootLevelSystemToPlayerLoop(world.GetExistingSystemManaged<SimulationSystemGroup>(), ref playerLoop);
                 ScriptBehaviourUpdateOrder.AppendSystemToPlayerLoop(world.GetExistingSystemManaged<PresentationSystemGroup>(), ref playerLoop,

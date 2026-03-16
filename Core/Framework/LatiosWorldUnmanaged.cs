@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Unity.Burst;
 using Unity.Collections;
@@ -29,10 +30,7 @@ namespace Latios
                 if (m_impl == null)
                     return false;
 
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+                CheckHandleIsValid();
 
                 return true;
             }
@@ -45,19 +43,13 @@ namespace Latios
         {
             get
             {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+                CheckHandleIsValid();
                 return m_impl->m_zeroToleranceForExceptionsEnabled;
             }
 
             set
             {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+                CheckHandleIsValid();
                 m_impl->m_zeroToleranceForExceptionsEnabled = value;
             }
         }
@@ -69,11 +61,26 @@ namespace Latios
         {
             get
             {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+                CheckHandleIsValid();
                 return m_impl->m_worldUnmanaged.EntityManager.World as LatiosWorld;
+            }
+        }
+
+        /// <summary>
+        /// True if live baking occurred for this update frame. This is set and cleared right after Unity's live baking systems update.
+        /// This should always be false in builds.
+        /// </summary>
+        public bool liveBakedThisFrame
+        {
+            get
+            {
+                CheckHandleIsValid();
+                return m_impl->m_liveBakedThisFrame;
+            }
+            internal set
+            {
+                CheckHandleIsValid();  // Since we are calling this from baking scanning for all worlds, it is best to be safe.
+                m_impl->m_liveBakedThisFrame = value;
             }
         }
 
@@ -85,10 +92,7 @@ namespace Latios
         {
             get
             {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+                CheckHandleIsValid();
                 return m_impl->m_worldBlackboardEntity;
             }
         }
@@ -100,10 +104,8 @@ namespace Latios
         {
             get
             {
+                CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
                 if (m_impl->m_sceneBlackboardEntity == Entity.Null)
                 {
                     throw new System.InvalidOperationException(
@@ -135,10 +137,8 @@ namespace Latios
         {
             get
             {
+                CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-                if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                    throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
                 if (m_impl->m_syncPointPlaybackSystem == null)
                 {
                     throw new System.InvalidOperationException("There is no initialized SyncPointPlaybackSystem in the World.");
@@ -161,10 +161,7 @@ namespace Latios
         public bool AddManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent,
         InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
@@ -186,10 +183,7 @@ namespace Latios
         /// <returns>Returns true if the entity had the managed struct component, false otherwise</returns>
         public bool RemoveManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
@@ -211,10 +205,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         public T GetManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             if (m_impl->m_managedStructStorage == default)
             {
                 var managedStructStorage       = new ManagedStructComponentStorage();
@@ -239,10 +230,8 @@ namespace Latios
         public void SetManagedStructComponent<T>(Entity entity, T managedStructComponent) where T : struct, IManagedStructComponent,
         InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
+            CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, managedStructComponent.componentType))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
@@ -261,10 +250,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing IManagedComponent</typeparam>
         public bool HasManagedStructComponent<T>(Entity entity) where T : struct, IManagedStructComponent, InternalSourceGen.StaticAPI.IManagedStructComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             var em = m_impl->m_worldUnmanaged.EntityManager;
 
             if (m_impl->m_managedStructStorage == default)
@@ -305,10 +291,7 @@ namespace Latios
         public bool AddOrSetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             var  em              = m_impl->m_worldUnmanaged.EntityManager;
             bool addedAssociated = em.HasComponent(entity, collectionComponent.componentType);
             if (addedAssociated)
@@ -341,10 +324,7 @@ namespace Latios
         /// <returns>True if the entity had the AssociatedComponentType, false otherwise</returns>
         public bool RemoveCollectionComponentAndDispose<T>(Entity entity) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
 
             var  type          = m_impl->m_collectionComponentStorage.GetExistType<T>();
             bool hadAssociated = m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(entity, type);
@@ -369,10 +349,8 @@ namespace Latios
         /// <returns>The collection component instance</returns>
         public T GetCollectionComponent<T>(Entity entity, bool readOnly) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
+            CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
             var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
@@ -405,10 +383,8 @@ namespace Latios
         public T GetCollectionComponent<T>(Entity entity, out JobHandle collectionUseDependency, bool readOnly = false) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
+            CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
             var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
@@ -450,10 +426,8 @@ namespace Latios
         public void SetCollectionComponentAndDisposeOld<T>(Entity entity, T collectionComponent) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
+            CheckHandleIsValid();
 #if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-
             if (!m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, collectionComponent.componentType))
                 throw new System.InvalidOperationException($"Entity {entity} does not have a component of type: {typeof(T).Name}");
 #endif
@@ -473,10 +447,7 @@ namespace Latios
         /// <typeparam name="T">The struct type implementing ICollectionComponent</typeparam>
         public bool HasCollectionComponent<T>(Entity entity) where T : unmanaged, ICollectionComponent, InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             var type = m_impl->m_collectionComponentStorage.GetExistType<T>();
             return m_impl->m_worldUnmanaged.EntityManager.HasComponent(entity, type);
         }
@@ -494,10 +465,7 @@ namespace Latios
         public void UpdateCollectionComponentDependency<T>(Entity entity, JobHandle handle, bool isReadOnlyHandle) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
 
             if (!m_impl->m_collectionComponentStorage.TryGetCollectionComponent<T>(entity, out var storedRef))
@@ -535,10 +503,7 @@ namespace Latios
         public void UpdateCollectionComponentMainThreadAccess<T>(Entity entity, bool wasAccessedAsReadOnly) where T : unmanaged, ICollectionComponent,
         InternalSourceGen.StaticAPI.ICollectionComponentSourceGenerated
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
 
             m_impl->ClearCollectionDependency(entity, BurstRuntime.GetHashCode64<T>());
             if (wasAccessedAsReadOnly)
@@ -559,10 +524,7 @@ namespace Latios
         /// <returns>The Collection Aspect instance</returns>
         public T GetCollectionAspect<T>(Entity entity) where T : unmanaged, ICollectionAspect<T>
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
             return default(T).CreateCollectionAspect(this, m_impl->m_worldUnmanaged.EntityManager, entity);
         }
 
@@ -571,16 +533,22 @@ namespace Latios
         /// </summary>
         public void CompleteAllTrackedJobs()
         {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
-                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
-#endif
+            CheckHandleIsValid();
 
             foreach (var dep in m_impl->m_collectionDependencies)
                 if (dep.hasExtraDisposeDependency)
                     dep.extraDisposeDependency.Complete();
 
             m_impl->m_collectionComponentStorage.CompleteEverything();
+        }
+        #endregion
+
+        #region Safety
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckHandleIsValid()
+        {
+            if (!LatiosWorldUnmanagedTracking.CheckHandle(m_index, m_version))
+                throw new System.InvalidOperationException("LatiosWorldUnmanaged is uninitialized. You must fetch a valid instance from SystemState.");
         }
         #endregion
     }
@@ -638,9 +606,12 @@ namespace Latios
         public WorldUnmanaged                   m_worldUnmanaged;
         public UnsafeList<SystemHandle>         m_executingSystemStack;
         public UnsafeList<CollectionDependency> m_collectionDependencies;
+        public SystemChainUpdatesManager        m_systemChainUpdatesManager;
         public bool                             m_zeroToleranceForExceptionsEnabled;
         public bool                             m_errorState;
         public bool                             m_registeredSystemOnce;
+        public bool                             m_liveBakedThisFrame;
+        public int                              m_frameCounter;
 
         public Systems.SyncPointPlaybackSystem* m_syncPointPlaybackSystem;
 
@@ -693,6 +664,7 @@ namespace Latios
                 }
             }
 #endif
+            m_systemChainUpdatesManager.BeforeOnUpdate(ref m_worldUnmanaged.ResolveSystemStateRef(system), m_frameCounter);
 
             m_executingSystemStack.Add(system);
         }

@@ -72,7 +72,6 @@ namespace Latios.Transforms
                 if (enableTransformSyncing)
                 {
                     entityManager.AddComponent(entity, Abstract.QueryExtensions.GetAbstractWorldTransformRWComponentType());
-                    entityManager.AddComponentData(entity, new CopyTransformToEntity { useUniformScale = useUniformScale });
                 }
 
                 s_initializeCache.Clear();

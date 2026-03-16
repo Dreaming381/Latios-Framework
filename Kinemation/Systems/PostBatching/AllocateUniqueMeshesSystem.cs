@@ -19,6 +19,7 @@ namespace Latios.Kinemation.Systems
 
         EntityQuery m_newMeshesQuery;
         EntityQuery m_deadMeshesQuery;
+        EntityQuery m_deadMeshesQuery2;
         EntityQuery m_liveBakedQuery;
 
         [BurstCompile]
@@ -26,32 +27,29 @@ namespace Latios.Kinemation.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
 
-            m_newMeshesQuery  = state.Fluent().With<UniqueMeshConfig>(true).Without<TrackedUniqueMesh>().Build();
-            m_deadMeshesQuery = state.Fluent().With<TrackedUniqueMesh>(true).Without<UniqueMeshConfig>().Build();
-
-            if ((state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None)
-            {
-                m_liveBakedQuery = state.Fluent().With<TrackedUniqueMesh>(true).With<MaterialMeshInfo>(false).Build();
-            }
+            m_newMeshesQuery   = state.Fluent().With<UniqueMeshConfig, MaterialMeshInfo>(true).Without<TrackedUniqueMesh>().Build();
+            m_deadMeshesQuery  = state.Fluent().With<TrackedUniqueMesh>(true).Without<UniqueMeshConfig>().Build();
+            m_deadMeshesQuery2 = state.Fluent().With<TrackedUniqueMesh, UniqueMeshConfig>(true).Without<MaterialMeshInfo>().Build();
+            m_liveBakedQuery   = state.Fluent().With<TrackedUniqueMesh, LiveBakedTag>(true).With<MaterialMeshInfo>(false).Build();
+            m_liveBakedQuery.AddChangedVersionFilter(ComponentType.ReadOnly<MaterialMeshInfo>());
 
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new UniqueMeshPool
             {
-                allMeshes                   = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
-                unusedMeshes                = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
-                invalidMeshesToCull         = new NativeHashSet<int>(64, Allocator.Persistent),
-                meshesPrevalidatedThisFrame = new NativeHashSet<int>(64, Allocator.Persistent),
-                meshToIdMap                 = new NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, int>(64, Allocator.Persistent),
-                idToMeshMap                 = new NativeHashMap<int, UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent)
+                allMeshes    = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
+                unusedMeshes = new NativeList<UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent),
+                meshToIdMap  = new NativeHashMap<UnityObjectRef<UnityEngine.Mesh>, int>(64, Allocator.Persistent),
+                idToMeshMap  = new NativeHashMap<int, UnityObjectRef<UnityEngine.Mesh> >(64, Allocator.Persistent)
             });
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var newMeshesCount  = m_newMeshesQuery.CalculateEntityCountWithoutFiltering();
-            var deadMeshesCount = m_deadMeshesQuery.CalculateEntityCountWithoutFiltering();
-            var neededMeshes    = newMeshesCount - deadMeshesCount;
-            var meshPool        = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
+            var newMeshesCount   = m_newMeshesQuery.CalculateEntityCountWithoutFiltering();
+            var deadMeshesCount  = m_deadMeshesQuery.CalculateEntityCountWithoutFiltering();
+            var deadMeshesCount2 = m_deadMeshesQuery2.CalculateEntityCountWithoutFiltering();
+            var neededMeshes     = newMeshesCount - deadMeshesCount - deadMeshesCount2;
+            var meshPool         = latiosWorld.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
             if (neededMeshes > 0)
             {
                 var newAllocatedMeshes = CollectionHelper.CreateNativeArray<UnityObjectRef<UnityEngine.Mesh> >(neededMeshes,
@@ -76,15 +74,19 @@ namespace Latios.Kinemation.Systems
                 }.Schedule(state.Dependency);
             }
 
-            if (deadMeshesCount > 0)
+            if (deadMeshesCount + deadMeshesCount2 > 0)
             {
-                state.Dependency = new DeadMeshesJob
+                var job = new DeadMeshesJob
                 {
                     ecb           = latiosWorld.syncPoint.CreateEntityCommandBuffer(),
                     entityHandle  = GetEntityTypeHandle(),
                     meshPool      = meshPool,
                     trackedHandle = GetComponentTypeHandle<TrackedUniqueMesh>(true)
-                }.Schedule(m_deadMeshesQuery, state.Dependency);
+                };
+                if (deadMeshesCount > 0)
+                    state.Dependency = job.Schedule(m_deadMeshesQuery, state.Dependency);
+                if (deadMeshesCount2 > 0)
+                    state.Dependency = job.Schedule(m_deadMeshesQuery2, state.Dependency);
             }
             if (newMeshesCount > 0)
             {
@@ -96,7 +98,7 @@ namespace Latios.Kinemation.Systems
                     mmiHandle    = GetComponentTypeHandle<MaterialMeshInfo>(false)
                 }.Schedule(m_newMeshesQuery, state.Dependency);
             }
-            if ((state.WorldUnmanaged.Flags & WorldFlags.Editor) != WorldFlags.None)
+            if (!m_liveBakedQuery.IsEmptyIgnoreFilter)
             {
                 state.Dependency = new PatchLiveBakedMeshesJob
                 {
@@ -133,6 +135,7 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public EntityTypeHandle                       entityHandle;
             [ReadOnly] public ComponentTypeHandle<TrackedUniqueMesh> trackedHandle;
+            public ComponentTypeHandle<MaterialMeshInfo>             mmiHandle;
             public EntityCommandBuffer                               ecb;
             public UniqueMeshPool                                    meshPool;
 
@@ -141,11 +144,13 @@ namespace Latios.Kinemation.Systems
                 var entities = chunk.GetNativeArray(entityHandle);
                 ecb.RemoveComponent<TrackedUniqueMesh>(entities);
                 var tracked = (TrackedUniqueMesh*)chunk.GetRequiredComponentDataPtrRO(ref trackedHandle);
+                var mmis    = chunk.GetComponentDataPtrRW(ref mmiHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var mesh = tracked[i].mesh;
                     meshPool.unusedMeshes.Add(mesh);
-                    meshPool.invalidMeshesToCull.Remove(meshPool.meshToIdMap[mesh]);
+                    if (mmis != null)
+                        mmis[i].Mesh = 0;
                 }
             }
         }
@@ -168,7 +173,6 @@ namespace Latios.Kinemation.Systems
                     meshPool.unusedMeshes.Length--;
                     accb.Add(entities[i], new TrackedUniqueMesh { mesh = mesh });
                     var id                                             = meshPool.meshToIdMap[mesh];
-                    meshPool.invalidMeshesToCull.Add(id);
                     if (mmis != null)
                     {
                         mmis[i].Mesh = id;

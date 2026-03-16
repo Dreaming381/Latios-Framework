@@ -16,6 +16,7 @@ using FrustumPlanes = Unity.Rendering.FrustumPlanes;
 
 namespace Latios.Kinemation.Systems
 {
+    [DontSyncPreviousUpdatesThisFrame(32)]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]

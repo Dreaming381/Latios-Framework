@@ -124,6 +124,7 @@ namespace Latios.Systems
             m_impl->m_collectionComponentStorage.Dispose();
             m_impl->m_collectionDependencies.Dispose();
             m_impl->m_executingSystemStack.Dispose();
+            m_impl->m_systemChainUpdatesManager.Dispose();
             AllocatorManager.Free(Allocator.Persistent, m_impl);
             m_impl = null;
             LatiosWorldUnmanagedTracking.DestroyHandle(m_trackingIndex, m_trackingVersion);

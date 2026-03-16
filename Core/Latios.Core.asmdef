@@ -12,7 +12,8 @@
         "Unity.Scenes",
         "Unity.Build",
         "Unity.NetCode",
-        "Unity.Networking.Transport"
+        "Unity.Networking.Transport",
+        "Unity.Scenes.Editor"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

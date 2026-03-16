@@ -29,7 +29,7 @@
 void SetupProjectedDecalVertex_float(in float3 positionObjectSpace, in float3 normalObjectSpace, in float nearClipPlane, out float3 outPositionObjectSpace, out float3 outNormalObjectSpace, out float3 outTangentObjectSpace)
 {
     float3 nearClipNormalOS = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(0, 0, 1, 0))).xyz;
-    float3 nearClipPositionOS = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(0, 0, 0, 1))).xyz;
+    float3 nearClipPositionOS = mul(UNITY_MATRIX_I_M, mul(UNITY_MATRIX_I_V, float4(0, 0, -nearClipPlane, 1))).xyz;
     float distanceToPlaneOS = abs(dot(float3(0, 0, 0.5) - nearClipPositionOS, nearClipNormalOS));
     const float centerToCornerDistance = 0.9086; // Cube root of 3 * (0.5^2) rounded up
     if (distanceToPlaneOS < centerToCornerDistance)

@@ -94,7 +94,7 @@ namespace Latios.Kinemation.Authoring
             {
                 var bone   = m_bones[i];
                 var parent = m_bones[bone.parentIndex];
-                qvvs.mul(ref bone.rootTransform, parent.rootTransform, bone.localTransform);
+                qvvs.mulclean(ref bone.rootTransform, parent.rootTransform, bone.localTransform);
                 bone.reversePath = $"{bone.shortName}/{parent.reversePath}";
                 m_bones[i]       = bone;
             }

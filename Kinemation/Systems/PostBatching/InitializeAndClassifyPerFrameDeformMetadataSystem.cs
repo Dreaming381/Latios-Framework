@@ -1,4 +1,3 @@
-using Latios.Kinemation.InternalSourceGen;
 using Unity.Burst;
 using Unity.Burst.Intrinsics;
 using Unity.Collections;
@@ -27,11 +26,6 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        public void OnDestroy(ref SystemState state)
-        {
-        }
-
-        [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
             MaxRequiredDeformData maxes     = default;
@@ -45,27 +39,8 @@ namespace Latios.Kinemation.Systems
 
             state.Dependency = new Job
             {
-                blendShapeStateHandle                   = GetComponentTypeHandle<BlendShapeState>(true),
-                blendShapeWeightHandle                  = GetBufferTypeHandle<BlendShapeWeight>(true),
-                chunkHeaderHandle                       = GetComponentTypeHandle<ChunkHeader>(true),
-                currentDeformHandle                     = GetComponentTypeHandle<CurrentDeformShaderIndex>(true),
-                currentDqsVertexHandle                  = GetComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>(true),
-                currentMatrixVertexHandle               = GetComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>(true),
-                deformClassificationMap                 = map.AsParallelWriter(),
-                disableComputeShaderProcessingTagHandle = GetComponentTypeHandle<DisableComputeShaderProcessingTag>(true),
-                dqsDeformTagHandle                      = GetComponentTypeHandle<DualQuaternionSkinningDeformTag>(true),
-                dynamicMeshStateHandle                  = GetComponentTypeHandle<DynamicMeshState>(true),
-                dynamicMeshVertexHandle                 = GetBufferTypeHandle<DynamicMeshVertex>(true),
-                legacyComputeDeformHandle               = GetComponentTypeHandle<LegacyComputeDeformShaderIndex>(true),
-                legacyDotsDeformHandle                  = GetComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>(true),
-                legacyLbsHandle                         = GetComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex>(true),
-                previousDeformHandle                    = GetComponentTypeHandle<PreviousDeformShaderIndex>(true),
-                previousDqsVertexHandle                 = GetComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>(true),
-                previousMatrixVertexHandle              = GetComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex>(true),
-                skeletonDependentHandle                 = GetComponentTypeHandle<SkeletonDependent>(true),
-                twoAgoDeformHandle                      = GetComponentTypeHandle<TwoAgoDeformShaderIndex>(true),
-                twoAgoDqsVertexHandle                   = GetComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>(true),
-                twoAgoMatrixVertexHandle                = GetComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>(true),
+                chunkHeaderHandle       = GetComponentTypeHandle<ChunkHeader>(true),
+                deformClassificationMap = map.AsParallelWriter(),
             }.ScheduleParallel(m_query, state.Dependency);
         }
 
@@ -74,32 +49,31 @@ namespace Latios.Kinemation.Systems
         {
             [ReadOnly] public ComponentTypeHandle<ChunkHeader> chunkHeaderHandle;
 
-            [ReadOnly] public ComponentTypeHandle<LegacyLinearBlendSkinningShaderIndex> legacyLbsHandle;
-            [ReadOnly] public ComponentTypeHandle<LegacyComputeDeformShaderIndex>       legacyComputeDeformHandle;
-            [ReadOnly] public ComponentTypeHandle<LegacyDotsDeformParamsShaderIndex>    legacyDotsDeformHandle;
-
-            [ReadOnly] public ComponentTypeHandle<CurrentMatrixVertexSkinningShaderIndex>  currentMatrixVertexHandle;
-            [ReadOnly] public ComponentTypeHandle<PreviousMatrixVertexSkinningShaderIndex> previousMatrixVertexHandle;
-            [ReadOnly] public ComponentTypeHandle<TwoAgoMatrixVertexSkinningShaderIndex>   twoAgoMatrixVertexHandle;
-            [ReadOnly] public ComponentTypeHandle<CurrentDqsVertexSkinningShaderIndex>     currentDqsVertexHandle;
-            [ReadOnly] public ComponentTypeHandle<PreviousDqsVertexSkinningShaderIndex>    previousDqsVertexHandle;
-            [ReadOnly] public ComponentTypeHandle<TwoAgoDqsVertexSkinningShaderIndex>      twoAgoDqsVertexHandle;
-
-            [ReadOnly] public ComponentTypeHandle<CurrentDeformShaderIndex>  currentDeformHandle;
-            [ReadOnly] public ComponentTypeHandle<PreviousDeformShaderIndex> previousDeformHandle;
-            [ReadOnly] public ComponentTypeHandle<TwoAgoDeformShaderIndex>   twoAgoDeformHandle;
-
-            [ReadOnly] public ComponentTypeHandle<SkeletonDependent> skeletonDependentHandle;
-            [ReadOnly] public ComponentTypeHandle<BlendShapeState>   blendShapeStateHandle;
-            [ReadOnly] public BufferTypeHandle<BlendShapeWeight>     blendShapeWeightHandle;
-            [ReadOnly] public ComponentTypeHandle<DynamicMeshState>  dynamicMeshStateHandle;
-            [ReadOnly] public BufferTypeHandle<DynamicMeshVertex>    dynamicMeshVertexHandle;
-
-            [ReadOnly] public ComponentTypeHandle<DisableComputeShaderProcessingTag> disableComputeShaderProcessingTagHandle;
-
-            [ReadOnly] public ComponentTypeHandle<DualQuaternionSkinningDeformTag> dqsDeformTagHandle;
-
             public NativeParallelHashMap<ArchetypeChunk, DeformClassification>.ParallelWriter deformClassificationMap;
+
+            HasChecker<LegacyLinearBlendSkinningShaderIndex> legacyLbsChecker;
+            HasChecker<LegacyComputeDeformShaderIndex>       legacyComputeDeformChecker;
+            HasChecker<LegacyDotsDeformParamsShaderIndex>    legacyDotsDeformChecker;
+
+            HasChecker<CurrentMatrixVertexSkinningShaderIndex>  currentMatrixVertexChecker;
+            HasChecker<PreviousMatrixVertexSkinningShaderIndex> previousMatrixVertexChecker;
+            HasChecker<TwoAgoMatrixVertexSkinningShaderIndex>   twoAgoMatrixVertexChecker;
+            HasChecker<CurrentDqsVertexSkinningShaderIndex>     currentDqsVertexChecker;
+            HasChecker<PreviousDqsVertexSkinningShaderIndex>    previousDqsVertexChecker;
+            HasChecker<TwoAgoDqsVertexSkinningShaderIndex>      twoAgoDqsVertexChecker;
+
+            HasChecker<CurrentDeformShaderIndex>  currentDeformChecker;
+            HasChecker<PreviousDeformShaderIndex> previousDeformChecker;
+            HasChecker<TwoAgoDeformShaderIndex>   twoAgoDeformChecker;
+
+            HasChecker<DisableComputeShaderProcessingTag> disableComputeShaderProcessingChecker;
+            HasChecker<DualQuaternionSkinningDeformTag>   dqsDeformChecker;
+
+            HasChecker<SkeletonDependent> skeletonDependentChecker;
+            HasChecker<BlendShapeState>   blendShapeStateChecker;
+            HasChecker<BlendShapeWeight>  blendShapeWeightChecker;
+            HasChecker<DynamicMeshState>  dynamicMeshStateChecker;
+            HasChecker<DynamicMeshVertex> dynamicMeshVertexChecker;
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -110,33 +84,33 @@ namespace Latios.Kinemation.Systems
                     var                  chunk          = chunks[i].ArchetypeChunk;
                     DeformClassification classification = default;
 
-                    bool hasSkeleton    = chunk.Has(ref skeletonDependentHandle);
-                    bool hasBlendShapes = chunk.Has(ref blendShapeStateHandle) && chunk.Has(ref blendShapeWeightHandle);
-                    bool hasDynamicMesh = chunk.Has(ref dynamicMeshStateHandle) && chunk.Has(ref dynamicMeshVertexHandle);
+                    bool hasSkeleton    = skeletonDependentChecker[chunk];
+                    bool hasBlendShapes = blendShapeStateChecker[chunk] && blendShapeWeightChecker[chunk];
+                    bool hasDynamicMesh = dynamicMeshStateChecker[chunk] && dynamicMeshVertexChecker[chunk];
 
-                    if (chunk.Has(ref legacyLbsHandle))
+                    if (legacyLbsChecker[chunk])
                         classification |= DeformClassification.LegacyLbs;
-                    if (chunk.Has(ref legacyComputeDeformHandle))
+                    if (legacyComputeDeformChecker[chunk])
                         classification |= DeformClassification.LegacyCompute;
-                    if (chunk.Has(ref legacyDotsDeformHandle))
+                    if (legacyDotsDeformChecker[chunk])
                         classification |= DeformClassification.LegacyDotsDefom;
-                    if (chunk.Has(ref currentMatrixVertexHandle))
+                    if (currentMatrixVertexChecker[chunk])
                         classification |= DeformClassification.CurrentVertexMatrix;
-                    if (chunk.Has(ref previousMatrixVertexHandle))
+                    if (previousMatrixVertexChecker[chunk])
                         classification |= DeformClassification.PreviousVertexMatrix;
-                    if (chunk.Has(ref twoAgoMatrixVertexHandle))
+                    if (twoAgoMatrixVertexChecker[chunk])
                         classification |= DeformClassification.TwoAgoVertexMatrix;
-                    if (chunk.Has(ref currentDqsVertexHandle))
+                    if (currentDqsVertexChecker[chunk])
                         classification |= DeformClassification.CurrentVertexDqs;
-                    if (chunk.Has(ref previousDqsVertexHandle))
+                    if (previousDqsVertexChecker[chunk])
                         classification |= DeformClassification.PreviousVertexDqs;
-                    if (chunk.Has(ref twoAgoDqsVertexHandle))
+                    if (twoAgoDqsVertexChecker[chunk])
                         classification |= DeformClassification.TwoAgoVertexDqs;
-                    if (chunk.Has(ref currentDeformHandle))
+                    if (currentDeformChecker[chunk])
                         classification |= DeformClassification.CurrentDeform;
-                    if (chunk.Has(ref previousDeformHandle))
+                    if (previousDeformChecker[chunk])
                         classification |= DeformClassification.PreviousDeform;
-                    if (chunk.Has(ref twoAgoDeformHandle))
+                    if (twoAgoDeformChecker[chunk])
                         classification |= DeformClassification.TwoAgoDeform;
                     var mask            = DeformClassification.LegacyCompute | DeformClassification.LegacyDotsDefom |
                                           DeformClassification.CurrentDeform | DeformClassification.PreviousDeform | DeformClassification.TwoAgoDeform;
@@ -147,13 +121,13 @@ namespace Latios.Kinemation.Systems
                         classification |= DeformClassification.RequiresGpuComputeBlendShapes;
                     if (hasDeformShader && hasSkeleton)
                     {
-                        if (chunk.Has(ref dqsDeformTagHandle))
+                        if (dqsDeformChecker[chunk])
                             classification |= DeformClassification.RequiresGpuComputeDqsSkinning;
                         else
                             classification |= DeformClassification.RequiresGpuComputeMatrixSkinning;
                     }
 
-                    if (chunk.Has(ref disableComputeShaderProcessingTagHandle))
+                    if (disableComputeShaderProcessingChecker[chunk])
                     {
                         classification &= ~(DeformClassification.RequiresGpuComputeBlendShapes | DeformClassification.RequiresGpuComputeMatrixSkinning |
                                             DeformClassification.RequiresGpuComputeDqsSkinning);

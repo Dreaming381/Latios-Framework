@@ -48,7 +48,8 @@ namespace Latios.Systems
     // it was altered to be an IRateManager instead.
     internal class LatiosInitializationSystemGroupManager : IRateManager
     {
-        LatiosWorld m_latiosWorld;
+        LatiosWorld                                         m_latiosWorld;
+        internal DeferredSimulationEndFrameControllerSystem m_deferredSimulationSystem = null;
 
         public LatiosInitializationSystemGroupManager(LatiosWorld world, InitializationSystemGroup initializationGroup)
         {
@@ -67,6 +68,10 @@ namespace Latios.Systems
             syncGroup.AddSystemToUpdateList(mergeGlobals);
             syncGroup.AddSystemToUpdateList(collectionReactive);
             syncGroup.AddSystemToUpdateList(managedStructReactive);
+
+#if UNITY_EDITOR
+            BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<AfterLiveBakingSuperSystem>(), world);
+#endif
         }
 
         public bool ShouldGroupUpdate(ComponentSystemGroup group)
@@ -74,8 +79,11 @@ namespace Latios.Systems
 #if ENABLE_UNITY_COLLECTIONS_CHECKS && !UNITY_DOTSRUNTIME
             group.ClearSystemIds();
 #endif
+            if (m_deferredSimulationSystem != null)
+                SuperSystem.UpdateSystem(m_latiosWorld.latiosWorldUnmanaged, m_deferredSimulationSystem.SystemHandle);
 
             m_latiosWorld.FrameStart();
+
             SuperSystem.DoLatiosFrameworkComponentSystemGroupUpdate(group);
             return false;
         }

@@ -13,8 +13,6 @@ namespace Latios.Transforms.Systems
     {
         EntityQuery m_clientsQuery;
         EntityQuery m_hostsQuery;
-        EntityQuery m_newTransformToEntityQuery;
-        EntityQuery m_deadTransformToEntityQuery;
         EntityQuery m_newTransformFromEntityQuery;
         EntityQuery m_deadTransformFromEntityQuery;
         EntityQuery m_removeDontDestroyOnSceneChangeQuery;
@@ -23,22 +21,13 @@ namespace Latios.Transforms.Systems
 
         protected override void OnCreate()
         {
-            m_clientsQuery              = Fluent.With<GameObjectEntity.ExistComponent>(true).With<GameObjectEntityBindClient>().IncludeDisabledEntities().Build();
-            m_hostsQuery                = Fluent.With<GameObjectEntityHost>().IncludeDisabledEntities().Build();
-            m_newTransformToEntityQuery =
-                Fluent.With<GameObjectEntity.ExistComponent>(true).With<CopyTransformToEntity>(true).Without<CopyTransformToEntityCleanupTag>().Build();
-            m_deadTransformToEntityQuery  = Fluent.With<CopyTransformToEntityCleanupTag>(true).Without<CopyTransformToEntity>().Build();
+            m_clientsQuery                = Fluent.With<GameObjectEntity.ExistComponent>(true).With<GameObjectEntityBindClient>().IncludeDisabledEntities().Build();
+            m_hostsQuery                  = Fluent.With<GameObjectEntityHost>().IncludeDisabledEntities().Build();
             m_newTransformFromEntityQuery =
                 Fluent.With<GameObjectEntity.ExistComponent>(true).With<CopyTransformFromEntityTag>(true).Without<CopyTransformFromEntityCleanupTag>().Build();
             m_deadTransformFromEntityQuery        = Fluent.With<CopyTransformFromEntityCleanupTag>(true).Without<CopyTransformFromEntityTag>().Build();
             m_removeDontDestroyOnSceneChangeQuery = Fluent.With<DontDestroyOnSceneChangeTag>(true).With<RemoveDontDestroyOnSceneChangeTag>().Build();
 
-            worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new CopyTransformToEntityMapping
-            {
-                entityToIndexMap     = new NativeHashMap<Entity, int>(128, Allocator.Persistent),
-                indexToEntityMap     = new NativeHashMap<int, Entity>(128, Allocator.Persistent),
-                transformAccessArray = new UnityEngine.Jobs.TransformAccessArray(128)
-            });
             worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new CopyTransformFromEntityMapping
             {
                 entityToIndexMap     = new NativeHashMap<Entity, int>(128, Allocator.Persistent),
@@ -49,7 +38,6 @@ namespace Latios.Transforms.Systems
 
         protected override void OnUpdate()
         {
-            var copyTransformToEntityMapping   = worldBlackboardEntity.GetCollectionComponent<CopyTransformToEntityMapping>();
             var copyTransformFromEntityMapping = worldBlackboardEntity.GetCollectionComponent<CopyTransformFromEntityMapping>();
 
             CompleteDependency();
@@ -93,60 +81,6 @@ namespace Latios.Transforms.Systems
                     EntityManager.DestroyEntity(match.client);
                     EntityManager.RemoveComponent<GameObjectEntityHost>(match.host);
                 }
-            }
-
-            if (!m_deadTransformToEntityQuery.IsEmptyIgnoreFilter)
-            {
-                var entities = m_deadTransformToEntityQuery.ToEntityArray(Allocator.Temp);
-                foreach (var entity in entities)
-                {
-                    var index = copyTransformToEntityMapping.entityToIndexMap[entity];
-                    copyTransformToEntityMapping.transformAccessArray.RemoveAtSwapBack(index);
-                    var movedEntity =
-                        copyTransformToEntityMapping.indexToEntityMap[copyTransformToEntityMapping.transformAccessArray.length];
-                    copyTransformToEntityMapping.indexToEntityMap[index]       = movedEntity;
-                    copyTransformToEntityMapping.entityToIndexMap[movedEntity] = index;
-                    copyTransformToEntityMapping.entityToIndexMap.Remove(entity);
-                    copyTransformToEntityMapping.indexToEntityMap.Remove(copyTransformToEntityMapping.transformAccessArray.length);
-                }
-                EntityManager.RemoveComponent<CopyTransformToEntityCleanupTag>(m_deadTransformToEntityQuery);
-            }
-
-            if (!m_newTransformToEntityQuery.IsEmptyIgnoreFilter)
-            {
-                var entities = m_newTransformToEntityQuery.ToEntityArray(Allocator.Temp);
-                if (entities.Length > copyTransformFromEntityMapping.transformAccessArray.capacity - copyTransformFromEntityMapping.transformAccessArray.length)
-                {
-                    // Need to reallocate
-                    var newCapacity              = math.ceilpow2(2 * (entities.Length + copyTransformFromEntityMapping.transformAccessArray.length));
-                    var oldMapping               = copyTransformToEntityMapping;
-                    copyTransformToEntityMapping = new CopyTransformToEntityMapping
-                    {
-                        entityToIndexMap     = new NativeHashMap<Entity, int>(newCapacity, Allocator.Persistent),
-                        indexToEntityMap     = new NativeHashMap<int, Entity>(newCapacity, Allocator.Persistent),
-                        transformAccessArray = new UnityEngine.Jobs.TransformAccessArray(newCapacity),
-                    };
-
-                    for (int i = 0; i < oldMapping.transformAccessArray.length; i++)
-                        copyTransformFromEntityMapping.transformAccessArray.Add(oldMapping.transformAccessArray[i]);
-
-                    new CopyMapsJob
-                    {
-                        srcEntityToIntMap = oldMapping.entityToIndexMap,
-                        srcIntToEntityMap = oldMapping.indexToEntityMap,
-                        dstEntityToIntMap = copyTransformToEntityMapping.entityToIndexMap,
-                        dstIntToEntityMap = copyTransformToEntityMapping.indexToEntityMap
-                    }.Run();
-                    worldBlackboardEntity.SetCollectionComponentAndDisposeOld(copyTransformToEntityMapping);
-                }
-                foreach (var entity in entities)
-                {
-                    var index = copyTransformToEntityMapping.transformAccessArray.length;
-                    copyTransformToEntityMapping.transformAccessArray.Add(latiosWorldUnmanaged.GetManagedStructComponent<GameObjectEntity>(entity).gameObjectTransform);
-                    copyTransformToEntityMapping.indexToEntityMap.Add(index, entity);
-                    copyTransformToEntityMapping.entityToIndexMap.Add(entity, index);
-                }
-                EntityManager.AddComponent<CopyTransformToEntityCleanupTag>(m_newTransformToEntityQuery);
             }
 
             if (!m_deadTransformFromEntityQuery.IsEmptyIgnoreFilter)

@@ -63,13 +63,12 @@ namespace Unity.Entities.Exposed
 
         public static ComponentLookup<T> GetComponentLookup<T>(this EntityManager em, bool isReadOnly) where T : unmanaged, IComponentData
         {
-            var access    = em.GetCheckedEntityDataAccess();
-            var typeIndex = TypeManager.GetTypeIndex<T>();
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            return new ComponentLookup<T>(typeIndex, access, isReadOnly);
-#else
-            return new ComponentLookup<T>(typeIndex, access);
-#endif
+            return em.GetComponentLookup<T>(isReadOnly);
+        }
+
+        public static BufferLookup<T> GetBufferLookup<T>(this EntityManager em, bool isReadOnly) where T : unmanaged, IBufferElementData
+        {
+            return em.GetBufferLookup<T>(isReadOnly);
         }
 
         public static RefRW<T> GetComponentDataRW<T>(this EntityManager em, Entity entity) where T : unmanaged, IComponentData
@@ -97,6 +96,9 @@ namespace Unity.Entities.Exposed
 #endif
 
         public static Entity GetEntity(this SystemHandle systemHandle) => systemHandle.m_Entity;
+
+        public static unsafe EntityManager* GetEntityManagerPtr(this EntityManager entityManager) => (EntityManager*)UnsafeUtility.AddressOf(
+            ref entityManager.WorldUnmanaged.GetImpl().m_EntityManager);
 
         // Todo: Definitely find a better home or wait for the bug to get fixed.
         // This is just for the TlsfAllocator, which is not thread-safe.

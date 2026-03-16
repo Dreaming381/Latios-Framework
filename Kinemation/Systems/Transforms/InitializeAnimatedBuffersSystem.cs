@@ -36,7 +36,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var lastSystemVersion = state.GetLiveBakeSafeLastSystemVersion();
+            var lastSystemVersion = state.LastSystemVersion;
             var skeletonJh        = new InitSkeletonJob
             {
                 lastSystemVersion = lastSystemVersion,

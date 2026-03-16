@@ -13,6 +13,7 @@ using static Unity.Entities.SystemAPI;
 
 namespace Latios.Kinemation.Systems
 {
+    [DontSyncPreviousUpdatesThisFrame(32)]
     [RequireMatchingQueriesForUpdate]
     [DisableAutoCreation]
     [BurstCompile]

@@ -30,7 +30,7 @@ public class LatiosEditorBootstrap : ICustomEditorBootstrap
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
         Latios.CoreBootstrap.InstallNetCodePreSpawnEnableInEditorSystem(world);
-        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
 
@@ -51,13 +51,12 @@ public class NetCodeLocalLatiosBootrap : ICustomLocalWorldBootstrap
         var systems = DefaultWorldInitialization.GetAllSystemTypeIndices(worldSystemFilterFlags);
         BootstrapTools.InjectUnitySystems(systems, world, world.simulationSystemGroup);
 
-        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        //Latios.Kinemation.KinemationBootstrap.InstallUniqueMeshesEarlyUploader(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
-        //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
+        Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
@@ -88,13 +87,12 @@ public class NetCodeClientLatiosBootrap : ICustomClientWorldBootstrap
 
         //Latios.Transforms.Compatibility.UnityNetCode.DefaultWorldTransformSmoothingAction.Register(world);
 
-        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world);
         Latios.Myri.MyriBootstrap.InstallMyri(world);
         Latios.Kinemation.KinemationBootstrap.InstallKinemation(world);
-        //Latios.Kinemation.KinemationBootstrap.InstallUniqueMeshesEarlyUploader(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphics(world);
         Latios.Calligraphics.CalligraphicsBootstrap.InstallCalligraphicsAnimations(world);
-        //Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
+        Latios.LifeFX.LifeFXBootstrap.InstallLifeFX(world);
 
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
@@ -123,7 +121,7 @@ public class NetCodeServerLatiosBootrap : ICustomServerWorldBootstrap
 
         //NetCodeBootstrapTools.EnableDynamicAssembliesList(world.Unmanaged);
 
-        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world);
 
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 
@@ -151,7 +149,7 @@ public class NetCodeThinClientLatiosBootrap : ICustomThinClientWorldBootstrap
 
         //NetCodeBootstrapTools.EnableDynamicAssembliesList(world.Unmanaged);
 
-        Latios.Transforms.TransformsBootstrap.InstallTransforms(world, world.simulationSystemGroup);
+        Latios.Transforms.TransformsBootstrap.InstallTransforms(world);
 
         BootstrapTools.InjectRootSuperSystems(systems, world, world.simulationSystemGroup);
 

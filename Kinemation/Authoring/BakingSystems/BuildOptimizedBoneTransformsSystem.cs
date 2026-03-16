@@ -39,7 +39,7 @@ namespace Latios.Kinemation.Authoring.Systems
                         {
                             rotation   = bone.localRotation,
                             position   = bone.localPosition,
-                            worldIndex = parentIndex,
+                            context32 = parentIndex,
                             stretch    = stretch,
                             scale      = scale
                         }

@@ -32,7 +32,7 @@ namespace Latios.Kinemation
             blender.buffer[0]         = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
-            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.worldIndex), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
         }
 
         /// <summary>
@@ -55,7 +55,7 @@ namespace Latios.Kinemation
             array[0]                  = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
-            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.worldIndex), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
         }
 
         /// <summary>
@@ -170,7 +170,7 @@ namespace Latios.Kinemation
             {
                 position   = math.rotate(previousInverse, current.position - previous.position),
                 rotation   = math.mul(current.rotation, previousInverse),
-                worldIndex = current.worldIndex,
+                context32 = current.context32,
                 scale      = current.scale / previous.scale,
                 stretch    = current.stretch / previous.stretch
             };
@@ -188,7 +188,7 @@ namespace Latios.Kinemation
             bone.rotation.value *= weight;
             bone.scale          *= weight;
             bone.stretch        *= weight;
-            bone.worldIndex      = math.asint(math.asfloat(bone.worldIndex) * weight);
+            bone.context32      = math.asint(math.asfloat(bone.context32) * weight);
             return bone;
         }
 
@@ -207,7 +207,7 @@ namespace Latios.Kinemation
                 rotation   = deltaA.rotation.value + math.chgsign(deltaB.rotation.value, math.dot(deltaA.rotation.value, deltaB.rotation.value)),
                 scale      = deltaA.scale + deltaB.scale,
                 stretch    = deltaA.stretch + deltaB.stretch,
-                worldIndex = math.asint(math.asfloat(deltaA.worldIndex) + math.asfloat(deltaB.worldIndex)),
+                context32 = math.asint(math.asfloat(deltaA.context32) + math.asfloat(deltaB.context32)),
             };
         }
 
@@ -227,7 +227,7 @@ namespace Latios.Kinemation
                 rotation   = math.mul(deltaSecond.rotation, deltaFirst.rotation),
                 scale      = deltaFirst.scale * deltaSecond.scale,
                 stretch    = deltaFirst.stretch * deltaSecond.stretch,
-                worldIndex = deltaFirst.worldIndex,
+                context32 = deltaFirst.context32,
             };
         }
     }

@@ -47,7 +47,11 @@ namespace Latios.Kinemation.Authoring
                 if (sharedMesh == null || sharedMesh.bindposeCount == 0)
                     continue;
 
-                skinnedMeshesToBind.Add(GetEntity(skinnedMesh, TransformUsageFlags.Dynamic));
+                var skinnedMeshEntity = GetEntity(skinnedMesh, TransformUsageFlags.Dynamic);
+                skinnedMeshesToBind.Add(skinnedMeshEntity);
+#if !LATIOS_TRANSFORMS_UNITY
+                this.AddInheritanceFlags(skinnedMeshEntity, Transforms.InheritanceFlags.CopyParent);
+#endif
             }
 
             AddComponent<SkeletonRootTag>(entity);

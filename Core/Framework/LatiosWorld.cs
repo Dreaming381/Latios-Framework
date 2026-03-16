@@ -113,6 +113,7 @@ namespace Latios
 
             m_unmanaged                                               = Unmanaged.GetLatiosWorldUnmanaged();
             m_unmanaged.m_impl->m_unmanagedSystemInterfacesDispatcher = GCHandle.Alloc(m_interfacesDispatcher, GCHandleType.Normal);
+            m_unmanaged.m_impl->m_systemChainUpdatesManager           = new SystemChainUpdatesManager(false);
 
             if (role == WorldRole.Default || role == WorldRole.Client)
             {
@@ -147,6 +148,7 @@ namespace Latios
 
         internal void FrameStart()
         {
+            m_unmanaged.m_impl->m_frameCounter++;
             if (m_resumeNextFrame)
             {
                 m_paused          = false;

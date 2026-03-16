@@ -1,0 +1,25 @@
+<engine:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/com.latios.latiosframework/Calligraphics/Authoring/Custom%20Inspector/TextRenderer.uss?fileID=7433441132597879392&amp;guid=af803826a3f8fbb4abf853df8d8efc13&amp;type=3#TextRenderer"/>
+    <engine:VisualElement data-source-type="Calligraphics.Authoring.TextRendererAuthoring, Latios.Calligraphics">
+        <editor:PropertyField binding-path="text" name="Text"/>
+        <editor:PropertyField binding-path="fontCollectionAsset" name="fontCollectionAsset"/>
+        <engine:DropdownField label="Default Font" binding-path="defaultFont"/>
+        <editor:PropertyField binding-path="fontStyles" name="FontStyles"/>
+        <engine:VisualElement class="narrow" style="flex-direction: row; justify-content: space-between;">
+            <engine:VisualElement name="LeftPanel">
+                <engine:FloatField label="Fontsize&#10;" value="42.2" binding-path="fontSize" name="fontSize"/>
+                <editor:ColorField label="Color" value="#00FFFFFF" name="color" binding-path="color"/>
+                <engine:FloatField label="Max Line Width" value="42.2" name="maxLineWidth" binding-path="maxLineWidth"/>
+                <engine:Toggle label="Word Wrap?" name="wordWrap" binding-path="wordWrap"/>
+            </engine:VisualElement>
+            <engine:VisualElement name="RightPanel">
+                <engine:FloatField label="Word Spacing" value="42.2" name="wordSpacing" binding-path="wordSpacing"/>
+                <engine:FloatField label="Line Spacing" value="42.2" name="lineSpacing" binding-path="lineSpacing"/>
+                <engine:FloatField label="Paragraph Spacing" value="42.2" name="paragraphSpacing" binding-path="paragraphSpacing"/>
+                <engine:Toggle label="Orthographic?" binding-path="isOrthographic" name="isOrthographic"/>
+            </engine:VisualElement>
+        </engine:VisualElement>
+        <editor:PropertyField binding-path="samplingPointSizeSDF" name="SamplingPointSizeSDF"/>
+        <editor:PropertyField binding-path="samplingPointSizeBitmap" name="SamplingPointSizeBitmap"/>
+    </engine:VisualElement>
+</engine:UXML>

@@ -48,7 +48,18 @@ namespace Latios.Kinemation.Systems
         }
 
         [BurstCompile]
-        public void OnUpdate(ref SystemState state) => m_data.DoUpdate(ref state, ref this);
+        public void OnUpdate(ref SystemState state)
+        {
+            var dispatchData = latiosWorld.worldBlackboardEntity.GetComponentData<DispatchContext>();
+            if (dispatchData.isCustomGraphicsDispatch)
+            {
+                var features = latiosWorld.worldBlackboardEntity.GetComponentData<EnableUpdatingInCustomGraphics>();
+                if (!features.dynamicMeshes)
+                    return;
+            }
+
+            m_data.DoUpdate(ref state, ref this);
+        }
 
         public void OnDestroy(ref SystemState state)
         {
