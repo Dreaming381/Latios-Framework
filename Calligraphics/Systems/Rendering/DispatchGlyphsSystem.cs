@@ -60,6 +60,7 @@ namespace Latios.Calligraphics.Systems
 
         // Prevent multiple updates per frame
         uint lastLatiosEntitiesGraphicsVersion;
+        int  lastDispatchPassIndex;
 
         protected override void OnCreate()
         {
@@ -122,9 +123,10 @@ namespace Latios.Calligraphics.Systems
                 if (!features.text)
                     return;
             }
-            if (dispatchData.globalSystemVersionOfLatiosEntitiesGraphics == lastLatiosEntitiesGraphicsVersion)
+            if (dispatchData.globalSystemVersionOfLatiosEntitiesGraphics == lastLatiosEntitiesGraphicsVersion && dispatchData.dispatchIndexThisFrame != lastDispatchPassIndex)
                 return;
             lastLatiosEntitiesGraphicsVersion = dispatchData.globalSystemVersionOfLatiosEntitiesGraphics;
+            lastDispatchPassIndex             = dispatchData.dispatchIndexThisFrame;
             ref var state                     = ref CheckedStateRef;
             m_data.DoUpdateManaged(ref state, this);
         }

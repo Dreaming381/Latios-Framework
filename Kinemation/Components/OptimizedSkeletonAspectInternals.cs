@@ -200,7 +200,10 @@ namespace Latios.Kinemation
                 var parent = math.max(0, parentIndices[i]);
                 var local  = localTransforms[i];
                 local.NormalizeBone();
-                rootTransforms[i] = qvvs.mul(rootTransforms[parent], in local);
+                var context32     = rootTransforms[i].context32;
+                var temp          = qvvs.mul(rootTransforms[parent], in local);
+                temp.context32    = context32;
+                rootTransforms[i] = temp;
             }
             {
                 var local = localTransforms[0];
@@ -218,7 +221,7 @@ namespace Latios.Kinemation
             {
                 if (rootTransforms[i].context32 >= 0)
                 {
-                    var rootTransform         = rootTransforms[i];
+                    var rootTransform = rootTransforms[i];
                     var socketHandle          = m_worldTransform.transformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(rootTransform.context32);
                     var socketTransform       = m_worldTransform.transformAspect[socketHandle];
                     rootTransform.context32   = socketTransform.worldTransform.context32;

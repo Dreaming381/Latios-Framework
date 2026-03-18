@@ -7,7 +7,6 @@ namespace Latios.Calligraphics.Systems
 {
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateBefore(typeof(GenerateGlyphsSystem))]
     [RequireMatchingQueriesForUpdate]
     [BurstCompile]
     public partial struct TextRendererInitializeSystem : ISystem

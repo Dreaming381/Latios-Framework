@@ -80,6 +80,7 @@ namespace Latios.Kinemation.Systems
                 {
                     ecb           = latiosWorld.syncPoint.CreateEntityCommandBuffer(),
                     entityHandle  = GetEntityTypeHandle(),
+                    mmiHandle     = GetComponentTypeHandle<MaterialMeshInfo>(false),
                     meshPool      = meshPool,
                     trackedHandle = GetComponentTypeHandle<TrackedUniqueMesh>(true)
                 };

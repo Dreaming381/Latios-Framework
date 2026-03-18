@@ -30,7 +30,7 @@ namespace Latios.Kinemation
             in Unity.Transforms.LocalToWorld localToWorld,
 #else
             TransformAspect transformAspect,
-            ref ComponentLookup<Socket> socketLookup,
+            ref ComponentLookup<Socket> socketLookupRO,
 #endif
             RefRO<OptimizedSkeletonHierarchyBlobReference>     optimizedSkeletonHierarchyBlobReference,
             RefRW<OptimizedSkeletonState>                      optimizedSkeletonState,
@@ -53,9 +53,10 @@ namespace Latios.Kinemation
             {
                 var requiredBones = m_skeletonHierarchyBlobRef.ValueRO.blob.Value.parentIndices.Length;
                 if (requiredBones * 6 == m_boneTransforms.Length)
-                    return;
-
-                if (m_boneTransforms.Length == requiredBones)
+                {
+                    // Nothing to do. Already initialized.
+                }
+                else if (m_boneTransforms.Length == requiredBones)
                 {
                     m_boneTransforms.Resize(requiredBones * 6, NativeArrayOptions.UninitializedMemory);
                     var array = m_boneTransforms.AsNativeArray();
@@ -103,7 +104,7 @@ namespace Latios.Kinemation
                     if (isMesh)
                         continue;
 
-                    if (!socketLookup.TryGetComponent(entity, out var socket))
+                    if (!socketLookupRO.TryGetComponent(entity, out var socket))
                         continue;
 
                     // Index 0 is the root. So just ignore this.

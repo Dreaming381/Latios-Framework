@@ -154,6 +154,7 @@ namespace Latios.Psyshock.Authoring.Systems
             }
         }
 
+        [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
         partial struct AddToMapJob : IJobEntity
         {

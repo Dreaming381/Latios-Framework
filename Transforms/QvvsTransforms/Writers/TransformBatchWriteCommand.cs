@@ -18,6 +18,22 @@ namespace Latios.Transforms
         internal TransformQvvs                                   writeData;
 
         /// <summary>
+        /// Creates a command that sets the world transform
+        /// </summary>
+        /// <param name="transform">The TransformAspect the command should apply to</param>
+        /// <param name="worldTransform">The new world transform to apply</param>
+        /// <returns>The resulting command that can be applied later</returns>
+        public static TransformBatchWriteCommand SetWorldTransform(TransformAspect transform, in TransformQvvs worldTransform)
+        {
+            return new TransformBatchWriteCommand
+            {
+                aspect    = transform,
+                writeType = TransformTools.Propagate.WriteCommand.WriteType.WorldTransformSet,
+                writeData = worldTransform
+            };
+        }
+
+        /// <summary>
         /// Creates a command that sets the local transform including stretch and context32
         /// </summary>
         /// <param name="transform">The TransformAspect the command should apply to</param>

@@ -54,6 +54,7 @@ namespace Latios.Kinemation
                 positionHandle  = GetBufferTypeHandle<UniqueMeshPosition>(true),
                 submeshHandle   = GetBufferTypeHandle<UniqueMeshSubmesh>(true),
                 tangentHandle   = GetBufferTypeHandle<UniqueMeshTangent>(true),
+                trackedHandle   = GetComponentTypeHandle<TrackedUniqueMesh>(true),
                 uv0xyHandle     = GetBufferTypeHandle<UniqueMeshUv0xy>(true),
                 uv3xyzHandle    = GetBufferTypeHandle<UniqueMeshUv3xyz>(true),
             }.ScheduleParallel(m_query, state.Dependency);
