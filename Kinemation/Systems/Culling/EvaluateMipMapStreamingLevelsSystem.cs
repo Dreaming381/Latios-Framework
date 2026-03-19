@@ -153,7 +153,7 @@ namespace Latios.Kinemation
                 mipMapsStreamingAssignmentLookup = GetBufferLookup<MipMapStreamingAssignment>(false),
                 textureStates                    = m_textureStates,
                 worldBlackbaordEntity            = latiosWorld.worldBlackboardEntity
-            }.Schedule();
+            }.Schedule(state.Dependency);
         }
 
         [BurstCompile]
@@ -221,6 +221,15 @@ namespace Latios.Kinemation
 
             public unsafe UnmanagedStreamingMipMapArray(StreamingMipMapArray managed, SharedValueMetadata metadata)
             {
+                if (managed.streamingTextures == null)
+                {
+                    this                 = default;
+                    renderMeshArrayHash  = managed.renderMeshArrayHash;
+                    metadataHash         = managed.metadataHash;
+                    sharedComponentIndex = metadata.index;
+                    version              = metadata.version;
+                    return;
+                }
                 streamingTextures = new UnsafeList<StreamingTextureInMaterial>(managed.streamingTextures.Length, Allocator.Persistent);
                 streamingTextures.Resize(managed.streamingTextures.Length);
                 managed.streamingTextures.AsSpan().CopyTo(new Span<StreamingTextureInMaterial>(streamingTextures.Ptr, streamingTextures.Length));

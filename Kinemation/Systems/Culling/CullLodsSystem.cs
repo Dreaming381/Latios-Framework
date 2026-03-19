@@ -84,6 +84,7 @@ namespace Latios.Kinemation.Systems
         bool   m_previousWasPerspective;
         int    m_maximumLODLevel;
         float  m_lodBias;
+        float  m_aspectRatio;
 
         public void OnCreate(ref SystemState state)
         {
@@ -93,14 +94,14 @@ namespace Latios.Kinemation.Systems
             m_metaQuery = state.Fluent().With<ChunkHeader>(true).With<EntitiesGraphicsChunkInfo>(false).With<ChunkPerCameraCullingMask>(false).Build();
 
             m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
-
-            state.RequireForUpdate(m_query);
         }
 
         public bool ShouldUpdateSystem(ref SystemState state)
         {
             m_maximumLODLevel = UnityEngine.QualitySettings.maximumLODLevel;
             m_lodBias         = UnityEngine.QualitySettings.lodBias;
+            var cam           = UnityEngine.Camera.main;
+            m_aspectRatio     = cam != null ? cam.aspect : 1f;
             return true;
         }
 
@@ -112,6 +113,17 @@ namespace Latios.Kinemation.Systems
             var   cameraPosition   = context.lodParameters.cameraPosition;
             var   isPerspective    = !context.lodParameters.isOrthographic;
             float cameraMultiplier = LodUtilities.CameraFactorFrom(in context.lodParameters, m_lodBias);
+
+            var mipmapParameters = latiosWorld.worldBlackboardEntity.GetBuffer<MipMapCameraParameters>(false);
+            mipmapParameters.Add(new MipMapCameraParameters
+            {
+                cameraFactor  = LodUtilities.CameraMipMapFactorFrom(in context.lodParameters, m_aspectRatio),
+                isPerspective = isPerspective,
+                position      = cameraPosition,
+            });
+
+            if (m_query.IsEmptyIgnoreFilter)
+                return;
 
             var needsCulling  = context.cullIndexThisFrame == 0;
             needsCulling     |= cameraMultiplier != m_previousCameraHeightMultiplier;

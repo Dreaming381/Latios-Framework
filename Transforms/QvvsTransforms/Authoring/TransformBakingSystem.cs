@@ -309,6 +309,8 @@ namespace Latios.Transforms.Authoring.Systems
             public EntityCommandBuffer.ParallelWriter ecb;
             public uint                               lastSystemVersion;
 
+            HasChecker<BakingOnlyEntity> bakingOnlyChecker;
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 bool localOverrideChanged  = chunk.DidChange(ref bakedLocalTransformOverrideHandle, lastSystemVersion);
@@ -322,6 +324,7 @@ namespace Latios.Transforms.Authoring.Systems
 
                 entityHierarchyChangeStream.BeginForEachIndex(unfilteredChunkIndex);
 
+                bool hasBakingOnly             = bakingOnlyChecker[chunk];
                 bool hasWorldTransform         = chunk.Has(ref worldTransformHandle);
                 bool hasRootReference          = chunk.Has(ref rootReferenceHandle);
                 bool hasAuthoringSiblingIndex  = chunk.Has(ref authoringSiblingIndexHandle);
@@ -372,8 +375,9 @@ namespace Latios.Transforms.Authoring.Systems
                     }
                     else
                     {
-                        needsWorldTransform = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.LocalToWorld) != 0;
-                        needsLocalTransform = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.RequestParent) != 0 || hasParentOverride;
+                        needsWorldTransform  = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.LocalToWorld) != 0;
+                        needsLocalTransform  = (transformAuthoring.RuntimeTransformUsage & RuntimeTransformComponentFlags.RequestParent) != 0 || hasParentOverride;
+                        needsLocalTransform &= !hasBakingOnly;
                     }
 
                     if (needsLocalTransform == false && needsWorldTransform == false && hasWorldTransform)

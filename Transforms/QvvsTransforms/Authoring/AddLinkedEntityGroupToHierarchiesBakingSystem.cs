@@ -33,7 +33,8 @@ namespace Latios.Transforms.Authoring.Systems
             {
                 entities        = entities,
                 hierarchyLookup = GetBufferLookup<EntityInHierarchy>(true),
-                legLookup       = GetBufferLookup<LinkedEntityGroup>(false)
+                legLookup       = GetBufferLookup<LinkedEntityGroup>(false),
+                esil            = GetEntityStorageInfoLookup()
             }.ScheduleParallel(entities.Length, 32, state.Dependency);
         }
 
@@ -42,7 +43,10 @@ namespace Latios.Transforms.Authoring.Systems
         {
             [ReadOnly] public NativeArray<Entity>                                        entities;
             [ReadOnly] public BufferLookup<EntityInHierarchy>                            hierarchyLookup;
+            [ReadOnly] public EntityStorageInfoLookup                                    esil;
             [NativeDisableParallelForRestriction] public BufferLookup<LinkedEntityGroup> legLookup;
+
+            HasChecker<EntityGuid> guidChecker;
 
             public void Execute(int index)
             {
@@ -54,6 +58,10 @@ namespace Latios.Transforms.Authoring.Systems
                 foreach (var element in hierarchy)
                 {
                     leg.Add(new LinkedEntityGroup { Value = element.entity });
+                    if (!guidChecker[esil[element.entity].Chunk])
+                    {
+                        UnityEngine.Debug.LogError($"LEG element is missing EntityGUID. Archetype: {esil[element.entity].Chunk.Archetype}");
+                    }
                 }
             }
         }

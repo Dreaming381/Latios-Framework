@@ -79,3 +79,13 @@ namespace Unity.Entities.Exposed
     }
 }
 
+namespace Unity.Entities.Hybrid.Baking
+{
+#if !LATIOS_TRANSFORMS_UNITY
+    [UpdateInGroup(typeof(TransformBakingSystemGroup), OrderFirst = true)]
+    partial class BakingOnlyEntityAuthoringBakingSystem
+    {
+    }
+#endif
+}
+
