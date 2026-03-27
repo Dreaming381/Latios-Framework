@@ -142,6 +142,18 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
             writer.WriteLine();
             writer.Close();
         }
+        public static void WriteArrayToFile(string path, in NativeArray<ushort> array)
+        {
+            if (array.Length == 0)
+                return;
+            StreamWriter writer = new StreamWriter(path, false);
+            for (int i = 0, end = array.Length; i < end; i++)
+            {
+                writer.WriteLine($"{array[i]}");
+            }
+            writer.WriteLine();
+            writer.Close();
+        }
         public static void WriteArrayToFile(string path, in NativeArray<int> array)
         {
             if (array.Length == 0)

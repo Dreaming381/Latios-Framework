@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Font = Latios.Calligraphics.HarfBuzz.Font;
 using Latios.Calligraphics.HarfBuzz;
 using Latios.Unsafe;
@@ -14,8 +15,8 @@ namespace Latios.Calligraphics
 {
     internal partial struct FontTable : ICollectionComponent
     {
-        public NativeList<Face>                 faces;
-        public NativeArray<UnsafeList<Font> >   perThreadFontCaches;
+        public NativeList<Face>                  faces;
+        public NativeArray<UnsafeList<Font> >    perThreadFontCaches;
         public NativeHashMap<FontLookupKey, int> fontAssetRefToFaceIndexMap;
         //variable fonts got names instances. create FontLookupKey for each instance,
         //and map it to index of named instance in face. Use this to lookup instance profile via FontLookupKey
@@ -233,6 +234,13 @@ namespace Latios.Calligraphics
         SDF16 = 1,
         Bitmap8888 = 2,
     }
+    internal enum GlyphEntryIDFlags : byte
+    {
+        SDF8NormalSize = 0,
+        SDF16BigSize = 1,
+        SDF16MassiveSize = 2,
+        Bitmap8888 = 3,
+    }
 
     internal partial struct GlyphTable : ICollectionComponent
     {
@@ -304,8 +312,29 @@ namespace Latios.Calligraphics
             // Todo:
         }
 
+        /// <summary>
+        /// the upper 2 bit are used by AllocateNewGlyphsJob to store the glyph type:
+        /// (00, 01, 10 = SDF, values of FontTextureSize enum for ultimate use in shader to calcualte SDR, 11 = Bitmap8888)
+        /// encode using EncodeGlyphEntryIDFlags and decode using DecodeGlyphEntryIDFlags
+        /// </summary>
         public NativeHashMap<Key, uint> glyphHashToIdMap;
         public NativeList<Entry>        entries;
+
+        /// <summary>
+        /// Flags will be decoded in shader by ExtractGlyphFlagsFromEntryID and used there to determine if glyph is SDF or bitmap,
+        /// and to determind the Signed Distance Ratio for SDF (keep in sync with TextConfigurationComponets.GetSpread()!)
+        /// Will also be used to determine which atlas is dirty in DispatchGlyphsSystem.Write
+        /// </summary>
+        /// <param name="glyphEntryID"></param>
+        public static void EncodeGlyphEntryIDFlags(in Key key, ref uint glyphEntryID)
+        {
+            uint topBits = key.format == RenderFormat.Bitmap8888 ? 3 : (uint)key.textureSize;
+            Bits.SetBits(ref glyphEntryID, 30, 2, topBits);
+        }
+        public static GlyphEntryIDFlags DecodeGlyphEntryIDFlags(uint glyphEntryID)
+        {
+            return (GlyphEntryIDFlags)(glyphEntryID >> 30);
+        }
 
         public JobHandle TryDispose(JobHandle inputDeps)
         {

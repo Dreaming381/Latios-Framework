@@ -36,9 +36,8 @@ namespace Latios.Calligraphics.Systems
                 foreach (var key in uniqueMissingGlyphSet)
                 {
                     missingGlyphsToAdd.AddNoResize(key);
-                    var  nextId  = nextIndex;
-                    uint topBits = key.format == RenderFormat.Bitmap8888 ? 3 : (uint)key.textureSize;
-                    Bits.SetBits(ref nextId, 30, 2, topBits);
+                    var nextId = nextIndex;
+                    GlyphTable.EncodeGlyphEntryIDFlags(in key, ref nextId);
                     glyphTable.glyphHashToIdMap.Add(key, nextId);
                     nextIndex++;
                 }

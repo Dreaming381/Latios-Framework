@@ -32,7 +32,7 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
                 var distSq         = distSqs[i];
                 var signedDistance = sign * math.min(math.sqrt(distSq) / spread, 1f);  // in [-1, 1] range
                 var scaled         = (signedDistance + 1f) * 65535f / 2f;  // unorm correction
-                buffer[i]          = (byte)scaled;
+                buffer[i]          = (ushort)scaled;
             }
         }
 

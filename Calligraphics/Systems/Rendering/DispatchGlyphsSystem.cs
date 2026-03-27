@@ -236,14 +236,14 @@ namespace Latios.Calligraphics.Systems
                 for (dirtySdf8Count = 0; dirtySdf8Count < collected.atlasDirtyIDs.Length; dirtySdf8Count++)
                 {
                     var dirtyId = collected.atlasDirtyIDs[dirtySdf8Count];
-                    if (dirtyId >= 0x40000000u)
+                    if (GlyphTable.DecodeGlyphEntryIDFlags(dirtyId) >= GlyphEntryIDFlags.SDF16BigSize)
                         break;
                 }
                 int dirtySdf16Count;
                 for (dirtySdf16Count = dirtySdf8Count; dirtySdf16Count < collected.atlasDirtyIDs.Length; dirtySdf16Count++)
                 {
                     var dirtyId = collected.atlasDirtyIDs[dirtySdf16Count];
-                    if (dirtyId >= 0x80000000u)
+                    if (GlyphTable.DecodeGlyphEntryIDFlags(dirtyId) >= GlyphEntryIDFlags.Bitmap8888)
                         break;
                 }
                 dirtySdf16Count      -= dirtySdf8Count;
