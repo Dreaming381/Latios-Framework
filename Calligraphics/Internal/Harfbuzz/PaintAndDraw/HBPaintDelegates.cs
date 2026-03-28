@@ -1,4 +1,3 @@
-﻿using System.Runtime.InteropServices;
 using System;
 using UnityEngine;
 using Unity.Mathematics;
@@ -42,7 +41,7 @@ namespace Latios.Calligraphics.HarfBuzz
             FunctionPointer<SweepGradientDelegate> sweepGradientFunctionPointer = BurstCompiler.CompileFunctionPointer<SweepGradientDelegate>(HB_paint_sweep_gradient_func_t);
             FunctionPointer<PopDelegate> pushGroupFunctionPointer = BurstCompiler.CompileFunctionPointer<PopDelegate>(HB_paint_push_group_func_t);
             FunctionPointer<PopGroupDelegate> popGroupFunctionPointer = BurstCompiler.CompileFunctionPointer<PopGroupDelegate>(HB_paint_pop_group_func_t);
-            FunctionPointer<CustomPalette_colorDelegate> customPaletteColorFunctionPointer = BurstCompiler.CompileFunctionPointer<CustomPalette_colorDelegate>(hb_paint_custom_palette_color_func_t);
+            //FunctionPointer<CustomPalette_colorDelegate> customPaletteColorFunctionPointer = BurstCompiler.CompileFunctionPointer<CustomPalette_colorDelegate>(hb_paint_custom_palette_color_func_t);
             FunctionPointer<ImageDelegate> imageFunctionPointer = BurstCompiler.CompileFunctionPointer<ImageDelegate>(hb_paint_image_func_t);
             FunctionPointer<ReleaseDelegate> releaseFunctionPointer = BurstCompiler.CompileFunctionPointer<ReleaseDelegate>(Test);
 
@@ -58,7 +57,7 @@ namespace Latios.Calligraphics.HarfBuzz
             Harfbuzz.hb_paint_funcs_set_sweep_gradient_func(ptr, sweepGradientFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
             Harfbuzz.hb_paint_funcs_set_push_group_func(ptr, pushGroupFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
             Harfbuzz.hb_paint_funcs_set_pop_group_func(ptr, popGroupFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
-            //HB.hb_paint_funcs_set_custom_palette_color_func(ptr, customPaletteColorFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
+            //Harfbuzz.hb_paint_funcs_set_custom_palette_color_func(ptr, customPaletteColorFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
             Harfbuzz.hb_paint_funcs_set_image_func(ptr, imageFunctionPointer, IntPtr.Zero, releaseFunctionPointer);
 
             Harfbuzz.hb_paint_funcs_make_immutable(ptr);
@@ -67,7 +66,6 @@ namespace Latios.Calligraphics.HarfBuzz
         [MonoPInvokeCallback(typeof(PushTransformDelegate))]
         public static void HB_paint_push_transform_func_t (IntPtr harfBuzzPaintFunct, ref PaintData data, float xx, float yx, float xy, float yy, float dx, float dy, IntPtr user_data)
         {
-
             //Debug.Log($"Push transform");
             var transform = new float2x3
             {
@@ -117,7 +115,7 @@ namespace Latios.Calligraphics.HarfBuzz
 
             var arraySize = clipRect.intWidth * clipRect.intHeight;
             if (!data.paintSurface.IsCreated || data.paintSurface.Length != arraySize)
-                data.paintSurface = new NativeArray<ColorARGB>(arraySize, Allocator.Temp);
+                data.paintSurface = new NativeArray<ColorBGRA>(arraySize, Allocator.Temp);
         }
         [BurstCompile]
         [MonoPInvokeCallback(typeof(PopDelegate))]
@@ -128,11 +126,14 @@ namespace Latios.Calligraphics.HarfBuzz
         }
         [BurstCompile]
         [MonoPInvokeCallback(typeof(ColorDelegate))]
-        public static void HB_paint_color_func_t(IntPtr harfBuzzPaintFunct, ref PaintData data, bool is_foreground, uint color, IntPtr user_data)
+        public static void HB_paint_color_func_t(IntPtr harfBuzzPaintFunct, ref PaintData data, int is_foreground, uint color, IntPtr user_data)
         {
-            //Debug.Log($"Paint solid color ARGB {(ColorARGB)color}");
-            var colorARGB = (ColorARGB)color;
-            var solidColor = new SolidColor(colorARGB);
+            //Debug.Log($"Paint solid color BGRA {is_foreground} {(ColorBGRA)color}");
+            SolidColor solidColor;
+            if (is_foreground == 0)
+                solidColor = new SolidColor((ColorBGRA)color);
+            else
+                solidColor = new SolidColor(data.foreGroundColor);
 
             //AntiAliasedRasterizer.Rasterize(ref data.clipGlyph, data.paintSurface, solidColor, data.clipRect);
             AntiAliasedRasterizer.RasterizeAndBlend(ref data.clipGlyph, data.paintSurface, solidColor, PaintCompositeMode.SRC_OVER, data.clipRect);
@@ -205,19 +206,19 @@ namespace Latios.Calligraphics.HarfBuzz
             if (data.group == 1)
             {
                 if(!data.tempSurface1.IsCreated)
-                    data.tempSurface1 = new NativeArray<ColorARGB>(data.paintSurface.Length, Allocator.Temp);
+                    data.tempSurface1 = new NativeArray<ColorBGRA>(data.paintSurface.Length, Allocator.Temp);
                 (data.paintSurface, data.tempSurface1) = (data.tempSurface1, data.paintSurface);
             }
             else if (data.group == 2)
             {
                 if (!data.tempSurface2.IsCreated)
-                    data.tempSurface2 = new NativeArray<ColorARGB>(data.paintSurface.Length, Allocator.Temp);
+                    data.tempSurface2 = new NativeArray<ColorBGRA>(data.paintSurface.Length, Allocator.Temp);
                 (data.paintSurface, data.tempSurface2) = (data.tempSurface2, data.paintSurface);
             }
             else if(data.group == 3)
             {
                 if (!data.tempSurface3.IsCreated)
-                    data.tempSurface3 = new NativeArray<ColorARGB>(data.paintSurface.Length, Allocator.Temp);
+                    data.tempSurface3 = new NativeArray<ColorBGRA>(data.paintSurface.Length, Allocator.Temp);
                 (data.paintSurface, data.tempSurface3) = (data.tempSurface3, data.paintSurface);
             }
             else
@@ -228,7 +229,7 @@ namespace Latios.Calligraphics.HarfBuzz
         public static void HB_paint_pop_group_func_t(IntPtr harfBuzzPaintFunct, ref PaintData data, PaintCompositeMode mode, IntPtr user_data)
         {
             //Debug.Log($"Pop group ({data.group}, blend mode {mode})");
-            NativeArray<ColorARGB> result, source, destination = default;
+            NativeArray<ColorBGRA> result, source, destination = default;
 
             result = data.paintSurface;
             source = data.paintSurface;
@@ -260,8 +261,8 @@ namespace Latios.Calligraphics.HarfBuzz
                         int i, ii = result.Length / 4 * 4;
                         for (i = 0;  i < ii; i += 4)
                         {
-                            var s = new uint4(source[i].argb, source[i + 1].argb, source[i + 2].argb, source[i + 3].argb);
-                            var d = new uint4(destination[i].argb, destination[i + 1].argb, destination[i + 2].argb, destination[i + 3].argb);
+                            var s = new uint4(source[i].bgra, source[i + 1].bgra, source[i + 2].bgra, source[i + 3].bgra);
+                            var d = new uint4(destination[i].bgra, destination[i + 1].bgra, destination[i + 2].bgra, destination[i + 3].bgra);
                             var r = Blending.SrcOver(s, d);
                             result[i] = r[0];
                             result[i + 1] = r[1];
@@ -342,9 +343,23 @@ namespace Latios.Calligraphics.HarfBuzz
         }
         [BurstCompile]
         [MonoPInvokeCallback(typeof(CustomPalette_colorDelegate))]
-        public static bool hb_paint_custom_palette_color_func_t (IntPtr harfBuzzPaintFunct, ref PaintData data, uint color_index, uint color, IntPtr user_data)
+        public static bool hb_paint_custom_palette_color_func_t (IntPtr harfBuzzPaintFunct, ref PaintData data, uint color_index, ref uint color, IntPtr user_data)
         {
-            //Debug.Log($"hb_paint_custom_palette_color color_index {color_index} color {color}");
+            Debug.Log($"hb_paint_custom_palette_color color_index {color_index} color {(ColorBGRA)color}");
+
+            //if (!data.customPalette.IsCreated)
+            //    data.customPalette = new NativeHashMap<uint, ColorBGRA>(16, Allocator.Temp);
+            //if (data.customPalette.ContainsKey(color_index))
+            //    data.customPalette[color_index] = color;
+            //else 
+            //    data.customPalette.Add(color_index, color);
+
+            //Debug.Log($"hb_paint_custom_palette_color color_index {color_index} color {(ColorBGRA)color}");
+            //var customPaletteColor = new SolidColor((ColorBGRA)color);
+
+            ////AntiAliasedRasterizer.Rasterize(ref data.clipGlyph, data.paintSurface, solidColor, data.clipRect);
+            //AntiAliasedRasterizer.RasterizeAndBlend(ref data.clipGlyph, data.paintSurface, customPaletteColor, PaintCompositeMode.SRC_OVER, data.clipRect);
+            
             return true;
         }
 
@@ -355,52 +370,53 @@ namespace Latios.Calligraphics.HarfBuzz
         /// </summary>
         [BurstCompile]
         [MonoPInvokeCallback(typeof(ImageDelegate))]
-        public static bool hb_paint_image_func_t(IntPtr harfBuzzPaintFunct, ref PaintData data, Blob image, uint width, uint height, PaintImageFormat format, float slant, ref GlyphExtents extents, IntPtr user_data)
-        {
-            //Debug.Log("hb_paint_image");
+        public static bool hb_paint_image_func_t(IntPtr harfBuzzPaintFunct, ref PaintData data, Blob imageBlob, uint width, uint height, PaintImageFormat format, float slant, ref GlyphExtents extents, IntPtr user_data)
+        {            
             data.imageFormat = format;            
             data.imageWidth = (int)width;
             data.imageHeight = (int)height;
-            var rawBytes= image.GetData();
-            if (format == PaintImageFormat.BGRA)
+            switch (format)
             {
-                var rawBytesLength = rawBytes.Length;
-                var textureData = new NativeArray<ColorARGB>(rawBytesLength / 4, Allocator.Temp);
-                int count = 0;
-                for (int i = 0, ii = rawBytes.Length; i < ii; i += 4)
-                    textureData[count++] = new ColorARGB(rawBytes[i+3], rawBytes[i+2], rawBytes[i+1], rawBytes[i]);
-                data.paintSurface = textureData;
-            }
-            else // HB_PAINT_IMAGE_FORMAT.PNG, HB_PAINT_IMAGE_FORMAT.SVG To-Do: find BURST compatible decoder
-                data.imageData = rawBytes;
+                case PaintImageFormat.BGRA:
+                    data.paintSurface = imageBlob.GetAsNativeArray().Reinterpret<ColorBGRA>(sizeof(byte));
+                    Debug.Log($"Image of {format} (width: {width}, height: {height}");
+                    break;
+                case PaintImageFormat.PNG:
+                    var rasterImage = Harfbuzz.hb_raster_image_create_or_fail();
+                    var deserializedPNG = rasterImage.TryDeserializeFromPNG(imageBlob);
+                    if (deserializedPNG)
+                    {
+                        //To-Do. implement scaling, see harfbuzz
 
-            Debug.Log($"width {width} height {height}  format {format} {data.imageData.Length}");
+                        //imageBlob is short lived, so copy data into data.paintSurface
+                        rasterImage.GetExtents(out var rasterExtents);
+                        var imageTexture = rasterImage.GetColorBGRA(rasterExtents);                        
+                        if (data.paintSurface.IsCreated)
+                            data.paintSurface.Dispose();
+                        data.paintSurface = new NativeArray<ColorBGRA>(imageTexture.Length, Allocator.Temp);
+                        data.paintSurface.CopyFrom(imageTexture);
+                        //Debug.Log($"Deserialized PNG to image (length: {imageTexture.Length}, width: {rasterExtents.width} height: {rasterExtents.height}");                       
+                    }
+                    rasterImage.Dispose();
+                    break;
+                case PaintImageFormat.SVG:
+                    //To-Do. see harfbuzz for how to decode SVG
+                    //Debug.Log("Deserialization of SVG not implemented");
+                    break;
+            }
             return true;
         }
 
         public delegate void PushTransformDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, float xx, float yx, float xy, float yy, float dx, float dy, IntPtr user_data);
-
         public delegate void PopDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, IntPtr user_data);
-
-        [return: MarshalAs(UnmanagedType.I1)]
         public delegate bool ColorGlyphDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, uint glyph, IntPtr font, IntPtr user_data);
-
         public delegate void PushClipGlyphDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, uint glyph, IntPtr font, IntPtr user_data);
-
         public delegate void PushClipRectangleDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, float xmin, float ymin, float xmax, float ymax, IntPtr user_data);
-
-        public delegate void ColorDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, bool is_foreground, uint color, IntPtr user_data);
-
-        [return: MarshalAs(UnmanagedType.I1)]
+        public delegate void ColorDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, int is_foreground, uint color, IntPtr user_data);
         public delegate bool ImageDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, Blob image, uint width, uint height, PaintImageFormat format, float slant, ref GlyphExtents extents, IntPtr user_data);
-
         public delegate void LinearOrRadialGradientDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, ColorLine color_line, float x0, float y0, float x1, float y1, float x2, float y2, IntPtr user_data);
-
         public delegate void SweepGradientDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, ColorLine color_line, float x0, float y0, float start_angle, float end_angle, IntPtr user_data);
-
         public delegate void PopGroupDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, PaintCompositeMode mode, IntPtr user_data);
-
-        [return: MarshalAs(UnmanagedType.I1)]
-        public delegate bool CustomPalette_colorDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, uint color_index, uint color, IntPtr user_data);
+        public delegate bool CustomPalette_colorDelegate(IntPtr harfBuzzPaintFunct, ref PaintData data, uint color_index, ref uint color, IntPtr user_data);
     }
 }

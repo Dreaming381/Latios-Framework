@@ -8,11 +8,17 @@ namespace Latios.Kinemation
     /// An aspect for working with blend shapes that abstracts away the rotation mechanisms.
     /// </summary>
     #pragma warning disable CS0618
-    public readonly partial struct BlendShapesAspect : IAspect
+    public partial struct BlendShapesAspect : IAspect
     #pragma warning restore CS0618
     {
-        readonly RefRW<BlendShapeState>          m_state;
-        readonly DynamicBuffer<BlendShapeWeight> m_weights;
+        RefRW<BlendShapeState>          m_state;
+        DynamicBuffer<BlendShapeWeight> m_weights;
+
+        public BlendShapesAspect(RefRW<BlendShapeState> blendShapeStateRefRW, DynamicBuffer<BlendShapeWeight> blendShapeWeightBufferRW)
+        {
+            m_state   = blendShapeStateRefRW;
+            m_weights = blendShapeWeightBufferRW;
+        }
 
         /// <summary>
         /// The number of blend shape weight parameters for this mesh
@@ -77,6 +83,15 @@ namespace Latios.Kinemation
                 int offset = BlendShapeState.TwoAgoFromMask[(int)(state.state & BlendShapeState.Flags.RotationMask)];
                 return m_weights.AsNativeArray().GetSubArray(weightCount * offset, weightCount).Reinterpret<float>().AsReadOnly();
             }
+        }
+
+        void IAspect.Initialize(EntityManager entityManager, Entity entity)
+        {
+            var esi          = entityManager.GetStorageInfo(entity);
+            var stateHandle  = entityManager.GetComponentTypeHandle<BlendShapeState>(false);
+            var weightHandle = entityManager.GetBufferTypeHandle<BlendShapeWeight>(false);
+            m_state          = new RefRW<BlendShapeState>(esi.Chunk.GetNativeArray(ref stateHandle), esi.IndexInChunk);
+            m_weights        = esi.Chunk.GetBufferAccessorRW(ref weightHandle)[esi.IndexInChunk];
         }
     }
 }

@@ -348,42 +348,6 @@ namespace Latios
         }
 
         /// <summary>
-        /// Adds the required components by the IAspect to the query, with any enableable components
-        /// required to be enabled
-        /// </summary>
-        /// <typeparam name="T">The type of IAspect to add to the query</typeparam>
-#pragma warning disable CS0618
-        public FluentQuery WithAspect<T>() where T : unmanaged, IAspect, IAspectCreate<T>
-        {
-            var tempList = new UnsafeList<ComponentType>(8, Allocator.Temp);
-            default(T).AddComponentRequirementsTo(ref tempList);
-            foreach (var component in tempList)
-            {
-                if (component.IsEnableable)
-                    m_withEnabled.Add(in component);
-                else
-                    m_with.Add(in component);
-            }
-            return this;
-        }
-
-        /// <summary>
-        /// Adds the required components by the IAspect to the query, regardless of component enabled state
-        /// </summary>
-        /// <typeparam name="T">The type of IAspect to add to the query</typeparam>
-        public FluentQuery WithAspectPresent<T>() where T : unmanaged, IAspect, IAspectCreate<T>
-        {
-            var tempList = new UnsafeList<ComponentType>(8, Allocator.Temp);
-            default(T).AddComponentRequirementsTo(ref tempList);
-            foreach (var component in tempList)
-            {
-                m_with.Add(in component);
-            }
-            return this;
-        }
-#pragma warning restore CS0618
-
-        /// <summary>
         /// Allows disabled entities to be included in the query
         /// </summary>
         public FluentQuery IncludeDisabledEntities()

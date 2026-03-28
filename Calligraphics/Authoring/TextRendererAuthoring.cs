@@ -52,7 +52,7 @@ namespace Latios.Calligraphics.Authoring
             DependsOn(authoring.fontCollectionAsset);
             int fontCount = 0;
             if (authoring.fontCollectionAsset == null ||
-                (fontCount = authoring.fontCollectionAsset.fontReferences.Count) == 0 ||
+                (fontCount = authoring.fontCollectionAsset.fontLoadDescriptions.Count) == 0 ||
                 authoring.defaultFont == string.Empty ||
                 authoring.material == null ||
                 authoring.language.Length == 0)

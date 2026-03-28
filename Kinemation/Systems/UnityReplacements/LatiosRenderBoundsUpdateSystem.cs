@@ -24,7 +24,7 @@ namespace Latios.Kinemation.Systems
     public partial struct LatiosRenderBoundsUpdateSystem : ISystem
     {
         EntityQuery                      m_WorldRenderBounds;
-        WorldTransformReadOnlyTypeHandle m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -32,7 +32,7 @@ namespace Latios.Kinemation.Systems
             m_WorldRenderBounds = state.Fluent().With<ChunkWorldRenderBounds>(false, true).With<WorldRenderBounds>(false).With<RenderBounds>(true)
                                   .WithWorldTransformReadOnly().Build();
 
-            m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         [BurstCompile]
@@ -61,7 +61,7 @@ namespace Latios.Kinemation.Systems
         unsafe struct BoundsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<RenderBounds>                       renderBoundsHandle;
-            [ReadOnly] public WorldTransformReadOnlyTypeHandle                        worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                        worldTransformHandle;
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>                  postProcessMatrixHandle;
             [ReadOnly] public ComponentTypeHandle<ShaderEffectRadialBounds>           shaderEffectRadialBoundsHandle;
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>                  skeletonDependentHandle;
@@ -213,12 +213,12 @@ namespace Latios.Kinemation.Systems
                 }
             }
 
-            bool DidOtherTransformChange(ref WorldTransformReadOnlyTypeHandle handle, Entity entity)
+            bool DidOtherTransformChange(ref WorldTransformReadOnlyAspect.TypeHandle handle, Entity entity)
             {
                 return handle.DidChange(esil[entity].Chunk, lastSystemVersion);
             }
 
-            bool DidOtherDependentsTransformChange(ref WorldTransformReadOnlyTypeHandle handle, Entity dependent)
+            bool DidOtherDependentsTransformChange(ref WorldTransformReadOnlyAspect.TypeHandle handle, Entity dependent)
             {
                 var dependentInfo = esil[dependent];
                 var dependents    = dependentInfo.Chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);

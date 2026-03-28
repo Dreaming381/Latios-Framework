@@ -14,7 +14,8 @@ namespace Latios.Calligraphics.Editor
             VisualElement myInspector = new VisualElement();
 
             if(visualTreeAsset == null)
-                visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Packages/com.textmeshdots/Authoring/Custom Inspector/FontCollectionAsset.uxml");
+                visualTreeAsset = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>(
+                    "Packages/com.latios.latiosframework/Calligraphics/Authoring/Custom Inspector/FontCollectionAsset.uxml");
             //visualTree.CloneTree(myInspector);
 
             var container = visualTreeAsset.Instantiate();

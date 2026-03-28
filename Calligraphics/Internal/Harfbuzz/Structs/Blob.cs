@@ -35,17 +35,14 @@ namespace Latios.Calligraphics.HarfBuzz
         //    ptr = HB.hb_blob_create_or_fail(data, length, memoryMode, IntPtr.Zero, releaseDelegate); //returned blob is immutable
         //    success = ptr != IntPtr.Zero;
         //}
-        public NativeArray<byte> GetData()
+        public NativeArray<byte> GetAsNativeArray()
         {
             uint length;
             NativeArray<byte> result;
             unsafe
             {
                 var bytes = Harfbuzz.hb_blob_get_data(ptr, out length);
-                result = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)bytes, (int)length, Allocator.Invalid);
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-                NativeArrayUnsafeUtility.SetAtomicSafetyHandle<byte>(ref result, AtomicSafetyHandle.GetTempMemoryHandle());
-#endif
+                result = Harfbuzz.GetNativeArray(bytes, (int)length);
             }
             return result;
         }

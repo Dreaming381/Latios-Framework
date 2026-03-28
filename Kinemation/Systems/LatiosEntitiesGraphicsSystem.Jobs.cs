@@ -102,8 +102,8 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<ChunkHeader>    ChunkHeader;
             public EntitiesGraphicsChunkUpdater                   EntitiesGraphicsChunkUpdater;
 
-            WorldTransformReadOnlyTypeHandle.HasChecker worldTransformChecker;
-            HasChecker<MaterialMeshInfo>                mmiChecker;
+            WorldTransformReadOnlyAspect.HasChecker worldTransformChecker;
+            HasChecker<MaterialMeshInfo>            mmiChecker;
 
             public void Execute(in ArchetypeChunk metaChunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {

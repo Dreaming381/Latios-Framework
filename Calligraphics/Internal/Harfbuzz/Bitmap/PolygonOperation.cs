@@ -11,7 +11,7 @@ namespace Latios.Calligraphics.HarfBuzz
         {
             var nodes      = subject.edges;
             var contourIDs = subject.contourIDs;
-            // We need as much precision as we can get to help out Clipper. With that said, clipper still creates artifacts sometimes. :(
+            // We aim for as much precision as we can get to help out Clipper.
             double scale = 5120000.0 / math.max(subject.glyphRect.width, subject.glyphRect.height);
             //var scale      = 1000.0;
             var invScale = 1.0 / scale;

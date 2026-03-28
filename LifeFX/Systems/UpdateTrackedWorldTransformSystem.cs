@@ -27,7 +27,7 @@ namespace Latios.LifeFX.Systems
         NativeList<Entity>        m_trackedEntities;
         NativeList<int>           m_freeList;
 
-        WorldTransformReadOnlyTypeHandle m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
         [BurstCompile]
         public void OnCreate(ref SystemState state)
@@ -36,7 +36,7 @@ namespace Latios.LifeFX.Systems
 
             m_query = state.Fluent().With<TrackedWorldTransform>(false).WithWorldTransformReadOnly().Build();
 
-            m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
 
             m_trackedTransforms = new NativeList<TransformQvvs>(1024, Allocator.Persistent);
             m_trackedEntities   = new NativeList<Entity>(1024, Allocator.Persistent);
@@ -127,7 +127,7 @@ namespace Latios.LifeFX.Systems
         struct UpdateJob : IJobChunk
         {
             [ReadOnly] public EntityTypeHandle                                     entityHandle;
-            [ReadOnly] public WorldTransformReadOnlyTypeHandle                     worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                     worldTransformHandle;
             [ReadOnly] public ComponentTypeHandle<TrackedWorldTransformEnableFlag> enabledFlagHandle;
             [ReadOnly] public NativeArray<Entity>                                  trackedEntities;
 
@@ -268,7 +268,7 @@ namespace Latios.LifeFX.Systems
         struct AllocateNewJob : IJob
         {
             [ReadOnly] public EntityTypeHandle                 entityHandle;
-            [ReadOnly] public WorldTransformReadOnlyTypeHandle worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
 
             public ComponentTypeHandle<TrackedWorldTransform> trackedTransformHandle;
             public NativeList<Entity>                         trackedEntities;

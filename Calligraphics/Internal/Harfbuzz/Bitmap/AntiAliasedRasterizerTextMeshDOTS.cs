@@ -10,7 +10,7 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
      */
     internal static class AntiAliasedRasterizer
     {
-        public static void Rasterize<T>(ref DrawData drawData, NativeArray<ColorARGB> textureData, T pattern, BBox clipRect, bool invert = false) where T : IPattern
+        public static void Rasterize<T>(ref DrawData drawData, NativeArray<ColorBGRA> textureData, T pattern, BBox clipRect, bool invert = false) where T : IPattern
         {
             PaintUtils.rasterizeCOLRMarker.Begin();
             var edges      = drawData.edges;
@@ -144,7 +144,7 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
             PaintUtils.rasterizeCOLRMarker.End();
         }
 
-        public static void RasterizeAndBlend<T>(ref DrawData drawData, NativeArray<ColorARGB> textureData, T pattern, PaintCompositeMode mode, BBox clipRect,
+        public static void RasterizeAndBlend<T>(ref DrawData drawData, NativeArray<ColorBGRA> textureData, T pattern, PaintCompositeMode mode, BBox clipRect,
                                                 bool invert = false) where T : IPattern
         {
             PaintUtils.rasterizeCOLRMarker.Begin();

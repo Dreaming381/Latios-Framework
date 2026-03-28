@@ -23,7 +23,7 @@ namespace Latios.Calligraphics.Systems
     {
         LatiosWorldUnmanaged latiosWorld;
         static MethodInfo    sMethodInfo;
-        static FieldInfo[]   sFontReference;
+        static FieldInfo[]   sFontLoadDescription;
         static object        sFontRef;
 
         public void OnCreate(ref SystemState state)
@@ -36,11 +36,11 @@ namespace Latios.Calligraphics.Systems
             }
             latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new FontTable
             {
-                faces                                = new NativeList<Face>(Allocator.Persistent),
-                perThreadFontCaches                  = perThreadFontCaches,
-                fontAssetRefs                        = new NativeList<FontLookupKey>(Allocator.Persistent),
-                fontAssetRefToFaceIndexMap           = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
-                fontAssetRefToNamedVariationIndexMap = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
+                faces                                 = new NativeList<Face>(Allocator.Persistent),
+                perThreadFontCaches                   = perThreadFontCaches,
+                fontLookupKeys                        = new NativeList<FontLookupKey>(Allocator.Persistent),
+                fontLookupKeyToFaceIndexMap           = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
+                fontLookupKeyToNamedVariationIndexMap = new NativeHashMap<FontLookupKey, int>(64, Allocator.Persistent),
             });
 
             GetSystemFontsMethod();
@@ -70,13 +70,13 @@ namespace Latios.Calligraphics.Systems
                     break;
                 }
             }
-            var fontReferenceType = textCoreFontEngineModule.GetType("UnityEngine.TextCore.LowLevel.FontReference");
-            sFontReference        = fontReferenceType.GetFields();
-            var m_fontRef         = Activator.CreateInstance(fontReferenceType);
+            var fontLoadDescriptionType = textCoreFontEngineModule.GetType("UnityEngine.TextCore.LowLevel.FontLoadDescription");
+            sFontLoadDescription        = fontLoadDescriptionType.GetFields();
+            var m_fontRef               = Activator.CreateInstance(fontLoadDescriptionType);
 
             BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Static;
-            sMethodInfo               = typeof(FontEngine).GetMethod("TryGetSystemFontReference", bindingFlags);
-            //MakeDelegate<sFontReference>(sMethodInfo);
+            sMethodInfo               = typeof(FontEngine).GetMethod("TryGetSystemFontLoadDescription", bindingFlags);
+            //MakeDelegate<sFontLoadDescription>(sMethodInfo);
         }
         static Func<string, string, object, bool> MakeDelegate<U>(MethodInfo methodInfo)
         {
@@ -84,38 +84,38 @@ namespace Latios.Calligraphics.Systems
             return (a, b, c) => f(a, b, (U)c);
         }
 
-        void LoadFont(NativeArray<FontLoadDescription> fontReferences, ref SystemState state, ref FontTable fontTable)
+        void LoadFont(NativeArray<FontLoadDescription> fontLoadDescriptions, ref SystemState state, ref FontTable fontTable)
         {
             Blob   blob;
             string fontAssetPath;
-            var    firstFontReference = fontReferences[0];
+            var    firstFontLoadDescription = fontLoadDescriptions[0];
 
-            if (firstFontReference.isSystemFont)
+            if (firstFontLoadDescription.isSystemFont)
             {
                 //loading rules: https://www.high-logic.com/fontcreator/manual15/fonttype.html
 
-                var      typeographicFamilyDataMissing = (firstFontReference.typographicFamily.IsEmpty || firstFontReference.typographicSubfamily.IsEmpty);
-                var      family                        = typeographicFamilyDataMissing ? firstFontReference.fontFamily : firstFontReference.typographicFamily;
-                var      subFamily                     = typeographicFamilyDataMissing ? firstFontReference.fontSubFamily : firstFontReference.typographicSubfamily;
+                var      typeographicFamilyDataMissing = (firstFontLoadDescription.typographicFamily.IsEmpty || firstFontLoadDescription.typographicSubfamily.IsEmpty);
+                var      family                        = typeographicFamilyDataMissing ? firstFontLoadDescription.fontFamily : firstFontLoadDescription.typographicFamily;
+                var      subFamily                     = typeographicFamilyDataMissing ? firstFontLoadDescription.fontSubFamily : firstFontLoadDescription.typographicSubfamily;
                 object[] args                          = new object[] { family.ToString(), subFamily.ToString(), sFontRef };
                 var      systemFontFound               = (bool)sMethodInfo.Invoke(null, args);
                 var      result                        = args[2];
 
-                //if (!TryGetSystemFontReference(family.ToString(), subFamily.ToString(), out UnityFontReference unityFontReference))
+                //if (!TryGetSystemFontLoadDescription(family.ToString(), subFamily.ToString(), out UnityFontLoadDescription unityFontLoadDescription))
                 if (!systemFontFound)
                 {
-                    //Debug.Log($"Could not find system font {sFontReference.fontFamily} {sFontReference.fontSubFamily}");
+                    //Debug.Log($"Could not find system font {sFontLoadDescription.fontFamily} {sFontLoadDescription.fontSubFamily}");
                     return;
                 }
                 //Debug.Log($"Found {fieldInfos[0].GetValue(result)} {fieldInfos[1].GetValue(result)} {fieldInfos[2].GetValue(result)} {fieldInfos[3].GetValue(result)}");
-                fontAssetPath = (string)sFontReference[3].GetValue(result);
+                fontAssetPath = (string)sFontLoadDescription[3].GetValue(result);
             }
             else
             {
-                if (firstFontReference.streamingAssetLocationValidated)
-                    fontAssetPath = Path.Combine(Application.streamingAssetsPath, firstFontReference.filePath.ToString());
+                if (firstFontLoadDescription.streamingAssetLocationValidated)
+                    fontAssetPath = Path.Combine(Application.streamingAssetsPath, firstFontLoadDescription.filePath.ToString());
                 else
-                    fontAssetPath = firstFontReference.filePath.ToString();
+                    fontAssetPath = firstFontLoadDescription.filePath.ToString();
 
                 if (!File.Exists(fontAssetPath))
                 {
@@ -128,16 +128,16 @@ namespace Latios.Calligraphics.Systems
             blob.MakeImmutable();  //is this neccessary considering we dispose the blob in next instruction?
 
             // in case font file is a collection font, we load all the ones we want in a batch to avoid reopening the file.
-            for (int i = 0, ii = fontReferences.Length; i < ii; i++)
+            for (int i = 0, ii = fontLoadDescriptions.Length; i < ii; i++)
             {
-                var tempFontReference = fontReferences[i];
-                var tempFontAssetRef  = tempFontReference.lookupKey;
-                if (!fontTable.fontAssetRefToFaceIndexMap.ContainsKey(tempFontAssetRef))
+                var tempFontLoadDescription = fontLoadDescriptions[i];
+                var tempFontLookupKey       = tempFontLoadDescription.fontLookupKey;
+                if (!fontTable.fontLookupKeyToFaceIndexMap.ContainsKey(tempFontLookupKey))
                 {
-                    var id = fontTable.fontAssetRefToFaceIndexMap.Count;
-                    fontTable.fontAssetRefs.Add(tempFontAssetRef);
-                    fontTable.fontAssetRefToFaceIndexMap.Add(tempFontAssetRef, id);
-                    var face = new Face(blob, tempFontReference.faceIndexInFile);
+                    var id = fontTable.fontLookupKeyToFaceIndexMap.Count;
+                    fontTable.fontLookupKeys.Add(tempFontLookupKey);
+                    fontTable.fontLookupKeyToFaceIndexMap.Add(tempFontLookupKey, id);
+                    var face = new Face(blob, tempFontLoadDescription.faceIndexInFile);
                     face.MakeImmutable();
                     fontTable.faces.Add(face);
 
@@ -160,12 +160,12 @@ namespace Latios.Calligraphics.Systems
                         float    coord;
 
                         //fetch a list of named variants
-                        //Debug.Log($"found {axisCount} variation axis for font {sFontReference.fontFamily} {sFontReference.fontSubFamily}, {face.NamedInstanceCount} named instances");
+                        //Debug.Log($"found {axisCount} variation axis for font {sFontLoadDescription.fontFamily} {sFontLoadDescription.fontSubFamily}, {face.NamedInstanceCount} named instances");
                         Span<float> coords = stackalloc float[axisCount];
                         for (int k = 0, kk = (int)face.NamedInstanceCount; k < kk; k++)
                         {
                             face.GetNamedInstanceDesignCoords(k, ref coords, out uint coordLength);
-                            var variableFontAssetRef = tempFontAssetRef;
+                            var variableFontLookupKey = tempFontLookupKey;
                             for (int f = 0, ff = (int)coordLength; f < ff; f++)
                             {
                                 //axisInfos and coords should be aligned in length and order
@@ -174,17 +174,17 @@ namespace Latios.Calligraphics.Systems
                                 switch (axisInfo.axisTag)
                                 {
                                     case AxisTag.WIDTH:
-                                        variableFontAssetRef.width = coord; break;
+                                        variableFontLookupKey.width = coord; break;
                                     case AxisTag.WEIGHT:
-                                        variableFontAssetRef.weight = coord; break;
+                                        variableFontLookupKey.weight = coord; break;
                                     case AxisTag.ITALIC:
-                                        variableFontAssetRef.isItalic = (int)coord == 1; break;
+                                        variableFontLookupKey.isItalic = (int)coord == 1; break;
                                     case AxisTag.SLANT:
-                                        variableFontAssetRef.slant = coord; break;
+                                        variableFontLookupKey.slant = coord; break;
                                 }
-                                //Debug.Log($"Add FontLookupKey {tempFontAssetRef} for variation axis: {axisInfo.axisTag} {face.GetName(axisInfo.nameID, language)}, value = {coord}");
+                                //Debug.Log($"Add FontLookupKey {tempFontLookupKey} for variation axis: {axisInfo.axisTag} {face.GetName(axisInfo.nameID, language)}, value = {coord}");
                             }
-                            fontTable.fontAssetRefToNamedVariationIndexMap.Add(variableFontAssetRef, k);
+                            fontTable.fontLookupKeyToNamedVariationIndexMap.Add(variableFontLookupKey, k);
                         }
                     }
                 }
@@ -223,7 +223,7 @@ namespace Latios.Calligraphics.Systems
                 var descriptions = blobRef.blob.Value.descriptions.AsSpan();
                 foreach (var desc in descriptions)
                 {
-                    if (!descSet.Add(desc.lookupKey))
+                    if (!descSet.Add(desc.fontLookupKey))
                         continue;
 
                     descList.Add(desc);

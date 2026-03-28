@@ -15,7 +15,7 @@ namespace Latios.Calligraphics
             bool isOpentype           = fontAssetPath.EndsWith("otf", System.StringComparison.OrdinalIgnoreCase);
             return isOpentype || isTrueType || isTrueTypeCollection;
         }
-        internal static bool GetFontInfo(string fontAssetPath, bool useSystemFont, Language language, NativeList<FontLoadDescription> fontReferences)
+        internal static bool GetFontInfo(string fontAssetPath, bool useSystemFont, Language language, NativeList<FontLoadDescription> fontLoadDescriptions)
         {
             if (IsValidFont(fontAssetPath))
             {
@@ -27,7 +27,7 @@ namespace Latios.Calligraphics
                 else
                     ValidateStreamingAssetPath(fontAssetPath, ref baseFontReference);
 
-                GetFaceInfo(blob, language, baseFontReference, fontReferences);
+                GetFaceInfo(blob, language, baseFontReference, fontLoadDescriptions);
                 blob.Dispose();
                 return true;
             }
@@ -37,49 +37,49 @@ namespace Latios.Calligraphics
                 return false;
             }
         }
-        internal static void ValidateStreamingAssetPath(string fontAssetPath, ref FontLoadDescription fontReference)
+        internal static void ValidateStreamingAssetPath(string fontAssetPath, ref FontLoadDescription fontLoadDescription)
         {
             var pathIndex = fontAssetPath.IndexOf("Assets/StreamingAssets");
             if (pathIndex == -1)
             {
                 Debug.LogError(
                     $"Unless you want to use System Fonts, the source font asset MUST be in \"Assets/StreamingAssets\"! Font cannot be loaded in a build from current location \"{fontAssetPath}\"");
-                fontReference.streamingAssetLocationValidated = false;
-                fontReference.filePath                        = Path.GetFullPath(fontAssetPath);
+                fontLoadDescription.streamingAssetLocationValidated = false;
+                fontLoadDescription.filePath                        = Path.GetFullPath(fontAssetPath);
             }
             else
             {
-                fontReference.streamingAssetLocationValidated = true;
-                fontReference.filePath                        = fontAssetPath.Substring(pathIndex + 23);
+                fontLoadDescription.streamingAssetLocationValidated = true;
+                fontLoadDescription.filePath                        = fontAssetPath.Substring(pathIndex + 23);
             }
         }
-        internal static bool GetFaceInfo(Blob blob, Language language, FontLoadDescription validatedFontReference, NativeList<FontLoadDescription> fontReferences)
+        internal static bool GetFaceInfo(Blob blob, Language language, FontLoadDescription validatedFontLoadDescription, NativeList<FontLoadDescription> fontLoadDescriptions)
         {
             for (int i = 0, ii = blob.FaceCount; i < ii; i++)
             {
                 var face                                      = new Face(blob, i);
-                var fontReference                             = new FontLoadDescription();
-                fontReference.filePath                        = validatedFontReference.filePath;
-                fontReference.isSystemFont                    = validatedFontReference.isSystemFont;
-                fontReference.streamingAssetLocationValidated = validatedFontReference.streamingAssetLocationValidated;
+                var fontLoadDescription                             = new FontLoadDescription();
+                fontLoadDescription.filePath                        = validatedFontLoadDescription.filePath;
+                fontLoadDescription.isSystemFont                    = validatedFontLoadDescription.isSystemFont;
+                fontLoadDescription.streamingAssetLocationValidated = validatedFontLoadDescription.streamingAssetLocationValidated;
 
-                fontReference.faceIndexInFile      = i;
-                fontReference.fontFamily           = face.GetName(NameID.FONT_FAMILY, language);
-                fontReference.fontSubFamily        = face.GetName(NameID.FONT_SUBFAMILY, language);
-                fontReference.typographicFamily    = face.GetName(NameID.TYPOGRAPHIC_FAMILY, language);
-                fontReference.typographicSubfamily = face.GetName(NameID.TYPOGRAPHIC_SUBFAMILY, language);
+                fontLoadDescription.faceIndexInFile      = i;
+                fontLoadDescription.fontFamily           = face.GetName(NameID.FONT_FAMILY, language);
+                fontLoadDescription.fontSubFamily        = face.GetName(NameID.FONT_SUBFAMILY, language);
+                fontLoadDescription.typographicFamily    = face.GetName(NameID.TYPOGRAPHIC_FAMILY, language);
+                fontLoadDescription.typographicSubfamily = face.GetName(NameID.TYPOGRAPHIC_SUBFAMILY, language);
 
                 var font                    = new Font(face);
-                fontReference.defaultWeight = font.GetStyleTag(StyleTag.WEIGHT);
-                fontReference.defaultWidth  = font.GetStyleTag(StyleTag.WIDTH);
-                fontReference.isItalic      = font.GetStyleTag(StyleTag.ITALIC) == 1;
-                fontReference.slant         = font.GetStyleTag(StyleTag.SLANT_ANGLE);
+                fontLoadDescription.defaultWeight = font.GetStyleTag(StyleTag.WEIGHT);
+                fontLoadDescription.defaultWidth  = font.GetStyleTag(StyleTag.WIDTH);
+                fontLoadDescription.isItalic      = font.GetStyleTag(StyleTag.ITALIC) == 1;
+                fontLoadDescription.slant         = font.GetStyleTag(StyleTag.SLANT_ANGLE);
 
-                if (!fontReferences.Contains(fontReference))
-                    fontReferences.Add(fontReference);
+                if (!fontLoadDescriptions.Contains(fontLoadDescription))
+                    fontLoadDescriptions.Add(fontLoadDescription);
                 // Duplicates are expected due to langauge support
-                //else if(!validatedFontReference.isSystemFont)
-                //    Debug.LogWarning($"font {sFontReference.fontFamily} {sFontReference.fontSubFamily} (system font? {sFontReference.isSystemFont}) was previously added to the list of fonts");
+                //else if(!validatedFontLoadDescription.isSystemFont)
+                //    Debug.LogWarning($"font {fontLoadDescription.fontFamily} {fontLoadDescription.fontSubFamily} (system font? {sFontReference.isSystemFont}) was previously added to the list of fonts");
 
                 face.Dispose();
                 font.Dispose();

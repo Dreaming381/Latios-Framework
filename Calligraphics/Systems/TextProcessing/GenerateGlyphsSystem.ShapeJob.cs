@@ -37,7 +37,7 @@ namespace Latios.Calligraphics.Systems
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if ((!chunk.DidChange(ref calliByteHandle, lastSystemVersion) && chunk.DidChange(ref textBaseConfigurationHandle, lastSystemVersion)) || fontTable.faces.IsEmpty)
+                if ((!chunk.DidChange(ref calliByteHandle, lastSystemVersion) && !chunk.DidChange(ref textBaseConfigurationHandle, lastSystemVersion)) || fontTable.faces.IsEmpty)
                     return;
 
                 if (!chunkMissingGlyphsSet.IsCreated)

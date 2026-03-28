@@ -137,7 +137,7 @@ namespace Latios.Calligraphics.Systems
 
                 public FontTextureSize m_fontTextureSize;
 
-                FontLookupKey FontAssetRef
+                FontLookupKey FontLookupKey
                 {
                     get { return new FontLookupKey(m_fontFamilyHash, m_fontWeight, m_fontWidth, m_isItalic); }
                 }
@@ -160,7 +160,7 @@ namespace Latios.Calligraphics.Systems
 
                     m_fontTextureSize = textBaseConfiguration.fontTextureSize;
 
-                    var defaultFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                    var defaultFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                     if(defaultFaceIndex == -1)
                     {
                         //fontTable does not contain a font of this family,
@@ -168,9 +168,9 @@ namespace Latios.Calligraphics.Systems
                         //leave everything else the same (weight, width etc), and search matching faceIndex
                         //Debug.Log($"Could not find FontLookupKey: {FontLookupKey}");
                         defaultFaceIndex        = 0;
-                        var defaultFontAssetRef = fontTable.fontAssetRefs[defaultFaceIndex];
-                        m_fontFamilyHash        = defaultFontAssetRef.familyHash;
-                        defaultFaceIndex        = fontTable.GetFaceIndex(FontAssetRef);
+                        var defaultFontLookupKey = fontTable.fontLookupKeys[defaultFaceIndex];
+                        m_fontFamilyHash        = defaultFontLookupKey.familyHash;
+                        defaultFaceIndex        = fontTable.GetFaceIndex(FontLookupKey);
 
                         //var face = fontTable.faces[defaultFaceIndex];
                         //var language = Language.English();
@@ -179,7 +179,7 @@ namespace Latios.Calligraphics.Systems
                     m_faceIndex = defaultFaceIndex == -1 ? m_faceIndex : defaultFaceIndex;
 
                     if (fontTable.faces[m_faceIndex].HasVarData)
-                        fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                        fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                 }
 
                 public void Update(ref XMLTag tag, ref FontTable fontTable, ref CalliString calliStringRaw)
@@ -193,10 +193,10 @@ namespace Latios.Calligraphics.Systems
                             else
                                 m_isItalic = false;
 
-                            newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                            newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                             m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                             if (fontTable.faces[m_faceIndex].HasVarData)
-                                fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                             return;
                         case TagType.Bold:
                             if (!tag.isClosing)
@@ -207,10 +207,10 @@ namespace Latios.Calligraphics.Systems
                             else
                                 m_fontWeight = m_fontWeightStack.RemoveExceptRoot();
 
-                            newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                            newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                             m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                             if (fontTable.faces[m_faceIndex].HasVarData)
-                                fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                             return;
                         case TagType.FontWeight:
                             if (!tag.isClosing)
@@ -221,10 +221,10 @@ namespace Latios.Calligraphics.Systems
                             else
                                 m_fontWeight = m_fontWeightStack.RemoveExceptRoot();
 
-                            newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                            newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                             m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                             if (fontTable.faces[m_faceIndex].HasVarData)
-                                fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                             return;
                         case TagType.FontWidth:
                             if (!tag.isClosing)
@@ -235,10 +235,10 @@ namespace Latios.Calligraphics.Systems
                             else
                                 m_fontWidth = m_fontWidthStack.RemoveExceptRoot();
 
-                            newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                            newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                             m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                             if (fontTable.faces[m_faceIndex].HasVarData)
-                                fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                             return;
                         case TagType.Font:
                             if (!tag.isClosing)
@@ -255,20 +255,20 @@ namespace Latios.Calligraphics.Systems
                                     m_fontFamilyHashStack.Add(m_fontFamilyHash);
                                 }
 
-                                newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                                newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                                 m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                                 if (fontTable.faces[m_faceIndex].HasVarData)
-                                    fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                    fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                                 return;
                             }
                             else
                             {
                                 m_fontFamilyHash = m_fontFamilyHashStack.RemoveExceptRoot();
 
-                                newFaceIndex = fontTable.GetFaceIndex(FontAssetRef);
+                                newFaceIndex = fontTable.GetFaceIndex(FontLookupKey);
                                 m_faceIndex  = newFaceIndex == -1 ? m_faceIndex : newFaceIndex;
                                 if (fontTable.faces[m_faceIndex].HasVarData)
-                                    fontTable.GetNamedVariationLookup(FontAssetRef, out m_namedVariationIndex);
+                                    fontTable.GetNamedVariationLookup(FontLookupKey, out m_namedVariationIndex);
                             }
                             return;
                     }

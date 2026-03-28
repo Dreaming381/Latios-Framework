@@ -232,6 +232,7 @@ namespace Latios.Calligraphics.Systems
 
             if (!collected.glyphEntryIDsToRasterize.IsEmpty)
             {
+                // atlasDirtyIDs are sorted, so extracting the upper 2 bit (encoding the GlyphEntryIDFlags enum) sorts atlas by type
                 int dirtySdf8Count;
                 for (dirtySdf8Count = 0; dirtySdf8Count < collected.atlasDirtyIDs.Length; dirtySdf8Count++)
                 {

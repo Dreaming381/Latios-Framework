@@ -48,7 +48,7 @@ namespace Latios.Myri.Systems
 
         BlobRetainer m_blobRetainer;
 
-        WorldTransformReadOnlyTypeHandle m_worldTransformHandle;
+        WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
         LatiosWorldUnmanaged latiosWorld;
 
@@ -75,7 +75,7 @@ namespace Latios.Myri.Systems
             m_deadListenersQuery  = state.Fluent().Without<AudioListener>().With<ListenerGraphState>().Build();
             m_sourcesQuery        = state.Fluent().With<AudioSourceVolume>(true).With<AudioSourceClip>(false).Build();
 
-            m_worldTransformHandle = new WorldTransformReadOnlyTypeHandle(ref state);
+            m_worldTransformHandle = new WorldTransformReadOnlyAspect.TypeHandle(ref state);
         }
 
         public bool ShouldUpdateSystem(ref SystemState state)

@@ -1,5 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
 using Font = Latios.Calligraphics.HarfBuzz.Font;
 using Latios.Calligraphics.HarfBuzz;
 using Latios.Unsafe;
@@ -17,11 +16,11 @@ namespace Latios.Calligraphics
     {
         public NativeList<Face>                  faces;
         public NativeArray<UnsafeList<Font> >    perThreadFontCaches;
-        public NativeHashMap<FontLookupKey, int> fontAssetRefToFaceIndexMap;
+        public NativeHashMap<FontLookupKey, int> fontLookupKeyToFaceIndexMap;
         //variable fonts got names instances. create FontLookupKey for each instance,
         //and map it to index of named instance in face. Use this to lookup instance profile via FontLookupKey
-        public NativeHashMap<FontLookupKey, int> fontAssetRefToNamedVariationIndexMap;
-        public NativeList<FontLookupKey>         fontAssetRefs;
+        public NativeHashMap<FontLookupKey, int> fontLookupKeyToNamedVariationIndexMap;
+        public NativeList<FontLookupKey>         fontLookupKeys;
 
         public Font SetVariableProfile(int faceIndex, int threadIndex, int variableProfileIndex)
         {
@@ -35,20 +34,20 @@ namespace Latios.Calligraphics
         }
         public bool GetNamedVariationLookup(FontLookupKey desiredFontAssetRef, out int namedVariationIndex)
         {
-            if (fontAssetRefToNamedVariationIndexMap.ContainsKey(desiredFontAssetRef))
+            if (fontLookupKeyToNamedVariationIndexMap.ContainsKey(desiredFontAssetRef))
             {
-                namedVariationIndex = fontAssetRefToNamedVariationIndexMap[desiredFontAssetRef];
+                namedVariationIndex = fontLookupKeyToNamedVariationIndexMap[desiredFontAssetRef];
                 return true;
             }
 
             //fall back to matching at least family and normal/italic
-            for (int i = 0, lenght = fontAssetRefs.Length; i < lenght; i++)
+            for (int i = 0, lenght = fontLookupKeys.Length; i < lenght; i++)
             {
                 //Debug.Log($"fallback candidate: {fontAssetRefs[i].ToString()}");
-                if (fontAssetRefs[i].familyHash == desiredFontAssetRef.familyHash && fontAssetRefs[i].isItalic == desiredFontAssetRef.isItalic)
+                if (fontLookupKeys[i].familyHash == desiredFontAssetRef.familyHash && fontLookupKeys[i].isItalic == desiredFontAssetRef.isItalic)
                 {
                     //Debug.Log($"desired: {desiredFontAssetRef}, found fallback candidate: {fontAssetRefs[i]}");
-                    namedVariationIndex = fontAssetRefToFaceIndexMap[fontAssetRefs[i]];
+                    namedVariationIndex = fontLookupKeyToFaceIndexMap[fontLookupKeys[i]];
                     return false;
                 }
             }
@@ -60,30 +59,30 @@ namespace Latios.Calligraphics
         {
             //Debug.Log($"Search for: {desiredFontAssetRef}");
             //default: perfect match of family name, weight, width and italic/normal
-            var fontIndex = fontAssetRefs.IndexOf(desiredFontAssetRef);
+            var fontIndex = fontLookupKeys.IndexOf(desiredFontAssetRef);
             if(fontIndex != -1)
             {
                 //Debug.Log($"desired: {desiredFontAssetRef}, found candidate: {fontAssetRefs[fontIndex]}");
-                return fontAssetRefToFaceIndexMap[fontAssetRefs[fontIndex]];
+                return fontLookupKeyToFaceIndexMap[fontLookupKeys[fontIndex]];
             }
 
             //fall back to matching at least family and normal/italic
-            for (int i = 0, lenght = fontAssetRefs.Length; i < lenght; i++)
+            for (int i = 0, lenght = fontLookupKeys.Length; i < lenght; i++)
             {
                 //Debug.Log($"fallback candidate: {fontAssetRefs[i].ToString()}");
-                if (fontAssetRefs[i].familyHash == desiredFontAssetRef.familyHash && fontAssetRefs[i].isItalic == desiredFontAssetRef.isItalic)
+                if (fontLookupKeys[i].familyHash == desiredFontAssetRef.familyHash && fontLookupKeys[i].isItalic == desiredFontAssetRef.isItalic)
                 {
                     //Debug.Log($"desired: {desiredFontAssetRef}, found fallback candidate: {fontAssetRefs[i]}");
-                    return fontAssetRefToFaceIndexMap[fontAssetRefs[i]];
+                    return fontLookupKeyToFaceIndexMap[fontLookupKeys[i]];
                 }
             }
 
             //fall back to matching at least family
-            for (int i = 0, lenght = fontAssetRefs.Length; i < lenght; i++)
+            for (int i = 0, lenght = fontLookupKeys.Length; i < lenght; i++)
             {
                 //Debug.Log($"fallback candidate: {fontAssetRefs[i].ToString()}");
-                if (fontAssetRefs[i].familyHash == desiredFontAssetRef.familyHash)
-                    return fontAssetRefToFaceIndexMap[fontAssetRefs[i]];
+                if (fontLookupKeys[i].familyHash == desiredFontAssetRef.familyHash)
+                    return fontLookupKeyToFaceIndexMap[fontLookupKeys[i]];
             }
             //Debug.Log($"Requested font {desiredFontAssetRef} not found");
             return -1;
@@ -108,9 +107,9 @@ namespace Latios.Calligraphics
             {
                 var jh = new DisposeInnerJob { table = this }.Schedule(inputDeps);
                 jh                                   = JobHandle.CombineDependencies(faces.Dispose(jh),
-                                                                                     fontAssetRefToNamedVariationIndexMap.Dispose(jh),
+                                                                                     fontLookupKeyToNamedVariationIndexMap.Dispose(jh),
                                                                                      perThreadFontCaches.Dispose(jh));
-                return JobHandle.CombineDependencies(jh, fontAssetRefs.Dispose(jh), fontAssetRefToFaceIndexMap.Dispose(jh));
+                return JobHandle.CombineDependencies(jh, fontLookupKeys.Dispose(jh), fontLookupKeyToFaceIndexMap.Dispose(jh));
             }
             return inputDeps;
         }
@@ -309,6 +308,10 @@ namespace Latios.Calligraphics
             {
                 get { return new BBox(xBearing, yBearing - height, xBearing + width, yBearing); }
             }
+            public GlyphExtents GlyphExtents
+            {
+                get { return new GlyphExtents {width = width, height = height, x_bearing = xBearing, y_bearing = yBearing }; }
+            }
             // Todo:
         }
 
@@ -322,7 +325,7 @@ namespace Latios.Calligraphics
 
         /// <summary>
         /// Flags will be decoded in shader by ExtractGlyphFlagsFromEntryID and used there to determine if glyph is SDF or bitmap,
-        /// and to determind the Signed Distance Ratio for SDF (keep in sync with TextConfigurationComponets.GetSpread()!)
+        /// and to determind the Signed Distance Ratio for SDF (keep in sync with FontEnumerationExtensions.GetSpread()!)
         /// Will also be used to determine which atlas is dirty in DispatchGlyphsSystem.Write
         /// </summary>
         /// <param name="glyphEntryID"></param>

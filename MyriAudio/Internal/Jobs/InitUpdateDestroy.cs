@@ -18,7 +18,7 @@ namespace Latios.Myri
         public struct UpdateListenersJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<AudioListener>       listenerHandle;
-            [ReadOnly] public WorldTransformReadOnlyTypeHandle         worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle  worldTransformHandle;
             [ReadOnly] public BufferTypeHandle<AudioListenerChannelID> channelGuidHandle;
             public NativeList<ListenerWithTransform>                   listenersWithTransforms;
             public NativeList<AudioSourceChannelID>                    listenersChannelIDs;
@@ -72,7 +72,7 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<AudioSourceDistanceFalloff>      distanceFalloffHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>          emitterConeHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceChannelID>            channelIDHandle;
-            [ReadOnly] public WorldTransformReadOnlyTypeHandle                     worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle              worldTransformHandle;
             [ReadOnly] public NativeReference<int>                                 audioFrame;
             [ReadOnly] public NativeReference<int>                                 lastPlayedAudioFrame;
             [ReadOnly] public NativeReference<int>                                 lastConsumedBufferId;

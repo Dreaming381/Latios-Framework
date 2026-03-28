@@ -7,7 +7,7 @@ namespace Latios.Calligraphics.HarfBuzz
     internal static class Blending
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ColorARGB Blend(ColorARGB source, ColorARGB destination, PaintCompositeMode mode)
+        public static ColorBGRA Blend(ColorBGRA source, ColorBGRA destination, PaintCompositeMode mode)
         {
             switch (mode)
             {
@@ -48,7 +48,7 @@ namespace Latios.Calligraphics.HarfBuzz
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ColorARGB SrcOver(ColorARGB s, ColorARGB d)
+        public static ColorBGRA SrcOver(ColorBGRA s, ColorBGRA d)
         {
             // r = s*sa + (1-sa)*d*da
             var oneMinusAlpha = 255 - s.a;
@@ -56,13 +56,13 @@ namespace Latios.Calligraphics.HarfBuzz
             var rr = (s.r * s.a / 255) + oneMinusAlpha * (d.r * d.a / 255) / 255;
             var rg = (s.g * s.a / 255) + oneMinusAlpha * (d.g * d.a / 255) / 255;
             var rb = (s.b * s.a / 255) + oneMinusAlpha * (d.b * d.a / 255) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint4 SrcOver(uint4 s, uint4 d)
         {
             //extract individual color components into uint4 vectors for subsequent SIMD math
-            //expects ColorARGB byte layout
+            //expects ColorBGRA byte layout
             var sa = s & 0xff;
             var sr = (s >> 8) & 0xff;
             var sg = (s >> 16) & 0xff;
@@ -81,7 +81,7 @@ namespace Latios.Calligraphics.HarfBuzz
             var rb = (sb * sa / 255) + oneMinusAlpha * (db * da / 255) / 255;
             return ra & 0xFF | (rr & 0xFF) << 8 | (rg & 0xFF) << 16 | (rb & 0xFF) << 24;
         }
-        public static ColorARGB DstOver(ColorARGB s, ColorARGB d)
+        public static ColorBGRA DstOver(ColorBGRA s, ColorBGRA d)
         {
             // r = d*da + (1-da)*s*sa
             var oneMinusAlpha = 255 - d.a;
@@ -89,12 +89,12 @@ namespace Latios.Calligraphics.HarfBuzz
             var rr = (d.r * d.a / 255) + oneMinusAlpha * (s.r * s.a / 255) / 255;
             var rg = (d.g * d.a / 255) + oneMinusAlpha * (s.g * s.a / 255) / 255;
             var rb = (d.b * d.a / 255) + oneMinusAlpha * (s.b * s.a / 255) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint4 DstOver(uint4 s, uint4 d)
         {
-            //expects ColorARGB byte layout
+            //expects ColorBGRA byte layout
             var sa = s & 0xff;
             var sr = (s >> 8) & 0xff;
             var sg = (s >> 16) & 0xff;
@@ -113,26 +113,17 @@ namespace Latios.Calligraphics.HarfBuzz
             var rb = (db * da / 255) + oneMinusAlpha * (sb * sa / 255) / 255;
             return ra & 0xFF | (rr & 0xFF) << 8 | (rg & 0xFF) << 16 | (rb & 0xFF) << 24;
         }
-        public static ColorARGB SrcIn(ColorARGB s, ColorARGB d)
+        public static ColorBGRA SrcIn(ColorBGRA s, ColorBGRA d)
         {
             // a = sa * da
-            // r = s *sa * da
+            // r = s * sa * da
             var ra = s.a * d.a / 255;
-            var rr = s.r * s.r / 255 * d.a / 255;
-            var rg = s.g * s.g / 255 * d.a / 255;
-            var rb = s.b * s.a / 255 * d.a / 255;            
-            return new ColorARGB(ra, rr, rg, rb);
+            var rr = s.r * s.a / 255 * d.a / 255;
+            var rg = s.g * s.a / 255 * d.a / 255;
+            var rb = s.b * s.a / 255 * d.a / 255;
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB SrcIn2(ColorARGB s, ColorARGB d)
-        {
-            // r = s * da
-            var ra = s.a * d.a / 255;
-            var rr = s.r * d.a / 255;
-            var rg = s.g * d.a / 255;
-            var rb = s.b * d.a / 255;
-            return new ColorARGB(ra, rr, rg, rb);
-        }
-        public static ColorARGB DstIn(ColorARGB s, ColorARGB d)
+        public static ColorBGRA DstIn(ColorBGRA s, ColorBGRA d)
         {
             // a = sa * da
             // r = s *sa * da
@@ -140,141 +131,131 @@ namespace Latios.Calligraphics.HarfBuzz
             var rr = d.r * d.a / 255 * s.a / 255;
             var rg = d.g * d.a / 255 * s.a / 255;
             var rb = d.b * d.a / 255 * s.a / 255;
-            var alpha = d.a * s.a / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB DstIn2(ColorARGB s, ColorARGB d)
-        {
-            // r = d * sa
-            var ra = d.a * s.a / 255;
-            var rr = d.r * s.a / 255;
-            var rg = d.g * s.a / 255;
-            var rb = d.b * s.a / 255;
-            return new ColorARGB(ra, rr, rg, rb);
-        }
-
-        public static ColorARGB SrcOut(ColorARGB s, ColorARGB d)
+        public static ColorBGRA SrcOut(ColorBGRA s, ColorBGRA d)
         {
             // r = s * (1 - da)
             var ra = s.a * (255 - d.a) / 255;
             var rr = s.r * (255 - d.a) / 255;
             var rg = s.g * (255 - d.a) / 255;
             var rb = s.b * (255 - d.a) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB DstOut(ColorARGB s, ColorARGB d)
+        public static ColorBGRA DstOut(ColorBGRA s, ColorBGRA d)
         {
             // r = d * (1 - sa)
             var ra = d.a * (255 - s.a) / 255;
             var rr = d.r * (255 - s.a) / 255;
             var rg = d.g * (255 - s.a) / 255;
             var rb = d.b * (255 - s.a) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
         
-        public static ColorARGB SrcAtop(ColorARGB s, ColorARGB d)
+        public static ColorBGRA SrcAtop(ColorBGRA s, ColorBGRA d)
         {
             // r = s*da + d*(1-sa)
             var ra = s.a * d.a / 255 + d.a * (255 - s.a) / 255;
             var rr = s.r * d.a / 255 + d.r * (255 - s.a) / 255;
             var rg = s.g * d.a / 255 + d.g * (255 - s.a) / 255;
             var rb = s.b * d.a / 255 + d.b * (255 - s.a) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB DstAtop(ColorARGB s, ColorARGB d)
+        public static ColorBGRA DstAtop(ColorBGRA s, ColorBGRA d)
         {
             // r = d*sa + s*(1-da)
             var ra = d.a * s.a / 255 + s.a * (255 - d.a) / 255;
             var rr = d.r * s.a / 255 + s.r * (255 - d.a) / 255;
             var rg = d.g * s.a / 255 + s.g * (255 - d.a) / 255;
             var rb = d.b * s.a / 255 + s.b * (255 - d.a) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB Xor(ColorARGB s, ColorARGB d)
+        public static ColorBGRA Xor(ColorBGRA s, ColorBGRA d)
         {
             // r = s*(1-da) + d*(1-sa)
             var ra = s.a * (255 - d.a) / 255 + d.a * (255 - s.a) / 255;
             var rr = s.r * (255 - d.a) / 255 + d.r * (255 - s.a) / 255;
             var rg = s.g * (255 - d.a) / 255 + d.g * (255 - s.a) / 255;
             var rb = s.b * (255 - d.a) / 255 + d.b * (255 - s.a) / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB Plus(ColorARGB s, ColorARGB d)
+        public static ColorBGRA Plus(ColorBGRA s, ColorBGRA d)
         {
             // r = min(s + d, 1)
             var ra = math.min(s.a + d.a, 255);
             var rr = math.min(s.r + d.r, 255);
             var rg = math.min(s.g + d.g, 255);
             var rb = math.min(s.b + d.b, 255);
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB Screen(ColorARGB s, ColorARGB d)
+        public static ColorBGRA Screen(ColorBGRA s, ColorBGRA d)
         {
             // r = s + d - s*d
             var ra = s.a + d.a - s.a * d.a / 255;
             var rr = s.r + d.r - s.r * d.r / 255;
             var rg = s.g + d.g - s.g * d.g / 255;
             var rb = s.b + d.b - s.b * d.b / 255;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static ColorARGB Multiply(ColorARGB s, ColorARGB d)
+        public static ColorBGRA Multiply(ColorBGRA s, ColorBGRA d)
         {
             // r = s*(1-da) + d*(1-sa) + s*d
             var ra = (s.a * (255 - d.a) / 255 + d.a * (255 - s.a) / 255 + (s.a * d.a / 255));
             var rr = (s.r * (255 - d.a) / 255 + d.r * (255 - s.a) / 255 + (s.r * d.r / 255));
             var rg = (s.g * (255 - d.a) / 255 + d.g * (255 - s.a) / 255 + (s.g * d.g / 255));
             var rb = (s.b * (255 - d.a) / 255 + d.b * (255 - s.a) / 255 + (s.b * d.b / 255));             
-            return new ColorARGB(ra, rr, rg, rb);
-        }
-        public static ColorARGB ColorDodge(ColorARGB s, ColorARGB d)
-        {
-            // a / (1 - d)
-            var ra = s.a / (255 - d.a);
-            var rr = s.r / (255 - d.r);
-            var rg = s.g / (255 - d.g);
-            var rb = s.b / (255 - d.b);
-            return new ColorARGB(ra, rr, rg, rb);
-        }
-        public static ColorARGB ColorBurn(ColorARGB s, ColorARGB d)
-        {
-            // 1 - (1 - s) / d
-            var ra = 255 - (255 - s.a) / d.a;
-            var rr = 255 - (255 - s.r) / d.r;
-            var rg = 255 - (255 - s.g) / d.g;
-            var rb = 255 - (255 - s.b) / d.b;
-            return new ColorARGB(ra, rr, rg, rb);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
 
-        public static ColorARGB Overlay(ColorARGB s, ColorARGB d)
+        public static ColorBGRA ColorDodge(ColorBGRA s, ColorBGRA d)
+        {
+            // r = min(d / (1 - s), 1)
+            var ra = s.a == 255 ? 255 : math.min(d.a * 255 / (255 - s.a), 255);
+            var rr = s.r == 255 ? 255 : math.min(d.r * 255 / (255 - s.r), 255);
+            var rg = s.g == 255 ? 255 : math.min(d.g * 255 / (255 - s.g), 255);
+            var rb = s.b == 255 ? 255 : math.min(d.b * 255 / (255 - s.b), 255);
+            return new ColorBGRA(rb, rg, rr, ra);
+        }
+        public static ColorBGRA ColorBurn(ColorBGRA s, ColorBGRA d)
+        {
+            // r = 1 - min((1 - d) / s, 1)
+            var ra = s.a == 0 ? 0 : 255 - math.min((255 - d.a) * 255 / s.a, 255);
+            var rr = s.r == 0 ? 0 : 255 - math.min((255 - d.r) * 255 / s.r, 255);
+            var rg = s.g == 0 ? 0 : 255 - math.min((255 - d.g) * 255 / s.g, 255);
+            var rb = s.b == 0 ? 0 : 255 - math.min((255 - d.b) * 255 / s.b, 255);
+            return new ColorBGRA(rb, rg, rr, ra);
+        }
+
+        public static ColorBGRA Overlay(ColorBGRA s, ColorBGRA d)
         {
             // multiply or screen, depending on d
             //multiply: // r = s*(1-da) + d*(1-sa) + s*d
             //screen: // r = s + d - s*d
-            var ra = math.select(255 - 2 * (255 - s.a) * (255 - d.a), 2 * s.a * d.a / 255, s.a < 127);
-            var rr = math.select(255 - 2 * (255 - s.r) * (255 - d.r), 2 * s.r * d.r / 255, s.r < 127);
-            var rg = math.select(255 - 2 * (255 - s.g) * (255 - d.g), 2 * s.g * d.g / 255, s.g < 127);
-            var rb = math.select(255 - 2 * (255 - s.b) * (255 - d.b), 2 * s.b * d.b / 255, s.b < 127);            
-            return new ColorARGB(ra, rr, rg, rb);
+            var ra = math.select(255 - 2 * (255 - s.a) * (255 - d.a) / 255, 2 * s.a * d.a / 255, s.a < 127);
+            var rr = math.select(255 - 2 * (255 - s.r) * (255 - d.r) / 255, 2 * s.r * d.r / 255, s.r < 127);
+            var rg = math.select(255 - 2 * (255 - s.g) * (255 - d.g) / 255, 2 * s.g * d.g / 255, s.g < 127);
+            var rb = math.select(255 - 2 * (255 - s.b) * (255 - d.b) / 255, 2 * s.b * d.b / 255, s.b < 127);
+            return new ColorBGRA(rb, rg, rr, ra);
         }
-        public static void SetWhite(NativeArray<ColorARGB> result)
+        public static void SetWhite(NativeArray<ColorBGRA> result)
         {
-            var color = new ColorARGB(255, 255, 255, 255);
+            var color = new ColorBGRA(255, 255, 255, 255);
             for (int i = 0; i < result.Length; i++)
                 result[i] = color;
         }
-        public static void SetBlack(NativeArray<ColorARGB> result)
+        public static void SetBlack(NativeArray<ColorBGRA> result)
         {
-            var color = new ColorARGB(255, 0, 0, 0);
+            var color = new ColorBGRA(0, 0, 0, 255);
             for (int i = 0; i < result.Length; i++)
                 result[i] = color;
         }
-        public static void SetTransparent(NativeArray<ColorARGB> result)
+        public static void SetTransparent(NativeArray<ColorBGRA> result)
         {
-            var color = new ColorARGB(0, 0, 0, 0);
+            var color = new ColorBGRA(0, 0, 0, 0);
             for (int i = 0; i < result.Length; i++)
                 result[i] = color;
         }
-        public static void Clear(NativeArray<ColorARGB> result)
+        public static void Clear(NativeArray<ColorBGRA> result)
         {
             for (int i = 0; i < result.Length; i++)
                 result[i] = 0;

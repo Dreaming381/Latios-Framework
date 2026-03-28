@@ -96,10 +96,10 @@ namespace Latios.Calligraphics.HarfBuzz
             //SDFCommon.WriteGlyphOutlineToFile("ClipGlyph-Transformed.txt", ref drawData, false);
         }
 
-        public static void BlitRawTexture(NativeArray<ColorARGB> src, int srcWidth, int srcHeight,  NativeArray<ColorARGB> dest, int dstWidth, int dstHeight, int destX, int destY)
+        public static void BlitRawTexture(NativeArray<ColorBGRA> src, int srcWidth, int srcHeight,  NativeArray<ColorBGRA> dest, int dstWidth, int dstHeight, int destX, int destY)
         {
             for (int y = 0; y < srcHeight; y++)
-                NativeArray<ColorARGB>.Copy(src, y * srcWidth, dest, (destY + y) * dstWidth + destX, srcWidth);
+                NativeArray<ColorBGRA>.Copy(src, y * srcWidth, dest, (destY + y) * dstWidth + destX, srcWidth);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -270,10 +270,10 @@ namespace Latios.Calligraphics.HarfBuzz
                     break;
             }
         }
-        public static ColorARGB SampleGradient(NativeList<ColorStop> stops,  float u)
+        public static ColorBGRA SampleGradient(NativeList<ColorStop> stops,  float u)
         {            
             if (stops.IsEmpty)
-                return new ColorARGB(255, 255, 255, 255);
+                return new ColorBGRA(255, 255, 255, 255);
 
             int stop;
             var colorStopCount = stops.Length;
@@ -285,25 +285,25 @@ namespace Latios.Calligraphics.HarfBuzz
             if (stop >= colorStopCount)
             {
                 //Debug.Log($"stops too long ( {stop} / {stops.Length - 1}), color {stops[colorStopLength - 1].color} ");
-                return stops[colorStopCount - 1].color;
+                return stops[colorStopCount - 1].Color;
             }
             if (stop == 0)
             {
                 //Debug.Log($"stop 0 ({stop} / {colorStopLength - 1}), color {stops[0].color} ");
-                return stops[0].color;
+                return stops[0].Color;
             }
 
             float percentageRange = stops[stop].offset - stops[stop - 1].offset;
             if (percentageRange > Epsilon)
             {
                 float blend = (u - stops[stop - 1].offset) / percentageRange;
-                //Debug.Log($"blending between ({stop - 1}  and {stop}), color {ColorARGB.LerpUnclamped(stops[stop - 1].color, stops[stop].color, blend)} ");
-                return ColorARGB.LerpUnclamped(stops[stop - 1].color, stops[stop].color, blend);
+                //Debug.Log($"blending between ({stop - 1}  and {stop}), color {ColorBGRA.LerpUnclamped(stops[stop - 1].color, stops[stop].color, blend)} ");
+                return ColorBGRA.LerpUnclamped(stops[stop - 1].Color, stops[stop].Color, blend);
             }
             else
             {
                 //Debug.Log($"last stop ({stop} / {colorStopLength - 1}), color {stops[stop - 1].color} ");
-                return stops[stop - 1].color;
+                return stops[stop - 1].Color;
             }
         }        
     }

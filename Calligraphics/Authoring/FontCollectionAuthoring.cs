@@ -24,7 +24,7 @@ namespace Latios.Calligraphics.Authoring
             if (fontCollectionAsset == null)
                 return false;
             baker.DependsOn(fontCollectionAsset);
-            var fontCount = fontCollectionAsset.fontReferences.Count;
+            var fontCount = fontCollectionAsset.fontLoadDescriptions.Count;
             if (fontCount == 0)
                 return false;
             handle = baker.RequestCreateBlobAsset(fontCollectionAsset);

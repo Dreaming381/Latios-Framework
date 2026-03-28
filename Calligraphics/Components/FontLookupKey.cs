@@ -3,8 +3,6 @@ using Unity.Collections;
 
 namespace Latios.Calligraphics
 {
-    // Note: In TextMeshDOTS, this is named FontAssetRef.
-
     /// <summary>
     /// FontLookupKey is a small key structure for a loaded font. It is used internally to lookup font face
     /// resources, but you can also use it for your own logic. FontLookupKey consists of a hash representing the

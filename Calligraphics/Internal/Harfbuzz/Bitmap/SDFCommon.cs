@@ -1,7 +1,6 @@
 using System.IO;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Calligraphics.HarfBuzz.Bitmap

@@ -296,64 +296,6 @@ namespace Latios.Psyshock
         }
     }
 
-#pragma warning disable CS0618
-    /// <summary>
-    /// A struct which wraps an IAspect.Lookup and allows for performing
-    /// Read-Write access in parallel using SafeEntity types when it is guaranteed safe to do so.
-    /// </summary>
-    /// <typeparam name="TAspectType">A type implementing IAspect</typeparam>
-    /// <typeparam name="TLookupType">The IAspect.Lookup for the specific IAspect type</typeparam>
-    public struct PhysicsAspectLookup<TAspectType, TLookupType> where TAspectType : unmanaged, IAspect where TLookupType : unmanaged,
-                                                                      Unity.Entities.Internal.InternalCompilerInterface.IAspectLookup<TAspectType>
-    {
-        [NativeDisableParallelForRestriction] TLookupType m_lookup;
-
-        /// <summary>
-        /// Constructs the wrapper around the specified initialized IAspect.Lookup
-        /// </summary>
-        /// <param name="lookup">An initialized IAspect.Lookup</param>
-        public PhysicsAspectLookup(TLookupType lookup)
-        {
-            m_lookup = lookup;
-        }
-
-        public static implicit operator PhysicsAspectLookup<TAspectType, TLookupType>(TLookupType lookup) => new PhysicsAspectLookup<TAspectType, TLookupType>(lookup);
-
-        /// <summary>
-        /// Updates the type handles of the wrapped IAspect.Lookup
-        /// </summary>
-        /// <param name="state">The SystemState to update the handles</param>
-        public void Update(ref SystemState state) => m_lookup.Update(ref state);
-
-        /// <summary>
-        /// Gets an Aspect on the entity represented by safeEntity.
-        /// When safety checks are enabled, this throws when parallel safety cannot
-        /// be guaranteed.
-        /// </summary>
-        /// <param name="safeEntity">A safeEntity representing an entity that may be safe to access</param>
-        public TAspectType this[SafeEntity entity]
-        {
-            get
-            {
-                ValidateSafeEntityIsSafe(entity);
-                return m_lookup[entity];
-            }
-        }
-
-        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
-        static void ValidateSafeEntityIsSafe(SafeEntity safeEntity)
-        {
-#if ENABLE_UNITY_COLLECTIONS_CHECKS
-            if (safeEntity.m_entity.Index < 0)
-            {
-                throw new InvalidOperationException(
-                    "The entity is not safe to access by PhysicsAspectLookup within this context. This could be because the scheduling mode does not support safe entity lookup, or because the entity in a PairStream was not granted read-write access at its creation. If you only intend to read this entity, use <TAspectType>.Lookup instead.");
-            }
-#endif
-        }
-    }
-#pragma warning restore CS0618
-
     public static class ComponentBrokerPhysicsExtensions
     {
         /// <summary>

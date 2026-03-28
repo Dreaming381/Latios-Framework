@@ -7,9 +7,12 @@ namespace Latios.Calligraphics.HarfBuzz
     internal struct ColorStop
     {
         public float offset;
-        [MarshalAs(UnmanagedType.I1)]
-        public bool isForeground;
-        public ColorARGB color;
+        private int isForeground; //hb_bool_t is 4 bytes!
+        private uint colorRaw;        // raw 0xBBGGRRAA uint as written by C
+        public bool IsForeground => isForeground != 0;
+
+        // Converts on read using the bit-shift path — endianness-safe
+        public ColorBGRA Color => colorRaw; // uses implicit operator ColorBGRA(uint)
     }
     internal struct ColorStopComparer : IComparer<ColorStop>
     {

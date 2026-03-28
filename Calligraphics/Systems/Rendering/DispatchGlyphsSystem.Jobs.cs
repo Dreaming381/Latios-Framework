@@ -416,43 +416,87 @@ namespace Latios.Calligraphics.Systems
                 }
                 else if (glyphEntry.key.format == RenderFormat.Bitmap8888)
                 {
-                    PaintData paintData     = default;
-                    paintData.drawDelegates = drawDelegates;
-                    paintData.clipGlyph     = drawData;
-                    paintData.Clear();
+                    //kPaintMarker.Begin();
+                    //PaintData paintData = default;
+                    //paintData.drawDelegates = drawDelegates;
+                    //paintData.clipGlyph = drawData;
+                    //paintData.Clear();
 
-                    // harfbuzz is not pushing clipRects anymore for bounded glyphs as of https://github.com/harfbuzz/harfbuzz/pull/5294
-                    // Boundedness calculation as per https://learn.microsoft.com/en-us/typography/opentype/spec/colr#glyph-metrics-and-boundedness
-                    // is not quite clear. This fix here is  assuming the bound is the clipRect of the base glyph. Need to allocate paint surface here
-                    // as it is not allocated via hb_paint_funcs_set_push_clip_rectangle_func for bounded glyphs
-                    paintData.clipRect = glyphEntry.ClipRect;
-                    paintData.clipRect.Expand(1);  //prevents rendering artifacts that occur for outlines that strech from minX to maxX of clipRect, reason unknown
-                    paintData.paintSurface = new NativeArray<ColorARGB>(paintData.clipRect.intWidth * paintData.clipRect.intHeight, Allocator.Temp);
+                    //// harfbuzz is not pushing clipRects anymore for bounded glyphs as of https://github.com/harfbuzz/harfbuzz/pull/5294
+                    //// Boundedness calculation as per https://learn.microsoft.com/en-us/typography/opentype/spec/colr#glyph-metrics-and-boundedness
+                    //// is not quite clear. This fix here is  assuming the bound is the clipRect of the base glyph. Need to allocate paint surface here
+                    //// as it is not allocated via hb_paint_funcs_set_push_clip_rectangle_func for bounded glyphs
+                    //paintData.clipRect = glyphEntry.ClipRect;
+                    //paintData.clipRect.Expand(1);  //prevents rendering artifacts that occur for outlines that strech from minX to maxX of clipRect, reason unknown
+                    //paintData.paintSurface = new NativeArray<ColorBGRA>(paintData.clipRect.intWidth * paintData.clipRect.intHeight, Allocator.Temp);
+                    //font.PaintGlyph(glyphEntry.key.glyphIndex, ref paintData, paintDelegates, 0, new(0, 0, 0, 255));
+                    //if (paintData.paintSurface.Length > 0)
+                    //{
+                    //    var bitmapTextureSlice = GetBitmapUpload(glyphIndex, glyphEntry.width, glyphEntry.height);
+                    //    Debug.Log($"Allocated {bitmapTextureSlice.Length} {glyphEntry.width} {glyphEntry.height}");
+
+                    //    uint x                        = (uint)glyphEntry.z;
+                    //    x                            |= ((uint)glyphEntry.key.format) << 30;
+                    //    uint y                        = (uint)pixelUploadOffsetsInBytes[glyphIndex] / 4;
+                    //    uint z                        = (uint)glyphEntry.x;
+                    //    z                            |= ((uint)glyphEntry.y) << 16;
+                    //    uint w                        = (uint)glyphEntry.width;
+                    //    w                            |= ((uint)glyphEntry.height) << 16;
+                    //    uploadMetaBuffer[glyphIndex]  = new uint4(x, y, z, w);
+
+                    //    for (int i = 0; i < bitmapTextureSlice.Length; i++)
+                    //    {
+                    //        var bgra = paintData.paintSurface[i];
+                    //        bitmapTextureSlice[i] = new Color32(bgra.r, bgra.g, bgra.b, bgra.a);
+                    //    }                        
+                    //}
+                    //else
+                    //    uploadMetaBuffer[glyphIndex] = default;
+                    //kPaintMarker.End();
 
                     kPaintMarker.Begin();
-                    font.PaintGlyph(glyphEntry.key.glyphIndex, ref paintData, paintDelegates, 0, new ColorARGB(255, 0, 0, 0));
-                    kPaintMarker.End();
-                    if (paintData.paintSurface.Length > 0)
-                    {
-                        var bitmapTextureSlice = GetBitmapUpload(glyphIndex, glyphEntry.width, glyphEntry.height);
+                    var foreground = new ColorBGRA(0, 0, 0, 255);
+                    var paint = new Paint(true);
+                    paint.SetScaleFactor(1, 1);
+                    paint.SetTransform(1f, 0f, 0f, 1f, 0f, 0f);
+                    paint.SetForeground(foreground);
+                    var glyphExtents = glyphEntry.GlyphExtents;
+                    paint.SetGlyphExtents(ref glyphExtents);
+
+                    var pen_x = 0f;
+                    var pen_y = glyphExtents.height;
+                    var painted = paint.PaintGlyph(font, glyphEntry.key.glyphIndex, pen_x, pen_y, 0, foreground);
+                    if (painted)
+                    { 
+                        var image = paint.Render();
+                        if (image.ptr != System.IntPtr.Zero)
                         {
-                            uint x                        = (uint)glyphEntry.z;
-                            x                            |= ((uint)glyphEntry.key.format) << 30;
-                            uint y                        = (uint)pixelUploadOffsetsInBytes[glyphIndex] / 4;
-                            uint z                        = (uint)glyphEntry.x;
-                            z                            |= ((uint)glyphEntry.y) << 16;
-                            uint w                        = (uint)glyphEntry.width;
-                            w                            |= ((uint)glyphEntry.height) << 16;
-                            uploadMetaBuffer[glyphIndex]  = new uint4(x, y, z, w);
+                            image.GetExtents(out RasterExtents rasterExtents);
+                            var imageBGRA = image.GetColorBGRA(rasterExtents);
+                            var bitmapTextureSlice = GetBitmapUpload(glyphIndex, glyphEntry.width, glyphEntry.height);
+
+                            uint x                       = (uint)glyphEntry.z;
+                            x                           |= ((uint)glyphEntry.key.format) << 30;
+                            uint y                       = (uint)pixelUploadOffsetsInBytes[glyphIndex] / 4;
+                            uint z                       = (uint)glyphEntry.x;
+                            z                           |= ((uint)glyphEntry.y) << 16;
+                            uint w                       = (uint)glyphEntry.width;
+                            w                           |= ((uint)glyphEntry.height) << 16;
+                            uploadMetaBuffer[glyphIndex] = new uint4(x, y, z, w);
+
+                            for (int i = 0; i < bitmapTextureSlice.Length; i++)
+                            {
+                                var bgra = imageBGRA[i];
+                                bitmapTextureSlice[i] = new Color32(bgra.r, bgra.g, bgra.b, bgra.a);
+                            }
+                            image.Dispose();
                         }
-                        for (int i = 0; i < bitmapTextureSlice.Length; i++)
-                        {
-                            var argb              = paintData.paintSurface[i];
-                            bitmapTextureSlice[i] = new Color32(argb.r, argb.g, argb.b, argb.a);
-                        }
+                        else
+                            uploadMetaBuffer[glyphIndex] = default;
                     }
                     else
                         uploadMetaBuffer[glyphIndex] = default;
+                    kPaintMarker.End();
                 }
             }
 

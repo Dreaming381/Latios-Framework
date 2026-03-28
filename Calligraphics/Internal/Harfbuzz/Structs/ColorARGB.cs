@@ -1,130 +1,63 @@
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System;
+using System.Runtime.CompilerServices;
+using Unity.Collections;
 using UnityEngine;
-using Unity.Mathematics;
 
 namespace Latios.Calligraphics.HarfBuzz
 {
-    [StructLayout(LayoutKind.Explicit)]
+    // no byte-offset union with uint (StructLayout(Explicit))
+    // because harfbuzz uint32_t hb_color_t follows big-endian layout to encode
+    // BGRA color 0xBBGGRRAA (most consumer IT would require little endian).
+    // So rather accessed this struct in endianness independant way via bit shifts
+    // like harfbuzz
     internal struct ColorARGB : IEquatable<ColorARGB>
     {
-        [FieldOffset(0)]
-        public uint argb;
-
-        [FieldOffset(0)]
         public byte a;
-
-        [FieldOffset(1)]
         public byte r;
-
-        [FieldOffset(2)]
         public byte g;
+        public byte b;
 
-        [FieldOffset(3)]
-        public byte b;        
-
-        public ColorARGB(byte a, byte r, byte g, byte b)
+        public uint argb
         {
-            argb = 0;
-            this.a = a;
-            this.r = r;
-            this.g = g;
-            this.b = b; 
-        }
-        public ColorARGB(int a, int r, int g, int b)
-        {
-            argb = 0;
-            this.a = (byte)a;
-            this.r = (byte)r;
-            this.g = (byte)g;
-            this.b = (byte)b;
-        }
-        //public static implicit operator uint(ColorARGB c)
-        //{
-        //    return (((uint)c.b & 0xFF) << 24) | (((uint)c.g & 0xFF) << 16) | (((uint)c.r & 0xFF) << 8) | ((uint)c.a & 0xFF);
-        //}
-        public static implicit operator ColorARGB(uint c)
-        {
-            return new ColorARGB { argb = c };
-        }
-        //public static explicit operator ColorARGB(int4 c)
-        //{
-        //    return new ColorARGB { a = (byte)c[0], r = (byte)c[1], g = (byte)c[2], b = (byte)c[3] };
-        //}
-        //public static explicit operator int4(ColorARGB c)
-        //{
-        //    return new int4 (c.a,c.r,c.g,c.b);
-        //}
-
-        #region Color32 interoperability
-        public static implicit operator ColorARGB(Color32 c)
-        {
-            return new ColorARGB(c.a, c.r, c.g, c.b);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => ((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | (uint)b;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set
+            {
+                a = (byte)((value >> 24) & 0xFF);
+                r = (byte)((value >> 16) & 0xFF);
+                g = (byte)((value >> 8) & 0xFF);
+                g = (byte)(value & 0xFF);
+            }
         }
 
-        public static implicit operator Color32(ColorARGB c)
+        public static void ConvertARGB32ToBGRA32(Texture2D sourceARGB, out NativeArray<ColorBGRA> destBGRA)
         {
-            return new Color32(c.r, c.g, c.b, c.a);
-        }
-        #endregion
+            var pixels = sourceARGB.GetRawTextureData<ColorARGB>();  // Access raw data directly
 
-        #region Color interoperability
-        public static implicit operator ColorARGB(Color c)
-        {
-            return (Color32)c;
-        }
-
-        public static implicit operator Color(ColorARGB c)
-        {
-            return (Color32)c;
-        }
-        #endregion
-
-        public static ColorARGB Lerp(ColorARGB a, ColorARGB b, float t)
-        {
-            t = math.saturate(t);
-            return new ColorARGB(
-                (byte)(a.a + (b.a - a.a) * t),
-                (byte)(a.r + (b.r - a.r) * t),
-                (byte)(a.g + (b.g - a.g) * t),
-                (byte)(a.b + (b.b - a.b) * t));
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ColorARGB LerpUnclamped(ColorARGB a, ColorARGB b, float t)
-        {
-            return new ColorARGB(
-                (byte)(a.a + (b.a - a.a) * t), 
-                (byte)(a.r + (b.r - a.r) * t), 
-                (byte)(a.g + (b.g - a.g) * t), 
-                (byte)(a.b + (b.b - a.b) * t));
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                var pixel                            = pixels[i];
+                (pixel.a, pixel.r, pixel.g, pixel.b) = (pixel.b, pixel.g, pixel.r, pixel.a);  //swap to convert from ARGB to BGRA
+                pixels[i]                            = pixel;
+            }
+            destBGRA = pixels.Reinterpret<ColorBGRA>();
         }
 
-        public override int GetHashCode()
-        {
-            return argb.GetHashCode();
-        }
+        public override int GetHashCode() => argb.GetHashCode();
 
         public override bool Equals(object other)
         {
             if (other is ColorARGB other2)
-            {
                 return Equals(other2);
-            }
-
             return false;
         }
 
-        public bool Equals(ColorARGB other)
-        {
-            return argb == other.argb;
-        }
-
+        // Compare via the computed uint so channel order doesn't matter
+        public bool Equals(ColorARGB other) => argb == other.argb;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override string ToString()
-        {
-            return $"ARGB {a} {r} {g} {b} ";
-        }
+        public override string ToString() => $"ARGB({b}, {g}, {r}, {a})";
     }
 }
+

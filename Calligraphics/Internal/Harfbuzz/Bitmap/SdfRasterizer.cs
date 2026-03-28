@@ -8,6 +8,7 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
     {
         public static void RasterizeSdf8(DrawData drawData, NativeArray<byte> buffer, in GlyphRect atlasRect, int padding, int spread)
         {
+            PaintUtils.rasterizeSDFMarker.Begin();
             var signs   = RasterizeSigns(drawData, in atlasRect, padding);
             var distSqs = RasterizeSquaredDistances(drawData, in atlasRect, padding, spread);
 
@@ -19,10 +20,12 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
                 var scaled         = (signedDistance + 1f) * 255f / 2f;  // unorm correction
                 buffer[i]          = (byte)scaled;
             }
+            PaintUtils.rasterizeSDFMarker.End();
         }
 
         public static void RasterizeSdf16(DrawData drawData, NativeArray<ushort> buffer, in GlyphRect atlasRect, int padding, int spread)
         {
+            PaintUtils.rasterizeSDFMarker.Begin();
             var signs   = RasterizeSigns(drawData, in atlasRect, padding);
             var distSqs = RasterizeSquaredDistances(drawData, in atlasRect, padding, spread);
 
@@ -34,6 +37,7 @@ namespace Latios.Calligraphics.HarfBuzz.Bitmap
                 var scaled         = (signedDistance + 1f) * 65535f / 2f;  // unorm correction
                 buffer[i]          = (ushort)scaled;
             }
+            PaintUtils.rasterizeSDFMarker.End();
         }
 
         // Fills the array with -1f for outside the glyph, and 1f for inside the glyph

@@ -94,7 +94,7 @@ namespace Latios.Calligraphics.Systems
                 var calliString = new CalliString(calliBytesBuffer);
                 var characters  = calliString.GetEnumerator();
 
-                var fontAssetRefs = fontTable.fontAssetRefs;
+                var fontLookupKeys = fontTable.fontLookupKeys;
                 var layoutConfig  = new LayoutConfig(in textBaseConfiguration);
 
                 XMLTag currentTag                   = default;

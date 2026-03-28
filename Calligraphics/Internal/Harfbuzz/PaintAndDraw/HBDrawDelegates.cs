@@ -49,7 +49,7 @@ namespace Latios.Calligraphics.HarfBuzz
         public static void HB_draw_move_to_func_t(IntPtr dfuncs, ref DrawData data, ref DrawState st, float to_x, float to_y, IntPtr user_data)
         {
             //Debug.Log($"Move from {st.current_x},{st.current_y}  to {to_x}, {to_y} (DrawState: path_open {st.path_open} {st.path_start_x} {st.path_start_y}");
-            if (st.path_open)//if path is open, a moveto operation is an implicit lineto opeation https://learn.microsoft.com/en-us/typography/opentype/spec/cff2
+            if (st.PathOpen)//if path is open, a moveto operation is an implicit lineto opeation https://learn.microsoft.com/en-us/typography/opentype/spec/cff2
             {
                 var edge = new SDFEdge(st.current_x, st.current_y, to_x, to_y);
                 var edgeBBox = BezierMath.GetLineBBox(edge.start_pos, edge.end_pos);

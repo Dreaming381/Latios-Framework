@@ -8,11 +8,17 @@ namespace Latios.Kinemation
     /// An aspect for working with dynamic meshes that abstracts away the rotation mechanisms
     /// </summary>
 #pragma warning disable CS0618
-    public readonly partial struct DynamicMeshAspect : IAspect
+    public partial struct DynamicMeshAspect : IAspect
 #pragma warning restore CS0618
     {
-        readonly RefRW<DynamicMeshState>          m_state;
-        readonly DynamicBuffer<DynamicMeshVertex> m_vertices;
+        RefRW<DynamicMeshState>          m_state;
+        DynamicBuffer<DynamicMeshVertex> m_vertices;
+
+        public DynamicMeshAspect(RefRW<DynamicMeshState> dynamicMeshStateRefRW, DynamicBuffer<DynamicMeshVertex> dynamicMeshVertexBufferRW)
+        {
+            m_state    = dynamicMeshStateRefRW;
+            m_vertices = dynamicMeshVertexBufferRW;
+        }
 
         /// <summary>
         /// The number of vertices in this dynamic mesh
@@ -80,6 +86,15 @@ namespace Latios.Kinemation
         }
 
         public static ComponentTypeSet RequiredComponentTypeSet => new ComponentTypeSet(ComponentType.ReadWrite<DynamicMeshState>(), ComponentType.ReadWrite<DynamicMeshVertex>());
+
+        void IAspect.Initialize(EntityManager entityManager, Entity entity)
+        {
+            var esi          = entityManager.GetStorageInfo(entity);
+            var stateHandle  = entityManager.GetComponentTypeHandle<DynamicMeshState>(false);
+            var weightHandle = entityManager.GetBufferTypeHandle<DynamicMeshVertex>(false);
+            m_state          = new RefRW<DynamicMeshState>(esi.Chunk.GetNativeArray(ref stateHandle), esi.IndexInChunk);
+            m_vertices       = esi.Chunk.GetBufferAccessorRW(ref weightHandle)[esi.IndexInChunk];
+        }
     }
 }
 

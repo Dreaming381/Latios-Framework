@@ -68,7 +68,7 @@ namespace Latios.Calligraphics.HarfBuzz
         /// the UV coordinates that a texture of the color gradient would have. 
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ColorARGB GetColor(float2 bitmapCoordinates)
+        public ColorBGRA GetColor(float2 bitmapCoordinates)
         {
             var designSpaceCoordinates = PaintUtils.mul(inverseTransform, bitmapCoordinates);
             var x = designSpaceCoordinates.x;

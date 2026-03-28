@@ -63,7 +63,7 @@ namespace Latios.Calligraphics.HarfBuzz
         /// the UV coordinates that a texture of the color gradient would have. 
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ColorARGB GetColor(float2 bitmapCoordinates)
+        public ColorBGRA GetColor(float2 bitmapCoordinates)
         {
             var designSpaceCoordinates = PaintUtils.mul(inverseTransform, bitmapCoordinates);
             var x = designSpaceCoordinates.x;
@@ -79,12 +79,12 @@ namespace Latios.Calligraphics.HarfBuzz
             px = x - x0; py = y - y0;
             pr = math.sqrt(px * px + py * py);
             if (s == 0)
-                return new ColorARGB(255, 255, 255, 255); //outside of cone is not painted.
+                return new ColorBGRA(255, 255, 255, 255); //outside of cone is not painted.
             else if (s == 2)
             {
                 t = math.max(roots[0], roots[1]);
                 if (t < 0 && pr > (r0 + r1))
-                    return new ColorARGB(255, 255, 255, 255); //outside of cone is not painted.
+                    return new ColorBGRA(255, 255, 255, 255); //outside of cone is not painted.
             }
             else
             {

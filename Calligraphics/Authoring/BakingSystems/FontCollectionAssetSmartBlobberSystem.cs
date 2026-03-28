@@ -67,7 +67,7 @@ namespace Latios.Calligraphics.Authoring.Systems
                 ref var root       = ref builder.ConstructRoot<FontLoadDescriptionsBlob>();
                 var     collection = bakeData.fontCollection.Value;
 
-                builder.ConstructFromList(ref root.descriptions, collection.fontReferences);
+                builder.ConstructFromList(ref root.descriptions, collection.fontLoadDescriptions);
                 root.collectionAssetName = collection.name;
                 var blob                 = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<FontLoadDescriptionsBlob>(Allocator.Persistent));
                 result.ValueRW.blob      = blob;
