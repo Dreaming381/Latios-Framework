@@ -348,6 +348,8 @@ namespace Latios.Psyshock
 
         public FixedString128Bytes name;
 
+        public int triangleCount => 2 * quadRows * quadsPerRow;
+
         internal interface IFindTrianglesProcessor
         {
             ulong FilterPatch(ref Patch patch, ulong borderMask, short quadsPerBit);

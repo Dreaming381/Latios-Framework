@@ -177,16 +177,13 @@ namespace Latios.Kinemation
         /// <param name="skeleton">The optimized skeleton to perform EWBIK on</param>
         /// <param name="targets">The array of IK targets and their weights. The algorithm will sort these in-place by bone index.</param>
         /// <param name="constraintSolver">The solver used to apply constraints and update the bone transforms</param>
-        public static unsafe void Solve<T>(ref OptimizedSkeletonAspect skeleton, ref Span<Target> targets, ref T constraintSolver) where T : unmanaged, IConstraintSolver
+        public static void Solve<T>(ref OptimizedSkeletonAspect skeleton, ref Span<Target> targets, ref T constraintSolver) where T : unmanaged, IConstraintSolver
         {
             // Our setup is a bit complicated. We need to figure out the bone solve order, which is simply iterating the bones backwards,
             // except we skip bones that don't have targets on themselves or descendants or are fixed to their parent.
             // In addition, we build a list of indices into our sorted targets (we sort them by bone for performance) per bone, such that
             // each bone knows all targets that influence both itself and its descendants.
-            fixed (Target* p = &targets[0])
-            {
-                NativeSortExtension.Sort(p, targets.Length, new TargetSorter());
-            }
+            targets.Sort(new TargetSorter());
             Span<SolveBoneItem> solveList            = stackalloc SolveBoneItem[skeleton.boneCount];
             Span<short>         indexInSolveList     = stackalloc short[skeleton.boneCount];
             int                 expandedTargetsCount = 0;

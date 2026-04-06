@@ -48,7 +48,9 @@ namespace Latios.Psyshock
         /// <returns>True if the ray hit the subCollider, false otherwise</returns>
         public static bool Raycast(in Ray ray, in Collider collider, in TransformQvvs transform, int subCollider, out RaycastResult result)
         {
-            return PointRayDispatch.Raycast(ray, in collider, in transform, subCollider, out result);
+            var hit                 = PointRayDispatch.Raycast(ray, in collider, in transform, subCollider, out result);
+            result.subColliderIndex = subCollider;
+            return hit;
         }
 
         /// <summary>

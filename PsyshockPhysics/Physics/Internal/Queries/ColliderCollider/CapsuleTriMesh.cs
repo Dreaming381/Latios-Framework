@@ -53,16 +53,19 @@ namespace Latios.Psyshock
             var aabb                       = Physics.AabbFrom(capsule, capsuleInTriMeshTransform);
             aabb.min                      -= maxDistance;
             aabb.max                      += maxDistance;
-            var triProcessor               = new DistanceAllProcessor<T>
+            fixed (T* processorPtr         = &processor)
             {
-                triMesh          = triMesh,
-                triMeshTransform = triMeshTransform,
-                capsule          = capsule,
-                capsuleTransform = capsuleTransform,
-                maxDistance      = maxDistance,
-                processor        = (T*)UnsafeUtility.AddressOf(ref processor)
-            };
-            triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor, triMesh.scale);
+                var triProcessor = new DistanceAllProcessor<T>
+                {
+                    triMesh          = triMesh,
+                    triMeshTransform = triMeshTransform,
+                    capsule          = capsule,
+                    capsuleTransform = capsuleTransform,
+                    maxDistance      = maxDistance,
+                    processor        = processorPtr
+                };
+                triMesh.triMeshColliderBlob.Value.FindTriangles(in aabb, ref triProcessor, triMesh.scale);
+            }
         }
 
         public static bool ColliderCast(in CapsuleCollider capsuleToCast,

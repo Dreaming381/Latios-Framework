@@ -55,6 +55,7 @@ namespace Latios.Psyshock
             {
                 case ColliderType.TriMesh: return collider.m_triMesh().triMeshColliderBlob.Value.triangles.Length;
                 case ColliderType.Compound: return collider.m_compound().compoundColliderBlob.Value.blobColliders.Length;
+                case ColliderType.Terrain: return collider.m_terrain().terrainColliderBlob.Value.triangleCount;
                 default: return 1;
             }
         }

@@ -116,11 +116,13 @@ foreach (var colliderTypeNameA in colliderTypeNames)
                                                  float maxDistance,
                                                  ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
 		{
-			var flipper = new DistanceAllResultFlipper<T> { processor = (T*)UnsafeUtility.AddressOf(ref processor) };
-			ColliderDistanceResult result = default;
-			
-			switch ((colliderA.type, colliderB.type))
+		    fixed (T* processorPtr = &processor)
 			{
+			    var flipper = new DistanceAllResultFlipper<T> { processor = processorPtr };
+			    ColliderDistanceResult result = default;
+			
+			    switch ((colliderA.type, colliderB.type))
+			    {
 <#
 i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
@@ -131,43 +133,43 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 	{
 		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
 #>
-				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+				    case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
 <#
 		if (i < firstComposite && j < firstComposite && i < j)
 		{
 #>
-				{
-					if (<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result))
-					{
-					    result.FlipInPlace();
-					    processor.Execute(in result);
-					}
-					break;
-				}
+				    {
+					    if (<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetween(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, out result))
+					    {
+					        result.FlipInPlace();
+					        processor.Execute(in result);
+				    	}
+				    	break;
+				    }
 <#
 		}
 		else if (i < firstComposite && j < firstComposite)
 		{
 #>
-				{
-					if (<#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, out result))
-					    processor.Execute(in result);
-					break;
-				}
+				    {
+				    	if (<#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetween(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, out result))
+				    	    processor.Execute(in result);
+				    	break;
+				    }
 <#
 		}
 		else if (i < j)
 		{
 #>
-					<#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetweenAll(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, ref flipper);
-					break;
+					    <#= colliderTypeNameA #><#= colliderTypeNameB #>.DistanceBetweenAll(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance, ref flipper);
+					    break;
 <#
 		}
 		else
 		{
 #>
-					<#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetweenAll(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, ref processor);
-					break;
+					    <#= colliderTypeNameB #><#= colliderTypeNameA #>.DistanceBetweenAll(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance, ref processor);
+					    break;
 <#
 		}
 		j++;			
@@ -175,6 +177,7 @@ foreach (var colliderTypeNameA in colliderTypeNames)
 	i++;
 }
 #>
+			    }
 			}
 		}
 

@@ -83,28 +83,10 @@ namespace Latios.Psyshock
                 return AabbFrom(in colliderToCast, in rigidTransform, castEnd);
             }
 
-            switch (colliderToCast.type)
-            {
-                case ColliderType.Sphere:
-                    return AabbFrom(colliderToCast.m_sphere, in castStart, castEnd);
-                case ColliderType.Capsule:
-                    return AabbFrom(colliderToCast.m_capsule, in castStart, castEnd);
-                case ColliderType.Box:
-                    return AabbFrom(colliderToCast.m_box, in castStart, castEnd);
-                case ColliderType.Triangle:
-                    return AabbFrom(colliderToCast.m_triangle, in castStart, castEnd);
-                case ColliderType.Convex:
-                    return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
-                case ColliderType.TriMesh:
-                    return AabbFrom(colliderToCast.m_triMesh(), in castStart, castEnd);
-                case ColliderType.Compound:
-                    return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
-                case ColliderType.Terrain:
-                    return AabbFrom(colliderToCast.m_terrain(), in castStart, castEnd);
-                default:
-                    ThrowUnsupportedType(colliderToCast.type);
-                    return new Aabb();
-            }
+            var aabbStart = AabbFrom(in colliderToCast, castStart);
+            var diff      = castEnd - castStart.position;
+            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
+            return CombineAabb(aabbStart, aabbEnd);
         }
 
         internal static Aabb AabbFrom(in Collider collider, in RigidTransform transform)
@@ -135,26 +117,10 @@ namespace Latios.Psyshock
 
         internal static Aabb AabbFrom(in Collider colliderToCast, in RigidTransform castStart, float3 castEnd)
         {
-            switch (colliderToCast.type)
-            {
-                case ColliderType.Sphere:
-                    return AabbFrom(colliderToCast.m_sphere, in castStart, castEnd);
-                case ColliderType.Capsule:
-                    return AabbFrom(colliderToCast.m_capsule, in castStart, castEnd);
-                case ColliderType.Box:
-                    return AabbFrom(colliderToCast.m_box, in castStart, castEnd);
-                case ColliderType.Triangle:
-                    return AabbFrom(colliderToCast.m_triangle, in castStart, castEnd);
-                case ColliderType.Convex:
-                    return AabbFrom(colliderToCast.m_convex, in castStart, castEnd);
-                case ColliderType.Compound:
-                    return AabbFrom(colliderToCast.m_compound(), in castStart, castEnd);
-                case ColliderType.Terrain:
-                    return AabbFrom(colliderToCast.m_terrain(), in castStart, castEnd);
-                default:
-                    ThrowUnsupportedType(colliderToCast.type);
-                    return new Aabb();
-            }
+            var aabbStart = AabbFrom(in colliderToCast, castStart);
+            var diff      = castEnd - castStart.pos;
+            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
+            return CombineAabb(aabbStart, aabbEnd);
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
@@ -306,120 +272,6 @@ namespace Latios.Psyshock
         {
             ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
             return AabbFrom(in compound, new RigidTransform(transform.rotation, transform.position));
-        }
-        #endregion
-
-        #region ColliderCasts
-        private static Aabb AabbFrom(in SphereCollider sphereToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(sphereToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(SphereCollider sphere, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref sphere, castStart.scale, castStart.stretch);
-            return AabbFrom(in sphere, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in CapsuleCollider capsuleToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(capsuleToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(CapsuleCollider capsule, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref capsule, castStart.scale, castStart.stretch);
-            return AabbFrom(in capsule, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in BoxCollider boxToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(boxToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(BoxCollider box, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref box, castStart.scale, castStart.stretch);
-            return AabbFrom(in box, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in TriangleCollider triangleToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(triangleToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(TriangleCollider triangle, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref triangle, castStart.scale, castStart.stretch);
-            return AabbFrom(in triangle, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in ConvexCollider convexToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(convexToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(ConvexCollider convex, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref convex, castStart.scale, castStart.stretch);
-            return AabbFrom(in convex, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in TriMeshCollider triMeshToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(triMeshToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(TriMeshCollider triMesh, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref triMesh, castStart.scale, castStart.stretch);
-            return AabbFrom(in triMesh, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in TerrainCollider terrainToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(terrainToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(TerrainCollider terrain, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref terrain, castStart.scale, castStart.stretch);
-            return AabbFrom(in terrain, new RigidTransform(castStart.rotation, castStart.position), castEnd);
-        }
-
-        private static Aabb AabbFrom(in CompoundCollider compoundToCast, in RigidTransform castStart, float3 castEnd)
-        {
-            var aabbStart = AabbFrom(compoundToCast, castStart);
-            var diff      = castEnd - castStart.pos;
-            var aabbEnd   = new Aabb(aabbStart.min + diff, aabbStart.max + diff);
-            return CombineAabb(aabbStart, aabbEnd);
-        }
-
-        private static Aabb AabbFrom(CompoundCollider compound, in TransformQvvs castStart, float3 castEnd)
-        {
-            ScaleStretchCollider(ref compound, castStart.scale, castStart.stretch);
-            return AabbFrom(in compound, new RigidTransform(castStart.rotation, castStart.position), castEnd);
         }
         #endregion
     }

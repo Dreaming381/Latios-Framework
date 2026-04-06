@@ -56,7 +56,7 @@ namespace Latios.Psyshock
             float  b               = 2f * math.dot(ray.displacement, delta);
             float  c               = math.dot(delta, delta) - sphere.radius * sphere.radius;
             float  discriminant    = b * b - 4f * a * c;
-            bool   hit             = discriminant >= 0f & c >= 0f;  //Unlike Unity.Physics, we ignore inside hits.
+            bool   hit             = discriminant >= 0f & c > 0f;  //Unlike Unity.Physics, we ignore inside hits.
             discriminant           = math.abs(discriminant);
             float sqrtDiscriminant = math.sqrt(discriminant);
             float root1            = (-b - sqrtDiscriminant) / (2f * a);
@@ -78,7 +78,7 @@ namespace Latios.Psyshock
             float4     b            = 2f * simd.dot(rayDisplacement, delta);
             float4     c            = simd.dot(delta, delta) - radius * radius;
             float4     discriminant = b * b - 4f * a * c;
-            bool4      hit          = discriminant >= 0f & c >= 0f;  //Unlike Unity.Physics, we ignore inside hits.
+            bool4      hit          = discriminant >= 0f & c > 0f;  //Unlike Unity.Physics, we ignore inside hits.
             discriminant            = math.abs(discriminant);
             float4 sqrtDiscriminant = math.sqrt(discriminant);
             float4 root1            = (-b - sqrtDiscriminant) / (2f * a);

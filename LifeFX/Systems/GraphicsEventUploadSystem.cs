@@ -469,7 +469,7 @@ namespace Latios.LifeFX.Systems
                     {
                         ref var range = ref eventRanges.ElementAt(index);
                         var     src   = eventEnumerator.GetCurrentPtr();
-                        var     dst   = UnsafeUtility.AddressOf(ref buffer.ElementAt((range.x + range.y) * eventSize));
+                        var     dst   = buffer.Ptr + ((range.x + range.y) * eventSize);
                         UnsafeUtility.MemCpy(dst, src, eventSize);
                         range.y++;
                     }

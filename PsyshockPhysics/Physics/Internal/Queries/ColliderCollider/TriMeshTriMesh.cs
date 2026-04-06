@@ -74,22 +74,25 @@ namespace Latios.Psyshock
             aabbBinA.min -= maxDistance;
             aabbBinA.max += maxDistance;
 
-            var outerProcessor = new DistanceAllOuterProcessor<T>
+            fixed (T* processorPtr = &processor)
             {
-                processor = new DistanceAllInnerProcessor<T>
+                var outerProcessor = new DistanceAllOuterProcessor<T>
                 {
-                    maxDistance = maxDistance,
-                    processor   = (T*)UnsafeUtility.AddressOf(ref processor),
-                    transformA  = aTransform,
-                    transformB  = bTransform,
-                    triMeshA    = triMeshA
-                },
-                aabbBinA   = aabbBinA,
-                transformB = bTransform,
-                triMeshB   = triMeshB
-            };
+                    processor = new DistanceAllInnerProcessor<T>
+                    {
+                        maxDistance = maxDistance,
+                        processor   = processorPtr,
+                        transformA  = aTransform,
+                        transformB  = bTransform,
+                        triMeshA    = triMeshA
+                    },
+                    aabbBinA   = aabbBinA,
+                    transformB = bTransform,
+                    triMeshB   = triMeshB
+                };
 
-            triMeshB.triMeshColliderBlob.Value.FindTriangles(in aabbAinB, ref outerProcessor, triMeshB.scale);
+                triMeshB.triMeshColliderBlob.Value.FindTriangles(in aabbAinB, ref outerProcessor, triMeshB.scale);
+            }
         }
 
         public static bool ColliderCast(in TriMeshCollider triMeshToCast,

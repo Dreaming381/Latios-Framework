@@ -65,19 +65,22 @@ namespace Latios.Psyshock
             if (minInt.y > terrain.terrainColliderBlob.Value.maxHeight || maxInt.y < terrain.terrainColliderBlob.Value.minHeight)
                 return;
 
-            var terrainProcessor = new DistanceBetweenAllProcessor<T>
+            fixed (T* processorPtr = &processor)
             {
-                convex           = convex,
-                convexTransform  = convexTransform,
-                maxDistance      = maxDistance,
-                minHeight        = (short)minInt.y,
-                maxHeight        = (short)maxInt.y,
-                heightOffset     = terrain.baseHeightOffset,
-                scale            = terrain.scale,
-                terrainTransform = terrainTransform,
-                processor        = (T*)UnsafeUtility.AddressOf(ref processor)
-            };
-            terrain.terrainColliderBlob.Value.FindTriangles(minInt.x, minInt.z, maxInt.x, maxInt.z, ref terrainProcessor);
+                var terrainProcessor = new DistanceBetweenAllProcessor<T>
+                {
+                    convex           = convex,
+                    convexTransform  = convexTransform,
+                    maxDistance      = maxDistance,
+                    minHeight        = (short)minInt.y,
+                    maxHeight        = (short)maxInt.y,
+                    heightOffset     = terrain.baseHeightOffset,
+                    scale            = terrain.scale,
+                    terrainTransform = terrainTransform,
+                    processor        = processorPtr
+                };
+                terrain.terrainColliderBlob.Value.FindTriangles(minInt.x, minInt.z, maxInt.x, maxInt.z, ref terrainProcessor);
+            }
         }
 
         public static bool ColliderCast(in ConvexCollider convexToCast,
