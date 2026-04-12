@@ -11,7 +11,7 @@ using UnityEngine.Rendering;
 namespace Latios.Calligraphics.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Calligraphics/Text Renderer")]
+    [AddComponentMenu("Latios/Calligraphics/Text Renderer (Calligraphics)")]
     public class TextRendererAuthoring : MonoBehaviour
     {
         public FontCollectionAsset fontCollectionAsset;

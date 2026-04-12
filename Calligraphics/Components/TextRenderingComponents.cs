@@ -111,12 +111,11 @@ namespace Latios.Calligraphics
         public uint count;
     }
 
-    internal partial struct NewEntitiesArrays : ICollectionComponent
+    internal partial struct NewEntitiesList : ICollectionComponent
     {
-        public NativeArray<Entity> newGlyphEntities;
-        public uint                lastTouchedGlobalSystemVersion;
+        public NativeList<Entity> newGlyphEntities;
 
-        public JobHandle TryDispose(JobHandle inputDeps) => inputDeps;
+        public JobHandle TryDispose(JobHandle inputDeps) => newGlyphEntities.Dispose(inputDeps);
     }
 }
 

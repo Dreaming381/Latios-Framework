@@ -173,8 +173,8 @@ namespace Latios.Kinemation.Authoring
             });
             AddComponent<MeshDeformDataBlobReference>(entity);
 
-            bool useFadeOut = settings != null ? settings.useFadeOut : false;
-            Span<MeshMaterialSubmeshSettings> mms = stackalloc MeshMaterialSubmeshSettings[m_materialsCache.Count];
+            bool                              useFadeOut = settings != null ? settings.useFadeOut : false;
+            Span<MeshMaterialSubmeshSettings> mms        = stackalloc MeshMaterialSubmeshSettings[m_materialsCache.Count];
             RenderingBakingTools.ExtractMeshMaterialSubmeshes(mms, sharedMesh, m_materialsCache, useFadeOut ? (byte)1 : (byte)255);
             var opaqueMaterialCount = RenderingBakingTools.GroupByDepthSorting(mms);
 
@@ -194,11 +194,13 @@ namespace Latios.Kinemation.Authoring
                 requireCrossfade = true;
             }
 
+            bool requiresDeformation = deformFeatures != MeshDeformDataFeatures.None ||
+                                       (settings != null && settings.bindingMode != SkinnedMeshSettingsAuthoring.BindingMode.DoNotGenerate);
             var rendererSettings = new MeshRendererBakeSettings
             {
                 targetEntity                = entity,
                 renderMeshDescription       = new RenderMeshDescription(authoring),
-                isDeforming                 = true,
+                isDeforming                 = requiresDeformation,
                 suppressDeformationWarnings = false,
                 useLightmapsIfPossible      = true,
                 lightmapIndex               = authoring.lightmapIndex,

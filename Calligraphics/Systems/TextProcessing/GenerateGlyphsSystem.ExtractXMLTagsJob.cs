@@ -15,13 +15,14 @@ namespace Latios.Calligraphics.Systems
             [NativeDisableParallelForRestriction] public NativeStream.Writer xmlTagStream;
             [ReadOnly] public NativeArray<int>                               firstEntityIndexInChunk;
             [ReadOnly] public BufferTypeHandle<CalliByte>                    calliByteHandle;
+            [ReadOnly] public ComponentTypeHandle<TextBaseConfiguration>     textBaseConfigurationHandle;
 
             public uint lastSystemVersion;
 
             [BurstCompile]
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!(chunk.DidChange(ref calliByteHandle, lastSystemVersion)))
+                if (!chunk.DidChange(ref calliByteHandle, lastSystemVersion) && !chunk.DidChange(ref textBaseConfigurationHandle, lastSystemVersion))
                     return;
 
                 var firstEntityIndex = firstEntityIndexInChunk[unfilteredChunkIndex];

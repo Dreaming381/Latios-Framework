@@ -13,9 +13,9 @@ namespace Latios.Calligraphics
     /// </summary>
     public struct TextBaseConfiguration : IComponentData
     {
-        ///// <summary>The hash code of the font's family name, which can be computed using TypeHash.FNV1A64<T>()
-        ///// Do NOT use the managed string version to compute the hash!
-        ///// </summary>
+        /// <summary>The hash code of the font's family name using a custom hash function.
+        /// Use SetFamily() to set this value.
+        /// </summary>
         public int defaultFontFamilyHash;
 
         /// <summary>
@@ -121,6 +121,11 @@ namespace Latios.Calligraphics
             get => Bits.GetBit(packed, 31);
             set => Bits.SetBit(ref packed, 31, value);
         }
+
+        /// <summary>
+        /// Sets the defaultFontFamilyHash by computing the hash of the passed in fontFamily string
+        /// </summary>
+        /// <param name="fontFamily"></param>
         public void SetFamily(FixedString128Bytes fontFamily)
         {
             defaultFontFamilyHash = TextHelper.GetHashCodeCaseInsensitive(fontFamily);

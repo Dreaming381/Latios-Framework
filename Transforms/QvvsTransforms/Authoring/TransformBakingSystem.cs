@@ -462,7 +462,7 @@ namespace Latios.Transforms.Authoring.Systems
                         hierarchy.GetOrderAndParent(entities[i], out var order, out var parent);
                         var targetParent  = hasParentOverride ? overrideParentArray[i].parent : transformAuthoring.RuntimeParent;
                         var parentChanged = parent != targetParent;
-                        var currentOrder  = hasAuthoringSiblingIndex ? authoringSiblingIndexArray[i].index : -1;
+                        var currentOrder  = (hasAuthoringSiblingIndex && !hasParentOverride) ? authoringSiblingIndexArray[i].index : -1;
 
                         // We check for override changes, flags, parent change, order change, and dirty transform data (change in positions, rotation, and scale)
                         if (localOverrideChanged || inheritanceFlagsChanged || parentChanged || order != currentOrder ||

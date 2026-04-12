@@ -1,6 +1,6 @@
 <UXML xmlns="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
     <Style src="project://database/Packages/com.latios.latiosframework/Calligraphics/Authoring/Custom%20Inspector/ColorGradientStyle.uss?fileID=7433441132597879392&amp;guid=2452b2526412cf94ebc05320b710d496&amp;type=3#ColorGradientStyle"/>
-    <VisualElement data-source-type="Calligraphics.TextColorGradient, Latios.Calligraphics" class="color-gradient-item" style="margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;">
+    <VisualElement data-source-type="Latios.Calligraphics.TextColorGradient, Latios.Calligraphics" class="color-gradient-item" style="margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px;">
         <TextField label="Gradient name" placeholder-text="filler text" binding-path="name"/>
         <EnumField label="Gradient Mode" value="HorizontalGradient" binding-path="colorMode" type="UnityEngine.TextCore.Text.ColorGradientMode, UnityEngine.TextCoreTextEngineModule"/>
         <VisualElement name="Top" class="color-panel">

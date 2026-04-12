@@ -1,5 +1,6 @@
 using static Unity.Entities.SystemAPI;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Rendering;
 
@@ -25,20 +26,21 @@ namespace Latios.Calligraphics.Systems
                     EntityQueryOptions.IgnoreComponentEnabledState).Build();
             m_deadMmiQuery          = QueryBuilder().WithPresent<PreviousRenderGlyph>().WithAbsent<MaterialMeshInfo>().Build();
             m_deadRenderBoundsQuery = QueryBuilder().WithPresent<PreviousRenderGlyph>().WithAbsent<RenderBounds>().Build();
-            latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld<NewEntitiesArrays>(default);
+            latiosWorld.worldBlackboardEntity.AddOrSetCollectionComponentAndDisposeOld(new NewEntitiesList
+            {
+                newGlyphEntities = new NativeList<Entity>(Allocator.Persistent)
+            });
         }
 
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            latiosWorld.worldBlackboardEntity.SetCollectionComponentAndDisposeOld(new NewEntitiesArrays
-            {
-                newGlyphEntities               = m_newGlyphsQuery.ToEntityArray(state.WorldUpdateAllocator),
-                lastTouchedGlobalSystemVersion = state.GlobalSystemVersion
-            });
+            var newEntitiesList = latiosWorld.worldBlackboardEntity.GetCollectionComponent<NewEntitiesList>(false);
+            state.CompleteDependency();
+            newEntitiesList.newGlyphEntities.AddRange(m_newGlyphsQuery.ToEntityArray(state.WorldUpdateAllocator));
 
             var renderingComponents = new ComponentTypeSet(ComponentType.ReadWrite<PreviousRenderGlyph>(), ComponentType.ReadWrite<GpuState>(),
-                                                           ComponentType.ReadWrite<ResidentRange>());
+                                                           ComponentType.ReadWrite<ResidentRange>(), ComponentType.ReadWrite<TextShaderIndex>());
             state.EntityManager.AddComponent(m_newGlyphsQuery, in renderingComponents);
             var glyphComponents = new ComponentTypeSet(ComponentType.ReadWrite<RenderGlyph>(), ComponentType.ReadWrite<AnimatedRenderGlyph>());
             state.EntityManager.RemoveComponent(m_deadMmiQuery,          in glyphComponents);

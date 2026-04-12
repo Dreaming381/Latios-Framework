@@ -455,7 +455,7 @@ namespace Latios.Transforms
         /// <summary>
         /// True if the entity has a parent and not a CopyParent inheritance flag.
         /// </summary>
-        public bool hasMutableLocalTransform => hasParent && m_handle.isCopyParent;
+        public bool hasMutableLocalTransform => hasParent && !m_handle.isCopyParent;
         /// <summary>
         /// True if the entity has a parent
         /// </summary>

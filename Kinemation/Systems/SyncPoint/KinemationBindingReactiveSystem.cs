@@ -359,7 +359,6 @@ namespace Latios.Kinemation.Systems
                 var skinnedMeshAddTypes = new FixedList128Bytes<ComponentType>();
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<BoundMesh>());
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<SkeletonDependent>());
-                skinnedMeshAddTypes.Add(ComponentType.ReadOnly<CopyParentWorldTransformTag>());
                 skinnedMeshAddTypes.Add(ComponentType.ChunkComponent<ChunkDeformPrefixSums>());
 #if LATIOS_TRANSFORMS_UNITY
                 skinnedMeshAddTypes.Add(ComponentType.ReadWrite<Unity.Transforms.Parent>());

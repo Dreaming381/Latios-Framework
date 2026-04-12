@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -11,25 +12,26 @@ namespace Latios.Calligraphics
     /// <summary>
     /// A Burst-compatible string type that wraps a DynamicBuffer of bytes
     /// </summary>
-    public struct CalliString :
-        INativeList<byte>,
-            IUTF8Bytes,
-            IComparable<string>,
-            IEquatable<string>,
-            IComparable<CalliString>,
-            IEquatable<CalliString>,
-            IComparable<NativeText>,
-            IEquatable<NativeText>,
-            IComparable<FixedString32Bytes>,
-            IEquatable<FixedString32Bytes>,
-            IComparable<FixedString64Bytes>,
-            IEquatable<FixedString64Bytes>,
-            IComparable<FixedString128Bytes>,
-            IEquatable<FixedString128Bytes>,
-            IComparable<FixedString512Bytes>,
-            IEquatable<FixedString512Bytes>,
-            IComparable<FixedString4096Bytes>,
-            IEquatable<FixedString4096Bytes>
+    public struct CalliString : INativeList<byte>,
+                                IUTF8Bytes,
+                                IComparable<string>,
+                                IEquatable<string>,
+                                IComparable<CalliString>,
+                                IEquatable<CalliString>,
+                                IComparable<NativeText>,
+                                IEquatable<NativeText>,
+                                IComparable<UnsafeText>,
+                                IEquatable<UnsafeText>,
+                                IComparable<FixedString32Bytes>,
+                                IEquatable<FixedString32Bytes>,
+                                IComparable<FixedString64Bytes>,
+                                IEquatable<FixedString64Bytes>,
+                                IComparable<FixedString128Bytes>,
+                                IEquatable<FixedString128Bytes>,
+                                IComparable<FixedString512Bytes>,
+                                IEquatable<FixedString512Bytes>,
+                                IComparable<FixedString4096Bytes>,
+                                IEquatable<FixedString4096Bytes>
     {
         DynamicBuffer<byte> m_stringBuffer;
 
@@ -147,8 +149,8 @@ namespace Latios.Calligraphics
         /// </remarks>
         public struct Enumerator : IEnumerator<Unicode.Rune>
         {
-            CalliString target;
-            int nextRuneByteIndex; //is actually index of byte AFTER current rune
+            CalliString  target;
+            int          nextRuneByteIndex;  //is actually index of byte AFTER current rune
             Unicode.Rune current;
 
             /// <summary>
@@ -157,9 +159,9 @@ namespace Latios.Calligraphics
             /// <param name="source">A NativeText for which to create an enumerator.</param>
             public Enumerator(CalliString source)
             {
-                target = source;
+                target            = source;
                 nextRuneByteIndex = 0;
-                current = default;
+                current           = default;
             }
 
             /// <summary>
@@ -205,7 +207,7 @@ namespace Latios.Calligraphics
                 return true;
             }
 
-            //cannot implement MovePrevious realiably as we cannot establish length of previous UTF8 rune 
+            //cannot implement MovePrevious realiably as we cannot establish length of previous UTF8 rune
             public bool MovePrevious()
             {
                 throw new NotImplementedException();
@@ -217,7 +219,7 @@ namespace Latios.Calligraphics
             public void Reset()
             {
                 nextRuneByteIndex = 0;
-                current = default;
+                current           = default;
             }
 
             object IEnumerator.Current
@@ -250,42 +252,47 @@ namespace Latios.Calligraphics
 
         public bool Equals(string other)
         {
-            throw new NotImplementedException();
+            return CompareTo(other) == 0;
         }
 
         public bool Equals(NativeText other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
+        }
+
+        public bool Equals(UnsafeText other)
+        {
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(CalliString other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(FixedString32Bytes other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(FixedString64Bytes other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(FixedString128Bytes other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(FixedString512Bytes other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public bool Equals(FixedString4096Bytes other)
         {
-            throw new NotImplementedException();
+            return Length == other.Length && CompareTo(other) == 0;
         }
 
         public int CompareTo(string other)
@@ -295,37 +302,42 @@ namespace Latios.Calligraphics
 
         public int CompareTo(NativeText other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
+        }
+
+        public int CompareTo(UnsafeText other)
+        {
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(CalliString other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(FixedString32Bytes other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(FixedString64Bytes other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(FixedString128Bytes other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(FixedString512Bytes other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
 
         public int CompareTo(FixedString4096Bytes other)
         {
-            throw new NotImplementedException();
+            return FixedStringMethods.CompareTo(ref this, other);
         }
     }
 }

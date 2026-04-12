@@ -1,18 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.15.0-beta.1]
-
-**This is a prerelease version of the Latios Framework version 0.15 which is
-still under development. Changelogs and Documentation, including the remainder
-of this README, are being updated to reflect the new features and changes in
-0.15.**
-
-**You are still welcome to submit bug reports and pull requests for this and
-future prerelease versions!**
-
-**This version of the alpha theoretically supports Unity 6000.0.23f1 with
-Entities 1.4.4 (entities version is same as official release). However, it has
-primarily tested using Unity 6000.3.8f1.**
+# Latios Framework for Unity ECS – [0.15.0]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -22,7 +10,7 @@ unintuitive details, then this framework may be exactly what you need to achieve
 your vision.
 
 The Latios Framework does not replace Unity’s ECS, but rather complements it
-with additional APIs and tools. In some cases, the Latios Framework may override
+with additional APIs and tools. In some cases, the Latios Framework may tweak
 Unity ECS’s underlying mechanisms to provide more features or improve
 performance. Desktop platforms are supported out-of-the-box. Other platforms may
 require additional effort (i.e. compiling native plugins) to achieve
@@ -40,10 +28,10 @@ adaptations of top-class solutions in the industry (see [Third Party
 Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
-This version targets Entities 1.4.3 with ENTITY_STORE_V1 and a minimum editor
+This version targets Entities 1.4.4 with ENTITY_STORE_V1 and a minimum editor
 version of 6000.0.23f1. Entities 6.4.0 compatibility is experimental.
 
-*[0.13.x] users, please read the* [*Upgrade
+*[0.14.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
 
 ## Modules
@@ -60,20 +48,16 @@ Bootstrap templates are provided in the Assets Create menu.
 
 [Core](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Core/README.md)
 is an essentials kit for handling common programming concerns in Unity’s ECS. It
-contains many features you might have heard of such as Blackboard Entities,
-Collection Components, Instantiate Command Buffers, Smart Blobbers, Explicit
-System Ordering, and Baking Bootstraps. But there are many more features around.
-If there is a common “hard” problem in ECS, there’s a good chance Core has a
-tool to address it.
+contains APIs for faster structural changes, improved workflows for shared
+settings and resources, tools to better organize your game loop, and plenty of
+API extensions covering many gaps in Unity’s ECS. If there is a common “hard”
+problem in ECS, there’s a good chance Core has a tool to address it.
 
-**Common Reasons to Use:**
+### Aux ECS
 
--   You use one of the other modules
--   You want one of the features
-
-**Common Reasons to Avoid:**
-
--   You have your own solutions for everything listed here
+Aux ECS is a collection that allows for storing a single-threaded ECS world,
+where entities are existing or fictional Unity entities. It can be used to tag
+entities with additional metadata without requiring sync points.
 
 ### QVVS Transforms
 
@@ -83,19 +67,13 @@ provide custom transforms systems based on the concept of QVVS transforms, which
 are vector-based transforms that can represent non-uniform scale without ever
 creating shear. This module comes with a fully functional custom transform
 system with automatic baking and systems, offering more features, performance,
-and determinism than what is shipped with Unity.
+and determinism than what is shipped with Unity. Unlike Unity Transforms, the
+QVVS Transform System is an always up-to-date system, meaning any change made to
+a transform will automatically sync with the rest of the hierarchy immediately.
 
 If you wish to use Unity Transforms instead, you can enable a compatibility mode
 for all other modules using the scripting define LATIOS_TRANSFORMS_UNITY. Some
 features in the other modules will be disabled when you do this.
-
-**Common Reasons to Use QVVS Transforms:**
-
--   You want a good transform hierarchy solution
-
-**Common Reasons to Use Unity Transforms:**
-
--   You use Unity Physics, Unity Character Controller, or Unity NetCode
 
 ### Calci
 
@@ -103,17 +81,7 @@ features in the other modules will be disabled when you do this.
 is a module focused on math and algorithms that can be useful for gameplay
 design as well as building blocks for engine-level functionality. Curves, RNG,
 and search algorithms can all be found here, as well as some lesser-known
-algorithms such as QCP. Most implementations are also heavily optimized for
-Burst.
-
-**Common Reasons to Use:**
-
--   You want a high-performance implementation of at least one of the algorithms
-    included
-
-**Common Reasons to Avoid:**
-
--   You have no need for any of the algorithms included
+algorithms such as QCP. Most implementations are heavily optimized for Burst.
 
 ### Psyshock
 
@@ -123,21 +91,8 @@ is a physics and spatial query module focused on user control. While most
 physics engines provide out-of-the-box simulation, Psyshock instead provides
 direct access to the underlying algorithms so that you can craft the perfect
 physics simulation for your game and not waste any computation on things you
-don’t need. Psyshock’s `CollisionWorld` allows performing ECS-spatial
-combination queries, allowing you to express game logic efficiently and
-concisely.
-
-**Common Reasons to Use Psyshock:**
-
--   You use QVVS Transforms
--   You only need collision detection
--   You want more control over physics
--   Unity Physics events system is too expensive
-
-**Common Reasons to Use Unity Physics:**
-
--   You want an out-of-the-box full-featured simulator with zero code compatible
-    with Unity Transforms
+don’t need. Psyshock’s `CollisionWorld` allows querying ECS archetypes
+spatially, allowing you to express game logic efficiently and concisely.
 
 ### Myri
 
@@ -148,64 +103,24 @@ both looping and non-looping audio sources, multiple listeners, directional and
 non-directional sources, and a voice combining feature to support massive
 amounts of sources at once. Playing audio is as simple as instantiating prefabs.
 
-**Common Reasons to Use:**
-
--   You want something simple and easy
-
-**Common Reasons to Ignore:**
-
--   You can afford and prefer to use FMOD
-
 ### Kinemation
 
 [Kinemation](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Kinemation%20Animation%20and%20Rendering/README.md)
-Animation and Rendering provides authored animation, simulated animation, and
-everything in between. It includes an overhauled Entities Graphics for
-significantly improved performance of both skinned and non-skinned entities
-including true frustum culling and LOD crossfade support. It also provides a
-comprehensive API for injecting custom effects into ECS rendering.
-
-On the animation side, Kinemation supports bone entity and optimized bone buffer
-configurations. It includes utilities for masking, inertial blending, and root
-motion. For animation clips, it leverages ACL, a powerful high quality animation
-compression solution used in AAA titles such as Rise of the Tomb Raider,
-Fortnite, and Valorant.
-
-**Common Reasons to Use:**
-
--   You use QVVS Transforms
--   You want better rendering performance and features related to LODs, light
-    probes, and deforming meshes
--   You want to customize and extend ECS rendering with access to the culling
-    and dispatch logic
--   You want an easier API for creating meshes at runtime
--   You prefer code-driven animation workflows and inertial blending
--   You wish to build your own animation visual tool tailored to your project
-
-**Common Reasons to Avoid:**
-
--   You’d rather pay money than use this framework
+Animation and Rendering provides everything you need to fill your game world
+with life and beauty. Decorate your world with dense foliage using Kinemation’s
+advanced LOD system and mipmap streaming. Modify meshes on the fly with
+Kinemation’s easy-to-use UniqueMesh solution. Animate entities with IK, inertial
+blending, and root motion. And experience better performance as Kinemation
+unlocks little-known rendering bottlenecks to achieve greater performance.
 
 ### Calligraphics
 
 [Calligraphics](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Calligraphics/README.md)
-is a world-space text rendering module. It uses TextCore fonts and formats text
-to be rendered via the Kinemation rendering pipeline, complete with custom ECS
-material property support. The text can be animated with the built-in tweening
-engine, or you can make your own animations with the glyph mapping API. Rich
-text tags are supported, with much of the implementation being ported from
-TextMeshPro and made Burst-compatible. Use Calligraphics for world-space labels,
-dialog, player names, and damage numbers.
-
-**Common Reasons to Use:**
-
--   You use QVVS Transforms
--   You want animated text
--   You are using any other module
-
-**Common Reasons to Avoid:**
-
--   TextMeshDOTS works and fully covers your needs
+is a world-space text rendering module. Whether you need a bunch of damage
+numbers, or complex world-space text supporting multiple languages and writing
+formats, Calligraphics has you covered. It leverages HarfBuzz and a custom
+dynamic SDF pipeline that makes it easy to get any text with any font on the
+screen.
 
 ### LifeFX
 
@@ -216,16 +131,6 @@ event payloads to VFX Graph via graphics buffers, as well as synchronizing
 entity transforms with the GPU. This way, a single VFX Graph instance can
 support thousands of entities.
 
-**Common Reasons to Use:**
-
--   You use VFX Graph at scale
--   You want a better way to get ECS graphics data into traditional
-    MonoBehaviours
-
-**Common Reasons to Avoid:**
-
--   You don’t need VFX Graph or custom graphics
-
 ### Unika
 
 [Unika](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Unika/README.md)
@@ -233,18 +138,6 @@ is a C\# scripting solution for ECS with full jobs and Burst support. Scripts
 are packed in dynamic buffers and can be invoked abstractly through interfaces
 using source generators. Scripts are fully referenceable from entities and other
 scripts, providing plenty of flexibility.
-
-**Common Reasons to Use:**
-
--   You have too many small jobs
--   You want something that can leverage your OOP experience as a fallback to
-    reduce development costs
--   You have technical artists who want to write `MonoBehaviour`-like code
--   You want a better API for modders
-
-**Common Reasons to Avoid:**
-
--   You exclusively use idiomatic foreach
 
 ### Future Modules
 
@@ -382,7 +275,7 @@ I do not promise backwards compatibility between feature releases (0.X). I will
 have upgrade guides detailing all the breakages and what to change. But it will
 be a manual process.
 
-Patch releases (0.13.X) will always preserve backwards compatibility back to the
+Patch releases (0.15.X) will always preserve backwards compatibility back to the
 last feature release.
 
 While I will provide tips and suggestions if you use older releases, I will not
@@ -394,20 +287,24 @@ If you would like to be added to this list, see
 [Contributing](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Contributing.md)
 for how to get started.
 
+-   Fribur – Calligraphics collaborator, owner of TextMeshDOTS, and original
+    integrator of HarfBuzz
 -   Sovogal – Significant contributions to the Calligraphics module (including
     the name)
 -   canmom – Android support, Kinemation baking fixes, and build fixes
--   Fribur – Calligraphics rich text overhaul and shader improvements
+-   Laicasaane – C\#10 support for source generators and Android support for
+    HarfBuzz
 -   Dechichi01 – Various fixes and improvements for Core, Psyshock, and
     Kinemation
+-   TrustNoOneElse – Backend assistance for QVVS Transforms and Calligraphics
+-   Obrazy - Fixes for `DynamicHashMap` and QVVS Transforms backend assistance
 -   clandais – Myri audio source scene editor handles
--   Anthiese – Mac OS support
+-   Anthiese – Mac OS support for AclUnity
 -   IlyasFed (NotBugThisFicha) – ADPCM for Myri
 -   germanoeich – F and Shift + F support for runtime entities
+-   sptndc – Mac OS fixes for HarfBuzz
 -   Lewis – Improvements to `EntityWith<>` and `EntityWithBuffer<>`
 -   aqscithe – Calci accretion disk point sampling
--   Obrazy - Fixes for `DynamicHashMap`
--   Laicasaane – C\#10 support for source generators
 -   Everyone else who reported bugs and made the Latios Framework more stable
     for everyone
 

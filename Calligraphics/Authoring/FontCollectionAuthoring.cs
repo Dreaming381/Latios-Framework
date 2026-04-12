@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Latios.Calligraphics.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Calligraphics/Font Collection")]
+    [AddComponentMenu("Latios/Calligraphics/Font Collection (Calligraphics)")]
     public class FontCollectionAuthoring : MonoBehaviour
     {
         public FontCollectionAsset fontCollectionAsset;

@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Latios.Kinemation.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Kinemation/Decal Settings")]
+    [AddComponentMenu("Latios/Kinemation/Decal Settings (Kinemation)")]
     public class DecalSettingsAuthoring : MonoBehaviour
     {
         [Range(0f, 180f)]
@@ -24,8 +24,10 @@ namespace Latios.Kinemation.Authoring
             var entity = GetEntity(TransformUsageFlags.Renderable);
             AddComponent(entity, new DecalAngleFade(math.radians(authoring.angleFadeMin), math.radians(authoring.angleFadeMax)));
 #else
-            UnityEngine.Debug.LogWarning("Either both URP and HDRP are installed in the project, or neither are installed. Cannot bake render pipeline specific DecalAngleFade component.");
+            UnityEngine.Debug.LogWarning(
+                "Either both URP and HDRP are installed in the project, or neither are installed. Cannot bake render pipeline specific DecalAngleFade component.");
 #endif
         }
     }
 }
+

@@ -47,15 +47,16 @@ namespace Latios.Calligraphics.Systems
             var refCountChangeBlocklistB       = new NativeStream(chunkCount, state.WorldUpdateAllocator);
             var residentDeallocationBlocklistB = new NativeStream(chunkCount, state.WorldUpdateAllocator);
 
-            var newEntitiesArrays = latiosWorld.worldBlackboardEntity.GetCollectionComponent<NewEntitiesArrays>(true);
-            if (newEntitiesArrays.newGlyphEntities.Length > 0 && ChangeVersionUtility.DidChange(newEntitiesArrays.lastTouchedGlobalSystemVersion, state.LastSystemVersion))
+            var newEntitiesArrays = latiosWorld.worldBlackboardEntity.GetCollectionComponent<NewEntitiesList>(true);
+            if (newEntitiesArrays.newGlyphEntities.Length > 0)
             {
                 state.Dependency = new DirtyNewJob
                 {
-                    newEntities         = newEntitiesArrays.newGlyphEntities,
+                    newEntities         = newEntitiesArrays.newGlyphEntities.AsArray(),
                     animatedGlyphLookup = GetBufferLookup<AnimatedRenderGlyph>(false),
                     glyphLookup         = GetBufferLookup<RenderGlyph>(false)
                 }.ScheduleParallel(newEntitiesArrays.newGlyphEntities.Length, 128, state.Dependency);
+                state.Dependency = new ClearNewEntitiesListJob { newEntities = newEntitiesArrays.newGlyphEntities }.Schedule(state.Dependency);
             }
 
             if (!m_deadQuery.IsEmptyIgnoreFilter)
@@ -136,6 +137,14 @@ namespace Latios.Calligraphics.Systems
                 if (!glyphLookup.TryGetBuffer(entity, out _))
                     animatedGlyphLookup.TryGetBuffer(entity, out _);
             }
+        }
+
+        [BurstCompile]
+        struct ClearNewEntitiesListJob : IJob
+        {
+            public NativeList<Entity> newEntities;
+
+            public void Execute() => newEntities.Clear();
         }
 
         [BurstCompile]

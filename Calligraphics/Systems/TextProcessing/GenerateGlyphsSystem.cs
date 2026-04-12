@@ -63,9 +63,10 @@ namespace Latios.Calligraphics.Systems
 
             state.Dependency = new ExtractTagsJob
             {
-                firstEntityIndexInChunk = firstEntityIndexInChunk,
-                xmlTagStream            = xmlTagStream.AsWriter(),
-                calliByteHandle         = SystemAPI.GetBufferTypeHandle<CalliByte>(true),
+                firstEntityIndexInChunk     = firstEntityIndexInChunk,
+                xmlTagStream                = xmlTagStream.AsWriter(),
+                calliByteHandle             = SystemAPI.GetBufferTypeHandle<CalliByte>(true),
+                textBaseConfigurationHandle = SystemAPI.GetComponentTypeHandle<TextBaseConfiguration>(true),
 
                 lastSystemVersion = m_skipChangeFilter ? 0 : state.LastSystemVersion,
             }.ScheduleParallel(m_query, firstEntityJH);

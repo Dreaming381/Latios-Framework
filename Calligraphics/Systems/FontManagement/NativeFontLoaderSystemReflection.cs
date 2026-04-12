@@ -70,12 +70,12 @@ namespace Latios.Calligraphics.Systems
                     break;
                 }
             }
-            var fontLoadDescriptionType = textCoreFontEngineModule.GetType("UnityEngine.TextCore.LowLevel.FontLoadDescription");
+            var fontLoadDescriptionType = textCoreFontEngineModule.GetType("UnityEngine.TextCore.LowLevel.FontReference");
             sFontLoadDescription        = fontLoadDescriptionType.GetFields();
-            var m_fontRef               = Activator.CreateInstance(fontLoadDescriptionType);
+            sFontRef                    = Activator.CreateInstance(fontLoadDescriptionType);
 
             BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Static;
-            sMethodInfo               = typeof(FontEngine).GetMethod("TryGetSystemFontLoadDescription", bindingFlags);
+            sMethodInfo               = typeof(FontEngine).GetMethod("TryGetSystemFontReference", bindingFlags);
             //MakeDelegate<sFontLoadDescription>(sMethodInfo);
         }
         static Func<string, string, object, bool> MakeDelegate<U>(MethodInfo methodInfo)

@@ -7,7 +7,7 @@ using UnityEngine.TextCore.Text;
 namespace Latios.Calligraphics.Authoring
 {
     [DisallowMultipleComponent]
-    [AddComponentMenu("Latios/Calligraphics/Text Color Gradient")]
+    [AddComponentMenu("Latios/Calligraphics/Text Color Gradient (Calligraphics)")]
     public class TextGradientAuthoring : MonoBehaviour
     {
         [Tooltip("For horizontal gradients, specify at least top-(left & right). For vertical gradients (top & bottom)-left. Otherwise specify all corner")]
