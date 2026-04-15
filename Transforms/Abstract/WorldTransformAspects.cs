@@ -3,6 +3,7 @@ using Unity.Entities.Exposed;
 using Unity.Mathematics;
 
 #if LATIOS_TRANSFORMS_UNITY
+using Unity.Transforms;
 using TransformComponent = Unity.Transforms.LocalToWorld;
 #else
 using TransformComponent = Latios.Transforms.WorldTransform;
@@ -19,16 +20,16 @@ namespace Latios.Transforms.Abstract
         {
             get
             {
-                ref readonly float4x4 ltw = ref localToWorld.ValueRO.Value;
+                ref readonly float4x4 ltw = ref worldTransform.ValueRO.Value;
                 return new TransformQvvs(ltw.Translation(), ltw.Rotation(), ltw.Scale().x, 1f);
             }
         }
 
-        public quaternion rotation => localToWorld.ValueRO.Rotation;
-        public float3 position => localToWorld.ValueRO.Position;
+        public quaternion rotation => worldTransform.ValueRO.Rotation;
+        public float3 position => worldTransform.ValueRO.Position;
 
         public bool isNativeQvvs => false;
-        public float4x4 matrix4x4 => localToWorld.ValueRO.Value;
+        public float4x4 matrix4x4 => worldTransform.ValueRO.Value;
 #else
         public TransformQvvs worldTransformQvvs => worldTransform.ValueRO.worldTransform;
 
