@@ -77,7 +77,8 @@ namespace Latios.Myri
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
-                if (entry.retainEntity != Entity.Null && consumedBuffer >= entry.lastSeenBuffer)
+                // Users need a full frame after a potential pause frame to send messages to Audio ECS that deregister blob asset usages
+                if (entry.retainEntity != Entity.Null && consumedBuffer >= entry.lastSeenBuffer + 2)
                 {
                     retainEntityManager.DestroyEntity(entry.retainEntity);
                     ownerToEntryMap.Remove(entry.owner);

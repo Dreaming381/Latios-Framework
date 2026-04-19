@@ -16,6 +16,7 @@ namespace Latios.Calligraphics.Systems
     [DisableAutoCreation]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
     [UpdateInGroup(typeof(Kinemation.Systems.DispatchRoundRobinEarlyExtensionsSuperSystem))]
+    [RequireMatchingQueriesForUpdate]
     public unsafe partial class DispatchGlyphsSystem : SubSystem, ICullingComputeDispatchSystem<DispatchGlyphsSystem.CollectState, DispatchGlyphsSystem.WriteState>
     {
         const int kTextureDimension = 4096;

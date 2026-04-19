@@ -222,7 +222,7 @@ namespace Latios.Kinemation
             {
                 if (rootTransforms[i].context32 >= 0)
                 {
-                    var rootTransform = rootTransforms[i];
+                    var rootTransform         = rootTransforms[i];
                     var socketHandle          = m_worldTransform.transformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(rootTransform.context32);
                     var socketTransform       = m_worldTransform.transformAspect[socketHandle];
                     rootTransform.context32   = socketTransform.worldTransform.context32;

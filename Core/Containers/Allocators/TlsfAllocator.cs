@@ -57,7 +57,7 @@ namespace Latios.Unsafe
         #endregion
 
         #region Lifecycle
-        public TlsfAllocator(AllocatorManager.AllocatorHandle parentAllocator, long poolSize, bool warnIfPoolIsAllocatedDuringallocationRequest)
+        public TlsfAllocator(AllocatorManager.AllocatorHandle parentAllocator, long poolSize, bool warnIfPoolIsAllocatedDuringAllocationRequest)
         {
             CheckMultipleOf64((ulong)poolSize);
 
@@ -70,7 +70,7 @@ namespace Latios.Unsafe
             m_standardPoolSize                             = poolSize;
             m_bytesTotal                                   = 0;
             m_bytesUsed                                    = 0;
-            m_warnIfPoolIsAllocatedDuringAllocationRequest = warnIfPoolIsAllocatedDuringallocationRequest;
+            m_warnIfPoolIsAllocatedDuringAllocationRequest = warnIfPoolIsAllocatedDuringAllocationRequest;
 
             UnsafeUtility.MemClear(m_freeBlocks,          UnsafeUtility.SizeOf<IntPtr>() * 2048);
             UnsafeUtility.MemClear(m_secondLevelFreeBits, UnsafeUtility.SizeOf<BitField64>() * 32);
@@ -154,10 +154,28 @@ namespace Latios.Unsafe
             m_bytesTotal += (ulong)poolSize;
         }
 
-        public void GetStats(out ulong bytesUsed, out ulong bytesTotal)
+        public void GetStats(out ulong bytesUsed, out ulong bytesTotal) => GetStats(out bytesUsed, out bytesTotal, out _, out _);
+
+        public void GetStats(out ulong bytesUsed, out ulong bytesTotal, out long standardPoolSize, out AllocatorManager.AllocatorHandle backingAllocator)
         {
-            bytesUsed  = m_bytesUsed;
-            bytesTotal = m_bytesTotal;
+            bytesUsed        = m_bytesUsed;
+            bytesTotal       = m_bytesTotal;
+            standardPoolSize = m_standardPoolSize;
+            backingAllocator = m_backingAllocator;
+        }
+
+        public static void GetRequiredAllocationParameters(long size, out int elementSize, out int alignment, out int numElements)
+        {
+            CheckMultipleOf64((ulong)size);
+            elementSize = (int)size;
+            numElements = 1;
+            if (size > (1 << 31))
+            {
+                size        = CollectionHelper.Align(size, 1 << 31);
+                elementSize = (1 << 31);
+                numElements = (int)(size / (1 << 31));
+            }
+            alignment = 64;
         }
         #endregion
 

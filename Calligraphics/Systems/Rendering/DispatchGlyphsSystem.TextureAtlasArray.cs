@@ -49,6 +49,8 @@ namespace Latios.Calligraphics.Systems
 
             public void Dispose()
             {
+                if (renderTexture2DArray == null)
+                    return;
                 if (Application.isPlaying)
                 {
                     renderTexture2DArray.Release();

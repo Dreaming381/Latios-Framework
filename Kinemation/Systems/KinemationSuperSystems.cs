@@ -94,6 +94,7 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    [DisableAutoCreation]
     public partial class KinemationPostRenderCollectSuperSystem : SuperSystem
     {
         CustomGraphicsRoundRobinDispatchSuperSystem dispatchSuperSystem;
@@ -111,6 +112,7 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    [DisableAutoCreation]
     public partial class KinemationPostRenderWriteSuperSystem : SuperSystem
     {
         CustomGraphicsRoundRobinDispatchSuperSystem dispatchSuperSystem;
@@ -128,6 +130,7 @@ namespace Latios.Kinemation.Systems
         }
     }
 
+    [DisableAutoCreation]
     public partial class KinemationPostRenderDispatchSuperSystem : SuperSystem
     {
         CustomGraphicsRoundRobinDispatchSuperSystem dispatchSuperSystem;

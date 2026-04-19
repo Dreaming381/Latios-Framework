@@ -3,6 +3,7 @@
     "rootNamespace": "Latios.Myri",
     "references": [
         "Latios.Core",
+        "Latios.AuxEcs",
         "Latios.Transforms",
         "Latios.Calci",
         "Unity.Audio.DSPGraph",
@@ -21,11 +22,11 @@
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [
-		{
+        {
             "name": "com.unity.entities",
             "expression": "1.4.0",
             "define": "ENTITIES_1_4"
         }
-	],
+    ],
     "noEngineReferences": false
 }

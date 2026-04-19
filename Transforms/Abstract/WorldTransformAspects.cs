@@ -3,8 +3,8 @@ using Unity.Entities.Exposed;
 using Unity.Mathematics;
 
 #if LATIOS_TRANSFORMS_UNITY
-using Unity.Transforms;
 using TransformComponent = Unity.Transforms.LocalToWorld;
+using Unity.Transforms;
 #else
 using TransformComponent = Latios.Transforms.WorldTransform;
 #endif

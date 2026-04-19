@@ -1,6 +1,6 @@
 ![](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/554a583e217bfe5bf38ece0ed65b22c33711afc6/media/bf2cb606139bb3ca01fe1c4c9f92cdf7.png)
 
-# Latios Framework for Unity ECS – [0.15.0]
+# Latios Framework for Unity ECS – [0.15.1]
 
 The Latios Framework is a powerful suite of high-performance low-level APIs and
 feature-sets for Unity’s ECS which aims to give you back control over your
@@ -29,7 +29,8 @@ Notices](THIRD%20PARTY%20NOTICES.md)) as well as original inventions geared
 towards Unity’s ECS.
 
 This version targets Entities 1.4.4 with ENTITY_STORE_V1 and a minimum editor
-version of 6000.0.23f1. Entities 6.4.0 compatibility is experimental.
+version of 6000.3.8f1. Entities 6.4.0 compatibility is not supported at this
+time.
 
 *[0.14.x] users, please read the* [*Upgrade
 Guide*](https://github.com/Dreaming381/Latios-Framework-Documentation/blob/main/Upgrade%20Guide.md)*!*
@@ -305,6 +306,7 @@ for how to get started.
 -   sptndc – Mac OS fixes for HarfBuzz
 -   Lewis – Improvements to `EntityWith<>` and `EntityWithBuffer<>`
 -   aqscithe – Calci accretion disk point sampling
+-   Miskinis – Unity Transforms mode fixes
 -   Everyone else who reported bugs and made the Latios Framework more stable
     for everyone
 
