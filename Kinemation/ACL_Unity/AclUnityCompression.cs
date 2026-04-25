@@ -118,7 +118,7 @@ namespace AclUnity
                 for (int i = 0; i < alignedScaleData.Length; i += parentIndices.Length)
                 {
                     var scaleSampleSubArray = alignedScaleData.GetSubArray(i, parentIndices.Length);
-                    Decompression.SampleFloats(compressedScales.GetUnsafeReadOnlyPtr(), scaleSampleSubArray, sampleTime, Decompression.KeyframeInterpolationMode.Nearest);
+                    Decompression.SampleFloatsFromRaw(compressedScales.GetUnsafeReadOnlyPtr(), scaleSampleSubArray, sampleTime, Decompression.KeyframeInterpolationMode.Nearest);
                     sampleTime += timeStep;
                 }
                 sampledScales = (float*)alignedScaleData.GetUnsafeReadOnlyPtr();

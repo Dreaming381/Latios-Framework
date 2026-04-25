@@ -503,7 +503,7 @@ namespace Latios.Kinemation.Authoring
                 else if (lodAppend.useOverrideMaterialsForLod1)
                     totalMms += lodAppend.overrideMaterialsForLod1.Count;
                 else
-                    totalMms += m_materialsCache.Count;
+                    totalMms    += m_materialsCache.Count;
                 lodAppend1Count  = totalMms - m_materialsCache.Count;
 
                 if (!lodAppend.enableLod2)
@@ -563,19 +563,30 @@ namespace Latios.Kinemation.Authoring
                     if (lodAppend.lod01TransitionMaxPercentage < lodAppend.lod01TransitionMinPercentage) // Be nice to the designers
                         (select2Lod.fullLod1ScreenHeightFraction, select2Lod.fullLod0ScreenHeightFraction) =
                             (select2Lod.fullLod0ScreenHeightFraction, select2Lod.fullLod1ScreenHeightFraction);
-                    if (lodAppend.lod1Mesh == null)
+                    if (lodAppend1Null)
                         select2Lod.fullLod1ScreenHeightFraction = (half)(-select2Lod.fullLod1ScreenHeightFraction);
                     AddComponent(entity, select2Lod);
                 }
                 else
                 {
                     select3Lod.fullLod0ScreenHeightFraction    = (half)(lodAppend.lod01TransitionMaxPercentage / 100f);
-                    select3Lod.fullLod1ScreenHeightMaxFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f);
+                    select3Lod.fullLod1ScreenHeightMaxFraction = (half)(lodAppend.lod01TransitionMinPercentage / 100f * math.select(1f, -1f, lodAppend1Null));
                     select3Lod.fullLod1ScreenHeightMinFraction = (half)(lodAppend.lod12TransitionMaxPercentage / 100f);
-                    select3Lod.fullLod2ScreenHeightFraction    = (half)(lodAppend.lod12TransitionMinPercentage / 100f * math.select(1f, -1f, lodAppend.lod2Mesh == null));
+                    select3Lod.fullLod2ScreenHeightFraction    = (half)(lodAppend.lod12TransitionMinPercentage / 100f * math.select(1f, -1f, lodAppend2Null));
                     AddComponent(entity, select3Lod);
                 }
                 AddComponent<UseMmiRangeLodTag>(entity);
+
+                if (lodAppend.disableLod1ShadowCasting | lodAppend.disableLod2ShadowCasting | lodAppend.disableLod1MotionVectors | lodAppend.disableLod2MotionVectors)
+                {
+                    AddComponent(entity, new MmiRangeLodFlags
+                    {
+                        disableLod1ShadowCasting = lodAppend.disableLod1ShadowCasting,
+                        disableLod2ShadowCasting = lodAppend.disableLod2ShadowCasting,
+                        disableLod1MotionVectors = lodAppend.disableLod1MotionVectors,
+                        disableLod2MotionVectors = lodAppend.disableLod2MotionVectors
+                    });
+                }
             }
 
             var rendererSettings = new MeshRendererBakeSettings

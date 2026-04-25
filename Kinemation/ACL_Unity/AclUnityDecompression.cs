@@ -305,13 +305,18 @@ namespace AclUnity
 
             compressedFloatsClip = (byte*)compressedFloatsClip + 16;
 
+            SampleFloatsFromRaw(compressedFloatsClip, outputBuffer, time, keyframeInterpolationMode);
+        }
+
+        internal static void SampleFloatsFromRaw(void* compressedFloatByteArray, NativeArray<float> outputBuffer, float time, KeyframeInterpolationMode keyframeInterpolationMode)
+        {
             if (X86.Avx2.IsAvx2Supported)
             {
-                AVX.sampleFloats(compressedFloatsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+                AVX.sampleFloats(compressedFloatByteArray, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
             }
             else
             {
-                NoExtensions.sampleFloats(compressedFloatsClip, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
+                NoExtensions.sampleFloats(compressedFloatByteArray, (float*)outputBuffer.GetUnsafePtr(), time, (byte)keyframeInterpolationMode);
             }
         }
 

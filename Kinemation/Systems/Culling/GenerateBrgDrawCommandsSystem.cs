@@ -107,6 +107,7 @@ namespace Latios.Kinemation.Systems
                 LastSystemVersion           = state.LastSystemVersion,
                 LightMaps                   = ManagedAPI.GetSharedComponentTypeHandle<LightMaps>(),
                 lodCrossfadeHandle          = GetComponentTypeHandle<LodCrossfade>(true),
+                mmiRangelLodFlagsHandle     = GetComponentTypeHandle<MmiRangeLodFlags>(true),
                 motionVectorDeformQueryMask = m_motionVectorDeformQueryMask,
                 PostProcessMatrix           = GetComponentTypeHandle<PostProcessMatrix>(true),
                 MaterialMeshInfo            = GetComponentTypeHandle<MaterialMeshInfo>(true),

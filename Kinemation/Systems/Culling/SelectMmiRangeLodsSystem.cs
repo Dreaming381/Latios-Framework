@@ -53,7 +53,8 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var parameters = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>().lodParameters;
+            var context    = latiosWorld.worldBlackboardEntity.GetComponentData<CullingContext>();
+            var parameters = context.lodParameters;
 
             m_worldTransformHandle.Update(ref state);
 
@@ -66,6 +67,7 @@ namespace Latios.Kinemation.Systems
                 boundsHandle           = GetComponentTypeHandle<WorldRenderBounds>(true),
                 select2Handle          = GetComponentTypeHandle<MmiRange2LodSelect>(true),
                 select3Handle          = GetComponentTypeHandle<MmiRange3LodSelect>(true),
+                rangeLodFlagsHandle    = GetComponentTypeHandle<MmiRangeLodFlags>(true),
                 lodGroupCrossfades     = GetComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins>(true),
                 mmiHandle              = GetComponentTypeHandle<MaterialMeshInfo>(false),
                 crossfadeHandle        = GetComponentTypeHandle<LodCrossfade>(false),
@@ -74,6 +76,7 @@ namespace Latios.Kinemation.Systems
                 meshLodCrossfadeMargin = latiosWorld.worldBlackboardEntity.GetComponentData<MeshLodCrossfadeMargin>().margin,
                 cameraPosition         = parameters.cameraPosition,
                 isPerspective          = !parameters.isOrthographic,
+                isShadowCasting        = context.viewType == UnityEngine.Rendering.BatchCullingViewType.Light,
                 cameraFactor           = cameraFactorNoBias * m_lodBias,
                 meshLodFactor          = m_meshLodThreshold / (cameraFactorNoBias * parameters.cameraPixelHeight),
                 inverseLodBias         = 1f / m_lodBias,
@@ -88,6 +91,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<WorldRenderBounds>                        boundsHandle;
             [ReadOnly] public ComponentTypeHandle<MmiRange2LodSelect>                       select2Handle;
             [ReadOnly] public ComponentTypeHandle<MmiRange3LodSelect>                       select3Handle;
+            [ReadOnly] public ComponentTypeHandle<MmiRangeLodFlags>                         rangeLodFlagsHandle;
             [ReadOnly] public ComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins> lodGroupCrossfades;
             [ReadOnly] public ComponentTypeHandle<MeshLodCurve>                             meshLodCurveHandle;
 
@@ -103,6 +107,7 @@ namespace Latios.Kinemation.Systems
             public float  meshLodCrossfadeMargin;
             public int    maxResolutionLodLevel;
             public bool   isPerspective;
+            public bool   isShadowCasting;
 
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -117,6 +122,7 @@ namespace Latios.Kinemation.Systems
                 var crossfadesEnabled       = chunk.GetEnabledMask(ref crossfadeHandle);
                 var select2s                = chunk.GetComponentDataPtrRO(ref select2Handle);
                 var select3s                = chunk.GetComponentDataPtrRO(ref select3Handle);
+                var rangeLodFlagsArray      = isShadowCasting ? chunk.GetComponentDataPtrRO(ref rangeLodFlagsHandle) : null;
                 var lodGroupPercentages     = chunk.GetComponentDataPtrRO(ref lodGroupCrossfades);
                 var meshLods                = chunk.GetComponentDataPtrRW(ref meshLodHandle);
                 var enableMeshLodCrossfades = chunk.GetEnabledMask(ref meshLodHandle);
@@ -125,13 +131,17 @@ namespace Latios.Kinemation.Systems
                 while (enumerator.NextEntityIndex(out int i))
                 {
                     MmiRange3LodSelect select;
+                    bool3              nullSelect;
                     MaterialMeshInfo   mmi;
                     int                maxLodSupported;
                     if (select3s != null)
                     {
-                        select          = select3s[i];
-                        mmi             = mmis[i];
-                        maxLodSupported = 2;
+                        select                                 = select3s[i];
+                        nullSelect                             = new bool3(false, select.fullLod1ScreenHeightMaxFraction < 0f, select.fullLod2ScreenHeightFraction < 0f);
+                        select.fullLod1ScreenHeightMaxFraction = (half)math.abs(select.fullLod1ScreenHeightMaxFraction);
+                        select.fullLod2ScreenHeightFraction    = (half)math.abs(select.fullLod2ScreenHeightFraction);
+                        mmi                                    = mmis[i];
+                        maxLodSupported                        = 2;
                     }
                     else if (select2s != null)
                     {
@@ -140,8 +150,9 @@ namespace Latios.Kinemation.Systems
                             fullLod0ScreenHeightFraction    = select2s[i].fullLod0ScreenHeightFraction,
                             fullLod1ScreenHeightMaxFraction = (half)math.abs(select2s[i].fullLod1ScreenHeightFraction),
                             fullLod1ScreenHeightMinFraction = default,
-                            fullLod2ScreenHeightFraction    = (half)math.select(0f, -1f, select2s[i].fullLod1ScreenHeightFraction < 0f),
+                            fullLod2ScreenHeightFraction    = default,
                         };
+                        nullSelect      = new bool3(false, new bool2(select2s[i].fullLod1ScreenHeightFraction < 0f));
                         mmi             = mmis[i];
                         maxLodSupported = 1;
                     }
@@ -154,8 +165,15 @@ namespace Latios.Kinemation.Systems
                             fullLod1ScreenHeightMinFraction = default,
                             fullLod2ScreenHeightFraction    = default,
                         };
+                        nullSelect      = default;
                         mmi             = default;
                         maxLodSupported = 0;
+                    }
+                    if (rangeLodFlagsArray != null)
+                    {
+                        var flags     = rangeLodFlagsArray[i];
+                        nullSelect.y &= !flags.disableLod1ShadowCasting;
+                        nullSelect.z &= !flags.disableLod2ShadowCasting;
                     }
 
                     float  height = math.cmax(boundsArray[i].Value.Extents) * 2f;
@@ -192,6 +210,7 @@ namespace Latios.Kinemation.Systems
                              out var crossfadeEnabled,
                              out var cull,
                              select,
+                             nullSelect,
                              center,
                              height,
                              groupMin,
@@ -217,6 +236,7 @@ namespace Latios.Kinemation.Systems
                           out bool crossfadeEnabled,
                           out bool cull,
                           MmiRange3LodSelect select,
+                          bool3 nullSelect,
                           float3 center,
                           float height,
                           float groupMin,
@@ -242,7 +262,6 @@ namespace Latios.Kinemation.Systems
                 maxLod     = math.max(maxLod, maxResolutionLodLevel);
                 minLod     = math.min(minLod, maxLodSupported);
                 maxLod     = math.min(maxLod, maxLodSupported);
-                minLod     = math.min(minLod, maxLodSupported);
                 groupMin   = math.min(groupMin, select.fullLod0ScreenHeightFraction);
                 if (minLod == maxLod)
                 {
@@ -279,13 +298,15 @@ namespace Latios.Kinemation.Systems
                     {
                         crossfadeEnabled = false;
                         mmi.SetCurrentLodRegion(2, false);
-                        if (select.fullLod2ScreenHeightFraction < 0f)
+                        if (nullSelect.z)
                             cull = true;
                     }
                     else if ((biasHeight <= oneMaxHeight) && biasHeight >= oneMinHeight)
                     {
                         crossfadeEnabled = false;
                         mmi.SetCurrentLodRegion(1, false);
+                        if (nullSelect.y)
+                            cull = true;
                     }
                     else if (biasHeight > oneMaxHeight)
                     {
@@ -301,7 +322,7 @@ namespace Latios.Kinemation.Systems
                     }
                 }
 
-                if (meshLod.levelCount <= 0)
+                if (meshLod.levelCount <= 0 || cull)
                     return;
 
                 var heights            = new float3(height, groupMax, groupMin);

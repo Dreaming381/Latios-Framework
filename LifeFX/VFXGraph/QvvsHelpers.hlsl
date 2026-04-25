@@ -9,6 +9,6 @@ TransformQvvs ConvertToTransformQvvs(float4 a, float4 b, float4 c)
 void ConvertToVfxQvvs(TransformQvvs transform, out float4 a, out float4 b, out float4 c)
 {
 	a = transform.rotation.value;
-	b = float4(transform.position, asfloat(transform.worldIndex));
+	b = float4(transform.position, asfloat(transform.context32));
 	c = float4(transform.stretch, transform.scale);
 }

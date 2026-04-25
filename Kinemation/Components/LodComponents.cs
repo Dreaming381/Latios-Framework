@@ -108,8 +108,8 @@ namespace Latios.Kinemation
 
     /// <summary>
     /// Specifies the height and screen percentages for a 2-LOD entity with the UseMmiRangeLodTag.
-    /// This is the best choice for high entity counts, such as projectiles. If height is negative,
-    /// LOD1 is treated as a culled LOD level.
+    /// This is the best choice for high entity counts, such as projectiles. If fullLod1ScreenHeighFraction
+    /// is negative, LOD1 is treated as a culled LOD level.
     /// </summary>
     public struct MmiRange2LodSelect : IComponentData
     {
@@ -120,7 +120,8 @@ namespace Latios.Kinemation
     /// <summary>
     /// Specifies the height and screen percentages for a 3-LOD entity with the UseMmiRangeLodTag.
     /// This is the best choice for high static entity counts, such as static environment props.
-    /// If height is negative, LOD2 is treated as a culled LOD level.
+    /// If fullLod1ScreenHeightMaxFraction is negative, LOD1 is treated as a culled LOD level.
+    /// If fullLod2ScreenHeightFraction is negative, LOD2 is treated as a culled LOD level.
     /// </summary>
     public struct MmiRange3LodSelect : IComponentData
     {
@@ -128,6 +129,34 @@ namespace Latios.Kinemation
         public half fullLod1ScreenHeightMaxFraction;
         public half fullLod1ScreenHeightMinFraction;
         public half fullLod2ScreenHeightFraction;
+    }
+
+    /// <summary>
+    /// Additional optimization flags for packed LODs
+    /// </summary>
+    public struct MmiRangeLodFlags : IComponentData
+    {
+        byte packed;
+        public bool disableLod1ShadowCasting
+        {
+            get => Bits.GetBit(packed, 0);
+            set => Bits.SetBit(ref packed, 0, value);
+        }
+        public bool disableLod2ShadowCasting
+        {
+            get => Bits.GetBit(packed, 1);
+            set => Bits.SetBit(ref packed, 1, value);
+        }
+        public bool disableLod1MotionVectors
+        {
+            get => Bits.GetBit(packed, 2);
+            set => Bits.SetBit(ref packed, 2, value);
+        }
+        public bool disableLod2MotionVectors
+        {
+            get => Bits.GetBit(packed, 3);
+            set => Bits.SetBit(ref packed, 3, value);
+        }
     }
 
     /// <summary>

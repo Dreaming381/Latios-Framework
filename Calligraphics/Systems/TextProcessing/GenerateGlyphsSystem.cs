@@ -24,7 +24,7 @@ namespace Latios.Calligraphics.Systems
         {
             latiosWorld = state.GetLatiosWorldUnmanaged();
             m_query     = SystemAPI.QueryBuilder()
-                          .WithAllRW<CalliByte>()
+                          .WithAllRW<CalliByte, RenderGlyph>()
                           .WithAll<TextBaseConfiguration>()
                           .Build();
 

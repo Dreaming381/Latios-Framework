@@ -68,6 +68,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly] public ComponentTypeHandle<LodCrossfade>                    lodCrossfadeHandle;
             [ReadOnly] public ComponentTypeHandle<RendererPriority>                rendererPriorityHandle;
             [ReadOnly] public ComponentTypeHandle<MeshLod>                         meshLodHandle;
+            [ReadOnly] public ComponentTypeHandle<MmiRangeLodFlags>                mmiRangelLodFlagsHandle;
             [ReadOnly] public EntityQueryMask                                      motionVectorDeformQueryMask;
             public bool                                                            splitsAreValid;
 
@@ -137,19 +138,20 @@ namespace Latios.Kinemation.Systems
 
                     int batchIndex = entitiesGraphicsChunkInfo.BatchIndex;
 
-                    var  materialMeshInfos   = chunk.GetComponentDataPtrRO(ref MaterialMeshInfo);
-                    var  worldTransforms     = chunk.GetComponentDataPtrRO(ref WorldTransform);
-                    var  postProcessMatrices = chunk.GetComponentDataPtrRO(ref PostProcessMatrix);
-                    var  lodCrossfades       = chunk.GetComponentDataPtrRO(ref lodCrossfadeHandle);
-                    var  rendererPriorities  = chunk.GetComponentDataPtrRO(ref rendererPriorityHandle);
-                    var  meshLods            = chunk.GetComponentDataPtrRO(ref meshLodHandle);
-                    var  meshLodCrossfades   = chunk.GetEnabledMask(ref meshLodHandle);
-                    bool hasPostProcess      = postProcessMatrices != null;
-                    bool isDepthSorted       = depthSortedChecker[chunk];
-                    bool isLightMapped       = chunk.GetSharedComponentIndex(LightMaps) >= 0;
-                    bool hasLodCrossfade     = lodCrossfades != null;
-                    bool useMmiRangeLod      = useMmiRangeLodChecker[chunk];
-                    bool hasOverrideMesh     = overrideMeshInRangeChecker[chunk];
+                    var  materialMeshInfos     = chunk.GetComponentDataPtrRO(ref MaterialMeshInfo);
+                    var  worldTransforms       = chunk.GetComponentDataPtrRO(ref WorldTransform);
+                    var  postProcessMatrices   = chunk.GetComponentDataPtrRO(ref PostProcessMatrix);
+                    var  lodCrossfades         = chunk.GetComponentDataPtrRO(ref lodCrossfadeHandle);
+                    var  rendererPriorities    = chunk.GetComponentDataPtrRO(ref rendererPriorityHandle);
+                    var  mmiRangeLodFlagsArray = chunk.GetComponentDataPtrRO(ref mmiRangelLodFlagsHandle);
+                    var  meshLods              = chunk.GetComponentDataPtrRO(ref meshLodHandle);
+                    var  meshLodCrossfades     = chunk.GetEnabledMask(ref meshLodHandle);
+                    bool hasPostProcess        = postProcessMatrices != null;
+                    bool isDepthSorted         = depthSortedChecker[chunk];
+                    bool isLightMapped         = chunk.GetSharedComponentIndex(LightMaps) >= 0;
+                    bool hasLodCrossfade       = lodCrossfades != null;
+                    bool useMmiRangeLod        = useMmiRangeLodChecker[chunk];
+                    bool hasOverrideMesh       = overrideMeshInRangeChecker[chunk];
 
                     BatchDrawCommandFlags chunkFlags = default;
 
@@ -310,8 +312,9 @@ namespace Latios.Kinemation.Systems
                                     matMeshIndexRange.length  = newLength;
                                 }
 
-                                int hiResMask  = 0;
-                                int lowResMask = 0;
+                                int              hiResMask        = 0;
+                                int              lowResMask       = 0;
+                                MmiRangeLodFlags mmiRangeLodFlags = default;
                                 if (useMmiRangeLod)
                                 {
                                     materialMeshInfo.GetCurrentLodRegion(out var hiResLodIndex, out var isMmiCrossfading);
@@ -330,6 +333,15 @@ namespace Latios.Kinemation.Systems
                                         var combinedMask = (brgRenderMeshArray.MaterialMeshSubMeshes[matMeshIndexRange.start].SubMeshIndex >> 16) & 0xff;
                                         if ((combinedMask & (hiResMask | lowResMask)) == 0)
                                             continue;
+                                    }
+
+                                    if (mmiRangeLodFlagsArray != null)
+                                    {
+                                        if ((mmiRangeLodFlags.disableLod1MotionVectors && hiResMask == 2) || (mmiRangeLodFlags.disableLod2MotionVectors && hiResMask == 4))
+                                        {
+                                            drawCommandFlags                 &= ~BatchDrawCommandFlags.HasMotion;
+                                            drawCommandFlagsWithoutCrossfade &= ~BatchDrawCommandFlags.HasMotion;
+                                        }
                                     }
                                 }
 

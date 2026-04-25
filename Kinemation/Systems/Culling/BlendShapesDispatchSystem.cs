@@ -440,7 +440,7 @@ namespace Latios.Kinemation.Systems
                     }
                 }
 
-                for (int i = 0; i < (int)payload.nonzeroWeightsCount; i++)
+                for (int i = 0; i < (int)payload.nonzeroWeightsCount;)
                 {
                     uint runCount = 1;
                     for (int j = i + 1; j < (int)payload.nonzeroWeightsCount; j++)

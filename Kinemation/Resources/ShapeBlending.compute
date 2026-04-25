@@ -79,7 +79,7 @@ void ShapeBlending (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
             {
                 const uint4 runShapeInfo = _metaBuffer.Load4((shapeMetaStart + meshShapeIter + shapeRunIter) * 16);
                 const uint runShapeDeltaStart = runShapeInfo.z;
-                const uint runShapeWeight = asfloat(runShapeInfo.w);
+                const float runShapeWeight = asfloat(runShapeInfo.w);
 
                 delta = _blendShapeDeltas2[runShapeDeltaStart + i];
                 vertex.position += runShapeWeight * delta.position;
