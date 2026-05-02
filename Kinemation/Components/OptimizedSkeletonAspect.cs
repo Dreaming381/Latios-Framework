@@ -114,12 +114,12 @@ namespace Latios.Kinemation
                     var bone = worldTransformBones[socket.boneIndex];
                     if (bone.boneTransform.context32 == -1)
                     {
-                        bone.boneTransform.context32 = handle.indexInHierarchy;
+                        bone.boneTransform.context32 = child.indexInHierarchy;
                         m_socketCount++;
                     }
                     else if (bone.boneTransform.context32 >= 0)
                     {
-                        ThrowIfDuplicateSocket(handle.root.entity, socket.boneIndex);
+                        ThrowIfDuplicateSocket(handle.entity, socket.boneIndex);
                         // In release builds, just ignore the duplicate socket.
                         continue;
                     }

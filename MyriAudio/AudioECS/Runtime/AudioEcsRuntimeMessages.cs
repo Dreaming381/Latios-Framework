@@ -18,5 +18,10 @@ namespace Latios.Myri
         public int      retiredCommandId;
         public MegaPipe feedbackPipe;
     }
+
+    internal struct ShutdownControlMessage
+    {
+        public int dummy;
+    }
 }
 

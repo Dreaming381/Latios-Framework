@@ -1,9 +1,11 @@
-﻿using Unity.Entities;
+﻿using Latios.Myri.DSP;
+using Unity.Entities;
 
 namespace Latios.Myri
 {
     /// <summary>
-    /// Configuration data for audio to be added to the worldBlackboardEntity
+    /// Configuration data for audio to be added to the worldBlackboardEntity.
+    /// This is sent to AudioECS as a message on initialization or change filter, and then mirrored by UpdateAudioSettingsSystem.
     /// </summary>
     public struct AudioSettings : IComponentData
     {
@@ -43,6 +45,18 @@ namespace Latios.Myri
         /// If enabled, warnings will be logged when the audio thread runs out of samples to process.
         /// </summary>
         public bool logWarningIfBuffersAreStarved;
+
+        public static AudioSettings kDefault => new AudioSettings
+        {
+            masterVolume                  = 1f,
+            masterGain                    = 1f,
+            masterLimiterDBRelaxPerSecond = BrickwallLimiter.kDefaultReleaseDBPerSample * 48000f,
+            masterLimiterLookaheadTime    = 255.9f / 48000f,
+            safetyAudioFrames             = 2,
+            audioFramesPerUpdate          = 1,
+            lookaheadAudioFrames          = 1,
+            logWarningIfBuffersAreStarved = false
+        };
     }
 }
 

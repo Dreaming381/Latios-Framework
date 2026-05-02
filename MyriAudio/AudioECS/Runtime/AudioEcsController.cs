@@ -80,7 +80,7 @@ namespace Latios.Myri
 
         public AudioEcsRootOutput CreateRealtime()
         {
-            return new AudioEcsRootOutput(m_tlsf, m_runner, m_atomicIds);
+            return new AudioEcsRootOutput(m_tlsf, m_runner, m_atomicIds, m_latiosWorld.worldBlackboardEntity);
         }
 
         public JobHandle Configure(ControlContext context, ref AudioEcsRootOutput realtime, in AudioFormat format)
@@ -119,6 +119,16 @@ namespace Latios.Myri
 
         public ProcessorInstance.Response OnMessage(ControlContext context, ProcessorInstance.Pipe pipe, ProcessorInstance.Message message)
         {
+            if (message.Is<ShutdownControlMessage>())
+            {
+                m_latiosWorld.GetCollectionComponent<AudioEcsFeedbackPipe>(m_latiosWorld.worldBlackboardEntity, out var jh, false);
+                jh.Complete();
+                m_latiosWorld.GetCollectionComponent<AudioEcsCommandPipe>(m_latiosWorld.worldBlackboardEntity, out jh, false);
+                jh.Complete();
+                m_latiosWorld.worldBlackboardEntity.RemoveCollectionComponentAndDispose<AudioEcsFeedbackPipe>();
+                m_latiosWorld.worldBlackboardEntity.RemoveCollectionComponentAndDispose<AudioEcsCommandPipe>();
+                return ProcessorInstance.Response.Handled;
+            }
             return ProcessorInstance.Response.Unhandled;
         }
 

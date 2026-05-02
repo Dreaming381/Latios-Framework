@@ -17,6 +17,7 @@ namespace Latios.Myri
         TlsfSecretary              m_tlsfSecretary;
         AuxWorld                   m_auxWorld;
         IAudioEcsSystemRunner.VPtr m_runner;
+        Entity                     m_worldBlackboardEntity;
         bool                       m_initialized;
         bool                       m_needsRunnerInitialization;
 
@@ -30,12 +31,13 @@ namespace Latios.Myri
         AudioEcsAtomicFeedbackIds     m_atomicIds;
         int                           m_maxReadCommandId;  // Read in Update(), used in Process().
 
-        public AudioEcsRootOutput(TlsfAllocator* tlsfAllocator, IAudioEcsSystemRunner.VPtr runner, AudioEcsAtomicFeedbackIds atomicIds)
+        public AudioEcsRootOutput(TlsfAllocator* tlsfAllocator, IAudioEcsSystemRunner.VPtr runner, AudioEcsAtomicFeedbackIds atomicIds, Entity worldBlackboardEntity)
         {
-            this        = default;
-            m_tlsf      = tlsfAllocator;
-            m_runner    = runner;
-            m_atomicIds = atomicIds;
+            this                    = default;
+            m_tlsf                  = tlsfAllocator;
+            m_runner                = runner;
+            m_atomicIds             = atomicIds;
+            m_worldBlackboardEntity = worldBlackboardEntity;
         }
 
         public void Configure(AudioFormat audioFormat)
@@ -107,6 +109,7 @@ namespace Latios.Myri
                 var initContext = new IAudioEcsSystemRunner.AudioFormatChangedContext
                 {
                     auxWorld                  = m_auxWorld,
+                    worldBlackboardEntity     = m_worldBlackboardEntity,
                     newAudioFormat            = m_audioFormat,
                     unityAudioRealtimeContext = context,
                     pipeWriter                = new FeedbackPipeWriter { m_megaPipe = m_feedbackPipeManager.activePipe },
@@ -127,6 +130,7 @@ namespace Latios.Myri
                 var changeContext = new IAudioEcsSystemRunner.AudioFormatChangedContext
                 {
                     auxWorld                  = m_auxWorld,
+                    worldBlackboardEntity     = m_worldBlackboardEntity,
                     newAudioFormat            = m_audioFormat,
                     unityAudioRealtimeContext = context,
                     pipeWriter                = new FeedbackPipeWriter { m_megaPipe = m_feedbackPipeManager.activePipe },
@@ -141,6 +145,7 @@ namespace Latios.Myri
             {
                 allRootOutputsEarlyProcessingJobHandle = inputJh,
                 auxWorld                               = m_auxWorld,
+                worldBlackboardEntity                  = m_worldBlackboardEntity,
                 feedbackID                             = m_feedbackPipeManager.feedbackID,
                 finalOutputBuffer                      = new FinalOutputBuffer
                 {

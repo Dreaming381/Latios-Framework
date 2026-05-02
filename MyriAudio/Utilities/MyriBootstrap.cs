@@ -31,8 +31,8 @@ namespace Latios.Myri
         /// <param name="latiosWorld">The LatiosWorld to install the AudioEcsCommandPipe, AudioEcsFeedbackPipe, and
         /// AudioEcsAtomicFeedbackId components onto the worldBlackboardEntity</param>
         /// <param name="controlContext">The ControlContext to allocate the RootOutput into</param>
-        /// <returns>A handle to the RootOutput. You must call ControlContext.Destroy() and pass in this instance when
-        /// you are done using it.</returns>
+        /// <returns>A handle to the RootOutput. You must call ShutdownCustomAudioEcsRuntime() and pass in this instance
+        /// when you are done using it.</returns>
         public static RootOutputInstance CreateCustomAudioEcsRuntime(IAudioEcsBootstrap bootstrap, LatiosWorldUnmanaged latiosWorld, ControlContext controlContext)
         {
             var control  = new AudioEcsController(bootstrap, latiosWorld);
@@ -42,6 +42,20 @@ namespace Latios.Myri
                 controlUpdateSetting  = ProcessorInstance.UpdateSetting.UpdateAlways,
                 realtimeUpdateSetting = ProcessorInstance.UpdateSetting.UpdateAlways,
             });
+        }
+
+        /// <summary>
+        /// Shuts down a custom Audio ECS runtime. This method ensures that any external resources still being used
+        /// by the runtime are safe to dispose after this method returns.
+        /// </summary>
+        /// <param name="instance">The RootOutputInstance returned by CreateCustomAudioEcsRuntime()</param>
+        /// <param name="controlContext">The ControlContext that was passed into CreateCustomAudioEcsRuntime()</param>
+        public static void ShutdownCustomAudioEcsRuntime(RootOutputInstance instance, ControlContext controlContext)
+        {
+            ShutdownControlMessage message = default;
+            controlContext.SendMessage(instance, ref message);
+            controlContext.Destroy(instance);
+            ControlContext.WaitForBuiltInQueueFlush();
         }
     }
 }

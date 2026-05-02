@@ -220,7 +220,7 @@ namespace Latios.Kinemation
             int commandsWritten = 0;
             for (int i = 1; i < boneCount; i++)
             {
-                if (rootTransforms[i].context32 >= 0)
+                if (rootTransforms[i].context32 > 0)
                 {
                     var rootTransform         = rootTransforms[i];
                     var socketHandle          = m_worldTransform.transformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(rootTransform.context32);

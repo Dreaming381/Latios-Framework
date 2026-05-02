@@ -3,6 +3,7 @@ using Latios.AuxEcs;
 using Latios.Unsafe;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine.Audio;
@@ -75,6 +76,10 @@ namespace Latios.Myri
             /// </summary>
             public AuxWorld auxWorld;
             /// <summary>
+            /// The worldBlackboardEntity that can be used in the auxWorld for singleton-like data.
+            /// </summary>
+            public Entity worldBlackboardEntity;
+            /// <summary>
             /// The UnityEngine.Audio RealtimeContext which can be used to process generators.
             /// </summary>
             public RealtimeContext unityAudioRealtimeContext;
@@ -114,6 +119,10 @@ namespace Latios.Myri
             /// </summary>
             public AuxWorld auxWorld;
             /// <summary>
+            /// The worldBlackboardEntity that can be used in the auxWorld for singleton-like data.
+            /// </summary>
+            public Entity worldBlackboardEntity;
+            /// <summary>
             /// The UnityEngine.Audio RealtimeContext which can be used to read the DSP clock and process generators.
             /// </summary>
             public RealtimeContext unityAudioRealtimeContext;
@@ -152,7 +161,14 @@ namespace Latios.Myri
         /// </summary>
         public struct ShutdownContext
         {
+            /// <summary>
+            /// The auxWorld to use for managing audio. It contains the realtime-safe allocator.
+            /// </summary>
             public AuxWorld auxWorld;
+            /// <summary>
+            /// The worldBlackboardEntity that can be used in the auxWorld for singleton-like data.
+            /// </summary>
+            public Entity worldBlackboardEntity;
         }
 
         /// <summary>

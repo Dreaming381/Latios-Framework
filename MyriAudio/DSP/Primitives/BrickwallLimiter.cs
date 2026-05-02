@@ -212,6 +212,31 @@ namespace Latios.Myri.DSP
             oldRight.Dispose();
             oldDb.Dispose();
         }
+
+        /// <summary>
+        /// Returns true if any sample in the limiter queue is nonzero.
+        /// </summary>
+        /// <returns></returns>
+        public bool HasNonZeroValueInQueue()
+        {
+            if (m_delayQueueL.count == 0 && m_delayQueueR.count == 0)
+                return false;
+
+            for (int i = 0; i < m_delayQueueL.count; i++)
+            {
+                var sample = m_delayQueueL[i];
+                if (sample != 0f)
+                    return true;
+            }
+
+            for (int i = 0; i < m_delayQueueR.count; i++)
+            {
+                var sample = m_delayQueueR[i];
+                if (sample != 0f)
+                    return true;
+            }
+            return false;
+        }
     }
 }
 

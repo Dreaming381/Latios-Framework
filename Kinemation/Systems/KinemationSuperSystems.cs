@@ -262,7 +262,7 @@ namespace Latios.Kinemation.Systems
             var old = World.CurrentGroupAllocators;
             World.SetGroupAllocator(RateGroupAllocators);
             base.OnUpdate();
-            World.RestoreGroupAllocator(old);
+            World.SetGroupAllocator(old);
         }
     }
 

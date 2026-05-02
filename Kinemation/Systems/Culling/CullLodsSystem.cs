@@ -114,13 +114,26 @@ namespace Latios.Kinemation.Systems
             var   isPerspective    = !context.lodParameters.isOrthographic;
             float cameraMultiplier = LodUtilities.CameraFactorFrom(in context.lodParameters, m_lodBias);
 
-            var mipmapParameters = latiosWorld.worldBlackboardEntity.GetBuffer<MipMapCameraParameters>(false);
-            mipmapParameters.Add(new MipMapCameraParameters
+            var  mipmapParameters   = latiosWorld.worldBlackboardEntity.GetBuffer<MipMapCameraParameters>(false);
+            var  mipmapCameraFactor = LodUtilities.CameraMipMapFactorFrom(in context.lodParameters, m_aspectRatio);
+            bool add                = true;
+            foreach (var cam in mipmapParameters)
             {
-                cameraFactor  = LodUtilities.CameraMipMapFactorFrom(in context.lodParameters, m_aspectRatio),
-                isPerspective = isPerspective,
-                position      = cameraPosition,
-            });
+                if (cam.cameraFactor == mipmapCameraFactor && cam.isPerspective == isPerspective && cam.position.Equals(cameraPosition))
+                {
+                    add = false;
+                    break;
+                }
+            }
+            if (add)
+            {
+                mipmapParameters.Add(new MipMapCameraParameters
+                {
+                    cameraFactor  = mipmapCameraFactor,
+                    isPerspective = isPerspective,
+                    position      = cameraPosition,
+                });
+            }
 
             if (m_query.IsEmptyIgnoreFilter)
                 return;

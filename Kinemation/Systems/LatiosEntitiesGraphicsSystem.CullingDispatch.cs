@@ -64,6 +64,7 @@ namespace Latios.Kinemation.Systems
         private unsafe void OnFinishedCulling(IntPtr customCullingResult)
         {
             m_unmanaged.OnFinishedCulling(ref CheckedStateRef, customCullingResult);
+            m_cullingSuperSystem.RateGroupAllocators->Update();
         }
 
         partial struct Unmanaged

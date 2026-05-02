@@ -415,8 +415,9 @@ namespace Latios.Kinemation
 
             [NativeSetThreadIndex] int threadIndex;
 
-            HasChecker<UseMmiRangeLodTag>      useMmiRangeLodChecker;
-            HasChecker<OverrideMeshInRangeTag> overrideMeshInRangeChecker;
+            HasChecker<UseMmiRangeLodTag>                                   useMmiRangeLodChecker;
+            HasChecker<OverrideMeshInRangeTag>                              overrideMeshInRangeChecker;
+            HasChecker<PromiseAllEntitiesInChunkUseSameMaterialMeshInfoTag> promiseChecker;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
@@ -437,6 +438,11 @@ namespace Latios.Kinemation
                 sharedIndexToArrayMap.TryGetValue(smmaIndex, out var smma);
 
                 var cameraParametersArray = cameraParametersLookup[worldBlackboardEntity].AsNativeArray();
+
+                if (promiseChecker[chunk])
+                {
+                    SelectPromisedEntities(ref mask, chunk.Count, worldBoundsArray, cameraParametersArray);
+                }
 
                 var entityEnumerator = new ChunkEntityEnumerator(true, new v128(mask.lower.Value, mask.upper.Value), chunk.Count);
                 while (entityEnumerator.NextEntityIndex(out var entityIndex))
@@ -549,6 +555,48 @@ namespace Latios.Kinemation
                     }
                     var textureIndex          = textureToStateIndexMap[textureInfo.streamingTexture];
                     levelsArray[textureIndex] = math.min(levelsArray[textureIndex], bestLevel);
+                }
+            }
+
+            unsafe void SelectPromisedEntities(ref ChunkPerFrameCullingMask mask,
+                                               int chunkCount,
+                                               WorldRenderBounds*                  worldBoundsArray,
+                                               NativeArray<MipMapCameraParameters> cameraParametersArray)
+            {
+                var oldMask = mask;
+                mask.lower.Clear();
+                mask.upper.Clear();
+
+                foreach (var camera in cameraParametersArray)
+                {
+                    int   bestIndex  = -1;
+                    float bestValue  = float.MaxValue;
+                    var   enumerator = new ChunkEntityEnumerator(true, new v128(oldMask.lower.Value, oldMask.upper.Value), chunkCount);
+                    while (enumerator.NextEntityIndex(out var i))
+                    {
+                        var   bounds     = worldBoundsArray[i];
+                        var   distanceSq = math.distancesq(bounds.Value.Center, camera.position);
+                        var   extents    = bounds.Value.Extents;
+                        float area;
+                        if (extents.x > extents.y)
+                            area = extents.x * math.max(extents.y, extents.z);
+                        else
+                            area = extents.y * math.max(extents.x, extents.z);
+
+                        var heuristic = distanceSq / math.max(area, math.EPSILON);
+                        if (heuristic < bestValue)
+                        {
+                            bestIndex = i;
+                            bestValue = heuristic;
+                        }
+                    }
+                    if (bestIndex >= 0)
+                    {
+                        if (bestIndex > 64)
+                            mask.upper.SetBits(bestIndex - 64, true);
+                        else
+                            mask.lower.SetBits(bestIndex, true);
+                    }
                 }
             }
         }

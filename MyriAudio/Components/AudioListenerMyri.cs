@@ -6,7 +6,7 @@ using Unity.Mathematics;
 namespace Latios.Myri
 {
     /// <summary>
-    /// A listener which captures audio in 3D space.
+    /// A listener which captures audio in 3D space. This component is mirrored in AudioECS via UpdateListenersSystem.
     /// </summary>
     public struct AudioListener : IComponentData
     {

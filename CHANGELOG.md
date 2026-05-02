@@ -10,6 +10,18 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.15.3] – 2026-5-2
+
+Officially supports Entities [1.4.6]
+
+### Changed
+
+-   Updated Core to v0.15.3
+-   Updated QVVS Transforms to v0.15.3
+-   Updated Myri to v0.15.3
+-   Updated Kinemation to v0.15.3
+-   Updated Calligraphics to v0.15.3
+
 ## [0.15.2] – 2026-4-25
 
 Officially supports Entities [1.4.6]
