@@ -15,20 +15,26 @@ namespace Latios.Myri
         [BurstCompile]
         public struct SampleJob : IJobParallelForDefer
         {
-            [ReadOnly] public NativeStream.Reader  capturedSources;
-            [ReadOnly] public NativeStream.Reader  channelStreams;
-            [ReadOnly] public NativeReference<int> audioFrame;
+            [ReadOnly] public NativeStream.Reader                 capturedSources;
+            [ReadOnly] public NativeStream.Reader                 channelStreams;
+            [ReadOnly] public NativeReference<CapturedFrameState> frameState;
+            [ReadOnly] public NativeArray<int2>                   outputRangesByChannel;
 
             [NativeDisableParallelForRestriction] public NativeArray<float> outputSamplesMegaBuffer;
 
-            public int sampleRate;
-            public int samplesPerFrame;
-
             public unsafe void Execute(int channelIndex)
             {
-                ulong samplesPlayed     = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
-                var   samplesPerChannel = outputSamplesMegaBuffer.Length / channelStreams.ForEachCount;
-                var   outputSamples     = outputSamplesMegaBuffer.GetSubArray(channelIndex * samplesPerChannel, samplesPerChannel);
+                var range = outputRangesByChannel[channelIndex];
+                // range.x will be -1 if there are no sources for this channel.
+                if (range.x < 0)
+                    return;
+
+                var   state           = frameState.Value;
+                var   audioFrame      = state.audioFrame;
+                var   sampleRate      = state.format.sampleRate;
+                var   samplesPerFrame = state.format.bufferFrameCount;
+                ulong samplesPlayed   = (ulong)samplesPerFrame * (ulong)state.audioFrame;
+                var   outputSamples   = outputSamplesMegaBuffer.GetSubArray(range.x, range.y);
 
                 using var tsa = ThreadStackAllocator.GetAllocator();
 
@@ -81,7 +87,7 @@ namespace Latios.Myri
                     }
                     else
                     {
-                        int jumpFrames = audioFrame.Value - clip.m_spawnedAudioFrame;
+                        int jumpFrames = audioFrame - clip.m_spawnedAudioFrame;
 
                         if (blob.sampleRate == sampleRate && sampleRateMultiplier == 1.0)
                         {
@@ -117,7 +123,7 @@ namespace Latios.Myri
                         // Very short clip. Just grab the whole thing.
                         var context = new CodecContext
                         {
-                            sampleRate           = sampleRate,
+                            sampleRate           = frameState.Value.format.sampleRate,
                             threadStackAllocator = tsa.CreateChildAllocator()
                         };
                         var input = CodecDispatch.DecodeChannel(clip.codec, ref clip.encodedSamples, isRightChannel, 0, clip.sampleCountPerChannel, ref context);
@@ -190,7 +196,7 @@ namespace Latios.Myri
                 int inputSampleStart       = math.max(clipStart, 0);
                 var context                = new CodecContext
                 {
-                    sampleRate           = sampleRate,
+                    sampleRate           = frameState.Value.format.sampleRate,
                     threadStackAllocator = tsa.CreateChildAllocator()
                 };
 
@@ -235,7 +241,7 @@ namespace Latios.Myri
                 var inputSampleCount = inputSampleEnd - inputSampleStart + 1;
                 var context          = new CodecContext
                 {
-                    sampleRate           = sampleRate,
+                    sampleRate           = frameState.Value.format.sampleRate,
                     threadStackAllocator = tsa.CreateChildAllocator()
                 };
                 var input  = CodecDispatch.DecodeChannel(clip.codec, ref clip.encodedSamples, isRightChannel, inputSampleStart, inputSampleCount, ref context);

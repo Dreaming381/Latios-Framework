@@ -248,7 +248,7 @@ namespace Latios.Calligraphics.Systems
                        NativeList<Feature>     features,
                        ref NativeStream.Writer glyphOTFStream)
             {
-                if (startIndex + length == text.Length && text[^ 1] == 0)
+                if (startIndex + length == text.Length && text.Length > 0 && text[^ 1] == 0)
                     length--; //last byte of CalliBytes buffer appears to be always '0', which should not be shaped.
                 buffer.AddText(text, (uint)startIndex, length);
                 buffer.Language = language;

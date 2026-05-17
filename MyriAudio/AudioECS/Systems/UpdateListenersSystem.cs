@@ -31,11 +31,7 @@ namespace Latios.Myri.AudioEcsBuiltin
                     if (context.auxWorld.TryGetComponent<AudioListener>(message.entity, out var listener))
                     {
                         // Existing listener with update
-                        context.auxWorld.TryGetComponent<AudioListenerChannelIDsList>(message.entity, out var list);
                         listener.aux = message.audioListener;
-                        list.aux.channelIDs.Clear();
-                        foreach (var channel in message.channels)
-                            list.aux.channelIDs.Add(channel);
                     }
                     else
                     {
@@ -49,6 +45,23 @@ namespace Latios.Myri.AudioEcsBuiltin
                                                                         (int)math.ceil(message.audioListener.limiterLookaheadTime * context.finalOutputBuffer.sampleRate),
                                                                         context.auxWorld.allocator)
                         });
+                    }
+
+                    if (context.auxWorld.TryGetComponent<AudioListenerChannelIDsList>(message.entity, out var list))
+                    {
+                        if (message.hasChannels)
+                        {
+                            list.aux.channelIDs.Clear();
+                            foreach (var channel in message.channels)
+                                list.aux.channelIDs.Add(channel);
+                        }
+                        else
+                        {
+                            context.auxWorld.RemoveComponent<AudioListenerChannelIDsList>(message.entity);
+                        }
+                    }
+                    else if (message.hasChannels)
+                    {
                         context.auxWorld.AddComponent(message.entity, new AudioListenerChannelIDsList(message.channels, context.auxWorld.allocator));
                     }
                 }

@@ -1,4 +1,5 @@
 ﻿using Latios.Calci;
+using Latios.Myri.AudioEcsBuiltin;
 using Latios.Transforms;
 using Latios.Transforms.Abstract;
 using Unity.Burst;
@@ -13,30 +14,74 @@ namespace Latios.Myri
 {
     internal static class InitUpdateDestroy
     {
+        [BurstCompile]
+        public struct CaptureIldFrameJob : IJob
+        {
+            public NativeReference<CapturedFrameState> capturedFrameState;
+
+            public NativeQueue<AudioFrameBufferHistoryElement>           audioFrameHistory;
+            [ReadOnly] public ComponentLookup<AudioSettings>             audioSettingsLookup;
+            [ReadOnly] public ComponentLookup<AudioEcsAtomicFeedbackIds> atomicLookup;
+            [ReadOnly] public ComponentLookup<AudioEcsFormat>            formatLookup;
+            public Entity                                                worldBlackboardEntity;
+
+            public unsafe void Execute()
+            {
+                var ids      = atomicLookup[worldBlackboardEntity].Read();
+                int frame    = ids.feedbackIdStarted;
+                int bufferId = ids.maxCommandIdConsumed;
+                var settings = audioSettingsLookup[worldBlackboardEntity];
+
+                while (!audioFrameHistory.IsEmpty() && audioFrameHistory.Peek().bufferId < bufferId)
+                {
+                    audioFrameHistory.Dequeue();
+                }
+                int targetFrame = frame + 1 + math.max(settings.lookaheadAudioFrames, 0);
+                if (!audioFrameHistory.IsEmpty() && audioFrameHistory.Peek().bufferId == bufferId)
+                {
+                    targetFrame = math.max(audioFrameHistory.Peek().expectedNextUpdateFrame, targetFrame);
+                }
+                var oldState             = capturedFrameState.Value;
+                var format               = formatLookup[worldBlackboardEntity].audioFormat;
+                var resetSources         = oldState.format.sampleRate != format.sampleRate || oldState.format.bufferFrameCount != format.bufferFrameCount;
+                capturedFrameState.Value = new CapturedFrameState
+                {
+                    audioFrame           = targetFrame,
+                    lastConsumedBufferId = bufferId,
+                    lastPlayedAudioFrame = frame,
+                    format               = format,
+                    audioSettings        = settings,
+                    requiresSourceReset  = resetSources,
+                };
+            }
+        }
+
         // Single
         [BurstCompile]
-        public struct UpdateListenersJob : IJobChunk
+        public struct CaptureListenersForSamplingJob : IJobChunk
         {
+            [ReadOnly] public EntityTypeHandle                         entityHandle;
             [ReadOnly] public ComponentTypeHandle<AudioListener>       listenerHandle;
             [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle  worldTransformHandle;
             [ReadOnly] public BufferTypeHandle<AudioListenerChannelID> channelGuidHandle;
             public NativeList<ListenerWithTransform>                   listenersWithTransforms;
+            public NativeList<ListenerWithPresampling>                 listenersWithPresampling;
             public NativeList<AudioSourceChannelID>                    listenersChannelIDs;
+            public NativeList<ListenerWithPresampling>                 culledListeners;
             public NativeArray<int>                                    channelCount;
             public NativeArray<int>                                    sourceChunkChannelCount;
             public int                                                 sourceChunkCount;
 
-            public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var listeners       = chunk.GetNativeArray(ref listenerHandle);
+                var entities        = chunk.GetEntityDataPtrRO(entityHandle);
+                var listeners       = chunk.GetComponentDataPtrRO(ref listenerHandle);
                 var worldTransforms = worldTransformHandle.Resolve(chunk);
                 var channelsBuffers = chunk.GetBufferAccessor(ref channelGuidHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
                     var l = listeners[i];
-                    //This culling desyncs the listener indices from the graph handling logic.
-                    //Todo: Figure out how to bring this optimization back.
-                    //if (l.volume > 0f)
+                    if (l.volume > 0f && sourceChunkCount > 0)
                     {
                         int2 range;
                         if (channelsBuffers.Length > 0)
@@ -56,7 +101,85 @@ namespace Latios.Myri
                         var channelsInListener      = l.ildProfile.Value.anglesPerLeftChannel.Length + l.ildProfile.Value.anglesPerRightChannel.Length;
                         channelCount[0]            += channelsInListener;
                         sourceChunkChannelCount[0] += channelsInListener * sourceChunkCount;
+
+                        listenersWithPresampling.Add(new ListenerWithPresampling
+                        {
+                            listener = entities[i],
+                            profile  = l.ildProfile,
+                        });
                     }
+                    else
+                    {
+                        culledListeners.Add(new ListenerWithPresampling
+                        {
+                            listener = entities[i],
+                            profile  = l.ildProfile,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Schedule single
+        [BurstCompile]
+        public struct UpdateChangedListenersJob : IJobChunk
+        {
+            [ReadOnly] public EntityTypeHandle                         entityHandle;
+            [ReadOnly] public ComponentTypeHandle<AudioListener>       listenerHandle;
+            [ReadOnly] public BufferTypeHandle<AudioListenerChannelID> channelGuidHandle;
+            [ReadOnly] public AudioEcsCommandPipe                      commandPipe;
+            public EntityCommandBuffer                                 ecb;
+            public uint                                                lastSystemVersion;
+
+            WorldTransformReadOnlyAspect.HasChecker worldTransformChecker;
+            HasChecker<TrackedListener>             trackedListenerChecker;
+
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
+            {
+                bool isAlive   = worldTransformChecker[chunk] && chunk.Has(ref listenerHandle);
+                bool isTracked = trackedListenerChecker[chunk];
+
+                if (isAlive)
+                {
+                    if (!isTracked || chunk.DidOrderChange(lastSystemVersion) ||
+                        chunk.DidChange(ref listenerHandle, lastSystemVersion) || chunk.DidChange(ref channelGuidHandle, lastSystemVersion))
+                    {
+                        var entities         = chunk.GetNativeArray(entityHandle);
+                        var listeners        = chunk.GetComponentDataPtrRO(ref listenerHandle);
+                        var channelIDBuffers = chunk.GetBufferAccessorRO(ref channelGuidHandle);
+                        for (int i = 0; i < chunk.Count; i++)
+                        {
+                            ref var message = ref commandPipe.pipe.CreateMessage<NewOrChangedListenerMessage>();
+                            message         = new NewOrChangedListenerMessage
+                            {
+                                audioListener = listeners[i],
+                                entity        = entities[i],
+                                hasChannels   = channelIDBuffers.Length > 0,
+                            };
+                            if (channelIDBuffers.Length > 0)
+                            {
+                                var buffer = channelIDBuffers[i];
+                                var span   = commandPipe.pipe.CreatePipeSpan<AudioListenerChannelID>(buffer.Length);
+                                buffer.AsNativeArray().AsReadOnlySpan().CopyTo(span.AsSpan());
+                                message.channels = span;
+                            }
+                        }
+
+                        if (!isTracked)
+                        {
+                            var tracker = new TrackedListener { hasChannelIDs = channelIDBuffers.Length > 0 };
+                            ecb.AddComponent(entities, tracker);
+                        }
+                    }
+                }
+                else if (isTracked)
+                {
+                    var     entities = chunk.GetNativeArray(entityHandle);
+                    ref var message  = ref commandPipe.pipe.CreateMessage<RemovedListenersMessage>();
+                    var     span     = commandPipe.pipe.CreatePipeSpan<Entity>(entities.Length);
+                    entities.AsReadOnlySpan().CopyTo(span.AsSpan());
+                    message.formerListenerEntities = span;
+                    ecb.RemoveComponent<TrackedListener>(entities);
                 }
             }
         }
@@ -73,16 +196,13 @@ namespace Latios.Myri
             [ReadOnly] public ComponentTypeHandle<AudioSourceEmitterCone>          emitterConeHandle;
             [ReadOnly] public ComponentTypeHandle<AudioSourceChannelID>            channelIDHandle;
             [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle              worldTransformHandle;
-            [ReadOnly] public NativeReference<int>                                 audioFrame;
-            [ReadOnly] public NativeReference<int>                                 lastPlayedAudioFrame;
-            [ReadOnly] public NativeReference<int>                                 lastConsumedBufferId;
-            public int                                                             bufferId;
-            public int                                                             sampleRate;
-            public int                                                             samplesPerFrame;
+            [ReadOnly] public NativeReference<CapturedFrameState>                  capturedFrameState;
+            [ReadOnly] public AudioEcsCommandPipe                                  commandPipe;
 
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var rng                   = new Rng.RngSequence(math.asuint(new int2(audioFrame.Value, unfilteredChunkIndex)));
+                var audioFrame            = capturedFrameState.Value.audioFrame;
+                var rng                   = new Rng.RngSequence(math.asuint(new int2(audioFrame, unfilteredChunkIndex)));
                 var volumes               = (AudioSourceVolume*)chunk.GetRequiredComponentDataPtrRO(ref volumeHandle);
                 var clips                 = (AudioSourceClip*)chunk.GetRequiredComponentDataPtrRW(ref clipHandle);
                 var hasTransforms         = worldTransformHandle.Has(in chunk);
@@ -92,6 +212,11 @@ namespace Latios.Myri
                 var cones                 = chunk.GetComponentDataPtrRO(ref emitterConeHandle);
                 var channelGuids          = chunk.GetComponentDataPtrRO(ref channelIDHandle);
                 var expireMask            = chunk.GetEnabledMask(ref expireHandle);
+                var bufferId              = commandPipe.commandId;
+                var format                = capturedFrameState.Value.format;
+                var sampleRate            = format.sampleRate;
+                var samplesPerFrame       = format.bufferFrameCount;
+                var reset                 = capturedFrameState.Value.requiresSourceReset;
 
                 stream.BeginForEachIndex(unfilteredChunkIndex);
                 for (int i = 0; i < chunk.Count; i++)
@@ -101,6 +226,9 @@ namespace Latios.Myri
 
                     if (!clip.m_clip.IsCreated)
                         continue;
+
+                    if (reset)
+                        clip.ResetPlaybackState();
 
                     double sampleRateMultiplier = sampleRateMultipliers != null ? sampleRateMultipliers[i].multiplier : 1.0;
                     if (clip.looping)
@@ -112,7 +240,7 @@ namespace Latios.Myri
                         {
                             if (clip.offsetIsBasedOnSpawn)
                             {
-                                ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                                ulong samplesPlayed = (ulong)samplesPerFrame * (ulong)audioFrame;
                                 if (sampleRate == clip.m_clip.Value.sampleRate && sampleRateMultiplier == 1.0)
                                 {
                                     int clipStart     = (int)(samplesPlayed % (ulong)clip.m_clip.Value.sampleCountPerChannel);
@@ -138,14 +266,14 @@ namespace Latios.Myri
                         }
                         else if (!clip.m_offsetLocked && clip.offsetIsBasedOnSpawn)
                         {
-                            if (lastConsumedBufferId.Value - clip.m_spawnedBufferId >= 0)
+                            if (capturedFrameState.Value.lastConsumedBufferId - clip.m_spawnedBufferId >= 0)
                             {
                                 clip.m_offsetLocked = true;
                             }
                             else
                             {
                                 // This check compares if the playhead loop advanced past the target start point in the loop
-                                ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame.Value;
+                                ulong  samplesPlayed                = (ulong)samplesPerFrame * (ulong)audioFrame;
                                 double clipSampleStride             = clip.m_clip.Value.sampleRate * sampleRateMultiplier / sampleRate;
                                 double samplesPlayedInSourceSamples = samplesPlayed * clipSampleStride;
                                 double clipStart                    = (samplesPlayedInSourceSamples + clip.m_loopOffset) % clip.m_clip.Value.sampleCountPerChannel;
@@ -170,15 +298,15 @@ namespace Latios.Myri
                             continue;
                         }
 
-                        var framesPlayed = lastPlayedAudioFrame.Value - clip.m_spawnedAudioFrame;
+                        var framesPlayed = capturedFrameState.Value.lastPlayedAudioFrame - clip.m_spawnedAudioFrame;
                         // There's a chance the one shot spawned last game frame but the dsp missed the audio frame.
                         // In such a case, we still want the one shot to start at the beginning rather than skip the first audio frame.
                         // This is more likely to happen in high framerate scenarios.
                         // This does not solve the problem where the audio frame ticks during DSP and again before the next AudioSystemUpdate.
-                        if ((!clip.m_initialized) || (clip.m_spawnedBufferId - lastConsumedBufferId.Value > 0 && framesPlayed >= 0))
+                        if ((!clip.m_initialized) || (clip.m_spawnedBufferId - capturedFrameState.Value.lastConsumedBufferId > 0 && framesPlayed >= 0))
                         {
                             clip.m_spawnedBufferId   = bufferId;
-                            clip.m_spawnedAudioFrame = audioFrame.Value;
+                            clip.m_spawnedAudioFrame = audioFrame;
                             clip.m_initialized       = true;
                         }
                         else

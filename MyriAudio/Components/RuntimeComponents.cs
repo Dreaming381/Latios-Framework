@@ -3,9 +3,20 @@ using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
+using UnityEngine.Audio;
 
 namespace Latios.Myri
 {
+    /// <summary>
+    /// A read-only component on the worldBlackboardEntity which provides the current Unity audio format.
+    /// Use this to read the sample rate, audio frame sample count, and channel configuration.
+    /// This component is not added until the format is established. DO NOT MODIFY!
+    /// </summary>
+    public struct AudioEcsFormat : IComponentData
+    {
+        public AudioFormat audioFormat;
+    }
+
     /// <summary>
     /// A read-only component on the worldBlackboardEntity that allows you to query the realtime state of the audio thread.
     /// Use this to estimate how far ahead in DSP time events need to be scheduled for.

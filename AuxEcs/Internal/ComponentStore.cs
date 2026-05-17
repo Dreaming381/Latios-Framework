@@ -33,7 +33,7 @@ namespace Latios.AuxEcs
 
         public void Dispose()
         {
-            if (!disposePtr.Equals(null))
+            if (!disposePtr.Equals(default))
             {
                 for (int chunkIndex = 0; chunkIndex < chunkPtrs.Length; chunkIndex++)
                 {
@@ -51,16 +51,14 @@ namespace Latios.AuxEcs
             }
 
             var allocator = chunkPtrs.Allocator;
-            foreach (var chunk in chunkPtrs)
-            {
-                AllocatorManager.Free(allocator, chunk.ToPointer(), elementSize, elementAlignment, elementsPerChunk);
-            }
-            foreach (var chunk in chunkVersionPtrs)
-            {
-                AllocatorManager.Free(allocator, chunk.ToPointer(), UnsafeUtility.SizeOf<int>(), UnsafeUtility.AlignOf<int>(), elementsPerChunk);
-            }
+            // Note: Can't use foreach here because it isn't implemented for UnsafePtrList, despite the IDE suggesting otherwise.
+            for (int i = 0; i < chunkPtrs.Length; i++)
+                AllocatorManager.Free(allocator, chunkPtrs[i], elementSize, elementAlignment, elementsPerChunk);
+            for (int i = 0; i < chunkVersionPtrs.Length; i++)
+                AllocatorManager.Free(allocator, chunkVersionPtrs[i], UnsafeUtility.SizeOf<int>(), UnsafeUtility.AlignOf<int>(), elementsPerChunk);
             chunkPtrs.Dispose();
             chunkVersionPtrs.Dispose();
+            freelist.Dispose();
         }
 
         public int instanceCount => elementCount;

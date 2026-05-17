@@ -122,12 +122,12 @@ namespace Latios.AuxEcs
             Span<int> newIndices = stackalloc int[oldIndices.Length - 1];
             oldTypes.Slice(0, typeIndexInArchetype).CopyTo(newTypes.Slice(0, typeIndexInArchetype));
             oldIndices.Slice(0, typeIndexInArchetype).CopyTo(newIndices.Slice(0, typeIndexInArchetype));
-            if (typeIndexInArchetype < newTypes.Length)
+            if (typeIndexInArchetype + 1 < newTypes.Length)
             {
                 var start     = typeIndexInArchetype + 1;
                 var remainder = oldTypes.Length - start;
-                oldTypes.Slice(start, remainder).CopyTo(newTypes.Slice(start, remainder));
-                oldIndices.Slice(start, remainder).CopyTo(newIndices.Slice(start, remainder));
+                oldTypes.Slice(start, remainder).CopyTo(newTypes.Slice(start - 1, remainder));
+                oldIndices.Slice(start, remainder).CopyTo(newIndices.Slice(start - 1, remainder));
             }
 
             ChangeArchetype(ref archetype, entity, in location, newTypes, newIndices);

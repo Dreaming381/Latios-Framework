@@ -9,22 +9,18 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.AudioEcsBuiltin
 {
-    public unsafe struct PresampledFrame : IDisposable
+    public unsafe struct PresampledUpdate : IDisposable
     {
-        //public float*                           samples;
-        //public AllocatorManager.AllocatorHandle allocator;
-        //public float                            extraSample;
-        //public int                              sampleCount;
-        //public int                              targetFrame;
-        //public int                              nextUpdateFrame;
-        //public int                              visualFrameId;
+        public BlobAssetReference<ListenerProfileBlob> profile;
+        public float*                                  buffer;
+        public UnsafeList<int>                         startOffsetInBufferByChannel;  // -1 means no samples
+        public int                                     audioFramesInUpdate;
+        public int                                     targetFrame;
+        public int                                     nextUpdateFrame;
+        public int                                     sampleRate;
+        public int                                     samplesPerAudioFrame;
 
-        public void Dispose()
-        {
-            //if (samples != null)
-            //    AllocatorManager.Free(allocator, samples, sampleCount);
-            this = default;
-        }
+        public void Dispose() => startOffsetInBufferByChannel.Dispose();
     }
 
     public struct PresampledChannel : IDisposable
@@ -35,17 +31,12 @@ namespace Latios.Myri.AudioEcsBuiltin
             public StateVariableFilter.Coefficients coefficients;
         }
 
-        public UnsafeList<PresampledFrame> presampledFrames;
-        public UnsafeList<Svf>             filters;
+        public UnsafeList<Svf> filters;
+        public float           volume;
+        public float           destepSample;
 
         public void Dispose()
         {
-            if (presampledFrames.IsCreated)
-            {
-                foreach (var update in presampledFrames)
-                    update.Dispose();
-                presampledFrames.Dispose();
-            }
             if (filters.IsCreated)
                 filters.Dispose();
             this = default;
@@ -55,7 +46,10 @@ namespace Latios.Myri.AudioEcsBuiltin
     public partial struct ListenerPresamplingState : IVInterface, IAuxDisposable
     {
         public UnsafeList<PresampledChannel>           channels;
+        public UnsafeList<PresampledUpdate>            updates;
         public BlobAssetReference<ListenerProfileBlob> previousBlob;
+        public int                                     nextUpdateFrame;
+        public int                                     previousSampleRate;
 
         public void Dispose()
         {
@@ -64,6 +58,12 @@ namespace Latios.Myri.AudioEcsBuiltin
                 foreach (var channel in channels)
                     channel.Dispose();
                 channels.Dispose();
+            }
+            if (updates.IsCreated)
+            {
+                foreach (var update in updates)
+                    update.Dispose();
+                updates.Dispose();
             }
             this = default;
         }

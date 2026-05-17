@@ -90,7 +90,7 @@ namespace Latios.AuxEcs
 
         public bool TryMatch(ReadOnlySpan<int> typeIdsToMatch, Span<int> typeIndicesInArchetypeResult)
         {
-            for (int i = 0; i < m_typeIds.Length; i++)
+            for (int i = 0; i < typeIdsToMatch.Length; i++)
             {
                 var index = GetTypeIndexInArchetype(typeIdsToMatch[i]);
                 if (index < 0)
@@ -102,7 +102,7 @@ namespace Latios.AuxEcs
 
         public bool Matches(ReadOnlySpan<int> typeIdsToMatch)
         {
-            for (int i = 0; i < m_typeIds.Length; i++)
+            for (int i = 0; i < typeIdsToMatch.Length; i++)
             {
                 var index = GetTypeIndexInArchetype(typeIdsToMatch[i]);
                 if (index < 0)

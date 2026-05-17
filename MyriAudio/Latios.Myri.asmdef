@@ -6,12 +6,10 @@
         "Latios.AuxEcs",
         "Latios.Transforms",
         "Latios.Calci",
-        "Unity.Audio.DSPGraph",
         "Unity.Burst",
         "Unity.Collections",
         "Unity.Entities",
         "Unity.Mathematics",
-        "Unity.Media.Utilities",
         "Unity.Entities.Hybrid"
     ],
     "includePlatforms": [],

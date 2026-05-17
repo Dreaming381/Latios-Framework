@@ -250,23 +250,24 @@ namespace Latios.Myri
         public struct Enumerator
         {
             MessageHeader* m_currentHeader;
+            MessageHeader* m_nextHeader;
             public Enumerator(long typeHash, ref MegaPipe pipe)
             {
+                m_currentHeader = null;
                 if (pipe.m_typeHashToLinkedMessageListMap.TryGetValue(typeHash, out var linkedList))
                 {
-                    m_currentHeader = linkedList.first;
+                    m_nextHeader = linkedList.first;
                 }
                 else
-                    m_currentHeader = null;
+                    m_nextHeader = null;
             }
             public void* Current => m_currentHeader->dataPtr;
             public bool MoveNext()
             {
-                if (m_currentHeader == null)
+                if (m_nextHeader == null)
                     return false;
-                if (m_currentHeader->nextHeader == null)
-                    return false;
-                m_currentHeader = m_currentHeader->nextHeader;
+                m_currentHeader = m_nextHeader;
+                m_nextHeader    = m_nextHeader->nextHeader;
                 return true;
             }
         }

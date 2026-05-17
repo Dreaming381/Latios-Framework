@@ -82,6 +82,8 @@ namespace Latios.Myri
         // NaN = unspatialized
         internal BlobArray<float4> anglesPerLeftChannel;
         internal BlobArray<float4> anglesPerRightChannel;
+
+        internal int channelCount => channelDspsLeft.Length + channelDspsRight.Length;
     }
 
     /// <summary>

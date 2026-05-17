@@ -1,4 +1,5 @@
 ﻿using System;
+using Latios.Myri.AudioEcsBuiltin;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
@@ -164,6 +165,154 @@ namespace Latios.Myri
                     if (result == 0)
                         result = source.itdIndex.CompareTo(other.source.itdIndex);
                     return result;
+                }
+            }
+        }
+
+        [BurstCompile]
+        public struct AllocateChannelsJob : IJob
+        {
+            [ReadOnly] public NativeStream.Reader                  chunkChannelStreams;
+            [ReadOnly] public NativeArray<int>                     channelCount;
+            [ReadOnly] public NativeReference<CapturedFrameState>  capturedFrameState;
+            [ReadOnly] public AudioEcsCommandPipe                  commandPipe;
+            [ReadOnly] public NativeArray<ListenerWithPresampling> listenersWithPresampling;
+            [ReadOnly] public NativeArray<ListenerWithPresampling> culledListeners;
+
+            public NativeList<float>    outputSamplesMegaBuffer;
+            public NativeList<int2>     outputRangesByChannel;
+            public NativeReference<int> releaseFrame;
+
+            public unsafe void Execute()
+            {
+                // Compute buffer metadata
+                var state             = capturedFrameState.Value;
+                var targetFrame       = state.audioFrame;
+                var frameCount        = state.audioSettings.audioFramesPerUpdate + state.audioSettings.safetyAudioFrames;
+                var samplesPerChannel = state.format.bufferFrameCount * frameCount + 8;  // 8 extra samples for anti-stepping
+                var nextUpdateFrame   = state.audioFrame + state.audioSettings.audioFramesPerUpdate;
+                releaseFrame.Value    = state.audioFrame + frameCount;
+
+                // Prefix sum channels with sources
+                outputRangesByChannel.Resize(channelCount[0], NativeArrayOptions.UninitializedMemory);
+                int chunkStreamCount = chunkChannelStreams.ForEachCount;
+                int samplesUsed      = 0;
+                for (int channelIndex = 0; channelIndex < outputRangesByChannel.Length; channelIndex++)
+                {
+                    bool hasAudio = false;
+                    for (int i = channelIndex; i < chunkStreamCount; i += outputRangesByChannel.Length)
+                    {
+                        if (chunkChannelStreams.BeginForEachIndex(i) > 0)
+                        {
+                            hasAudio = true;
+                            break;
+                        }
+                        // EndForEachIndex() is a sanity test to ensure we read all items and all data within each item.
+                        // Since we aren't doing that in this first pass, we need to skip the call.
+                        //chunkChannelStreams.EndForEachIndex();
+                    }
+
+                    if (hasAudio)
+                    {
+                        outputRangesByChannel[channelIndex]  = new int2(samplesUsed, samplesPerChannel);
+                        samplesUsed                         += samplesPerChannel;
+                    }
+                    else
+                        outputRangesByChannel[channelIndex] = new int2(-1, 0);
+                }
+
+                // Create buffer
+                outputSamplesMegaBuffer.Resize(samplesUsed, NativeArrayOptions.ClearMemory);
+                var bufferPtr = outputSamplesMegaBuffer.GetUnsafePtr();
+
+                // Write messages
+                commandPipe.pipe.WriteMessage(in state.audioSettings);
+
+                int channelCounter = 0;
+                foreach (var listener in listenersWithPresampling)
+                {
+                    ref var message = ref commandPipe.pipe.CreateMessage<PresampledListenerMessage>();
+                    var     span    = commandPipe.pipe.CreatePipeSpan<int>(listener.profile.Value.channelCount);
+                    for (int i = 0; i < span.length; i++)
+                    {
+                        span[i] = outputRangesByChannel[channelCounter].x;
+                        channelCounter++;
+                    }
+                    message = new PresampledListenerMessage
+                    {
+                        audioFramesInUpdate          = frameCount,
+                        buffer                       = bufferPtr,
+                        listenerEntity               = listener.listener,
+                        nextUpdateFrame              = nextUpdateFrame,
+                        profile                      = listener.profile,
+                        samplesPerAudioFrame         = state.format.bufferFrameCount,
+                        sampleRate                   = state.format.sampleRate,
+                        startOffsetInBufferByChannel = span,
+                        targetFrame                  = targetFrame,
+                    };
+                }
+
+                foreach (var listener in culledListeners)
+                {
+                    ref var message = ref commandPipe.pipe.CreateMessage<PresampledListenerMessage>();
+                    var     span    = commandPipe.pipe.CreatePipeSpan<int>(listener.profile.Value.channelCount);
+                    for (int i = 0; i < span.length; i++)
+                    {
+                        span[i] = -1;
+                    }
+                    message = new PresampledListenerMessage
+                    {
+                        audioFramesInUpdate          = frameCount,
+                        buffer                       = bufferPtr,
+                        listenerEntity               = listener.listener,
+                        nextUpdateFrame              = nextUpdateFrame,
+                        profile                      = listener.profile,
+                        samplesPerAudioFrame         = state.format.bufferFrameCount,
+                        sampleRate                   = state.format.sampleRate,
+                        startOffsetInBufferByChannel = span,
+                        targetFrame                  = targetFrame,
+                    };
+                }
+            }
+        }
+
+        [BurstCompile]
+        public struct AllocateSilenceJob : IJob
+        {
+            [ReadOnly] public NativeReference<CapturedFrameState>  capturedFrameState;
+            [ReadOnly] public AudioEcsCommandPipe                  commandPipe;
+            [ReadOnly] public NativeArray<ListenerWithPresampling> culledListeners;
+
+            public unsafe void Execute()
+            {
+                // Compute buffer metadata
+                var state           = capturedFrameState.Value;
+                var frameCount      = state.audioSettings.audioFramesPerUpdate + state.audioSettings.safetyAudioFrames;
+                var nextUpdateFrame = state.audioFrame + state.audioSettings.audioFramesPerUpdate;
+
+                // Write messages
+                commandPipe.pipe.WriteMessage(in state.audioSettings);
+
+                foreach (var listener in culledListeners)
+                {
+                    ref var message = ref commandPipe.pipe.CreateMessage<PresampledListenerMessage>();
+                    var     span    = commandPipe.pipe.CreatePipeSpan<int>(listener.profile.Value.channelCount);
+                    for (int i = 0; i < span.length; i++)
+                    {
+                        span[i] = -1;
+                    }
+                    message = new PresampledListenerMessage
+                    {
+                        audioFramesInUpdate          = frameCount,
+                        buffer                       = null,
+                        listenerEntity               = listener.listener,
+                        nextUpdateFrame              = nextUpdateFrame,
+                        profile                      = listener.profile,
+                        sampleRate                   = state.format.sampleRate,
+                        samplesPerAudioFrame         = state.format.bufferFrameCount,
+                        startOffsetInBufferByChannel = span,
+                        targetFrame                  = state.audioFrame
+                    };
                 }
             }
         }

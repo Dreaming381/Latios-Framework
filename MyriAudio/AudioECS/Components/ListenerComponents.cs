@@ -22,7 +22,7 @@ namespace Latios.Myri.AudioEcsBuiltin
         /// <summary>
         /// True if the buffers have a signal. False if the buffers have no signal, and should treated as if all values are 0f.
         /// </summary>
-        public bool hasSignal => !m_hasSignal;
+        public bool hasSignal => m_hasSignal;
         public int samplesPerChannel => m_samplesPerChannel;
 
         public ListenerStereoMix(int samplesPerChannel, AllocatorManager.AllocatorHandle allocator)

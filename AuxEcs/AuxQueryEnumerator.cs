@@ -84,7 +84,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -92,6 +92,7 @@ namespace Latios.AuxEcs
                     typeId0,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -102,10 +103,11 @@ namespace Latios.AuxEcs
                     {
                         typeIndex0       = typeIndicesInArchetype[0];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -211,7 +213,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -220,6 +222,7 @@ namespace Latios.AuxEcs
                     typeId1,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -231,10 +234,11 @@ namespace Latios.AuxEcs
                         typeIndex0       = typeIndicesInArchetype[0];
                         typeIndex1       = typeIndicesInArchetype[1];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -352,7 +356,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -362,6 +366,7 @@ namespace Latios.AuxEcs
                     typeId2,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -374,10 +379,11 @@ namespace Latios.AuxEcs
                         typeIndex1       = typeIndicesInArchetype[1];
                         typeIndex2       = typeIndicesInArchetype[2];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -507,7 +513,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -518,6 +524,7 @@ namespace Latios.AuxEcs
                     typeId3,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -531,10 +538,11 @@ namespace Latios.AuxEcs
                         typeIndex2       = typeIndicesInArchetype[2];
                         typeIndex3       = typeIndicesInArchetype[3];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -676,7 +684,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -688,6 +696,7 @@ namespace Latios.AuxEcs
                     typeId4,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -702,10 +711,11 @@ namespace Latios.AuxEcs
                         typeIndex3       = typeIndicesInArchetype[3];
                         typeIndex4       = typeIndicesInArchetype[4];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -859,7 +869,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -872,6 +882,7 @@ namespace Latios.AuxEcs
                     typeId5,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -887,10 +898,11 @@ namespace Latios.AuxEcs
                         typeIndex4       = typeIndicesInArchetype[4];
                         typeIndex5       = typeIndicesInArchetype[5];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -1056,7 +1068,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -1070,6 +1082,7 @@ namespace Latios.AuxEcs
                     typeId6,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -1086,10 +1099,11 @@ namespace Latios.AuxEcs
                         typeIndex5       = typeIndicesInArchetype[5];
                         typeIndex6       = typeIndicesInArchetype[6];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 
@@ -1267,7 +1281,7 @@ namespace Latios.AuxEcs
             if (!valid)
                 return false;
 
-            if (archetypeIndex < 0 || indexInArchetype >= (*allArchetypesStore)[archetypeIndex].instanceCount)
+            if (archetypeIndex < 0 || indexInArchetype + 1 >= (*allArchetypesStore)[archetypeIndex].instanceCount)
             {
                 // Find next matching archetype
                 Span<int> typeIdsToMatch = stackalloc int[]
@@ -1282,6 +1296,7 @@ namespace Latios.AuxEcs
                     typeId7,
                 };
                 Span<int> typeIndicesInArchetype = stackalloc int[typeIdsToMatch.Length];
+                bool      foundArchetype         = false;
                 while (archetypeIndex + 1 < allArchetypesStore->archetypesCount)
                 {
                     archetypeIndex++;
@@ -1299,10 +1314,11 @@ namespace Latios.AuxEcs
                         typeIndex6       = typeIndicesInArchetype[6];
                         typeIndex7       = typeIndicesInArchetype[7];
                         indexInArchetype = -1;
+                        foundArchetype   = true;
                         break;
                     }
                 }
-                if (archetypeIndex >= allArchetypesStore->archetypesCount)
+                if (!foundArchetype)
                     return false;
             }
 

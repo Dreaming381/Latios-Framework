@@ -41,31 +41,6 @@ namespace Latios.Myri.DSP
             m_rightChannel.z2 = 2 * v2 - m_rightChannel.z2;
             return m_coefficients.A * (m_coefficients.m0 * rightSample + m_coefficients.m1 * v1 + m_coefficients.m2 * v2);
         }
-
-        internal void ProcessFrame(ref SampleFrame frame, bool outputConnected)
-        {
-            if (!outputConnected || !frame.connected)
-            {
-                frame.connected = false;
-
-                for (int i = 0; i < frame.length; i++)
-                {
-                    ProcessLeftSample(0f);
-                    ProcessRightSample(0f);
-                }
-            }
-            else
-            {
-                var left  = frame.left;
-                var right = frame.right;
-
-                for (int i = 0; i < frame.length; i++)
-                {
-                    left[i]  = ProcessLeftSample(left[i]);
-                    right[i] = ProcessRightSample(right[i]);
-                }
-            }
-        }
         #endregion
 
         #region Static API

@@ -70,6 +70,10 @@ namespace Latios
             metaIdToSyncStateMap = new UnsafeHashMap<int, SyncState>(systems.Count, Allocator.Persistent);
             foreach (var system in systems)
             {
+                // For some reason, Unity includes a null system at the start of this list sometimes.
+                if (system == null)
+                    continue;
+
                 DontSyncPreviousUpdatesThisFrameAttribute syncAttribute = null;
                 try
                 {

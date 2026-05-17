@@ -37,8 +37,8 @@ namespace Latios.Myri
         {
             // We don't update entries on the frame they disappeared, even though their disappearance needs to be
             // captured in a buffer. We increment this so that it refers to the next possible buffer when the entry
-            // could disappear.
-            scheduledBuffer++;
+            // could disappear which is a full frame later, including accounting for a possible pause frame.
+            scheduledBuffer += 2;
 
             // Update still alive blob owners
             var aliveOwners = mainWorldEntityManager.GetAllUniqueBlobAssetOwners();
@@ -77,8 +77,8 @@ namespace Latios.Myri
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
-                // Users need a full frame after a potential pause frame to send messages to Audio ECS that deregister blob asset usages
-                if (entry.retainEntity != Entity.Null && consumedBuffer >= entry.lastSeenBuffer + 2)
+                // Wait until we have started processing a buffer later than the one that last retained the blobs.
+                if (entry.retainEntity != Entity.Null && consumedBuffer > entry.lastSeenBuffer)
                 {
                     retainEntityManager.DestroyEntity(entry.retainEntity);
                     ownerToEntryMap.Remove(entry.owner);

@@ -54,6 +54,8 @@ namespace Latios.Unsafe
         bool                             m_warnIfPoolIsAllocatedDuringAllocationRequest;
 
         static readonly uint4 kFootprint = new uint4('L', 'a', 't', 'i');
+
+        //UnsafeHashSet<IntPtr> m_debugPointerSet;
         #endregion
 
         #region Lifecycle
@@ -74,6 +76,8 @@ namespace Latios.Unsafe
 
             UnsafeUtility.MemClear(m_freeBlocks,          UnsafeUtility.SizeOf<IntPtr>() * 2048);
             UnsafeUtility.MemClear(m_secondLevelFreeBits, UnsafeUtility.SizeOf<BitField64>() * 32);
+
+            //m_debugPointerSet = new UnsafeHashSet<IntPtr>(1024, parentAllocator);
         }
 
         public void Dispose()
@@ -85,6 +89,8 @@ namespace Latios.Unsafe
             m_pools.Dispose();
             AllocatorManager.Free(m_backingAllocator, (IntPtr*)m_freeBlocks, 2048);
             AllocatorManager.Free(m_backingAllocator, m_secondLevelFreeBits, 32);
+
+            //m_debugPointerSet.Dispose();
         }
 
         public void AllocatePool(long minimumSize)
@@ -93,11 +99,11 @@ namespace Latios.Unsafe
             var poolSize    = math.max(minimumSize, m_standardPoolSize);
             var elementSize = (int)poolSize;
             var numElements = 1;
-            if (poolSize > (1 << 31))
+            if (poolSize > (1 << 30))
             {
-                poolSize    = CollectionHelper.Align(poolSize, 1 << 31);
+                poolSize    = CollectionHelper.Align(poolSize, 1 << 30);
                 elementSize = (1 << 31);
-                numElements = (int)(poolSize / (1 << 31));
+                numElements = (int)(poolSize / (1 << 30));
             }
             var pool = new Pool
             {
@@ -169,11 +175,11 @@ namespace Latios.Unsafe
             CheckMultipleOf64((ulong)size);
             elementSize = (int)size;
             numElements = 1;
-            if (size > (1 << 31))
+            if (size > (1 << 30))
             {
-                size        = CollectionHelper.Align(size, 1 << 31);
-                elementSize = (1 << 31);
-                numElements = (int)(size / (1 << 31));
+                size        = CollectionHelper.Align(size, 1 << 30);
+                elementSize = (1 << 30);
+                numElements = (int)(size / (1 << 30));
             }
             alignment = 64;
         }
@@ -198,12 +204,18 @@ namespace Latios.Unsafe
             {
                 CheckAlignmentIs64(block.Alignment);
                 block.Range.Pointer = (IntPtr)Allocate(block.Bytes);
+                //if (m_debugPointerSet.Contains(block.Range.Pointer))
+                //    throw new System.InvalidOperationException("Double allocated");
+                //m_debugPointerSet.Add(block.Range.Pointer);
+                //UnityEngine.Debug.Log($"Allocated {block.Range.Pointer.ToInt64()}:x");
                 return 0;
             }
 
             if (block.Range.Items == 0)
             {
+                //UnityEngine.Debug.Log($"Freed {block.Range.Pointer.ToInt64()}:x");
                 Free((void*)block.Range.Pointer);
+                //m_debugPointerSet.Remove(block.Range.Pointer);
                 m_thisAllocator.RemoveSafetyHandles();  // Bug workaround to prevent AtomicSafetyHandle memory leak.
                 return 0;
             }
@@ -226,11 +238,10 @@ namespace Latios.Unsafe
             header->nextFreeHeader     = null;
             header->previousFreeHeader = null;
 
-            var cacheLineCount      = header->byteCount / 64;
-            var firstLevelIndex     = Log2Ceil(cacheLineCount / 64);
-            var firstLevelInterval  = 1 << math.max(firstLevelIndex - 1, 0) + 6;
-            var secondLevelInterval = firstLevelIndex / 64;
-            var secondLevelIndex    = (int)(((long)cacheLineCount - firstLevelInterval) / secondLevelInterval);
+            var cacheLineCount  = header->byteCount / 64;
+            var firstLevelIndex = GetFirstLevelIndex(cacheLineCount);
+            GetFirstLevelInfo(firstLevelIndex, out var secondLevelInterval, out var firstLevelStart);
+            var secondLevelIndex = GetSecondLevelIndexRoundDown(cacheLineCount, secondLevelInterval, firstLevelStart);
 
             var freeBlockPointersIndex = firstLevelIndex * 64 + secondLevelIndex;
             var previousPtr            = m_freeBlocks[freeBlockPointersIndex];
@@ -247,21 +258,30 @@ namespace Latios.Unsafe
 
         void ClearFreeBlocksForByteCount(ulong byteCount)
         {
-            var cacheLineCount      = byteCount / 64;
-            var firstLevelIndex     = Log2Ceil(cacheLineCount / 64);
-            var firstLevelInterval  = 1 << math.max(firstLevelIndex - 1, 0) + 6;
-            var secondLevelInterval = firstLevelIndex / 64;
-            var secondLevelIndex    = (int)(((long)cacheLineCount - firstLevelInterval) / secondLevelInterval);
+            var cacheLineCount  = byteCount / 64;
+            var firstLevelIndex = GetFirstLevelIndex(cacheLineCount);
+            GetFirstLevelInfo(firstLevelIndex, out var secondLevelInterval, out var firstLevelStart);
+            var secondLevelIndex                                  = GetSecondLevelIndexRoundDown(cacheLineCount, secondLevelInterval, firstLevelStart);
+            m_freeBlocks[firstLevelIndex * 64 + secondLevelIndex] = null;
             m_secondLevelFreeBits[firstLevelIndex].SetBits(secondLevelIndex, false);
             if (m_secondLevelFreeBits[firstLevelIndex].Value == 0)
                 m_firstLevelFreeBits.SetBits(firstLevelIndex, false);
+        }
+
+        void SetHeaderForByteCount(ulong byteCount, AllocationHeader* header)
+        {
+            var cacheLineCount  = byteCount / 64;
+            var firstLevelIndex = GetFirstLevelIndex(cacheLineCount);
+            GetFirstLevelInfo(firstLevelIndex, out var secondLevelInterval, out var firstLevelStart);
+            var secondLevelIndex                                  = GetSecondLevelIndexRoundDown(cacheLineCount, secondLevelInterval, firstLevelStart);
+            m_freeBlocks[firstLevelIndex * 64 + secondLevelIndex] = header;
         }
 
         void* Allocate(long size)
         {
             var requiredSize       = (ulong)CollectionHelper.Align(size, 64);
             var requiredCacheLines = requiredSize / 64;
-            var firstLevelIndex    = Log2Ceil(requiredCacheLines / 64);
+            var firstLevelIndex    = GetFirstLevelIndex(requiredCacheLines);
             var firstLevelBits     = m_firstLevelFreeBits;
             if (firstLevelIndex > 0)
                 firstLevelBits.SetBits(0, false, firstLevelIndex);
@@ -276,11 +296,10 @@ namespace Latios.Unsafe
                 return Allocate(size);
             }
 
-            firstLevelIndex         = firstLevelBits.CountTrailingZeros();
-            var firstLevelInterval  = 1 << math.max(firstLevelIndex - 1, 0) + 6;
-            var secondLevelInterval = firstLevelIndex / 64;
-            var secondLevelIndex    = math.max(0, (int)(((long)requiredCacheLines - firstLevelInterval) / secondLevelInterval));
-            var secondLevelBits     = m_secondLevelFreeBits[firstLevelIndex];
+            firstLevelIndex = firstLevelBits.CountTrailingZeros();
+            GetFirstLevelInfo(firstLevelIndex, out var secondLevelInterval, out var firstLevelStart);
+            var secondLevelIndex = GetSecondLevelIndexRoundUp(requiredCacheLines, secondLevelInterval, firstLevelStart);
+            var secondLevelBits  = m_secondLevelFreeBits[firstLevelIndex];
             if (secondLevelIndex > 0)
                 secondLevelBits.SetBits(0, false, secondLevelIndex);
             if (secondLevelBits.Value == 0)
@@ -298,12 +317,19 @@ namespace Latios.Unsafe
                     AllocatePool((long)requiredSize);
                     return Allocate(size);
                 }
+                firstLevelIndex = firstLevelBits.CountTrailingZeros();
                 secondLevelBits = m_secondLevelFreeBits[firstLevelIndex];
             }
 
             secondLevelIndex           = secondLevelBits.CountTrailingZeros();
             var freeBlockPointersIndex = firstLevelIndex * 64 + secondLevelIndex;
+            var freeBlocksDebugSpan    = new Span<IntPtr>(m_freeBlocks, 2048);
             var headerTaken            = m_freeBlocks[freeBlockPointersIndex];
+            //if ((ulong)size > headerTaken->byteCount)
+            //{
+            //    throw new InvalidOperationException("Took a corrupted header.");
+            //}
+
             if (headerTaken->nextFreeHeader != null)
             {
                 headerTaken->nextFreeHeader->previousFreeHeader = null;
@@ -311,6 +337,7 @@ namespace Latios.Unsafe
             }
             else
             {
+                m_freeBlocks[freeBlockPointersIndex] = null;
                 m_secondLevelFreeBits[firstLevelIndex].SetBits(secondLevelIndex, false);
                 if (m_secondLevelFreeBits[firstLevelIndex].Value == 0)
                     m_firstLevelFreeBits.SetBits(firstLevelIndex, false);
@@ -342,6 +369,7 @@ namespace Latios.Unsafe
             };
             if (headerTaken->headerAfterInPool != null)
                 headerTaken->headerAfterInPool->headerBeforeInPool = headerLeftover;
+            headerTaken->headerAfterInPool                         = headerLeftover;
 
             AddBlockToFreeStore(headerLeftover);
             headerTaken->byteCount  = requiredCacheLines * 64;
@@ -364,15 +392,16 @@ namespace Latios.Unsafe
                     headerAfter->nextFreeHeader->previousFreeHeader = headerAfter->previousFreeHeader;
                 if (headerAfter->previousFreeHeader != null)
                     headerAfter->previousFreeHeader->nextFreeHeader = headerAfter->nextFreeHeader;
+                else if (headerAfter->nextFreeHeader != null)
+                    SetHeaderForByteCount(headerAfter->byteCount, headerAfter->nextFreeHeader);
                 else
                     ClearFreeBlocksForByteCount(headerAfter->byteCount);
 
                 // Point the next header in this block to the current header
+                header->headerAfterInPool = headerAfter->headerAfterInPool;
                 if (headerAfter->headerAfterInPool != null)
-                {
                     headerAfter->headerAfterInPool->headerBeforeInPool = header;
-                    header->headerAfterInPool                          = headerAfter->headerAfterInPool;
-                }
+
                 // Collapse the header after
                 header->byteCount      += headerAfter->byteCount + 64;
                 headerAfter->footprint  = default;
@@ -387,13 +416,15 @@ namespace Latios.Unsafe
                     headerBefore->nextFreeHeader->previousFreeHeader = headerBefore->previousFreeHeader;
                 if (headerBefore->previousFreeHeader != null)
                     headerBefore->previousFreeHeader->nextFreeHeader = headerBefore->nextFreeHeader;
+                else if (headerBefore->nextFreeHeader != null)
+                    SetHeaderForByteCount(headerBefore->byteCount, headerBefore->nextFreeHeader);
                 else
                     ClearFreeBlocksForByteCount(headerBefore->byteCount);
 
                 // Patch the header after
                 headerBefore->headerAfterInPool = header->headerAfterInPool;
                 if (headerBefore->headerAfterInPool != null)
-                    headerBefore->headerAfterInPool->headerAfterInPool = headerBefore;
+                    headerBefore->headerAfterInPool->headerBeforeInPool = headerBefore;
 
                 // Collapse the current header into the header before
                 headerBefore->byteCount += header->byteCount + 64;
@@ -405,14 +436,46 @@ namespace Latios.Unsafe
             m_bytesUsed -= byteCount;
         }
 
+        // The cache line distribution is a little weird. The first interval has 64 lines, the second has 128, and so-on.
+        // Here we represent the range of cache lines for each index, as well as the ranges divided by 64.
+        // index 0 = [0, 63] [0, 0]
+        // index 1 = [64, 191][1, 2]
+        // index 2 = [192, 447][3, 6]
+        // index 3 = [448, 959][7, 14]
+        // index 4 = [960, 1983][15, 30]
+        // ..
+        //
+        // A pattern emerges here when we look at the ranges divided by 64 (referred to as divided ranges).
+        // Add 1 to this divided range, and we see these divided ranges represent floorlog2 intervals.
+        // The lower bound of each divided range is our second-level interval stride. And the most-significant bit of that lower bound is at the position of the index we care about.
+        static int GetFirstLevelIndex(ulong cacheLineCount)
+        {
+            var divided = cacheLineCount / 64;
+            var addOne  = divided + 1;
+            return Log2Floor(addOne);
+        }
+
+        static void GetFirstLevelInfo(int firstLevelIndex, out int cacheLinesPerSecondLevelInterval, out long firstLevelStart)
+        {
+            var minDividedPlus1              = 1 << firstLevelIndex;
+            cacheLinesPerSecondLevelInterval = minDividedPlus1;
+            firstLevelStart                  = (minDividedPlus1 - 1) * (long)64;
+        }
+
+        static int GetSecondLevelIndexRoundDown(ulong cacheLineCount, int cacheLinesPerSecondLevelInterval, long firstLevelStart)
+        {
+            return (int)(((long)cacheLineCount - firstLevelStart) / cacheLinesPerSecondLevelInterval);
+        }
+
+        static int GetSecondLevelIndexRoundUp(ulong cacheLineCount, int cacheLinesPerSecondLevelInterval, long firstLevelStart)
+        {
+            var roundUpOffset = cacheLinesPerSecondLevelInterval - 1;
+            return (int)(((long)cacheLineCount - firstLevelStart + roundUpOffset) / cacheLinesPerSecondLevelInterval);
+        }
+
         static int Log2Floor(ulong a)
         {
             return 63 - math.lzcnt(a);
-        }
-
-        static int Log2Ceil(ulong a)
-        {
-            return 64 - math.lzcnt(a);
         }
         #endregion
 
@@ -450,12 +513,24 @@ namespace Latios.Unsafe
             var header = (AllocationHeader*)ptr;
             header--;
             if (!header->footprint.Equals(kFootprint))
+            {
+                //if (m_debugPointerSet.Contains(new IntPtr(ptr)))
+                //{
+                //    throw new InvalidOperationException("A pointer is contained in the TLSF debug set but does not match the footprint. Something bad happened.");
+                //}
+
                 throw new InvalidOperationException(
                     $"The pointer does not appear to be allocated by a TLSF allocator. It may not point to the start of the allocation, or adjacent memory may have been stomped on.");
+            }
             if (header->allocator != m_thisAllocator)
                 throw new InvalidOperationException($"The pointer was allocated with a different TLSF allocator then the one it is attempting to free with.");
             if (header->free)
+            {
+                //if (m_debugPointerSet.Contains(new IntPtr(ptr)))
+                //    throw new InvalidOperationException("A pointer has a header marked free even though it is still in the TLSF debug set.");
+
                 throw new InvalidOperationException($"The pointer has already been freed.");
+            }
         }
         #endregion
     }

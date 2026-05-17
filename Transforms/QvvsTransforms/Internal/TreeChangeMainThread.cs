@@ -227,7 +227,7 @@ namespace Latios.Transforms
                 bool         needsCleanup          = true;
                 if (options != ClearParentOptions.IgnoreLinkedEntityGroup && em.HasBuffer<LinkedEntityGroup>(rootReference.rootEntity))
                 {
-                    var leg = em.GetBuffer<LinkedEntityGroup>(rootReference.rootEntity, options == ClearParentOptions.TransferLinkedEntityGroup);
+                    var leg = em.GetBuffer<LinkedEntityGroup>(rootReference.rootEntity, options != ClearParentOptions.TransferLinkedEntityGroup);
 
                     bool matchedAll;
                     if (options == ClearParentOptions.TransferLinkedEntityGroup)
@@ -292,7 +292,7 @@ namespace Latios.Transforms
                     TreeKernels.RemoveRootComponents(em, child, removeLegFromChild);
                 else
                 {
-                    TreeKernels.UpdateRootReferencesFromDiff(hierarchy.AsNativeArray(), default, em);
+                    TreeKernels.UpdateRootReferencesFromDiff(newHierarchy.AsNativeArray(), default, em);
                     if (needsCleanup)
                     {
                         var newCleanup = em.AddBuffer<EntityInHierarchyCleanup>(child);

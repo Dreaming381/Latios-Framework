@@ -9,6 +9,7 @@ namespace Latios.Myri.AudioEcsBuiltin
         public Entity                           entity;
         public AudioListener                    audioListener;
         public PipeSpan<AudioListenerChannelID> channels;
+        public bool                             hasChannels;
     }
 
     public struct RemovedListenersMessage

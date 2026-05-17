@@ -4,13 +4,17 @@ using Unity.Mathematics;
 
 namespace Latios.Myri.AudioEcsBuiltin
 {
-    public struct PresampledBufferMessage
+    public unsafe struct PresampledListenerMessage
     {
-        public PipeSpan<float> samples;
-        public Entity          listenerEntity;
-        public int             listenerChannel;
-        public int             targetFrame;
-        public int             nextUpdateFrame;
+        public Entity                                  listenerEntity;
+        public BlobAssetReference<ListenerProfileBlob> profile;
+        public float*                                  buffer;
+        public PipeSpan<int>                           startOffsetInBufferByChannel;  // -1 means no samples
+        public int                                     audioFramesInUpdate;
+        public int                                     targetFrame;
+        public int                                     nextUpdateFrame;
+        public int                                     sampleRate;
+        public int                                     samplesPerAudioFrame;
     }
 }
 

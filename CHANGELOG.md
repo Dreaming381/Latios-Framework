@@ -10,6 +10,18 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.15.4] – 2026-5-16
+
+Officially supports Entities [1.4.6]
+
+### Changed
+
+-   Updated Core to v0.15.4
+-   Updated to Aux ECS v0.15.4
+-   Updated QVVS Transforms to v0.15.4
+-   Updated Myri to v0.15.4
+-   Updated Calligraphics to v0.15.4
+
 ## [0.15.3] – 2026-5-2
 
 Officially supports Entities [1.4.6]

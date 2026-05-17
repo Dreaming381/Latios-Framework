@@ -20,7 +20,8 @@ namespace Latios.AuxEcs
         /// <param name="allocator">The allocator to use</param>
         public AuxWorld(AllocatorManager.AllocatorHandle allocator)
         {
-            impl = AllocatorManager.Allocate<AuxWorldImpl>(allocator);
+            impl  = AllocatorManager.Allocate<AuxWorldImpl>(allocator);
+            *impl = new AuxWorldImpl(allocator);
         }
 
         /// <summary>

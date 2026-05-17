@@ -51,8 +51,9 @@ namespace Latios.Myri
         {
             if (!m_initialized && m_hasAudioFormatUpdate)
             {
-                m_auxWorld                = new AuxWorld(m_tlsf->Handle);
-                m_outputBuffer            = new UnsafeList<float>(m_audioFormat.channelCount * m_audioFormat.bufferFrameCount, m_tlsf->Handle);
+                m_auxWorld     = new AuxWorld(m_tlsf->Handle);
+                m_outputBuffer = new UnsafeList<float>(m_audioFormat.channelCount * m_audioFormat.bufferFrameCount, m_tlsf->Handle);
+                m_outputBuffer.AddReplicate(default, m_outputBuffer.Capacity);
                 m_visualFrameUpdatesCache = new UnsafeList<VisualFrameUpdate>(128, m_tlsf->Handle);
                 m_tlsfSecretary.Init(ref *m_tlsf);
                 m_feedbackPipeManager.Init(m_tlsf->Handle);
@@ -226,6 +227,7 @@ namespace Latios.Myri
             m_visualFrameUpdatesCache.Dispose();
             m_tlsfSecretary.Shutdown(ref *m_tlsf);
             m_feedbackPipeManager.Shutdown();
+            m_auxWorld.Dispose();
         }
 
         struct TlsfSecretary
@@ -262,6 +264,7 @@ namespace Latios.Myri
                     {
                         allocator       = backingAllocator,
                         bytesToAllocate = standardPoolSize,
+                        result          = m_allocationResult
                     }.Schedule();
                     m_hasPendingAllocationJob = true;
                 }
@@ -290,9 +293,9 @@ namespace Latios.Myri
             [BurstCompile]
             struct AllocateJob : IJob
             {
-                public AllocatorManager.AllocatorHandle allocator;
-                public long                             bytesToAllocate;
-                NativeReference<AllocationResult>       result;
+                public AllocatorManager.AllocatorHandle  allocator;
+                public long                              bytesToAllocate;
+                public NativeReference<AllocationResult> result;
 
                 public void Execute()
                 {
@@ -303,6 +306,7 @@ namespace Latios.Myri
                         elementSize = elementSize,
                         numElements = numElements
                     };
+                    UnityEngine.Debug.Log("Allocated new block");
                 }
             }
         }
@@ -342,7 +346,7 @@ namespace Latios.Myri
                 for (int i = 0; i < sentPipes.Length; i++)
                 {
                     var sentPipe = sentPipes[i];
-                    if (feedbackID <= retiredId)
+                    if (sentPipe.feedbackID <= retiredId)
                     {
                         sentPipe.pipe.Dispose();
                     }

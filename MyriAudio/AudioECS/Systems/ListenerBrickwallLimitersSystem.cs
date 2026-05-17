@@ -24,7 +24,7 @@ namespace Latios.Myri.AudioEcsBuiltin
                 var     oldVolume           = limiter.volume;
                 var     newPreGain          = settings.aux.gain;
                 var     newVolume           = settings.aux.volume;
-                var     smoothRatePerSample = sampleRate * 0.015f;  // Small 15 millisecond smoothing
+                var     smoothRatePerSample = math.rcp(sampleRate * 0.015f);  // Small 15 millisecond smoothing
                 limiter.releasePerSampleDB  = settings.aux.limiterDBRelaxPerSecond * sampleRate;
                 limiter.SetLookaheadSampleCount(lookaheadSamples);
 
