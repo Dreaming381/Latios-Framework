@@ -8,6 +8,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Jobs.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.TextCore.LowLevel;
 
 using Font = Latios.Calligraphics.HarfBuzz.Font;
@@ -86,9 +87,8 @@ namespace Latios.Calligraphics.Systems
 
         void LoadFont(NativeArray<FontLoadDescription> fontLoadDescriptions, ref SystemState state, ref FontTable fontTable)
         {
-            Blob   blob;
-            string fontAssetPath;
-            var    firstFontLoadDescription = fontLoadDescriptions[0];
+            Blob blob;
+            var  firstFontLoadDescription = fontLoadDescriptions[0];
 
             if (firstFontLoadDescription.isSystemFont)
             {
@@ -108,23 +108,24 @@ namespace Latios.Calligraphics.Systems
                     return;
                 }
                 //Debug.Log($"Found {fieldInfos[0].GetValue(result)} {fieldInfos[1].GetValue(result)} {fieldInfos[2].GetValue(result)} {fieldInfos[3].GetValue(result)}");
-                fontAssetPath = (string)sFontLoadDescription[3].GetValue(result);
+                blob = new Blob((string)sFontLoadDescription[3].GetValue(result));
+            }
+            else if (firstFontLoadDescription.streamingAssetLocationValidated)
+            {
+                if (!TryCreateStreamingAssetBlob(firstFontLoadDescription.filePath.ToString(), out blob))
+                    return;
             }
             else
             {
-                if (firstFontLoadDescription.streamingAssetLocationValidated)
-                    fontAssetPath = Path.Combine(Application.streamingAssetsPath, firstFontLoadDescription.filePath.ToString());
-                else
-                    fontAssetPath = firstFontLoadDescription.filePath.ToString();
-
+                var fontAssetPath = firstFontLoadDescription.filePath.ToString();
                 if (!File.Exists(fontAssetPath))
                 {
                     //Debug.Log($"Could not find font in {fontAssetPath}");
                     return;
                 }
+                blob = new Blob(fontAssetPath);
             }
 
-            blob = new Blob(fontAssetPath);
             blob.MakeImmutable();  //is this neccessary considering we dispose the blob in next instruction?
 
             // in case font file is a collection font, we load all the ones we want in a batch to avoid reopening the file.
@@ -191,6 +192,38 @@ namespace Latios.Calligraphics.Systems
             }
             //blob can be disposed here, face and font are disposed at world shutdown via FontTable.TryDispose
             blob.Dispose();
+        }
+
+        // On Android StreamingAssets are inside the APK; per Unity docs only UnityWebRequest can read them
+        static unsafe bool TryCreateStreamingAssetBlob(string relativePath, out Blob blob)
+        {
+#if !UNITY_ANDROID || UNITY_EDITOR
+            var path = Path.Combine(Application.streamingAssetsPath, relativePath);
+            if (!File.Exists(path))
+            {
+                blob = default;
+                return false;
+            }
+            blob = new Blob(path);
+            return true;
+#else
+            var source = Path.Combine(Application.streamingAssetsPath, relativePath);
+            using (var request = UnityWebRequest.Get(source))
+            {
+                request.SendWebRequest();
+                while (!request.isDone) { }
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogError($"Calligraphics: failed to read '{source}': {request.error}");
+                    blob = default;
+                    return false;
+                }
+                var nativeData = request.downloadHandler.nativeData;
+                byte* ptr = (byte*)nativeData.GetUnsafeReadOnlyPtr();
+                blob = new Blob(ptr, (uint)nativeData.Length, MemoryMode.DUBLICATE);
+                return true;
+            }
+#endif
         }
 
         [BurstCompile]

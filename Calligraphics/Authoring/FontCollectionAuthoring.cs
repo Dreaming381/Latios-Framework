@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using Latios.Authoring;
 using Unity.Entities;
 using UnityEngine;
@@ -45,5 +44,3 @@ namespace Latios.Calligraphics.Authoring
     {
     }
 }
-#endif
-
