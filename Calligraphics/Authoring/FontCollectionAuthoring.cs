@@ -35,7 +35,7 @@ namespace Latios.Calligraphics.Authoring
 
         public void PostProcessBlobRequests(EntityManager entityManager, Entity entity)
         {
-            var blob = handle.Resolve(entityManager);
+            var blob                                                                            = handle.Resolve(entityManager);
             entityManager.SetComponentData(entity, new FontLoadDescriptionsBlobReference { blob = blob });
         }
     }
@@ -44,3 +44,4 @@ namespace Latios.Calligraphics.Authoring
     {
     }
 }
+

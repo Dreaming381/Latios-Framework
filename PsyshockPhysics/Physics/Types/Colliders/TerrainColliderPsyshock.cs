@@ -142,9 +142,10 @@ namespace Latios.Psyshock
 
                         for (int quadInRow = 0; quadInRow < 8; quadInRow++)
                         {
-                            var  quadInPatch = 8 * quadRow + quadInRow;
-                            var  quadOffset  = (patch.startY + quadRow) * root.quadsPerRow + math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
-                            bool valid       = patch.startX + quadInRow < root.quadsPerRow;
+                            var  quadInPatch  = 8 * quadRow + quadInRow;
+                            var  quadOffset   = (patch.startY + quadRow) * root.quadsPerRow + math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
+                            var  vertexOffset = (patch.startY + quadRow) * (root.quadsPerRow + 1) + math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
+                            bool valid        = patch.startX + quadInRow < root.quadsPerRow;
 
                             var quadElement = quadOffset / 32;
                             var parityBit   = quadOffset % 32;
@@ -153,10 +154,10 @@ namespace Latios.Psyshock
                             Bits.SetBit(ref patch.isFirstTriangleOrChildPatchValid, quadInPatch, valid && trianglesValid[quadElement].IsSet(triangleFirstBit));
                             Bits.SetBit(ref patch.isSecondTriangleValid,            quadInPatch, valid && trianglesValid[quadElement].IsSet(triangleFirstBit + 1));
 
-                            var heightA    = heightsRowMajor[quadOffset];
-                            var heightB    = heightsRowMajor[quadOffset + 1];
-                            var heightC    = heightsRowMajor[quadOffset + root.quadsPerRow];
-                            var heightD    = heightsRowMajor[quadOffset + root.quadsPerRow + 1];
+                            var heightA    = heightsRowMajor[vertexOffset];
+                            var heightB    = heightsRowMajor[vertexOffset + 1];
+                            var heightC    = heightsRowMajor[vertexOffset + root.quadsPerRow + 1];
+                            var heightD    = heightsRowMajor[vertexOffset + root.quadsPerRow + 2];
                             var min        = (short)math.min(math.min(heightA, heightB), math.min(heightC, heightD));
                             var max        = (short)math.max(math.max(heightA, heightB), math.max(heightC, heightD));
                             patch.min      = (short)math.min(patch.min, min);
@@ -388,13 +389,13 @@ namespace Latios.Psyshock
             static readonly ulong[] kBorderMasks = new ulong[]
             {
                 // Left
-                0xffffffffffffffff, 0x7f7f7f7f7f7f7f7f, 0x3f3f3f3f3f3f3f3f, 0x1f1f1f1f1f1f1f1f, 0x0f0f0f0f0f0f0f0f, 0x0707070707070707, 0x0303030303030303, 0x0101010101010101,
-                // Right
                 0xffffffffffffffff, 0xfefefefefefefefe, 0xfcfcfcfcfcfcfcfc, 0xf8f8f8f8f8f8f8f8, 0xf0f0f0f0f0f0f0f0, 0xe0e0e0e0e0e0e0e0, 0xc0c0c0c0c0c0c0c0, 0x8080808080808080,
+                // Right
+                0xffffffffffffffff, 0x7f7f7f7f7f7f7f7f, 0x3f3f3f3f3f3f3f3f, 0x1f1f1f1f1f1f1f1f, 0x0f0f0f0f0f0f0f0f, 0x0707070707070707, 0x0303030303030303, 0x0101010101010101,
+                // Bottom
+                0xffffffffffffffff, 0xffffffffffffff00, 0xffffffffffff0000, 0xffffffffff000000, 0xffffffff00000000, 0xffffff0000000000, 0xffff000000000000, 0xff00000000000000,
                 // Top
                 0xffffffffffffffff, 0x00ffffffffffffff, 0x0000ffffffffffff, 0x000000ffffffffff, 0x00000000ffffffff, 0x0000000000ffffff, 0x000000000000ffff, 0x00000000000000ff,
-                // Bottom
-                0xffffffffffffffff, 0xffffffffffffff00, 0xffffffffffff0000, 0xffffffffff000000, 0xffffffff00000000, 0xffffff0000000000, 0xffff000000000000, 0xff00000000000000
             };
 
             public ulong GetFilteredQuadMaskFromHeights(short minHeight, short maxHeight)
@@ -504,9 +505,9 @@ namespace Latios.Psyshock
             public ulong GetBorderMask(int minX, int minY, int maxX, int maxY)
             {
                 var result  = kBorderMasks[math.clamp(minX - startX, 0, 7)];
-                result     |= kBorderMasks[8 + math.clamp(7 + startX - maxX, 0, 7)];
-                result     |= kBorderMasks[16 + math.clamp(minY - startY, 0, 7)];
-                result     |= kBorderMasks[24 + math.clamp(7 + startY - maxY, 0, 7)];
+                result     &= kBorderMasks[8 + math.clamp(7 + startX - maxX, 0, 7)];
+                result     &= kBorderMasks[16 + math.clamp(minY - startY, 0, 7)];
+                result     &= kBorderMasks[24 + math.clamp(7 + startY - maxY, 0, 7)];
                 return result;
             }
         }

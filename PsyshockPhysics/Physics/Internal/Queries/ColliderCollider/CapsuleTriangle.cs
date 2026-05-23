@@ -336,11 +336,12 @@ namespace Latios.Psyshock
             {
                 // Because the ray didn't hit, we should hopefully not have to worry about degenerate distance checks for the capsule segment
                 SphereCollider axisSphere = new SphereCollider(closestAxisPoint, capsule.radius);
-                bool           hitAxis    = SphereTriangle.TriangleSphereDistance(triangle, axisSphere, maxDistance, out var axisResult);
-                SphereCollider aSphere    = new SphereCollider(capsule.pointA, capsule.radius);
-                bool           hitA       = SphereTriangle.TriangleSphereDistance(triangle, aSphere, maxDistance, out var aResult);
-                SphereCollider bSphere    = new SphereCollider(capsule.pointB, capsule.radius);
-                bool           hitB       = SphereTriangle.TriangleSphereDistance(triangle, bSphere, maxDistance, out var bResult);
+                bool           hitAxis    = SphereTriangle.TriangleSphereDistance(triangle, axisSphere, maxDistance, out var axisResult) &&
+                                  !closestAxisPoint.Equals(capsule.pointA) && !closestAxisPoint.Equals(capsule.pointA + capEdge);
+                SphereCollider aSphere = new SphereCollider(capsule.pointA, capsule.radius);
+                bool           hitA    = SphereTriangle.TriangleSphereDistance(triangle, aSphere, maxDistance, out var aResult);
+                SphereCollider bSphere = new SphereCollider(capsule.pointB, capsule.radius);
+                bool           hitB    = SphereTriangle.TriangleSphereDistance(triangle, bSphere, maxDistance, out var bResult);
                 if (!hitAxis && !hitA && !hitB)
                 {
                     result = axisResult;
