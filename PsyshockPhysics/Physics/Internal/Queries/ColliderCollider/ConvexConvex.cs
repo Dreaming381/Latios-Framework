@@ -8,6 +8,23 @@ namespace Latios.Psyshock
 {
     internal static class ConvexConvex
     {
+        public static bool AreOverlapping(in ConvexCollider convexA,
+                                         in RigidTransform aTransform,
+                                         in ConvexCollider convexB,
+                                         in RigidTransform bTransform)
+        {
+            return WithinDistance(in convexA, in aTransform, in convexB, in bTransform, 0f);
+        }
+
+        public static bool WithinDistance(in ConvexCollider convexA,
+                                          in RigidTransform aTransform,
+                                          in ConvexCollider convexB,
+                                          in RigidTransform bTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in convexA, in aTransform, in convexB, in bTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in ConvexCollider convexA,
                                            in RigidTransform aTransform,
                                            in ConvexCollider convexB,

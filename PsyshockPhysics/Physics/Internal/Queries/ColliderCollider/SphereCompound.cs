@@ -5,6 +5,23 @@ namespace Latios.Psyshock
 {
     internal static class SphereCompound
     {
+        public static bool AreOverlapping(in CompoundCollider compound,
+                                         in RigidTransform compoundTransform,
+                                         in SphereCollider sphere,
+                                         in RigidTransform sphereTransform)
+        {
+            return WithinDistance(in compound, in compoundTransform, in sphere, in sphereTransform, 0f);
+        }
+
+        public static bool WithinDistance(in CompoundCollider compound,
+                                          in RigidTransform compoundTransform,
+                                          in SphereCollider sphere,
+                                          in RigidTransform sphereTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in compound, in compoundTransform, in sphere, in sphereTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in CompoundCollider compound,
                                            in RigidTransform compoundTransform,
                                            in SphereCollider sphere,

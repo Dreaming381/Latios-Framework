@@ -6,6 +6,16 @@ namespace Latios.Psyshock
 {
     internal static class PointRayTriangle
     {
+        public static bool AreOverlapping(float3 point, in TriangleCollider triangle, in RigidTransform triangleTransform)
+        {
+            return WithinDistance(point, in triangle, in triangleTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in TriangleCollider triangle, in RigidTransform triangleTransform, float maxDistance)
+        {
+            return DistanceBetween(point, in triangle, in triangleTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(float3 point, in TriangleCollider triangle, in RigidTransform triangleTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInTriangleSpace = math.transform(math.inverse(triangleTransform), point);

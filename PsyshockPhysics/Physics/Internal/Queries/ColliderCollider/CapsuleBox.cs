@@ -7,7 +7,23 @@ namespace Latios.Psyshock
 {
     internal static class CapsuleBox
     {
-        // Box is first because it is cheaper to transform a capsule into A-space
+        public static bool AreOverlapping(in BoxCollider box,
+                                         in RigidTransform boxTransform,
+                                         in CapsuleCollider capsule,
+                                         in RigidTransform capsuleTransform)
+        {
+            return WithinDistance(in box, in boxTransform, in capsule, in capsuleTransform, 0f);
+        }
+
+        public static bool WithinDistance(in BoxCollider box,
+                                          in RigidTransform boxTransform,
+                                          in CapsuleCollider capsule,
+                                          in RigidTransform capsuleTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in box, in boxTransform, in capsule, in capsuleTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in BoxCollider box,
                                            in RigidTransform boxTransform,
                                            in CapsuleCollider capsule,

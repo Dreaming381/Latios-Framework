@@ -1,10 +1,26 @@
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
     internal static class CompoundTerrain
     {
+        public static bool AreOverlapping(in TerrainCollider terrain,
+                                          in RigidTransform terrainTransform,
+                                          in CompoundCollider compound,
+                                          in RigidTransform compoundTransform)
+        {
+            return WithinDistance(in terrain, in terrainTransform, in compound, in compoundTransform, 0f);
+        }
+
+        public static bool WithinDistance(in TerrainCollider terrain,
+                                          in RigidTransform terrainTransform,
+                                          in CompoundCollider compound,
+                                          in RigidTransform compoundTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in terrain, in terrainTransform, in compound, in compoundTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in TerrainCollider terrain,
                                            in RigidTransform terrainTransform,
                                            in CompoundCollider compound,

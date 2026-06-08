@@ -7,6 +7,16 @@ namespace Latios.Psyshock
 {
     internal static class PointRayCapsule
     {
+        public static bool AreOverlapping(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform)
+        {
+            return WithinDistance(point, in capsule, in capsuleTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance)
+        {
+            return DistanceBetween(point, in capsule, in capsuleTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInCapSpace = math.transform(math.inverse(capsuleTransform), point);

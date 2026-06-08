@@ -213,11 +213,11 @@ namespace Latios.Psyshock
 
         private static Aabb AabbFrom(in TerrainCollider terrain, in RigidTransform transform)
         {
-            int  halfDimInt   = terrain.terrainColliderBlob.Value.quadsPerRow / 2;
+            int  dimInt       = terrain.terrainColliderBlob.Value.quadsPerRow;
             int  minHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.minHeight;
             int  maxHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.maxHeight;
-            int3 minInt       = new int3(-halfDimInt, minHeightInt, -halfDimInt);
-            int3 maxInt       = new int3(halfDimInt, maxHeightInt, halfDimInt);
+            int3 minInt       = new int3(0, minHeightInt, 0);
+            int3 maxInt       = new int3(dimInt, maxHeightInt, dimInt);
             var  localAabb    = new Aabb(minInt * terrain.scale, maxInt * terrain.scale);
             return TransformAabb(new TransformQvvs(transform), localAabb);
         }

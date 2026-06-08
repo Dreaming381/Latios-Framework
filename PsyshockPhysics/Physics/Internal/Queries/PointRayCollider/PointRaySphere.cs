@@ -6,9 +6,21 @@ namespace Latios.Psyshock
 {
     internal static class PointRaySphere
     {
+        public static bool AreOverlapping(float3 point, in SphereCollider sphere, in RigidTransform sphereTransform)
+        {
+            return WithinDistance(point, in sphere, in sphereTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in SphereCollider sphere, in RigidTransform sphereTransform, float maxDistance)
+        {
+            var pointInSphereSpace = math.InverseTransformFast(sphereTransform, point);
+            var threshold          = math.square(sphere.radius + maxDistance);
+            return math.distancesq(pointInSphereSpace, sphere.center) <= threshold;
+        }
+
         public static bool DistanceBetween(float3 point, in SphereCollider sphere, in RigidTransform sphereTransform, float maxDistance, out PointDistanceResult result)
         {
-            var  pointInSphereSpace = math.transform(math.inverse(sphereTransform), point);
+            var  pointInSphereSpace = math.InverseTransformFast(sphereTransform, point);
             bool hit                = PointSphereDistance(pointInSphereSpace, in sphere, maxDistance, out var localResult, out _);
             result                  = new PointDistanceResult
             {

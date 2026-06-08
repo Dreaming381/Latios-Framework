@@ -51,6 +51,89 @@ namespace Latios.Psyshock
 {
 	internal static class ColliderColliderDispatch
 	{
+		public static bool AreOverlapping(in Collider colliderA,
+                                           in RigidTransform aTransform,
+                                           in Collider colliderB,
+                                           in RigidTransform bTransforme)
+		{
+			switch ((colliderA.type, colliderB.type))
+			{
+<#
+int i = 0;
+foreach (var colliderTypeNameA in colliderTypeNames)
+{
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
+	int j = 0;
+	foreach (var colliderTypeNameB in colliderTypeNames)
+	{
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
+#>
+				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+<#
+		if (i < j)
+		{
+#>
+					return <#= colliderTypeNameA #><#= colliderTypeNameB #>.AreOverlapping(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform);
+<#
+		}
+		else
+		{
+#>
+					return <#= colliderTypeNameB #><#= colliderTypeNameA #>.AreOverlapping(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform);
+<#
+		}
+		j++;			
+	}
+	i++;
+}
+#>
+				default:
+					return false;
+			}
+		}
+		
+		public static bool WithinDistance(in Collider colliderA,
+                                           in RigidTransform aTransform,
+                                           in Collider colliderB,
+                                           in RigidTransform bTransform,
+                                           float maxDistance)
+		{
+			switch ((colliderA.type, colliderB.type))
+			{
+<#
+i = 0;
+foreach (var colliderTypeNameA in colliderTypeNames)
+{
+	var colliderNameA = colliderPropertyNames[colliderTypeNameA];
+	int j = 0;
+	foreach (var colliderTypeNameB in colliderTypeNames)
+	{
+		var colliderNameB = colliderPropertyNames[colliderTypeNameB];
+#>
+				case (ColliderType.<#= colliderTypeNameA #>, ColliderType.<#= colliderTypeNameB #>):
+<#
+		if (i < j)
+		{
+#>
+					return <#= colliderTypeNameA #><#= colliderTypeNameB #>.WithinDistance(in colliderB.m_<#= colliderNameB #>, in bTransform, in colliderA.m_<#= colliderNameA #>, in aTransform, maxDistance);
+<#
+		}
+		else
+		{
+#>
+					return <#= colliderTypeNameB #><#= colliderTypeNameA #>.WithinDistance(in colliderA.m_<#= colliderNameA #>, in aTransform, in colliderB.m_<#= colliderNameB #>, in bTransform, maxDistance);
+<#
+		}
+		j++;			
+	}
+	i++;
+}
+#>
+				default:
+					return false;
+			}
+		}
+		
 		public static bool DistanceBetween(in Collider colliderA,
                                            in RigidTransform aTransform,
                                            in Collider colliderB,
@@ -61,7 +144,7 @@ namespace Latios.Psyshock
 			switch ((colliderA.type, colliderB.type))
 			{
 <#
-int i = 0;
+i = 0;
 foreach (var colliderTypeNameA in colliderTypeNames)
 {
 	var colliderNameA = colliderPropertyNames[colliderTypeNameA];

@@ -74,6 +74,46 @@ namespace Latios.Psyshock
             }
         }
 
+        public unsafe struct PointAreOverlappingImmediateProcessor : IFindObjectsProcessor
+        {
+            private float3 m_point;
+            private bool*  m_hit;
+
+            public PointAreOverlappingImmediateProcessor(float3 point, ref bool hit)
+            {
+                m_point = point;
+                m_hit   = (bool*)UnsafeUtility.AddressOf(ref hit);
+            }
+
+            public void Execute(in FindObjectsResult result)
+            {
+                if (*m_hit)
+                    return;
+                *m_hit = PointRayDispatch.AreOverlapping(m_point, result.collider, result.transform);
+            }
+        }
+
+        public unsafe struct PointWithinImmediateProcessor : IFindObjectsProcessor
+        {
+            private float3 m_point;
+            private float  m_maxDistance;
+            private bool*  m_hit;
+
+            public PointWithinImmediateProcessor(float3 point, float maxDistance, ref bool hit)
+            {
+                m_point       = point;
+                m_maxDistance = maxDistance;
+                m_hit         = (bool*)UnsafeUtility.AddressOf(ref hit);
+            }
+
+            public void Execute(in FindObjectsResult result)
+            {
+                if (*m_hit)
+                    return;
+                *m_hit = PointRayDispatch.WithinDistance(m_point, result.collider, result.transform, m_maxDistance);
+            }
+        }
+
         public unsafe struct PointDistanceClosestImmediateProcessor : IFindObjectsProcessor
         {
             private float3               m_point;
@@ -141,6 +181,70 @@ namespace Latios.Psyshock
                         aabb        = result.aabb
                     };
                 }
+            }
+        }
+
+        public unsafe struct ColliderAreOverlappingImmediateProcessor : IFindObjectsProcessor
+        {
+            private Collider       m_collider;
+            private RigidTransform m_transform;
+            private bool*          m_hit;
+
+            public ColliderAreOverlappingImmediateProcessor(in Collider collider,
+                                                            in RigidTransform transform,
+                                                            ref bool result)
+            {
+                m_collider  = collider;
+                m_transform = transform;
+                m_hit       = (bool*)UnsafeUtility.AddressOf(ref result);
+            }
+
+            public void Execute(in FindObjectsResult result)
+            {
+                if (*m_hit)
+                    return;
+
+                var target          = result.collider;
+                var targetTransform = result.transform;
+                Physics.ScaleStretchCollider(ref target, targetTransform.scale, targetTransform.stretch);
+                *m_hit = ColliderColliderDispatch.AreOverlapping(in m_collider,
+                                                                 in m_transform,
+                                                                 target,
+                                                                 new RigidTransform(targetTransform.rotation, targetTransform.position));
+            }
+        }
+
+        public unsafe struct ColliderWithinImmediateProcessor : IFindObjectsProcessor
+        {
+            private Collider       m_collider;
+            private RigidTransform m_transform;
+            private float          m_maxDistance;
+            private bool*          m_hit;
+
+            public ColliderWithinImmediateProcessor(in Collider collider,
+                                                    in RigidTransform transform,
+                                                    float maxDistance,
+                                                    ref bool result)
+            {
+                m_collider    = collider;
+                m_transform   = transform;
+                m_maxDistance = maxDistance;
+                m_hit         = (bool*)UnsafeUtility.AddressOf(ref result);
+            }
+
+            public void Execute(in FindObjectsResult result)
+            {
+                if (*m_hit)
+                    return;
+
+                var target          = result.collider;
+                var targetTransform = result.transform;
+                Physics.ScaleStretchCollider(ref target, targetTransform.scale, targetTransform.stretch);
+                *m_hit = ColliderColliderDispatch.WithinDistance(in m_collider,
+                                                                 in m_transform,
+                                                                 target,
+                                                                 new RigidTransform(targetTransform.rotation, targetTransform.position),
+                                                                 m_maxDistance);
             }
         }
 

@@ -7,6 +7,16 @@ namespace Latios.Psyshock
 {
     internal static class PointRayConvex
     {
+        public static bool AreOverlapping(float3 point, in ConvexCollider convex, in RigidTransform convexTransform)
+        {
+            return WithinDistance(point, in convex, in convexTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in ConvexCollider convex, in RigidTransform convexTransform, float maxDistance)
+        {
+            return DistanceBetween(point, in convex, in convexTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(float3 point, in ConvexCollider convex, in RigidTransform convexTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInConvexSpace = math.transform(math.inverse(convexTransform), point);

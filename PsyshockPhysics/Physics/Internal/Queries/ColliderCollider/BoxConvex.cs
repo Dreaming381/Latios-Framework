@@ -7,6 +7,23 @@ namespace Latios.Psyshock
 {
     internal static class BoxConvex
     {
+        public static bool AreOverlapping(in ConvexCollider convex,
+                                         in RigidTransform convexTransform,
+                                         in BoxCollider box,
+                                         in RigidTransform boxTransform)
+        {
+            return WithinDistance(in convex, in convexTransform, in box, in boxTransform, 0f);
+        }
+
+        public static bool WithinDistance(in ConvexCollider convex,
+                                          in RigidTransform convexTransform,
+                                          in BoxCollider box,
+                                          in RigidTransform boxTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in convex, in convexTransform, in box, in boxTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in ConvexCollider convex,
                                            in RigidTransform convexTransform,
                                            in BoxCollider box,

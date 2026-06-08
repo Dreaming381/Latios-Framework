@@ -1,13 +1,21 @@
 using Latios.Calci;
 using Unity.Burst;
-using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
 {
-    [BurstCompile]
     internal static class PointRayBox
     {
+        public static bool AreOverlapping(float3 point, in BoxCollider box, in RigidTransform boxTransform)
+        {
+            return WithinDistance(point, in box, in boxTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in BoxCollider box, in RigidTransform boxTransform, float maxDistance)
+        {
+            return DistanceBetween(point, in box, in boxTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(float3 point, in BoxCollider box, in RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
         {
             var  pointInBoxSpace = math.transform(math.inverse(boxTransform), point);

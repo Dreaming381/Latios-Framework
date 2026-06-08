@@ -4,6 +4,16 @@ namespace Latios.Psyshock
 {
     internal static class PointRayTerrain
     {
+        public static bool AreOverlapping(float3 point, in TerrainCollider terrain, in RigidTransform terrainTransform)
+        {
+            return WithinDistance(point, in terrain, in terrainTransform, 0f);
+        }
+
+        public static bool WithinDistance(float3 point, in TerrainCollider terrain, in RigidTransform terrainTransform, float maxDistance)
+        {
+            return DistanceBetween(point, in terrain, in terrainTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(float3 point, in TerrainCollider terrain, in RigidTransform terrainTransform, float maxDistance, out PointDistanceResult result)
         {
             var pointInScaledTerrainSpace = math.transform(math.inverse(terrainTransform), point);

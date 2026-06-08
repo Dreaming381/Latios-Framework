@@ -5,7 +5,17 @@ namespace Latios.Psyshock
 {
     internal static class SphereConvex
     {
-        // Convex is first because it is cheaper to transform a sphere into A-space
+        public static bool AreOverlapping(in ConvexCollider convex, in RigidTransform convexTransform, in SphereCollider sphere, in RigidTransform sphereTransform)
+        {
+            return WithinDistance(in convex, in convexTransform, in sphere, in sphereTransform, 0f);
+        }
+
+        public static bool WithinDistance(in ConvexCollider convex, in RigidTransform convexTransform, in SphereCollider sphere, in RigidTransform sphereTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in convex, in convexTransform, in sphere, in sphereTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in ConvexCollider convex, in RigidTransform convexTransform, in SphereCollider sphere, in RigidTransform sphereTransform,
                                            float maxDistance,
                                            out ColliderDistanceResult result)

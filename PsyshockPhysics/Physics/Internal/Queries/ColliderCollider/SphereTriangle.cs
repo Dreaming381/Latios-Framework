@@ -5,7 +5,23 @@ namespace Latios.Psyshock
 {
     internal static class SphereTriangle
     {
-        // Triangle is first because it is cheaper to transform a sphere into A-space
+        public static bool AreOverlapping(in TriangleCollider triangle,
+                                         in RigidTransform triangleTransform,
+                                         in SphereCollider sphere,
+                                         in RigidTransform sphereTransform)
+        {
+            return WithinDistance(in triangle, in triangleTransform, in sphere, in sphereTransform, 0f);
+        }
+
+        public static bool WithinDistance(in TriangleCollider triangle,
+                                          in RigidTransform triangleTransform,
+                                          in SphereCollider sphere,
+                                          in RigidTransform sphereTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in triangle, in triangleTransform, in sphere, in sphereTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in TriangleCollider triangle,
                                            in RigidTransform triangleTransform,
                                            in SphereCollider sphere,

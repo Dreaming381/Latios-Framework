@@ -6,7 +6,23 @@ namespace Latios.Psyshock
 {
     internal static class CapsuleConvex
     {
-        // Todo: Does it make more sense to have capsule be first or convex?
+        public static bool AreOverlapping(in ConvexCollider convex,
+                                         in RigidTransform convexTransform,
+                                         in CapsuleCollider capsule,
+                                         in RigidTransform capsuleTransform)
+        {
+            return WithinDistance(in convex, in convexTransform, in capsule, in capsuleTransform, 0f);
+        }
+
+        public static bool WithinDistance(in ConvexCollider convex,
+                                          in RigidTransform convexTransform,
+                                          in CapsuleCollider capsule,
+                                          in RigidTransform capsuleTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in convex, in convexTransform, in capsule, in capsuleTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in ConvexCollider convex,
                                            in RigidTransform convexTransform,
                                            in CapsuleCollider capsule,

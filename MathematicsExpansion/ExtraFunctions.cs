@@ -67,7 +67,7 @@ namespace Unity.Mathematics
         /// <summary>
         /// Returns the vector (or point) transformed by the inverse of the rotation. The rotation quaternion is assumed to be normalized.
         /// </summary>
-        /// <param name="normalizedRotation">The rotaiton to inversely rotate the point by</param>
+        /// <param name="normalizedRotation">The rotation to inversely rotate the point by</param>
         /// <param name="vector">The vector or point to be inversely rotated</param>
         /// <returns>The resulting vector or point</returns>
         public static float3 InverseRotateFast(quaternion normalizedRotation, float3 vector)
@@ -84,6 +84,29 @@ namespace Unity.Mathematics
         public static quaternion InverseRotateFast(quaternion normalizedRotation, quaternion rotationToBeRotated)
         {
             return mul(conjugate(normalizedRotation), rotationToBeRotated);
+        }
+
+        /// <summary>
+        /// Returns the point transformed by the inverse of the RigidTransform. The RigidTransform is assumed to have a normalized rotation.
+        /// </summary>
+        /// <param name="rigidTransform">The transform to inversely transform the point by</param>
+        /// <param name="point">The point to be inversely transformed</param>
+        /// <returns>The resulting point</returns>
+        public static float3 InverseTransformFast(in RigidTransform rigidTransform, float3 point)
+        {
+            return InverseRotateFast(rigidTransform.rot, point - rigidTransform.pos);
+        }
+
+        /// <summary>
+        /// Returns the second RigidTransform transformed by the inverse of the first RigidTransform. The first RigidTransform is assumed to have a normalized rotation.
+        /// </summary>
+        /// <param name="a">The first RigidTransform to inversely transform the second RigidTransform by</param>
+        /// <param name="v">The second RigidTransform to be inversely transformed</param>
+        /// <returns>The resulting point</returns>
+        public static RigidTransform InverseTransformFast(in RigidTransform a, in RigidTransform b)
+        {
+            var inverseRot = conjugate(a.rot);
+            return new RigidTransform(mul(inverseRot, b.rot), rotate(inverseRot, b.pos - a.pos));
         }
     }
 

@@ -1,5 +1,3 @@
-using Latios.Transforms;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -7,6 +5,23 @@ namespace Latios.Psyshock
 {
     internal static class ConvexTriMesh
     {
+        public static bool AreOverlapping(in TriMeshCollider triMesh,
+                                         in RigidTransform triMeshTransform,
+                                         in ConvexCollider convex,
+                                         in RigidTransform convexTransform)
+        {
+            return WithinDistance(in triMesh, in triMeshTransform, in convex, in convexTransform, 0f);
+        }
+
+        public static bool WithinDistance(in TriMeshCollider triMesh,
+                                          in RigidTransform triMeshTransform,
+                                          in ConvexCollider convex,
+                                          in RigidTransform convexTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in triMesh, in triMeshTransform, in convex, in convexTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in TriMeshCollider triMesh,
                                            in RigidTransform triMeshTransform,
                                            in ConvexCollider convex,

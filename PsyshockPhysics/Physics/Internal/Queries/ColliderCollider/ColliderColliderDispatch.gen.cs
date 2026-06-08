@@ -6,6 +6,287 @@ namespace Latios.Psyshock
 {
     internal static class ColliderColliderDispatch
     {
+        public static bool AreOverlapping(in Collider colliderA,
+                                          in RigidTransform aTransform,
+                                          in Collider colliderB,
+                                          in RigidTransform bTransform)
+        {
+            switch ((colliderA.type, colliderB.type))
+            {
+                case (ColliderType.Sphere, ColliderType.Sphere):
+                    return SphereSphere.AreOverlapping(in colliderA.m_sphere, in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Sphere, ColliderType.Capsule):
+                    return SphereCapsule.AreOverlapping(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.Box):
+                    return SphereBox.AreOverlapping(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.Triangle):
+                    return SphereTriangle.AreOverlapping(in colliderB.m_triangle, in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.Convex):
+                    return SphereConvex.AreOverlapping(in colliderB.m_convex, in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.TriMesh):
+                    return SphereTriMesh.AreOverlapping(in colliderB.m_triMesh(), in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.Compound):
+                    return SphereCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                    return SphereTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_sphere, in aTransform);
+                case (ColliderType.Capsule, ColliderType.Sphere):
+                    return SphereCapsule.AreOverlapping(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Capsule, ColliderType.Capsule):
+                    return CapsuleCapsule.AreOverlapping(in colliderA.m_capsule, in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Capsule, ColliderType.Box):
+                    return CapsuleBox.AreOverlapping(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Capsule, ColliderType.Triangle):
+                    return CapsuleTriangle.AreOverlapping(in colliderB.m_triangle, in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Capsule, ColliderType.Convex):
+                    return CapsuleConvex.AreOverlapping(in colliderB.m_convex, in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Capsule, ColliderType.TriMesh):
+                    return CapsuleTriMesh.AreOverlapping(in colliderB.m_triMesh(), in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Capsule, ColliderType.Compound):
+                    return CapsuleCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                    return CapsuleTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_capsule, in aTransform);
+                case (ColliderType.Box, ColliderType.Sphere):
+                    return SphereBox.AreOverlapping(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Box, ColliderType.Capsule):
+                    return CapsuleBox.AreOverlapping(in colliderA.m_box, in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Box, ColliderType.Box):
+                    return BoxBox.AreOverlapping(in colliderA.m_box, in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.Box, ColliderType.Triangle):
+                    return BoxTriangle.AreOverlapping(in colliderB.m_triangle, in bTransform, in colliderA.m_box, in aTransform);
+                case (ColliderType.Box, ColliderType.Convex):
+                    return BoxConvex.AreOverlapping(in colliderB.m_convex, in bTransform, in colliderA.m_box, in aTransform);
+                case (ColliderType.Box, ColliderType.TriMesh):
+                    return BoxTriMesh.AreOverlapping(in colliderB.m_triMesh(), in bTransform, in colliderA.m_box, in aTransform);
+                case (ColliderType.Box, ColliderType.Compound):
+                    return BoxCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_box, in aTransform);
+                case (ColliderType.Box, ColliderType.Terrain):
+                    return BoxTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_box, in aTransform);
+                case (ColliderType.Triangle, ColliderType.Sphere):
+                    return SphereTriangle.AreOverlapping(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Triangle, ColliderType.Capsule):
+                    return CapsuleTriangle.AreOverlapping(in colliderA.m_triangle, in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Triangle, ColliderType.Box):
+                    return BoxTriangle.AreOverlapping(in colliderA.m_triangle, in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.Triangle, ColliderType.Triangle):
+                    return TriangleTriangle.AreOverlapping(in colliderA.m_triangle, in aTransform, in colliderB.m_triangle, in bTransform);
+                case (ColliderType.Triangle, ColliderType.Convex):
+                    return TriangleConvex.AreOverlapping(in colliderB.m_convex, in bTransform, in colliderA.m_triangle, in aTransform);
+                case (ColliderType.Triangle, ColliderType.TriMesh):
+                    return TriangleTriMesh.AreOverlapping(in colliderB.m_triMesh(), in bTransform, in colliderA.m_triangle, in aTransform);
+                case (ColliderType.Triangle, ColliderType.Compound):
+                    return TriangleCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_triangle, in aTransform);
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                    return TriangleTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_triangle, in aTransform);
+                case (ColliderType.Convex, ColliderType.Sphere):
+                    return SphereConvex.AreOverlapping(in colliderA.m_convex, in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Convex, ColliderType.Capsule):
+                    return CapsuleConvex.AreOverlapping(in colliderA.m_convex, in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Convex, ColliderType.Box):
+                    return BoxConvex.AreOverlapping(in colliderA.m_convex, in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.Convex, ColliderType.Triangle):
+                    return TriangleConvex.AreOverlapping(in colliderA.m_convex, in aTransform, in colliderB.m_triangle, in bTransform);
+                case (ColliderType.Convex, ColliderType.Convex):
+                    return ConvexConvex.AreOverlapping(in colliderA.m_convex, in aTransform, in colliderB.m_convex, in bTransform);
+                case (ColliderType.Convex, ColliderType.TriMesh):
+                    return ConvexTriMesh.AreOverlapping(in colliderB.m_triMesh(), in bTransform, in colliderA.m_convex, in aTransform);
+                case (ColliderType.Convex, ColliderType.Compound):
+                    return ConvexCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_convex, in aTransform);
+                case (ColliderType.Convex, ColliderType.Terrain):
+                    return ConvexTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_convex, in aTransform);
+                case (ColliderType.TriMesh, ColliderType.Sphere):
+                    return SphereTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.TriMesh, ColliderType.Capsule):
+                    return CapsuleTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.TriMesh, ColliderType.Box):
+                    return BoxTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.TriMesh, ColliderType.Triangle):
+                    return TriangleTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_triangle, in bTransform);
+                case (ColliderType.TriMesh, ColliderType.Convex):
+                    return ConvexTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_convex, in bTransform);
+                case (ColliderType.TriMesh, ColliderType.TriMesh):
+                    return TriMeshTriMesh.AreOverlapping(in colliderA.m_triMesh(), in aTransform, in colliderB.m_triMesh(), in bTransform);
+                case (ColliderType.TriMesh, ColliderType.Compound):
+                    return TriMeshCompound.AreOverlapping(in colliderB.m_compound(), in bTransform, in colliderA.m_triMesh(), in aTransform);
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                    return TriMeshTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_triMesh(), in aTransform);
+                case (ColliderType.Compound, ColliderType.Sphere):
+                    return SphereCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Compound, ColliderType.Capsule):
+                    return CapsuleCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Compound, ColliderType.Box):
+                    return BoxCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.Compound, ColliderType.Triangle):
+                    return TriangleCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_triangle, in bTransform);
+                case (ColliderType.Compound, ColliderType.Convex):
+                    return ConvexCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_convex, in bTransform);
+                case (ColliderType.Compound, ColliderType.TriMesh):
+                    return TriMeshCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_triMesh(), in bTransform);
+                case (ColliderType.Compound, ColliderType.Compound):
+                    return CompoundCompound.AreOverlapping(in colliderA.m_compound(), in aTransform, in colliderB.m_compound(), in bTransform);
+                case (ColliderType.Compound, ColliderType.Terrain):
+                    return CompoundTerrain.AreOverlapping(in colliderB.m_terrain(), in bTransform, in colliderA.m_compound(), in aTransform);
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    return SphereTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_sphere, in bTransform);
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    return CapsuleTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_capsule, in bTransform);
+                case (ColliderType.Terrain, ColliderType.Box):
+                    return BoxTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_box, in bTransform);
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    return TriangleTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_triangle, in bTransform);
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    return ConvexTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_convex, in bTransform);
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    return TriMeshTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_triMesh(), in bTransform);
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    return CompoundTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_compound(), in bTransform);
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    return TerrainTerrain.AreOverlapping(in colliderA.m_terrain(), in aTransform, in colliderB.m_terrain(), in bTransform);
+                default:
+                    return false;
+            }
+        }
+
+        public static bool WithinDistance(in Collider colliderA,
+                                          in RigidTransform aTransform,
+                                          in Collider colliderB,
+                                          in RigidTransform bTransform,
+                                          float maxDistance)
+        {
+            switch ((colliderA.type, colliderB.type))
+            {
+                case (ColliderType.Sphere, ColliderType.Sphere):
+                    return SphereSphere.WithinDistance(in colliderA.m_sphere, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Capsule):
+                    return SphereCapsule.WithinDistance(in colliderB.m_capsule, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Box):
+                    return SphereBox.WithinDistance(in colliderB.m_box, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Triangle):
+                    return SphereTriangle.WithinDistance(in colliderB.m_triangle, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Convex):
+                    return SphereConvex.WithinDistance(in colliderB.m_convex, in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.TriMesh):
+                    return SphereTriMesh.WithinDistance(in colliderB.m_triMesh(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Compound):
+                    return SphereCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Sphere, ColliderType.Terrain):
+                    return SphereTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_sphere, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Sphere):
+                    return SphereCapsule.WithinDistance(in colliderA.m_capsule, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Capsule):
+                    return CapsuleCapsule.WithinDistance(in colliderA.m_capsule, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Box):
+                    return CapsuleBox.WithinDistance(in colliderB.m_box, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Triangle):
+                    return CapsuleTriangle.WithinDistance(in colliderB.m_triangle, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Convex):
+                    return CapsuleConvex.WithinDistance(in colliderB.m_convex, in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.TriMesh):
+                    return CapsuleTriMesh.WithinDistance(in colliderB.m_triMesh(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Compound):
+                    return CapsuleCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Capsule, ColliderType.Terrain):
+                    return CapsuleTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_capsule, in aTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Sphere):
+                    return SphereBox.WithinDistance(in colliderA.m_box, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Capsule):
+                    return CapsuleBox.WithinDistance(in colliderA.m_box, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Box):
+                    return BoxBox.WithinDistance(in colliderA.m_box, in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Triangle):
+                    return BoxTriangle.WithinDistance(in colliderB.m_triangle, in bTransform, in colliderA.m_box, in aTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Convex):
+                    return BoxConvex.WithinDistance(in colliderB.m_convex, in bTransform, in colliderA.m_box, in aTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.TriMesh):
+                    return BoxTriMesh.WithinDistance(in colliderB.m_triMesh(), in bTransform, in colliderA.m_box, in aTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Compound):
+                    return BoxCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_box, in aTransform, maxDistance);
+                case (ColliderType.Box, ColliderType.Terrain):
+                    return BoxTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_box, in aTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Sphere):
+                    return SphereTriangle.WithinDistance(in colliderA.m_triangle, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Capsule):
+                    return CapsuleTriangle.WithinDistance(in colliderA.m_triangle, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Box):
+                    return BoxTriangle.WithinDistance(in colliderA.m_triangle, in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Triangle):
+                    return TriangleTriangle.WithinDistance(in colliderA.m_triangle, in aTransform, in colliderB.m_triangle, in bTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Convex):
+                    return TriangleConvex.WithinDistance(in colliderB.m_convex, in bTransform, in colliderA.m_triangle, in aTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.TriMesh):
+                    return TriangleTriMesh.WithinDistance(in colliderB.m_triMesh(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Compound):
+                    return TriangleCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance);
+                case (ColliderType.Triangle, ColliderType.Terrain):
+                    return TriangleTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_triangle, in aTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Sphere):
+                    return SphereConvex.WithinDistance(in colliderA.m_convex, in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Capsule):
+                    return CapsuleConvex.WithinDistance(in colliderA.m_convex, in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Box):
+                    return BoxConvex.WithinDistance(in colliderA.m_convex, in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Triangle):
+                    return TriangleConvex.WithinDistance(in colliderA.m_convex, in aTransform, in colliderB.m_triangle, in bTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Convex):
+                    return ConvexConvex.WithinDistance(in colliderA.m_convex, in aTransform, in colliderB.m_convex, in bTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.TriMesh):
+                    return ConvexTriMesh.WithinDistance(in colliderB.m_triMesh(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Compound):
+                    return ConvexCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance);
+                case (ColliderType.Convex, ColliderType.Terrain):
+                    return ConvexTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_convex, in aTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Sphere):
+                    return SphereTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Capsule):
+                    return CapsuleTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Box):
+                    return BoxTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Triangle):
+                    return TriangleTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_triangle, in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Convex):
+                    return ConvexTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_convex, in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.TriMesh):
+                    return TriMeshTriMesh.WithinDistance(in colliderA.m_triMesh(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Compound):
+                    return TriMeshCompound.WithinDistance(in colliderB.m_compound(), in bTransform, in colliderA.m_triMesh(), in aTransform, maxDistance);
+                case (ColliderType.TriMesh, ColliderType.Terrain):
+                    return TriMeshTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_triMesh(), in aTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Sphere):
+                    return SphereCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Capsule):
+                    return CapsuleCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Box):
+                    return BoxCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Triangle):
+                    return TriangleCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_triangle, in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Convex):
+                    return ConvexCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_convex, in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.TriMesh):
+                    return TriMeshCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Compound):
+                    return CompoundCompound.WithinDistance(in colliderA.m_compound(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance);
+                case (ColliderType.Compound, ColliderType.Terrain):
+                    return CompoundTerrain.WithinDistance(in colliderB.m_terrain(), in bTransform, in colliderA.m_compound(), in aTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Sphere):
+                    return SphereTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_sphere, in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Capsule):
+                    return CapsuleTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_capsule, in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Box):
+                    return BoxTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_box, in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Triangle):
+                    return TriangleTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_triangle, in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Convex):
+                    return ConvexTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_convex, in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.TriMesh):
+                    return TriMeshTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_triMesh(), in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Compound):
+                    return CompoundTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_compound(), in bTransform, maxDistance);
+                case (ColliderType.Terrain, ColliderType.Terrain):
+                    return TerrainTerrain.WithinDistance(in colliderA.m_terrain(), in aTransform, in colliderB.m_terrain(), in bTransform, maxDistance);
+                default:
+                    return false;
+            }
+        }
+
         public static bool DistanceBetween(in Collider colliderA,
                                            in RigidTransform aTransform,
                                            in Collider colliderB,

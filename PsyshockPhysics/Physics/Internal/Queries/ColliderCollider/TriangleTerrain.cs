@@ -5,6 +5,23 @@ namespace Latios.Psyshock
 {
     internal static class TriangleTerrain
     {
+        public static bool AreOverlapping(in TerrainCollider terrain,
+                                         in RigidTransform terrainTransform,
+                                         in TriangleCollider triangle,
+                                         in RigidTransform triangleTransform)
+        {
+            return WithinDistance(in terrain, in terrainTransform, in triangle, in triangleTransform, 0f);
+        }
+
+        public static bool WithinDistance(in TerrainCollider terrain,
+                                          in RigidTransform terrainTransform,
+                                          in TriangleCollider triangle,
+                                          in RigidTransform triangleTransform,
+                                          float maxDistance)
+        {
+            return DistanceBetween(in terrain, in terrainTransform, in triangle, in triangleTransform, maxDistance, out _);
+        }
+
         public static bool DistanceBetween(in TerrainCollider terrain,
                                            in RigidTransform terrainTransform,
                                            in TriangleCollider triangle,
