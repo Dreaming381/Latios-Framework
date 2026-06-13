@@ -602,7 +602,7 @@ namespace Latios.Kinemation
                         ref var childRoot                  = ref bones[currentRootBaseIndex + nextTransformBoneIndex];
                         ref var parentRoot                 = ref bones[currentRootBaseIndex + parentIndicesBlob[nextTransformBoneIndex]];
                         var     context32                  = childRoot.boneTransform.context32;
-                        childRoot.boneTransform            = rootTransformsWithIndices[nextTransformBoneIndex];
+                        childRoot.boneTransform            = rootTransformsWithIndices[transformSpanIndex];
                         childRoot.boneTransform.context32  = context32;
                         childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
                         childLocal.boneTransform.context32 = math.asint(1f);
@@ -618,7 +618,7 @@ namespace Latios.Kinemation
                     ref var childRoot                  = ref bones[currentRootBaseIndex + parentChild.child];
                     ref var parentRoot                 = ref bones[currentRootBaseIndex + parentChild.parent];
                     var     context32                  = childRoot.boneTransform.context32;
-                    childRoot.boneTransform            = rootTransformsWithIndices[nextTransformBoneIndex];
+                    childRoot.boneTransform            = rootTransformsWithIndices[transformSpanIndex];
                     childRoot.boneTransform.context32  = context32;
                     childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
                     childLocal.boneTransform.context32 = math.asint(1f);

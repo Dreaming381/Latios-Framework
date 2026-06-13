@@ -23,7 +23,7 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct LatiosRenderBoundsUpdateSystem : ISystem
     {
-        EntityQuery                      m_WorldRenderBounds;
+        EntityQuery                             m_WorldRenderBounds;
         WorldTransformReadOnlyAspect.TypeHandle m_worldTransformHandle;
 
         [BurstCompile]
@@ -61,7 +61,7 @@ namespace Latios.Kinemation.Systems
         unsafe struct BoundsJob : IJobChunk
         {
             [ReadOnly] public ComponentTypeHandle<RenderBounds>                       renderBoundsHandle;
-            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                        worldTransformHandle;
+            [ReadOnly] public WorldTransformReadOnlyAspect.TypeHandle                 worldTransformHandle;
             [ReadOnly] public ComponentTypeHandle<PostProcessMatrix>                  postProcessMatrixHandle;
             [ReadOnly] public ComponentTypeHandle<ShaderEffectRadialBounds>           shaderEffectRadialBoundsHandle;
             [ReadOnly] public ComponentTypeHandle<SkeletonDependent>                  skeletonDependentHandle;
@@ -167,6 +167,7 @@ namespace Latios.Kinemation.Systems
                             tempSkeletonOffsetsBuffer[i]     = skeletonWorldBoundsOffsetsFromPositionLookup[dependents[dependentInfo.IndexInChunk].root];
                         }
                     }
+                    skeletonBufferFilled = true;
                 }
                 else if (skeletonBufferFilled)
                 {

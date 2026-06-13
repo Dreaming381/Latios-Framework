@@ -14,12 +14,13 @@ namespace Latios.Psyshock
 
         public static bool WithinDistance(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance)
         {
-            return DistanceBetween(point, in capsule, in capsuleTransform, maxDistance, out _);
+            var pointInCapSpace = math.InverseTransformFast(in capsuleTransform, point);
+            return PointCapsuleWithin(pointInCapSpace, in capsule, maxDistance);
         }
 
         public static bool DistanceBetween(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
         {
-            var  pointInCapSpace = math.transform(math.inverse(capsuleTransform), point);
+            var  pointInCapSpace = math.InverseTransformFast(in capsuleTransform, point);
             bool hit             = PointCapsuleDistance(pointInCapSpace, in capsule, maxDistance, out var localResult);
             result               = new PointDistanceResult
             {
@@ -41,32 +42,62 @@ namespace Latios.Psyshock
             return hit;
         }
 
+        internal static bool PointCapsuleWithin(float3 point, in CapsuleCollider capsule, float maxDistance)
+        {
+            // Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
+            float3 ab         = capsule.pointB - capsule.pointA;
+            float3 ap         = point - capsule.pointA;
+            float  dot        = math.dot(ap, ab);
+            float  abLengthSq = math.lengthsq(ab);
+            dot               = math.clamp(dot, 0f, abLengthSq);
+            var factor        = dot / abLengthSq;
+            // If the division fails, that means we somehow weren't closest to an endpoint, but the numbers are too small to calculate where inbetween, so we just use the exact middle.
+            factor             = math.select(0.5f, factor, math.isfinite(factor));
+            var pointOnSegment = math.select(capsule.pointA + ab * factor, capsule.pointB, dot == abLengthSq);
+            var threshold      = math.square(capsule.radius + maxDistance);
+            return math.distancesq(point, pointOnSegment) <= threshold;
+        }
+
         internal static bool PointCapsuleDistance(float3 point, in CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
         {
-            //Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
-            float3 edge           = capsule.pointB - capsule.pointA;
-            float3 ap             = point - capsule.pointA;
-            float  dot            = math.dot(ap, edge);
-            float  edgeLengthSq   = math.lengthsq(edge);
-            dot                   = math.clamp(dot, 0f, edgeLengthSq);
-            float3 pointOnSegment = capsule.pointA;
-            if (dot > 0f)
-                pointOnSegment    += edge * dot / edgeLengthSq;
-            SphereCollider sphere  = new SphereCollider(pointOnSegment, capsule.radius);
-            var            hit     = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
-
-            result.featureCode = 0x4000;
-            result.featureCode = (ushort)math.select(result.featureCode, 0, dot == 0f);
-            result.featureCode = (ushort)math.select(result.featureCode, 1, dot == edgeLengthSq);
+            // Strategy: Project p onto the capsule's line clamped to the segment. Then inflate point on line as sphere
+            float3 ab         = capsule.pointB - capsule.pointA;
+            float3 ap         = point - capsule.pointA;
+            float  dot        = math.dot(ap, ab);
+            float  abLengthSq = math.lengthsq(ab);
+            dot               = math.clamp(dot, 0f, abLengthSq);
+            ushort featureCode;
+            float3 pointOnSegment;
+            if (dot == 0f)
+            {
+                featureCode    = 0;
+                pointOnSegment = capsule.pointA;
+            }
+            else if (dot == abLengthSq)
+            {
+                featureCode    = 1;
+                pointOnSegment = capsule.pointB;
+            }
+            else
+            {
+                featureCode = 0x4000;
+                var factor  = dot / abLengthSq;
+                // If the division fails, that means we somehow weren't closest to an endpoint, but the numbers are too small to calculate where inbetween, so we just use the exact middle.
+                factor         = math.select(0.5f, factor, math.isfinite(factor));
+                pointOnSegment = capsule.pointA + ab * factor;
+            }
+            SphereCollider sphere = new SphereCollider(pointOnSegment, capsule.radius);
+            var            hit    = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
+            result.featureCode    = featureCode;
             if (Hint.Likely(!degenerate))
                 return hit;
 
-            if (math.all(edge == 0f))
+            if (ab.Equals(float3.zero))
                 return hit;
 
-            mathex.GetDualPerpendicularNormalized(edge, out var capsuleNormal, out _);
+            mathex.GetDualPerpendicularNormalized(ab, out var capsuleNormal, out _);
             result.normal   = capsuleNormal;
-            result.hitpoint = pointOnSegment;
+            result.hitpoint = pointOnSegment + capsule.radius * capsuleNormal;
             result.distance = 0f;
             return hit;
         }

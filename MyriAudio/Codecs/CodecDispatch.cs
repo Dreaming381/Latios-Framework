@@ -1,5 +1,6 @@
 using System;
 using Latios.Unsafe;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 
@@ -11,10 +12,50 @@ namespace Latios.Myri
         ADPCM,
     }
 
-    internal struct CodecContext
+    // Note: Dispose is only required when created with a dspAllocator inside AudioECS.
+    internal unsafe struct CodecContext : IDisposable
     {
-        public ThreadStackAllocator threadStackAllocator;
-        public int                  sampleRate;
+        public ThreadStackAllocator             threadStackAllocator;
+        public AllocatorManager.AllocatorHandle dspAllocator;
+        UnsafeList<Allocation>                  allocations;
+        public int                              sampleRate;
+
+        struct Allocation
+        {
+            public void* ptr;
+            public int   length;
+            public int   elementSize;
+            public int   alignment;
+        }
+
+        public Span<T> AllocateSpan<T>(int length) where T : unmanaged
+        {
+            if (threadStackAllocator.isCreated)
+                return threadStackAllocator.AllocateAsSpan<T>(length);
+            if (!allocations.IsCreated)
+                allocations = new UnsafeList<Allocation>(8, dspAllocator);
+            var ptr         = AllocatorManager.Allocate(dspAllocator, UnsafeUtility.SizeOf<T>(), UnsafeUtility.AlignOf<T>(), length);
+            allocations.Add(new Allocation
+            {
+                ptr         = ptr,
+                elementSize = UnsafeUtility.SizeOf<T>(),
+                alignment   = UnsafeUtility.AlignOf<T>(),
+                length      = length
+            });
+            return new Span<T>(ptr, length);
+        }
+
+        public void Dispose()
+        {
+            if (allocations.IsCreated)
+            {
+                foreach (var allocation in allocations)
+                {
+                    AllocatorManager.Free(dspAllocator, allocation.ptr, allocation.elementSize, allocation.alignment, allocation.length);
+                }
+                allocations.Dispose();
+            }
+        }
     }
 
     internal ref struct StereoSamples

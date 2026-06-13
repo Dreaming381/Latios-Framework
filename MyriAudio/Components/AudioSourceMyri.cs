@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using Latios.Unsafe;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -245,6 +247,80 @@ namespace Latios.Myri
         /// The codec used for the encodedSamples
         /// </summary>
         public Codec codec;
+
+        /// <summary>
+        /// Gets the left channel samples starting at the startOffset, and continuing until the samples buffer is filled from index 0.
+        /// If there are not enough samples in the clip, the clip will loop.
+        /// </summary>
+        /// <param name="allocator">An allocator to use for any temporary allocations required by the codec.</param>
+        /// <param name="samples">The output buffer of samples. The length specifies how many samples to read.</param>
+        /// <param name="startOffset">The start offset in the clip to read samples from</param>
+        public void GetLeftOrMonoSamples(AllocatorManager.AllocatorHandle allocator, Span<float> samples, int startOffset)
+        {
+            var context = new CodecContext { dspAllocator = allocator };
+            GetChannelSamples(ref context, samples, startOffset, false);
+            context.Dispose();
+        }
+
+        /// <summary>
+        /// Gets the right channel samples starting at the startOffset, and continuing until the samples buffer is filled from index 0.
+        /// If there are not enough samples in the clip, the clip will loop.
+        /// </summary>
+        /// <param name="allocator">An allocator to use for any temporary allocations required by the codec.</param>
+        /// <param name="samples">The output buffer of samples. The length specifies how many samples to read.</param>
+        /// <param name="startOffset">The start offset in the clip to read samples from</param>
+        public void GetRightSamples(AllocatorManager.AllocatorHandle allocator, Span<float> samples, int startOffset)
+        {
+            CheckIsStereo();
+            var context = new CodecContext { dspAllocator = allocator };
+            GetChannelSamples(ref context, samples, startOffset, true);
+            context.Dispose();
+        }
+
+        void GetChannelSamples(ref CodecContext context, Span<float> samples, int startOffset, bool rightChannel)
+        {
+            context.sampleRate = sampleRate;
+            if (samples.Length >= sampleCountPerChannel)
+            {
+                // Read everything, then rearrange
+                var allSamples = CodecDispatch.DecodeChannel(codec, ref encodedSamples, rightChannel, 0, sampleCountPerChannel, ref context);
+                int readIndex  = startOffset;
+                for (int i = 0; i < samples.Length; i++)
+                {
+                    readIndex  %= allSamples.Length;
+                    samples[i]  = allSamples[readIndex];
+                    readIndex++;
+                }
+            }
+            else
+            {
+                var startIndex = startOffset % sampleCountPerChannel;
+                if (startIndex + samples.Length <= sampleCountPerChannel)
+                {
+                    var sampledRange = CodecDispatch.DecodeChannel(codec, ref encodedSamples, rightChannel, startIndex, samples.Length, ref context);
+                    sampledRange.CopyTo(samples);
+                }
+                else
+                {
+                    var samplesToEnd = sampleCountPerChannel - startIndex;
+                    var firstRange   = CodecDispatch.DecodeChannel(codec, ref encodedSamples, rightChannel, startIndex, samplesToEnd, ref context);
+                    firstRange.CopyTo(samples.Slice(0, samplesToEnd));
+                    var leftoverSamples = samples.Length - samplesToEnd;
+                    var secondRange     = CodecDispatch.DecodeChannel(codec, ref encodedSamples, rightChannel, 0, leftoverSamples, ref context);
+                    secondRange.CopyTo(samples.Slice(samplesToEnd, leftoverSamples));
+                }
+            }
+            context.threadStackAllocator.Dispose();
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
+        void CheckIsStereo()
+        {
+            if (!isStereo)
+            {
+                throw new InvalidOperationException($"Audio clip {name} is not stereo, and does not have a right channel to sample from.");
+            }
+        }
     }
 }
 

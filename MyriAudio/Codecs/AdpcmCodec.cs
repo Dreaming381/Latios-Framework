@@ -23,8 +23,8 @@ namespace Latios.Myri
 
             ADPCMCodec.EncodeChannel(monoSamplesToEncode, ref array);
 
-            var decodedSamples = context.threadStackAllocator.AllocateAsSpan<float>(monoSamplesToEncode.Length);
-            var imaStates      = context.threadStackAllocator.AllocateAsSpan<ADPCMCodec.IMAState>(monoSamplesToEncode.Length);
+            var decodedSamples = context.AllocateSpan<float>(monoSamplesToEncode.Length);
+            var imaStates      = context.AllocateSpan<ADPCMCodec.IMAState>(monoSamplesToEncode.Length);
 
             ADPCMCodec.DecodeChannelWithIMAStates(new ReadOnlySpan<byte>(array.GetUnsafePtr(), array.Length), ref decodedSamples, ref imaStates);
             signalToNoiseRatio = DSP.DspTools.CalculateSignalToNoiseRatio(monoSamplesToEncode, decodedSamples);
@@ -45,10 +45,10 @@ namespace Latios.Myri
             ADPCMCodec.EncodeChannel(leftSamplesToEncode,  ref leftArray);
             ADPCMCodec.EncodeChannel(rightSamplesToEncode, ref rightArray);
 
-            var decodedLeft  = context.threadStackAllocator.AllocateAsSpan<float>(leftSamplesToEncode.Length);
-            var decodedRight = context.threadStackAllocator.AllocateAsSpan<float>(rightSamplesToEncode.Length);
-            var imaLeft      = context.threadStackAllocator.AllocateAsSpan<ADPCMCodec.IMAState>(leftSamplesToEncode.Length);
-            var imaRight     = context.threadStackAllocator.AllocateAsSpan<ADPCMCodec.IMAState>(rightSamplesToEncode.Length);
+            var decodedLeft  = context.AllocateSpan<float>(leftSamplesToEncode.Length);
+            var decodedRight = context.AllocateSpan<float>(rightSamplesToEncode.Length);
+            var imaLeft      = context.AllocateSpan<ADPCMCodec.IMAState>(leftSamplesToEncode.Length);
+            var imaRight     = context.AllocateSpan<ADPCMCodec.IMAState>(rightSamplesToEncode.Length);
 
             ADPCMCodec.DecodeChannelWithIMAStates(new ReadOnlySpan<byte>(leftArray.GetUnsafePtr(), leftArray.Length),   ref decodedLeft,  ref imaLeft);
             ADPCMCodec.DecodeChannelWithIMAStates(new ReadOnlySpan<byte>(rightArray.GetUnsafePtr(), rightArray.Length), ref decodedRight, ref imaRight);
@@ -67,7 +67,7 @@ namespace Latios.Myri
 
         public ReadOnlySpan<float> DecodeSingleChannel(int start, int count, bool rightChannel, ref CodecContext context)
         {
-            var                decoded   = context.threadStackAllocator.AllocateAsSpan<float>(count);
+            var                decoded   = context.AllocateSpan<float>(count);
             var                seekIndex = start / 1024;
             Seek1024IMAState   seekIma;
             ReadOnlySpan<byte> encoded;

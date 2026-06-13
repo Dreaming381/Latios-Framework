@@ -29,6 +29,8 @@ namespace Latios.Kinemation
         NativeList<TextureState>                          m_textureStates;
         NativeList<int>                                   m_textureStatesFreelist;
 
+        int m_lastQualityLevel;
+
         static List<StreamingMipMapArray> s_sharedValuesCache   = new List<StreamingMipMapArray>();
         static List<int>                  s_sharedIndicesCache  = new List<int>();
         static List<int>                  s_sharedVersionsCache = new List<int>();
@@ -44,6 +46,8 @@ namespace Latios.Kinemation
             m_sharedIndexToUnmanagedArrayMap = new NativeHashMap<int, UnmanagedStreamingMipMapArray>(32, Allocator.Persistent);
             m_textureStates                  = new NativeList<TextureState>(128, Allocator.Persistent);
             m_textureStatesFreelist          = new NativeList<int>(128, Allocator.Persistent);
+
+            m_lastQualityLevel = 0;
         }
 
         [BurstCompile]
@@ -148,12 +152,15 @@ namespace Latios.Kinemation
                 textureStates      = m_textureStates,
             }.Schedule(state.Dependency);
 
-            state.Dependency = new PostProcessTexturesJob
+            var currentQualityLevel = QualitySettings.GetQualityLevel();
+            state.Dependency        = new PostProcessTexturesJob
             {
                 mipMapsStreamingAssignmentLookup = GetBufferLookup<MipMapStreamingAssignment>(false),
                 textureStates                    = m_textureStates,
-                worldBlackbaordEntity            = latiosWorld.worldBlackboardEntity
+                worldBlackboardEntity            = latiosWorld.worldBlackboardEntity,
+                reset                            = currentQualityLevel != m_lastQualityLevel
             }.Schedule(state.Dependency);
+            m_lastQualityLevel = currentQualityLevel;
         }
 
         [BurstCompile]
@@ -640,12 +647,16 @@ namespace Latios.Kinemation
         {
             public NativeList<TextureState>                textureStates;
             public BufferLookup<MipMapStreamingAssignment> mipMapsStreamingAssignmentLookup;
-            public Entity                                  worldBlackbaordEntity;
+            public Entity                                  worldBlackboardEntity;
+            public bool                                    reset;
 
             public void Execute()
             {
-                var assignments = mipMapsStreamingAssignmentLookup[worldBlackbaordEntity];
-                assignments.Clear();
+                var assignments = mipMapsStreamingAssignmentLookup[worldBlackboardEntity];
+
+                // Todo: Merge the assignments. For now, we produce duplicates, which might be somewhat intense on the main thread,
+                // but merging could also be pricy and have weird determinism issues.
+                //assignments.Clear();
 
                 for (int i = 0; i < textureStates.Length; i++)
                 {
@@ -654,7 +665,7 @@ namespace Latios.Kinemation
                         continue;
 
                     var bestLevel = math.min(state.evaluatedLevel, math.cmin(state.oneTwoThreeFourAgo));
-                    if (bestLevel != state.assignedLevel)
+                    if (bestLevel != state.assignedLevel || reset)
                     {
                         state.assignedLevel = bestLevel;
                         assignments.Add(new MipMapStreamingAssignment

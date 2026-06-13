@@ -692,7 +692,7 @@ namespace Latios.Kinemation
                     else if (vertexCount != normalBuffers[entityIndex].Length)
                     {
                         UnityEngine.Debug.LogError(
-                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} positions and {normalBuffers[entityIndex].Length} tangents. These must match.");
+                            $"{entities[entityIndex].ToFixedString()} has {vertexCount} positions and {normalBuffers[entityIndex].Length} normals. These must match.");
                         failed = true;
                     }
                 }

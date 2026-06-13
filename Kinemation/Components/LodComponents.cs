@@ -218,7 +218,8 @@ namespace Latios.Kinemation
 
         public struct MeshMetric
         {
-            public float  uv0Metric;
+            public float uv0Metric;
+            // Todo: Replace this with single float of areaScale2 precomputed in 0.16.0.
             public float3 meshLocalBounds;
         }
 
@@ -385,12 +386,18 @@ namespace Latios.Kinemation
                     return 0;
             }
 
-            var   boundsScale = worldRenderBounds.Value.Extents / math.max(1e-6f, meshMetric.meshLocalBounds);
+            var   boundsScale = worldRenderBounds.Value.Extents;
             float areaScale;
             if (boundsScale.x > boundsScale.y)
                 areaScale = boundsScale.x * math.max(boundsScale.y, boundsScale.z);
             else
                 areaScale = boundsScale.y * math.max(boundsScale.x, boundsScale.z);
+            float areaScale2;
+            if (meshMetric.meshLocalBounds.x > meshMetric.meshLocalBounds.y)
+                areaScale2 = meshMetric.meshLocalBounds.x * math.max(meshMetric.meshLocalBounds.y, meshMetric.meshLocalBounds.z);
+            else
+                areaScale2  = meshMetric.meshLocalBounds.y * math.max(meshMetric.meshLocalBounds.x, meshMetric.meshLocalBounds.z);
+            areaScale      /= math.max(1e-6f, areaScale2);
 
             var distributionMetric = meshMetric.uv0Metric * areaScale / (textureScale.x * textureScale.y);
 
