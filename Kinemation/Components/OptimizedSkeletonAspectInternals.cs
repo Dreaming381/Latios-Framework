@@ -402,6 +402,7 @@ namespace Latios.Kinemation
                 var socket             = referenceTransformAspect[handle];
                 transform.context32    = socket.context32;
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalTransformQvvs(socket, in transform);
+                commandCount++;
 #endif
             }
 
@@ -413,6 +414,7 @@ namespace Latios.Kinemation
                 var handle             = referenceTransformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(socketTransformHierarchyIndex);
                 var socket             = referenceTransformAspect[handle];
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalPosition(socket, position);
+                commandCount++;
 #endif
             }
 
@@ -424,6 +426,7 @@ namespace Latios.Kinemation
                 var handle             = referenceTransformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(socketTransformHierarchyIndex);
                 var socket             = referenceTransformAspect[handle];
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalRotation(socket, rotation);
+                commandCount++;
 #endif
             }
 
@@ -437,6 +440,7 @@ namespace Latios.Kinemation
                 // Todo: Switch to explicit position-rotation command when that is supported.
                 var localScale         = socket.localScale;
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalTransform(socket, new TransformQvs(position, rotation, localScale));
+                commandCount++;
 #endif
             }
 
@@ -448,6 +452,7 @@ namespace Latios.Kinemation
                 var handle             = referenceTransformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(socketTransformHierarchyIndex);
                 var socket             = referenceTransformAspect[handle];
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalScale(socket, scale);
+                commandCount++;
 #endif
             }
 
@@ -461,6 +466,7 @@ namespace Latios.Kinemation
                 // Todo: Switch to explicit position-scale command when that is supported.
                 var localRotation      = socket.localRotation;
                 commands[commandCount] = TransformBatchWriteCommand.SetLocalTransform(socket, new TransformQvs(position, localRotation, scale));
+                commandCount++;
 #endif
             }
 
@@ -472,6 +478,7 @@ namespace Latios.Kinemation
                 var handle             = referenceTransformAspect.entityInHierarchyHandle.GetFromIndexInHierarchy(socketTransformHierarchyIndex);
                 var socket             = referenceTransformAspect[handle];
                 commands[commandCount] = TransformBatchWriteCommand.SetStretch(socket, stretch);
+                commandCount++;
 #endif
             }
         }
@@ -627,6 +634,7 @@ namespace Latios.Kinemation
                     transformSpanIndex++;
                 }
             }
+            socketUpdater.ApplyAndDispose();
         }
 
         struct TransformWithIndicesComparer : IComparer<TransformQvvs>

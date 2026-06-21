@@ -193,6 +193,11 @@ namespace Latios.Transforms
                     previousIndex = handle.indexInHierarchy;
                 }
             }
+            else
+            {
+                fastPath = false;
+                sortPath = false;
+            }
 
             var tsa = ThreadStackAllocator.GetAllocator();
             if (fastPath)

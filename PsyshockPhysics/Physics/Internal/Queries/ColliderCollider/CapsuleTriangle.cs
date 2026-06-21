@@ -232,7 +232,7 @@ namespace Latios.Psyshock
             simdFloat3 triEdges  = triPoints.bcaa - triPoints;
 
             float3 capEdge = capsule.pointB - capsule.pointA;
-            CapsuleCapsule.SegmentSegment(in triPoints, in triEdges, new simdFloat3(capsule.pointA), new simdFloat3(capEdge), out var closestTriEdges, out var closestCapsuleAxis);
+            CapsuleCapsule.SegmentSegmentOld(in triPoints, in triEdges, new simdFloat3(capsule.pointA), new simdFloat3(capEdge), out var closestTriEdges, out var closestCapsuleAxis);
             float3 segSegDists      = simd.distancesq(closestTriEdges, closestCapsuleAxis).xyz;
             bool   bIsBetter        = segSegDists.y < segSegDists.x;
             float3 closestEdgePoint = math.select(closestTriEdges.a, closestTriEdges.b, bIsBetter);

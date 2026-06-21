@@ -19,6 +19,12 @@ namespace Latios.Unsafe
             set => s_settings.Data.maxDepths = value;
         }
 
+        public static int maxAllocatorsPerThreadError
+        {
+            get => s_settings.Data.maxDepthsError;
+            set => s_settings.Data.maxDepthsError = value;
+        }
+
         public static int defaultBlockSize
         {
             get => s_settings.Data.defaultBlockSize;
@@ -246,6 +252,7 @@ namespace Latios.Unsafe
         struct Settings
         {
             public int maxDepths;
+            public int maxDepthsError;
             public int defaultBlockSize;
         }
 
@@ -268,7 +275,7 @@ namespace Latios.Unsafe
             // There is no domain unload in player builds, so we must be sure to shutdown when the process exits.
             AppDomain.CurrentDomain.ProcessExit += (_, __) => { Shutdown(); };
 
-            s_settings.Data = new Settings { defaultBlockSize = 1024 * 1024, maxDepths = 32 };
+            s_settings.Data = new Settings { defaultBlockSize = 1024 * 1024, maxDepths = 32, maxDepthsError = 8192 };
             s_states.Data.Init();
             s_initialized = true;
         }
@@ -292,16 +299,19 @@ namespace Latios.Unsafe
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         static void CheckForDepthLeaks(int depth)
         {
-            if (depth > s_settings.Data.maxDepths)
+            if (depth > s_settings.Data.maxDepthsError)
                 throw new System.InvalidOperationException(
-                    $"Thread has too many ThreadStackAllocators compared to the max threshold of {s_settings.Data.maxDepths}. This may be a sign of a leak caused by allocator instances not being disposed.");
+                    $"Thread has too many ThreadStackAllocators compared to the max error threshold of {s_settings.Data.maxDepthsError}. This exception is to stop an infinite memory leak. Please refer to the allocator creating the error messages and determine why it is not being disposed.");
+            if (depth > s_settings.Data.maxDepths)
+                UnityEngine.Debug.LogError(
+                    $"Thread has too many ThreadStackAllocators compared to the warning threshold of {s_settings.Data.maxDepths}. This may be a sign of a leak caused by allocator instances not being disposed.");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS")]
         static void CheckForDepthLeaks(int depthOfFreed, int depthsTotal)
         {
             if (depthOfFreed < depthsTotal)
-                throw new System.InvalidOperationException(
+                UnityEngine.Debug.LogError(
                     $"A ThreadStackAllocator is being deallocated before {depthsTotal - depthOfFreed} subsequently created ThreadStackAllocators have been disposed. This is a leak caused by allocator instances not being disposed.");
         }
         #endregion

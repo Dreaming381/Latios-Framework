@@ -81,7 +81,7 @@ namespace Latios.Kinemation.Systems
                 get => packed.SInt6;
                 set => packed.SInt6 = value;
             }
-            public int renderingPriority
+            public int renderingPriority  // Todo: Use this for generating draw ranges
             {
                 get => packed.SInt7;
                 set => packed.SInt7 = value;

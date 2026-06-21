@@ -544,7 +544,7 @@ namespace Latios.Psyshock
                 var bSupportEinB = math.select(0f, -2f, maskB);
                 var bSupportP    = math.transform(bInASpace, bSupportPinB);
                 var bSupportE    = math.rotate(bInASpace, bSupportEinB);
-                CapsuleCapsule.SegmentSegment(aSupportP, aSupportE, bSupportP, bSupportE, out var closestA, out var closestB, out _);
+                CapsuleCapsule.SegmentSegmentOld(aSupportP, aSupportE, bSupportP, bSupportE, out var closestA, out var closestB, out _);
                 var closestAinB = math.transform(aInBSpace, closestA);
                 // The two points should be on or inside each other's boxes, or else we picked up the wrong edges
                 // (edges of parallel faces could have multiple valid support points)
@@ -563,7 +563,7 @@ namespace Latios.Psyshock
 
                     var aStarts = new simdFloat3(aSupportP, aSupportP, aAlternateSupportP, aAlternateSupportP);
                     var bStarts = new simdFloat3(bSupportP, bAlternateSupportP, bSupportP, bAlternateSupportP);
-                    CapsuleCapsule.SegmentSegment(in aStarts, new simdFloat3(aSupportE), in bStarts, new simdFloat3(bSupportE), out var closestAs, out var closestBs);
+                    CapsuleCapsule.SegmentSegmentOld(in aStarts, new simdFloat3(aSupportE), in bStarts, new simdFloat3(bSupportE), out var closestAs, out var closestBs);
                     var closestAsInB       = simd.transform(aInBSpace, closestAs);
                     var clampedAs          = simd.clamp(closestAsInB, -halfSizeB, halfSizeB);
                     var clampedBs          = simd.clamp(closestBs, -halfSizeA, halfSizeA);
@@ -671,12 +671,12 @@ namespace Latios.Psyshock
 
                 var aStarts = new simdFloat3(aSupportP, aSupportP, aAlternateSupportP, aAlternateSupportP);
                 var bStarts = new simdFloat3(bSupportP, bAlternateSupportP, bSupportP, bAlternateSupportP);
-                var valid   = CapsuleCapsule.SegmentSegmentInvalidateEndpoints(aStarts,
-                                                                               new simdFloat3(aSupportE),
-                                                                               bStarts,
-                                                                               new simdFloat3(bSupportE),
-                                                                               out var closestAs,
-                                                                               out var closestBs);
+                var valid   = CapsuleCapsule.SegmentSegmentInvalidateEndpointsOld(aStarts,
+                                                                                  new simdFloat3(aSupportE),
+                                                                                  bStarts,
+                                                                                  new simdFloat3(bSupportE),
+                                                                                  out var closestAs,
+                                                                                  out var closestBs);
                 if (math.any(valid))
                 {
                     var distSqs       = math.select(float.MaxValue, simd.distancesq(closestAs, closestBs), valid);
@@ -1314,12 +1314,12 @@ namespace Latios.Psyshock
 
                 var aStarts = new simdFloat3(aSupportP, aSupportP, aAlternateSupportP, aAlternateSupportP);
                 var bStarts = new simdFloat3(bSupportP, bAlternateSupportP, bSupportP, bAlternateSupportP);
-                var valid   = CapsuleCapsule.SegmentSegmentInvalidateEndpoints(aStarts,
-                                                                               new simdFloat3(aSupportE),
-                                                                               bStarts,
-                                                                               new simdFloat3(bSupportE),
-                                                                               out var closestAs,
-                                                                               out var closestBs);
+                var valid   = CapsuleCapsule.SegmentSegmentInvalidateEndpointsOld(aStarts,
+                                                                                  new simdFloat3(aSupportE),
+                                                                                  bStarts,
+                                                                                  new simdFloat3(bSupportE),
+                                                                                  out var closestAs,
+                                                                                  out var closestBs);
                 if (math.any(valid))
                 {
                     var distSqs       = math.select(float.MaxValue, simd.distancesq(closestAs, closestBs), valid);

@@ -11,7 +11,7 @@ namespace Latios.Kinemation.Systems
 #if !LATIOS_TRANSFORMS_UNITY
     [RequireMatchingQueriesForUpdate]
     [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
-    [UpdateInGroup(typeof(Latios.Transforms.Systems.ExportToGameObjectTransformsEndInitializationSuperSystem), OrderFirst = true)]
+    [UpdateInGroup(typeof(Latios.Transforms.Systems.ExportToGameObjectTransformsEndSimulationSuperSystem), OrderFirst = true)]
     [DisableAutoCreation]
     [BurstCompile]
     public partial struct ForceInitializeUninitializedOptimizedSkeletonsSystem : ISystem

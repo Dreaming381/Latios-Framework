@@ -54,9 +54,8 @@ namespace Latios.Transforms.Systems
     }
 
     /// <summary>
-    /// This group updates at the end of simulation, and is when any logic that exports entity data back to GameObject
-    /// data should occur.
-    /// You can use [UpdateInGroup(typeof(PostTransformSuperSystem))] to add systems that should be updated
+    /// This group updates at the end of initialization, and is when any logic that exports entity data back to GameObject data should occur.
+    /// You can use [UpdateInGroup(typeof(ExportToGameObjectTransformsEndInitializationSuperSystem))] to add systems that should be updated
     /// at this time.
     /// </summary>
     /// [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
@@ -76,9 +75,8 @@ namespace Latios.Transforms.Systems
     }
 
     /// <summary>
-    /// This group updates at the end of simulation, and is when any logic that exports entity data back to GameObject
-    /// data should occur.
-    /// You can use [UpdateInGroup(typeof(PostTransformSuperSystem))] to add systems that should be updated
+    /// This group updates at the end of simulation, and is when any logic that exports entity data back to GameObject data should occur.
+    /// You can use [UpdateInGroup(typeof(ExportToGameObjectTransformsEndSimulationSuperSystem))] to add systems that should be updated
     /// at this time.
     /// </summary>
     /// [WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]

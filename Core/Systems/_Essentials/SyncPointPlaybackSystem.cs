@@ -144,6 +144,9 @@ namespace Latios.Systems
             m_playbackInstances.Clear();
             JobHandle.CompleteAll(m_jobHandles.AsArray());
             m_jobHandles.Dispose();
+            foreach (var ecb in m_entityCommandBuffers)
+                ecb.Dispose();
+
             m_commandBufferAllocator.Allocator.Rewind();
             m_commandBufferAllocator.Allocator.Dispose();
             m_commandBufferAllocator.Dispose();

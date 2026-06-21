@@ -370,7 +370,7 @@ namespace Latios.Psyshock
                                                    new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
             simdFloat3 boxEdgesX = new simdFloat3(new float3(2f * box.halfSize.x, 0f, 0f));
-            CapsuleCapsule.SegmentSegment(simdOsPointA, simdCapsuleEdge, boxPointsX, boxEdgesX, out simdFloat3 edgesClosestAsX, out simdFloat3 edgesClosestBsX);
+            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsX, boxEdgesX, out simdFloat3 edgesClosestAsX, out simdFloat3 edgesClosestBsX);
             simdFloat3 boxNormalsX = new simdFloat3(new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f),
                                                     new float3(0f, math.SQRT2 / 2f, -math.SQRT2 / 2f),
                                                     new float3(0f, -math.SQRT2 / 2f, math.SQRT2 / 2f),
@@ -394,7 +394,7 @@ namespace Latios.Psyshock
                                                    new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
             simdFloat3 boxEdgesY = new simdFloat3(new float3(0f, 2f * box.halfSize.y, 0f));
-            CapsuleCapsule.SegmentSegment(simdOsPointA, simdCapsuleEdge, boxPointsY, boxEdgesY, out simdFloat3 edgesClosestAsY, out simdFloat3 edgesClosestBsY);
+            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsY, boxEdgesY, out simdFloat3 edgesClosestAsY, out simdFloat3 edgesClosestBsY);
             simdFloat3 boxNormalsY = new simdFloat3(new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f),
                                                     new float3(math.SQRT2 / 2f, 0f, -math.SQRT2 / 2f),
                                                     new float3(-math.SQRT2 / 2f, 0f, math.SQRT2 / 2f),
@@ -413,7 +413,7 @@ namespace Latios.Psyshock
                                                    new float3(-box.halfSize.x, box.halfSize.y, -box.halfSize.z),
                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
             simdFloat3 boxEdgesZ = new simdFloat3(new float3(0f, 0f, 2f * box.halfSize.z));
-            CapsuleCapsule.SegmentSegment(simdOsPointA, simdCapsuleEdge, boxPointsZ, boxEdgesZ, out simdFloat3 edgesClosestAsZ, out simdFloat3 edgesClosestBsZ);
+            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsZ, boxEdgesZ, out simdFloat3 edgesClosestAsZ, out simdFloat3 edgesClosestBsZ);
             simdFloat3 boxNormalsZ = new simdFloat3(new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f),
                                                     new float3(math.SQRT2 / 2f, -math.SQRT2 / 2f, 0f),
                                                     new float3(-math.SQRT2 / 2f, math.SQRT2 / 2f, 0f),

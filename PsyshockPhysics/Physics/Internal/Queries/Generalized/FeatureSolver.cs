@@ -65,7 +65,7 @@ namespace Latios.Psyshock
                     var edgeStartB = verticesB[previousJ];
                     var edgeEndB   = verticesB[i];
 
-                    CapsuleCapsule.SegmentSegment(edgeStartA, edgeEndA - edgeStartA, edgeStartB, edgeEndB - edgeStartB, out var foundA, out var foundB, out var caughtEndpoints);
+                    CapsuleCapsule.SegmentSegment(edgeStartA, edgeEndA, edgeStartB, edgeEndB, out var foundA, out var foundB, out var caughtEndpoints);
                     if (!math.any(caughtEndpoints))
                     {
                         // We found our edge-edge
