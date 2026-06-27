@@ -616,6 +616,7 @@ namespace Latios.Psyshock
         #region Schedulers
         /// <summary>
         /// Run the FindPairs operation without using a job. This method can be invoked from inside a job.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         public void RunImmediate()
         {
@@ -720,6 +721,7 @@ namespace Latios.Psyshock
         #region Schedulers
         /// <summary>
         /// Run the FindPairs operation without using a job. This method can be invoked from inside a job.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         public void RunImmediate()
         {
@@ -829,6 +831,7 @@ namespace Latios.Psyshock
         #region Schedulers
         /// <summary>
         /// Run the FindPairs operation without using a job. This method can be invoked from inside a job.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         public void RunImmediate()
         {
@@ -967,6 +970,7 @@ namespace Latios.Psyshock
         #region Schedulers
         /// <summary>
         /// Run the FindPairs operation without using a job. This method can be invoked from inside a job.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         public void RunImmediate()
         {

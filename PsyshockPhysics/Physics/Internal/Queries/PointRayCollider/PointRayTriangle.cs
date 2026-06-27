@@ -300,7 +300,7 @@ namespace Latios.Psyshock
                 float3     doubleStart = ray.start + ray.start;
                 simdFloat3 r           = doubleStart - (triPoints + triPoints.bcaa);
                 float3     dots        = simd.dot(r, edgeNormals).xyz;
-                outNormal              = math.select(normal, -normal, nDotAStart >= 0f);
+                outNormal              = math.select(normal, -normal, math.dot(normal, ray.displacement) >= 0f);
                 return math.all(dots <= 0f) || math.all(dots >= 0f);
             }
             else if (nDotAStart == 0f && nDotAEnd == 0f)
@@ -372,7 +372,7 @@ namespace Latios.Psyshock
                 float3     doubleEnd   = ray.end + ray.end;
                 simdFloat3 r           = doubleEnd - (triPoints + triPoints.bcda);
                 float3     dots        = simd.dot(r, edgeNormals).xyz;
-                outNormal              = math.select(normal, -normal, nDotAStart >= 0f);
+                outNormal              = math.select(normal, -normal, math.dot(normal, ray.displacement) >= 0f);
                 return math.all(dots <= 0f) || math.all(dots >= 0f);
             }
             else

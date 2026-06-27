@@ -5,9 +5,9 @@ namespace Latios.Psyshock
     internal static class CapsuleTerrain
     {
         public static bool AreOverlapping(in TerrainCollider terrain,
-                                         in RigidTransform terrainTransform,
-                                         in CapsuleCollider capsule,
-                                         in RigidTransform capsuleTransform)
+                                          in RigidTransform terrainTransform,
+                                          in CapsuleCollider capsule,
+                                          in RigidTransform capsuleTransform)
         {
             return WithinDistance(in terrain, in terrainTransform, in capsule, in capsuleTransform, 0f);
         }
@@ -346,7 +346,6 @@ namespace Latios.Psyshock
                     return;
 
                 var triangle = PointRayTerrain.CreateLocalTriangle(ref blob, triangleHeightIndices, heightOffset, scale);
-                Physics.ScaleStretchCollider(ref triangle, 1f, scale);
                 // Check that we don't start already intersecting.
                 if (CapsuleTriangle.DistanceBetween(in triangle, in terrainTransform, in capsule, in castStart, 0f, out _))
                 {

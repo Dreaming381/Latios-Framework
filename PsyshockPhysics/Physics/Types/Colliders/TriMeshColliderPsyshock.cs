@@ -145,6 +145,7 @@ namespace Latios.Psyshock
         /// <summary>
         /// Constructs a Blob Asset for the specified mesh triangles. The user is responsible for the lifecycle
         /// of the resulting blob asset. Calling in a Baker may not result in correct incremental behavior.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         /// <param name="builder">The initialized BlobBuilder to create the blob asset with</param>
         /// <param name="vertices">The vertices of the mesh</param>
@@ -203,6 +204,7 @@ namespace Latios.Psyshock
         /// Constructs a Blob Asset for the specified MeshData. The user is responsible for the lifecycle
         /// of the resulting blob asset. Calling in a Baker may not result in correct incremental behavior.
         /// Submeshes that are not triangles are ignored.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         /// <param name="builder">The initialized BlobBuilder to create the blob asset with</param>
         /// <param name="mesh">The input mesh to build the blob from</param>

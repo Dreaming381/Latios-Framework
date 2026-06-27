@@ -7,12 +7,24 @@ namespace Latios.Psyshock
     {
         public static bool AreOverlapping(float3 point, in CompoundCollider compound, in RigidTransform compoundTransform)
         {
-            return WithinDistance(point, in compound, in compoundTransform, 0f);
+            foreach (var i in new CompoundAabbEnumerator(new SphereCollider(point, 0f), RigidTransform.identity, compound, compoundTransform, 0f))
+            {
+                compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
+                if (AreOverlapping(point, in blobCollider, math.mul(compoundTransform, blobTransform)))
+                    return true;
+            }
+            return false;
         }
 
         public static bool WithinDistance(float3 point, in CompoundCollider compound, in RigidTransform compoundTransform, float maxDistance)
         {
-            return DistanceBetween(point, in compound, in compoundTransform, maxDistance, out _);
+            foreach (var i in new CompoundAabbEnumerator(new SphereCollider(point, 0f), RigidTransform.identity, compound, compoundTransform, maxDistance))
+            {
+                compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
+                if (WithinDistance(point, in blobCollider, math.mul(compoundTransform, blobTransform), maxDistance))
+                    return true;
+            }
+            return false;
         }
 
         public static bool DistanceBetween(float3 point, in CompoundCollider compound, in RigidTransform compoundTransform, float maxDistance, out PointDistanceResult result)
@@ -20,7 +32,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            foreach (var i in new CompoundAabbEnumerator(new SphereCollider(point, 0f), RigidTransform.identity, compound, compoundTransform))
+            foreach (var i in new CompoundAabbEnumerator(new SphereCollider(point, 0f), RigidTransform.identity, compound, compoundTransform, maxDistance))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = DistanceBetween(point,
@@ -58,6 +70,34 @@ namespace Latios.Psyshock
         }
 
         // We use a reduced set dispatch here so that Burst doesn't have to try to make these methods re-entrant.
+        private static bool AreOverlapping(float3 point, in Collider collider, in RigidTransform transform)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    return PointRaySphere.AreOverlapping(point, in collider.m_sphere, in transform);
+                case ColliderType.Capsule:
+                    return PointRayCapsule.AreOverlapping(point, in collider.m_capsule, in transform);
+                case ColliderType.Box:
+                    return PointRayBox.AreOverlapping(point, in collider.m_box, in transform);
+                default:
+                    return false;
+            }
+        }
+        private static bool WithinDistance(float3 point, in Collider collider, in RigidTransform transform, float maxDistance)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    return PointRaySphere.WithinDistance(point, in collider.m_sphere, in transform, maxDistance);
+                case ColliderType.Capsule:
+                    return PointRayCapsule.WithinDistance(point, in collider.m_capsule, in transform, maxDistance);
+                case ColliderType.Box:
+                    return PointRayBox.WithinDistance(point, in collider.m_box, in transform, maxDistance);
+                default:
+                    return false;
+            }
+        }
         private static bool DistanceBetween(float3 point, in Collider collider, in RigidTransform transform, float maxDistance, out PointDistanceResult result)
         {
             switch (collider.type)
@@ -104,13 +144,19 @@ namespace Latios.Psyshock
             {
                 Physics.GetCenterExtents(queryAabb, out var c, out var e);
                 var box = new BoxCollider(c, e);
-                this    = new CompoundAabbEnumerator(box, RigidTransform.identity, compound, compoundTransform);
+                this    = new CompoundAabbEnumerator(box, RigidTransform.identity, compound, compoundTransform, 0f);
             }
 
-            public CompoundAabbEnumerator(in Collider queryCollider, in RigidTransform queryTransform, in CompoundCollider compound, in RigidTransform compoundTransform)
+            public CompoundAabbEnumerator(in Collider queryCollider,
+                                          in RigidTransform queryTransform,
+                                          in CompoundCollider compound,
+                                          in RigidTransform compoundTransform,
+                                          float maxDistance)
             {
                 var queryInCompoundSpace  = math.mul(math.inverse(compoundTransform), queryTransform);
                 var queryAabb             = Physics.AabbFrom(in queryCollider, queryInCompoundSpace);
+                queryAabb.min            -= maxDistance;
+                queryAabb.max            += maxDistance;
                 var inverseScale          = math.rcp(compound.scale * compound.stretch);
                 queryAabb.min            *= inverseScale;
                 queryAabb.max            *= inverseScale;

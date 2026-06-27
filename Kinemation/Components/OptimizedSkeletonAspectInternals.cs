@@ -388,7 +388,7 @@ namespace Latios.Kinemation
             public void ApplyAndDispose()
             {
 #if !LATIOS_TRANSFORMS_UNITY
-                commands.ApplyTransforms();
+                commands.Slice(0, commandCount).ApplyTransforms();
                 tsa.Dispose();
 #endif
             }

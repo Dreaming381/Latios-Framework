@@ -6,11 +6,17 @@ namespace Latios.Psyshock
     internal static class ConvexCompound
     {
         public static bool AreOverlapping(in CompoundCollider compound,
-                                         in RigidTransform compoundTransform,
-                                         in ConvexCollider convex,
-                                         in RigidTransform convexTransform)
+                                          in RigidTransform compoundTransform,
+                                          in ConvexCollider convex,
+                                          in RigidTransform convexTransform)
         {
-            return WithinDistance(in compound, in compoundTransform, in convex, in convexTransform, 0f);
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform, 0f))
+            {
+                compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
+                if (AreOverlapping(in blobCollider, math.mul(compoundTransform, blobTransform), in convex, in convexTransform))
+                    return true;
+            }
+            return false;
         }
 
         public static bool WithinDistance(in CompoundCollider compound,
@@ -19,7 +25,13 @@ namespace Latios.Psyshock
                                           in RigidTransform convexTransform,
                                           float maxDistance)
         {
-            return DistanceBetween(in compound, in compoundTransform, in convex, in convexTransform, maxDistance, out _);
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform, maxDistance))
+            {
+                compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
+                if (WithinDistance(in blobCollider, math.mul(compoundTransform, blobTransform), in convex, in convexTransform, maxDistance))
+                    return true;
+            }
+            return false;
         }
 
         public static bool DistanceBetween(in CompoundCollider compound,
@@ -32,7 +44,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform))
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform, maxDistance))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = DistanceBetween(in blobCollider,
@@ -57,7 +69,7 @@ namespace Latios.Psyshock
                                                  float maxDistance,
                                                  ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform))
+            foreach (var i in new PointRayCompound.CompoundAabbEnumerator(convex, convexTransform, compound, compoundTransform, maxDistance))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
                 bool newHit = DistanceBetween(in blobCollider,
@@ -157,6 +169,41 @@ namespace Latios.Psyshock
         }
 
         // We use a reduced set dispatch here so that Burst doesn't have to try to make these methods re-entrant.
+        private static bool AreOverlapping(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in ConvexCollider convex,
+                                           in RigidTransform convexTransform)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    return SphereConvex.AreOverlapping(in convex, in convexTransform, in collider.m_sphere, in colliderTransform);
+                case ColliderType.Capsule:
+                    return CapsuleConvex.AreOverlapping(in convex, in convexTransform, in collider.m_capsule, in colliderTransform);
+                case ColliderType.Box:
+                    return BoxConvex.AreOverlapping(in convex, in convexTransform, in collider.m_box, in colliderTransform);
+                default:
+                    return false;
+            }
+        }
+        private static bool WithinDistance(in Collider collider,
+                                           in RigidTransform colliderTransform,
+                                           in ConvexCollider convex,
+                                           in RigidTransform convexTransform,
+                                           float maxDistance)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    return SphereConvex.WithinDistance(in convex, in convexTransform, in collider.m_sphere, in colliderTransform, maxDistance);
+                case ColliderType.Capsule:
+                    return CapsuleConvex.WithinDistance(in convex, in convexTransform, in collider.m_capsule, in colliderTransform, maxDistance);
+                case ColliderType.Box:
+                    return BoxConvex.WithinDistance(in convex, in convexTransform, in collider.m_box, in colliderTransform, maxDistance);
+                default:
+                    return false;
+            }
+        }
         private static bool DistanceBetween(in Collider collider,
                                             in RigidTransform colliderTransform,
                                             in ConvexCollider convex,

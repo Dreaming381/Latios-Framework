@@ -19,11 +19,11 @@ namespace Latios
     /// while the second half is an overflow region. There is always one "element" in the overflow region to ensure that if the
     /// buffer were to be trimmed, it could be recovered again. That element may or may not be occupied, and uses the bucket linked
     /// list index as the count of real elements in the hashmap.
-    /// 
-    /// The element in the bucket is the start of a forward-linked list of elements sharing the same mapped bucket (hash modulus collisions), 
+    ///
+    /// The element in the bucket is the start of a forward-linked list of elements sharing the same mapped bucket (hash modulus collisions),
     /// with all other elements in the linked list being in the overflow region. Elements in the linked list should always progress forward
     /// in the buffer. That is, a linked list of indices 1, 10, 14 is fine, but a linked list of indices 1, 14, 10 is illegal.
-    /// 
+    ///
     /// The very last element in the DynamicBuffer uses the linked list pointer to instead hold the count within the hashmap.
     /// The element may or may not be occupied, as it might exist to conserve the bucket count, which is computed from the ceilPow2
     /// of the length of the DynamicBuffer.
@@ -252,6 +252,7 @@ namespace Latios
 
         /// <summary>
         /// Reorders the hashmap to adjust for entries whose hashcodes may have changed after a remap.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         public void ReconstructAfterRemap()
         {
@@ -439,7 +440,7 @@ namespace Latios
                         // We already moved the last element, so clear the candidate's link.
                         candidate.nextIndex = 0;
                     }
-                    Backfill(m_buffer.Length - 1); // Do the block at the top of this method to erase the last element after we moved it.
+                    Backfill(m_buffer.Length - 1);  // Do the block at the top of this method to erase the last element after we moved it.
                     return;
                 }
                 else if (candidate.nextIndex > index && !reinserted)

@@ -14,6 +14,7 @@ namespace Latios.Unika
     {
         /// <summary>
         /// Adds a script to the entity. The new script will be at the last index in the script collection.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         /// <typeparam name="T">The type of script to add</typeparam>
         /// <param name="script">The script initial field values to add</param>
@@ -59,6 +60,7 @@ namespace Latios.Unika
         /// Adds a script to the entity, copying the script data from the specified source.
         /// The new script will be at the last index in the script collection.
         /// Any Script type including the sourceScript may be invalidated and need to be re-resolved.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         /// <param name="sourceScript">The script to copy all contents and metadata from</param>
         /// <returns>The index of the new script in the script collection</returns>

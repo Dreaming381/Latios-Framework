@@ -178,6 +178,7 @@ namespace Latios.Psyshock
         /// Constructs a compound collider blob out of an array of axis-aligned box colliders.
         /// Each box's center will be zero'd with the center being applied to the box's transform instead (this improves the mid-phase).
         /// This is a fast-path for voxel-based colliders.
+        /// Warning: This method may only be called from the main thread or a job worker thread. Usage by any other thread might cause a race-condition induced crash.
         /// </summary>
         /// <param name="blobBuilder">The blob builder to create the blob asset with</param>
         /// <param name="axisAlignedBoxes">A list of axis-aligned box colliders, whose centers should be specified relative to the compound collider's center</param>

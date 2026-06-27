@@ -354,7 +354,6 @@ namespace Latios.Psyshock
                     return;
 
                 var triangle = PointRayTerrain.CreateLocalTriangle(ref blob, triangleHeightIndices, heightOffset, scale);
-                Physics.ScaleStretchCollider(ref triangle, 1f, scale);
                 // Check that we don't start already intersecting.
                 if (TriangleCompound.DistanceBetween(in compound, in castStart, in triangle, in terrainTransform, 0f, out _))
                 {

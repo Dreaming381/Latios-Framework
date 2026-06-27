@@ -6,9 +6,9 @@ namespace Latios.Psyshock
     internal static class SphereBox
     {
         public static bool AreOverlapping(in BoxCollider box,
-                                         in RigidTransform boxTransform,
-                                         in SphereCollider sphere,
-                                         in RigidTransform sphereTransform)
+                                          in RigidTransform boxTransform,
+                                          in SphereCollider sphere,
+                                          in RigidTransform sphereTransform)
         {
             return WithinDistance(in box, in boxTransform, in sphere, in sphereTransform, 0f);
         }
@@ -19,7 +19,10 @@ namespace Latios.Psyshock
                                           in RigidTransform sphereTransform,
                                           float maxDistance)
         {
-            return DistanceBetween(in box, in boxTransform, in sphere, in sphereTransform, maxDistance, out _);
+            var    sphereInBoxSpaceTransform = math.InverseTransformFast(in boxTransform, in sphereTransform);
+            float3 sphereCenterInBoxSpace    = math.transform(sphereInBoxSpaceTransform, sphere.center);
+            Unity.Burst.CompilerServices.Hint.Assume(sphere.radius >= 0f);
+            return PointRayBox.PointBoxWithin(sphereCenterInBoxSpace, in box, maxDistance + sphere.radius);
         }
 
         public static bool DistanceBetween(in BoxCollider box,
@@ -29,8 +32,7 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var            boxWorldToLocal           = math.inverse(boxTransform);
-            var            sphereInBoxSpaceTransform = math.mul(boxWorldToLocal, sphereTransform);
+            var            sphereInBoxSpaceTransform = math.InverseTransformFast(in boxTransform, in sphereTransform);
             float3         sphereCenterInBoxSpace    = math.transform(sphereInBoxSpaceTransform, sphere.center);
             SphereCollider sphereInBoxSpace          = new SphereCollider(sphereCenterInBoxSpace, sphere.radius);
             bool           hit                       = BoxSphereDistance(in box,

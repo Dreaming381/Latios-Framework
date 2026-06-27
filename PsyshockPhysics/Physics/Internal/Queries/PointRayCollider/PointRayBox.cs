@@ -8,17 +8,20 @@ namespace Latios.Psyshock
     {
         public static bool AreOverlapping(float3 point, in BoxCollider box, in RigidTransform boxTransform)
         {
-            return WithinDistance(point, in box, in boxTransform, 0f);
+            var pointInBoxSpace = math.InverseTransformFast(in boxTransform, point);
+            var clampedPoint    = math.clamp(pointInBoxSpace, box.center - box.halfSize, box.center + box.halfSize);
+            return pointInBoxSpace.Equals(clampedPoint);
         }
 
         public static bool WithinDistance(float3 point, in BoxCollider box, in RigidTransform boxTransform, float maxDistance)
         {
-            return DistanceBetween(point, in box, in boxTransform, maxDistance, out _);
+            var pointInBoxSpace = math.InverseTransformFast(in boxTransform, point);
+            return PointBoxWithin(pointInBoxSpace, in box, maxDistance);
         }
 
         public static bool DistanceBetween(float3 point, in BoxCollider box, in RigidTransform boxTransform, float maxDistance, out PointDistanceResult result)
         {
-            var  pointInBoxSpace = math.transform(math.inverse(boxTransform), point);
+            var  pointInBoxSpace = math.InverseTransformFast(in boxTransform, point);
             bool hit             = PointBoxDistance(pointInBoxSpace, in box, maxDistance, out var localResult);
             result               = new PointDistanceResult
             {
@@ -41,6 +44,14 @@ namespace Latios.Psyshock
             return hit;
         }
 
+        internal static bool PointBoxWithin(float3 point, in BoxCollider box, float maxDistance)
+        {
+            var clampedPoint = math.clamp(point, box.center - box.halfSize, box.center + box.halfSize);
+            if (maxDistance >= 0f)
+                return math.distancesq(point, clampedPoint) <= maxDistance * maxDistance;
+            return math.cmin(box.halfSize - math.abs(point - box.center)) >= math.abs(maxDistance);
+        }
+
         internal static bool PointBoxDistance(float3 point, in BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
         {
             // Idea: The positive octant of the box contains 7 feature regions: 3 faces, 3 edges, and inside.
@@ -50,7 +61,7 @@ namespace Latios.Psyshock
             float3 osPoint    = point - box.center;  //os = origin space
             bool3  isNegative = osPoint < 0f;
             float3 ospPoint   = math.select(osPoint, -osPoint, isNegative);  //osp = origin space positive
-            int    region     = math.bitmask(new bool4(ospPoint >= box.halfSize, false).zyxw);
+            int    region     = math.bitmask(new bool4(ospPoint >= box.halfSize, false));
             switch (region)
             {
                 case 0:
@@ -71,12 +82,12 @@ namespace Latios.Psyshock
                 }
                 case 1:
                 {
-                    // xy in box, z outside
-                    // Closest feature is the z-face
-                    result.distance    = ospPoint.z - box.halfSize.z;
-                    result.hitpoint    = new float3(ospPoint.xy, box.halfSize.z);
-                    result.normal      = new float3(0f, 0f, 1f);
-                    result.featureCode = (ushort)(0x8002 + math.select(0, 3, isNegative.z));
+                    // yz in box, x outside
+                    // Closest feature is the x-face
+                    result.distance    = ospPoint.x - box.halfSize.x;
+                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.yz);
+                    result.normal      = new float3(1f, 0f, 0f);
+                    result.featureCode = (ushort)(0x8000 + math.select(0, 3, isNegative.x));
                     break;
                 }
                 case 2:
@@ -91,22 +102,22 @@ namespace Latios.Psyshock
                 }
                 case 3:
                 {
-                    // x in box, yz outside
-                    // Closest feature is the x-axis edge
-                    result.distance    = math.distance(ospPoint.yz, box.halfSize.yz);
-                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.yz);
-                    result.normal      = new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f);
-                    result.featureCode = (ushort)(0x4000 + math.bitmask(new bool4(isNegative.yz, false, false)));
+                    // z in box, xy outside
+                    // Closest feature is the z-axis edge
+                    result.distance    = math.distance(ospPoint.xy, box.halfSize.xy);
+                    result.hitpoint    = new float3(box.halfSize.xy, ospPoint.z);
+                    result.normal      = new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f);
+                    result.featureCode = (ushort)(0x4008 + math.bitmask(new bool4(isNegative.xy, false, false)));
                     break;
                 }
                 case 4:
                 {
-                    // yz in box, x outside
-                    // Closest feature is the x-face
-                    result.distance    = ospPoint.x - box.halfSize.x;
-                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.yz);
-                    result.normal      = new float3(1f, 0f, 0f);
-                    result.featureCode = (ushort)(0x8000 + math.select(0, 3, isNegative.x));
+                    // xy in box, z outside
+                    // Closest feature is the z-face
+                    result.distance    = ospPoint.z - box.halfSize.z;
+                    result.hitpoint    = new float3(ospPoint.xy, box.halfSize.z);
+                    result.normal      = new float3(0f, 0f, 1f);
+                    result.featureCode = (ushort)(0x8002 + math.select(0, 3, isNegative.z));
                     break;
                 }
                 case 5:
@@ -121,12 +132,12 @@ namespace Latios.Psyshock
                 }
                 case 6:
                 {
-                    // z in box, xy outside
-                    // Closest feature is the z-axis edge
-                    result.distance    = math.distance(ospPoint.xy, box.halfSize.xy);
-                    result.hitpoint    = new float3(box.halfSize.xy, ospPoint.z);
-                    result.normal      = new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f);
-                    result.featureCode = (ushort)(0x4008 + math.bitmask(new bool4(isNegative.xy, false, false)));
+                    // x in box, yz outside
+                    // Closest feature is the x-axis edge
+                    result.distance    = math.distance(ospPoint.yz, box.halfSize.yz);
+                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.yz);
+                    result.normal      = new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f);
+                    result.featureCode = (ushort)(0x4000 + math.bitmask(new bool4(isNegative.yz, false, false)));
                     break;
                 }
                 default:
