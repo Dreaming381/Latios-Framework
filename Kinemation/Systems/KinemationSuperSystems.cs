@@ -198,6 +198,9 @@ namespace Latios.Kinemation.Systems
             GetOrCreateAndAddUnmanagedSystem<LatiosUpdateEntitiesGraphicsChunkStructureSystem>();
             GetOrCreateAndAddUnmanagedSystem<LatiosAddWorldAndChunkRenderBoundsSystem>();
             GetOrCreateAndAddUnmanagedSystem<KinemationBindingReactiveSystem>();
+            // Expand the buffers of optimized skeletons first bound here (e.g. runtime-instantiated or netcode ghosts)
+            // before they are skinned; the frame sync point is followed by this system in PostSyncPointGroup, this one was not.
+            GetOrCreateAndAddUnmanagedSystem<InitializeAnimatedBuffersSystem>();
         }
     }
 
