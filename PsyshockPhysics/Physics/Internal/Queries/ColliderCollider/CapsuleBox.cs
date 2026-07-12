@@ -8,11 +8,15 @@ namespace Latios.Psyshock
     internal static class CapsuleBox
     {
         public static bool AreOverlapping(in BoxCollider box,
-                                         in RigidTransform boxTransform,
-                                         in CapsuleCollider capsule,
-                                         in RigidTransform capsuleTransform)
+                                          in RigidTransform boxTransform,
+                                          in CapsuleCollider capsule,
+                                          in RigidTransform capsuleTransform)
         {
-            return WithinDistance(in box, in boxTransform, in capsule, in capsuleTransform, 0f);
+            var capInBoxSpaceTransform = math.InverseTransformFast(in boxTransform, in capsuleTransform);
+            var capsuleInBoxSpace      = new CapsuleCollider(math.transform(capInBoxSpaceTransform, capsule.pointA),
+                                                             math.transform(capInBoxSpaceTransform, capsule.pointB),
+                                                             capsule.radius);
+            return BoxCapsuleOverlapping(in box, in capsuleInBoxSpace);
         }
 
         public static bool WithinDistance(in BoxCollider box,
@@ -21,7 +25,11 @@ namespace Latios.Psyshock
                                           in RigidTransform capsuleTransform,
                                           float maxDistance)
         {
-            return DistanceBetween(in box, in boxTransform, in capsule, in capsuleTransform, maxDistance, out _);
+            var capInBoxSpaceTransform = math.InverseTransformFast(in boxTransform, in capsuleTransform);
+            var capsuleInBoxSpace      = new CapsuleCollider(math.transform(capInBoxSpaceTransform, capsule.pointA),
+                                                             math.transform(capInBoxSpaceTransform, capsule.pointB),
+                                                             capsule.radius);
+            return BoxCapsuleWithin(in box, in capsuleInBoxSpace, maxDistance);
         }
 
         public static bool DistanceBetween(in BoxCollider box,
@@ -31,8 +39,7 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var boxWorldToLocal        = math.inverse(boxTransform);
-            var capInBoxSpaceTransform = math.mul(boxWorldToLocal, capsuleTransform);
+            var capInBoxSpaceTransform = math.InverseTransformFast(in boxTransform, in capsuleTransform);
             var capsuleInBoxSpace      = new CapsuleCollider(math.transform(capInBoxSpaceTransform, capsule.pointA),
                                                              math.transform(capInBoxSpaceTransform, capsule.pointB),
                                                              capsule.radius);
@@ -49,7 +56,7 @@ namespace Latios.Psyshock
                                         in RigidTransform targetBoxTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(in targetBox, in targetBoxTransform, in capsuleToCast, in castStart, 0f, out _))
+            if (AreOverlapping(in targetBox, in targetBoxTransform, in capsuleToCast, in castStart))
             {
                 result = default;
                 return false;
@@ -166,7 +173,7 @@ namespace Latios.Psyshock
                                         in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            if (DistanceBetween(in boxToCast, in castStart, in targetCapsule, in targetCapsuleTransform, 0f, out _))
+            if (AreOverlapping(in boxToCast, in castStart, in targetCapsule, in targetCapsuleTransform))
             {
                 result = default;
                 return false;
@@ -328,13 +335,57 @@ namespace Latios.Psyshock
             return result;
         }
 
-        private static bool BoxCapsuleDistance(in BoxCollider box, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
+        unsafe struct float12
+        {
+            public fixed float values[12];
+
+            public float this[int index]
+            {
+                get => values[index];
+                set => values[index] = value;
+            }
+        }
+
+        static readonly float[] sBoxPointsAxSigns = { -1f, -1f, -1f, -1f, 1f, 1f, -1f, -1f, 1f, 1f, -1f, -1f};
+        static readonly float[] sBoxPointsBxSigns = { 1f, 1f, 1f, 1f, 1f, 1f, -1f, -1f, 1f, 1f, -1f, -1f };
+        static readonly float[] sBoxPointsAySigns = { 1f, 1f, -1f, -1f, -1f, -1f, -1f, -1f, 1f, -1f, 1f, -1f };
+        static readonly float[] sBoxPointsBySigns = { 1f, 1f, -1f, -1f, 1f, 1f, 1f, 1f, 1f, -1f, 1f, -1f };
+        static readonly float[] sBoxPointsAzSigns = { 1f, -1f, 1f, -1f, 1f, -1f, 1f, -1f, -1f, -1f, -1f, -1f };
+        static readonly float[] sBoxPointsBzSigns = { 1f, -1f, 1f, -1f, 1f, -1f, 1f, -1f, 1f, 1f, 1f, 1f };
+
+        private static bool BoxCapsuleOverlapping(in BoxCollider box, in CapsuleCollider capsule)
         {
             float3 osPointA = capsule.pointA - box.center;  //os = origin space
             float3 osPointB = capsule.pointB - box.center;
-            float3 pointsPointOnBox;
-            float3 pointsPointOnSegment;
-            float  axisDistance;
+
+            var maxAxis        = math.max(osPointA, osPointB) + capsule.radius;
+            var minAxis        = math.min(osPointA, osPointB) - capsule.radius;
+            var axisSeparation = (maxAxis < -box.halfSize) | (minAxis > box.halfSize);
+            if (math.any(axisSeparation))
+                return false;
+
+            var        edgeDirs              = new simdFloat3(new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), new float3(1f, 0f, 0f));
+            var        capEdge               = math.normalizesafe(osPointB - osPointA);
+            var        axes                  = simd.normalizesafe(simd.cross(capEdge, edgeDirs));
+            var        capADots              = simd.dot(osPointA, axes);
+            var        capBDots              = simd.dot(osPointB, axes);
+            var        minCapSupport         = math.min(capADots, capBDots) - capsule.radius;
+            var        maxCapSupport         = math.max(capADots, capBDots) + capsule.radius;
+            simdFloat3 maxBoxSupportVertices = default;
+            maxBoxSupportVertices.x          = math.chgsign(box.halfSize.x, axes.x);
+            maxBoxSupportVertices.y          = math.chgsign(box.halfSize.y, axes.y);
+            maxBoxSupportVertices.z          = math.chgsign(box.halfSize.z, axes.z);
+            var maxBoxSupport                = simd.dot(maxBoxSupportVertices, axes);
+            var minBoxSupport                = -maxBoxSupport;
+            var crossSeparation              = (maxCapSupport < minBoxSupport) | (minCapSupport > maxBoxSupport);
+            return !math.any(crossSeparation);
+        }
+
+        private static bool BoxCapsuleWithin(in BoxCollider box, in CapsuleCollider capsule, float maxDistance)
+        {
+            float3 osPointA = capsule.pointA - box.center;  //os = origin space
+            float3 osPointB = capsule.pointB - box.center;
+            float  pointsSignedDistanceSq;
             // Step 1: Points vs Planes
             {
                 float3 distancesToMin = math.max(osPointA, osPointB) + box.halfSize;
@@ -344,33 +395,366 @@ namespace Latios.Psyshock
                 bool3  bestAxisMask   = bestDistance == bestDistances;
                 // Prioritize y first, then z, then x if multiple distances perfectly match.
                 // Todo: Should this be configurabe?
-                bestAxisMask.xz      &= !bestAxisMask.y;
-                bestAxisMask.x       &= !bestAxisMask.z;
-                float3 zeroMask       = math.select(0f, 1f, bestAxisMask);
-                bool   useMin         = (bestDistances * zeroMask).Equals(distancesToMin * zeroMask);
-                float  aOnAxis        = math.dot(osPointA, zeroMask);
-                float  bOnAxis        = math.dot(osPointB, zeroMask);
-                bool   aIsGreater     = aOnAxis > bOnAxis;
-                pointsPointOnSegment  = math.select(osPointA, osPointB, useMin ^ aIsGreater);
-                pointsPointOnBox      = math.select(pointsPointOnSegment, math.select(box.halfSize, -box.halfSize, useMin), bestAxisMask);
-                pointsPointOnBox      = math.clamp(pointsPointOnBox, -box.halfSize, box.halfSize);
-                axisDistance          = -bestDistance;
+                bestAxisMask.xz            &= !bestAxisMask.y;
+                bestAxisMask.x             &= !bestAxisMask.z;
+                bool3 useMin                = bestDistances == distancesToMin;
+                bool3 aIsGreater            = osPointA > osPointB;
+                bool  useB                  = math.any((useMin ^ aIsGreater) & bestAxisMask);
+                var   pointsPointOnSegment  = math.select(osPointA, osPointB, useB);
+                var   pointsPointOnBox      = math.select(pointsPointOnSegment, math.select(box.halfSize, -box.halfSize, useMin), bestAxisMask);
+                pointsPointOnBox            = math.clamp(pointsPointOnBox, -box.halfSize, box.halfSize);
+                float axisDistance          = -bestDistance;
+                float signedDistanceSq      = math.distancesq(pointsPointOnSegment, pointsPointOnBox);
+                pointsSignedDistanceSq      = math.select(signedDistanceSq, -signedDistanceSq, axisDistance <= 0f);
+            }
+
+            // Step 2: Edge vs Edges
+            float edgesSignedDistanceSq;
+            {
+                // Todo: We could inline the SegmentSegment invocations to simplify the initial dot products.
+                float3 edgeA        = osPointB - osPointA;
+                float  lengthASq    = math.lengthsq(edgeA);
+                float  invLengthASq = 1f / lengthASq;
+
+                float12 signedDistanceSqs = default;
+                for (int i = 0; i < 12; i++)
+                {
+                    // Inline CapsuleCapsule.SegmentSegment
+                    // Get the box start segment
+                    var startBx = math.chgsign(box.halfSize.x, sBoxPointsAxSigns[i]);
+                    var startBy = math.chgsign(box.halfSize.y, sBoxPointsAySigns[i]);
+                    var startBz = math.chgsign(box.halfSize.z, sBoxPointsAzSigns[i]);
+                    var endBx   = math.chgsign(box.halfSize.x, sBoxPointsBxSigns[i]);
+                    var endBy   = math.chgsign(box.halfSize.y, sBoxPointsBySigns[i]);
+                    var endBz   = math.chgsign(box.halfSize.z, sBoxPointsBzSigns[i]);
+                    // Get the box edge magnitude
+                    var edgeB = 2f * math.select(math.select(box.halfSize.x, box.halfSize.y, i >= 4), box.halfSize.z, i >= 8);
+                    var diffX = startBx - osPointA.x;
+                    var diffY = startBy - osPointA.y;
+                    var diffZ = startBz - osPointA.z;
+
+                    var r            = edgeB * math.select(math.select(edgeA.x, edgeA.y, i >= 4), edgeA.z, i >= 8);
+                    var s1           = edgeA.x * diffX + edgeA.y * diffY + edgeA.z * diffZ;
+                    var s2           = edgeB * math.select(math.select(diffX, diffY, i >= 4), diffZ, i >= 8);
+                    var lengthBSq    = edgeB * edgeB;
+                    var invDenom     = 1f / (lengthASq * lengthBSq - r * r);
+                    var invLengthBSq = 1f / lengthBSq;
+
+                    // Find the closest point on edge A to the line containing edge B
+                    float fracA = (s1 * lengthBSq - s2 * r) * invDenom;
+                    fracA       = math.clamp(fracA, 0.0f, 1.0f);
+                    // Find the closest point on edge B to the point on A just found
+                    float fracB = fracA * (invLengthBSq * r) - invLengthBSq * s2;
+                    fracB       = math.clamp(fracB, 0.0f, 1.0f);
+                    // If the point on B was clamped then there may be a closer point on A to the edge
+                    fracA          = fracB * (invLengthASq * r) + invLengthASq * s1;
+                    fracA          = math.clamp(fracA, 0.0f, 1.0f);
+                    bool fracAIs1  = fracA == 1f;
+                    var  closestAx = math.select(osPointA.x + fracA * edgeA.x, osPointB.x, fracAIs1);
+                    var  closestAy = math.select(osPointA.y + fracA * edgeA.y, osPointB.y, fracAIs1);
+                    var  closestAz = math.select(osPointA.z + fracA * edgeA.z, osPointB.z, fracAIs1);
+                    bool fracBIs1  = fracB == 1f;
+                    var  closestBx = math.select(math.lerp(startBx, endBx, fracB), endBx, fracBIs1);
+                    var  closestBy = math.select(math.lerp(startBy, endBy, fracB), endBy, fracBIs1);
+                    var  closestBz = math.select(math.lerp(startBz, endBz, fracB), endBz, fracBIs1);
+
+                    // Evaluate validity of the result.
+                    // Imagine a line that goes perpendicular through a box's edge at the midpoint.
+                    // All orientations of that line which do not penetrate the box (tangency is not considered penetrating in this case) are validly resolved collisions.
+                    // Orientations of the line which do penetrate are not valid.
+                    // If we constrain the capsule edge to be perpendicular, normalize it, and then compute the dot product, we can compare that to the necessary 45 degree angle
+                    // where penetration occurs. Parallel lines are excluded because either we want to record a capsule point (step 1) or a perpendicular edge on the box.
+                    var root2                         = math.SQRT2 / 2f;
+                    var muteX                         = math.select(0f, 1f, sBoxPointsAxSigns[i] == sBoxPointsBxSigns[i]);
+                    var muteY                         = math.select(0f, 1f, sBoxPointsAySigns[i] == sBoxPointsBySigns[i]);
+                    var muteZ                         = math.select(0f, 1f, sBoxPointsAzSigns[i] == sBoxPointsBzSigns[i]);
+                    var boxNormalX                    = math.chgsign(root2, sBoxPointsAxSigns[i]) * muteX;
+                    var boxNormalY                    = math.chgsign(root2, sBoxPointsAySigns[i]) * muteY;
+                    var boxNormalZ                    = math.chgsign(root2, sBoxPointsAzSigns[i]) * muteZ;
+                    var mutedCapsuleEdgeX             = edgeA.x * muteX;
+                    var mutedCapsuleEdgeY             = edgeA.y * muteY;
+                    var mutedCapsuleEdgeZ             = edgeA.z * muteZ;
+                    var notParallel                   = mutedCapsuleEdgeX != 0f || mutedCapsuleEdgeY != 0f || mutedCapsuleEdgeZ != 0f;
+                    var mutedNormalizedCapsuleEdgeMag =
+                        math.rsqrt(mutedCapsuleEdgeX * mutedCapsuleEdgeX + mutedCapsuleEdgeY * mutedCapsuleEdgeY + mutedCapsuleEdgeZ * mutedCapsuleEdgeZ);
+                    var mutedNormalizedCapsuleEdgeX = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeX;
+                    var mutedNormalizedCapsuleEdgeY = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeY;
+                    var mutedNormalizedCapsuleEdgeZ = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeZ;
+                    var alignment                   = mutedNormalizedCapsuleEdgeX * boxNormalX + mutedNormalizedCapsuleEdgeY * boxNormalY + mutedNormalizedCapsuleEdgeZ *
+                                                      boxNormalZ;
+                    var valid      = notParallel && math.abs(alignment) <= root2;
+                    var distanceSq = math.square(closestBx - closestAx) + math.square(closestBy - closestAy) + math.square(closestBz - closestAz);
+                    var inside     = math.abs(closestAx) <= box.halfSize.x && math.abs(closestAy) <= box.halfSize.y && math.abs(closestAz) <= box.halfSize.z;
+
+                    // Finalize result
+                    signedDistanceSqs[i] = math.select(float.MaxValue, math.select(distanceSq, -distanceSq, inside), valid);
+                }
+
+                uint bestValue = math.asuint(float.MinValue);
+                for (int i = 0; i < 12; i++)
+                {
+                    // Integers are required for reduction, and we always favor values close to 0. But we prefer negative, so we flip the sign
+                    // so that positive values convert into larger integers.
+                    uint val = math.asuint(-signedDistanceSqs[i]);
+                    if (val < bestValue)
+                    {
+                        bestValue = val;
+                    }
+                }
+                edgesSignedDistanceSq = -math.asfloat(bestValue);
+            }
+
+            // Step 3: Pick the better between points and edges
+            bool pointsBeatEdges      = (pointsSignedDistanceSq <= edgesSignedDistanceSq) ^ ((pointsSignedDistanceSq < 0f) | (edgesSignedDistanceSq < 0f));
+            pointsBeatEdges          |= edgesSignedDistanceSq == float.MaxValue;
+            var bestSignedDistanceSq  = math.select(edgesSignedDistanceSq, pointsSignedDistanceSq, pointsBeatEdges);
+
+            // Step 4: Create result
+            var bestSignedDistance = math.sign(bestSignedDistanceSq) * math.sqrt(math.abs(bestSignedDistanceSq));
+            return bestSignedDistance - capsule.radius <= maxDistance;
+        }
+
+        private static bool BoxCapsuleDistance(in BoxCollider box, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
+        {
+            float3 osPointA = capsule.pointA - box.center;  //os = origin space
+            float3 osPointB = capsule.pointB - box.center;
+            float3 pointsPointOnBox;
+            float3 pointsPointOnSegment;
+            float  pointsSignedDistanceSq;
+            // Step 1: Points vs Planes
+            {
+                float3 distancesToMin = math.max(osPointA, osPointB) + box.halfSize;
+                float3 distancesToMax = box.halfSize - math.min(osPointA, osPointB);
+                float3 bestDistances  = math.min(distancesToMin, distancesToMax);
+                float  bestDistance   = math.cmin(bestDistances);
+                bool3  bestAxisMask   = bestDistance == bestDistances;
+                // Prioritize y first, then z, then x if multiple distances perfectly match.
+                // Todo: Should this be configurabe?
+                bestAxisMask.xz        &= !bestAxisMask.y;
+                bestAxisMask.x         &= !bestAxisMask.z;
+                bool3 useMin            = bestDistances == distancesToMin;
+                bool3 aIsGreater        = osPointA > osPointB;
+                bool  useB              = math.any((useMin ^ aIsGreater) & bestAxisMask);
+                pointsPointOnSegment    = math.select(osPointA, osPointB, useB);
+                pointsPointOnBox        = math.select(pointsPointOnSegment, math.select(box.halfSize, -box.halfSize, useMin), bestAxisMask);
+                pointsPointOnBox        = math.clamp(pointsPointOnBox, -box.halfSize, box.halfSize);
+                float axisDistance      = -bestDistance;
+                float signedDistanceSq  = math.distancesq(pointsPointOnSegment, pointsPointOnBox);
+                pointsSignedDistanceSq  = math.select(signedDistanceSq, -signedDistanceSq, axisDistance <= 0f);
+            }
+
+            // Step 2: Edge vs Edges
+            float3 edgesPointOnSegment;
+            float3 edgesPointOnBox;
+            float  edgesSignedDistanceSq;
+            {
+                // Todo: We could inline the SegmentSegment invocations to simplify the initial dot products.
+                float3 edgeA        = osPointB - osPointA;
+                float  lengthASq    = math.lengthsq(edgeA);
+                float  invLengthASq = 1f / lengthASq;
+
+                float12 signedDistanceSqs = default;
+                float12 closestAxs        = default;
+                float12 closestAys        = default;
+                float12 closestAzs        = default;
+                float12 closestBxs        = default;
+                float12 closestBys        = default;
+                float12 closestBzs        = default;
+                for (int i = 0; i < 12; i++)
+                {
+                    // Inline CapsuleCapsule.SegmentSegment
+                    // Get the box start segment
+                    var startBx = math.chgsign(box.halfSize.x, sBoxPointsAxSigns[i]);
+                    var startBy = math.chgsign(box.halfSize.y, sBoxPointsAySigns[i]);
+                    var startBz = math.chgsign(box.halfSize.z, sBoxPointsAzSigns[i]);
+                    var endBx   = math.chgsign(box.halfSize.x, sBoxPointsBxSigns[i]);
+                    var endBy   = math.chgsign(box.halfSize.y, sBoxPointsBySigns[i]);
+                    var endBz   = math.chgsign(box.halfSize.z, sBoxPointsBzSigns[i]);
+                    // Get the box edge magnitude
+                    var edgeB = 2f * math.select(math.select(box.halfSize.x, box.halfSize.y, i >= 4), box.halfSize.z, i >= 8);
+                    var diffX = startBx - osPointA.x;
+                    var diffY = startBy - osPointA.y;
+                    var diffZ = startBz - osPointA.z;
+
+                    var r            = edgeB * math.select(math.select(edgeA.x, edgeA.y, i >= 4), edgeA.z, i >= 8);
+                    var s1           = edgeA.x * diffX + edgeA.y * diffY + edgeA.z * diffZ;
+                    var s2           = edgeB * math.select(math.select(diffX, diffY, i >= 4), diffZ, i >= 8);
+                    var lengthBSq    = edgeB * edgeB;
+                    var invDenom     = 1f / (lengthASq * lengthBSq - r * r);
+                    var invLengthBSq = 1f / lengthBSq;
+
+                    // Find the closest point on edge A to the line containing edge B
+                    float fracA = (s1 * lengthBSq - s2 * r) * invDenom;
+                    fracA       = math.clamp(fracA, 0.0f, 1.0f);
+                    // Find the closest point on edge B to the point on A just found
+                    float fracB = fracA * (invLengthBSq * r) - invLengthBSq * s2;
+                    fracB       = math.clamp(fracB, 0.0f, 1.0f);
+                    // If the point on B was clamped then there may be a closer point on A to the edge
+                    fracA          = fracB * (invLengthASq * r) + invLengthASq * s1;
+                    fracA          = math.clamp(fracA, 0.0f, 1.0f);
+                    bool fracAIs1  = fracA == 1f;
+                    var  closestAx = math.select(osPointA.x + fracA * edgeA.x, osPointB.x, fracAIs1);
+                    var  closestAy = math.select(osPointA.y + fracA * edgeA.y, osPointB.y, fracAIs1);
+                    var  closestAz = math.select(osPointA.z + fracA * edgeA.z, osPointB.z, fracAIs1);
+                    bool fracBIs1  = fracB == 1f;
+                    var  closestBx = math.select(math.lerp(startBx, endBx, fracB), endBx, fracBIs1);
+                    var  closestBy = math.select(math.lerp(startBy, endBy, fracB), endBy, fracBIs1);
+                    var  closestBz = math.select(math.lerp(startBz, endBz, fracB), endBz, fracBIs1);
+
+                    // Evaluate validity of the result.
+                    // Imagine a line that goes perpendicular through a box's edge at the midpoint.
+                    // All orientations of that line which do not penetrate the box (tangency is not considered penetrating in this case) are validly resolved collisions.
+                    // Orientations of the line which do penetrate are not valid.
+                    // If we constrain the capsule edge to be perpendicular, normalize it, and then compute the dot product, we can compare that to the necessary 45 degree angle
+                    // where penetration occurs. Parallel lines are excluded because either we want to record a capsule point (step 1) or a perpendicular edge on the box.
+                    var root2                         = math.SQRT2 / 2f;
+                    var muteX                         = math.select(0f, 1f, sBoxPointsAxSigns[i] == sBoxPointsBxSigns[i]);
+                    var muteY                         = math.select(0f, 1f, sBoxPointsAySigns[i] == sBoxPointsBySigns[i]);
+                    var muteZ                         = math.select(0f, 1f, sBoxPointsAzSigns[i] == sBoxPointsBzSigns[i]);
+                    var boxNormalX                    = math.chgsign(root2, sBoxPointsAxSigns[i]) * muteX;
+                    var boxNormalY                    = math.chgsign(root2, sBoxPointsAySigns[i]) * muteY;
+                    var boxNormalZ                    = math.chgsign(root2, sBoxPointsAzSigns[i]) * muteZ;
+                    var mutedCapsuleEdgeX             = edgeA.x * muteX;
+                    var mutedCapsuleEdgeY             = edgeA.y * muteY;
+                    var mutedCapsuleEdgeZ             = edgeA.z * muteZ;
+                    var notParallel                   = mutedCapsuleEdgeX != 0f || mutedCapsuleEdgeY != 0f || mutedCapsuleEdgeZ != 0f;
+                    var mutedNormalizedCapsuleEdgeMag =
+                        math.rsqrt(mutedCapsuleEdgeX * mutedCapsuleEdgeX + mutedCapsuleEdgeY * mutedCapsuleEdgeY + mutedCapsuleEdgeZ * mutedCapsuleEdgeZ);
+                    var mutedNormalizedCapsuleEdgeX = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeX;
+                    var mutedNormalizedCapsuleEdgeY = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeY;
+                    var mutedNormalizedCapsuleEdgeZ = mutedNormalizedCapsuleEdgeMag * mutedCapsuleEdgeZ;
+                    var alignment                   = mutedNormalizedCapsuleEdgeX * boxNormalX + mutedNormalizedCapsuleEdgeY * boxNormalY + mutedNormalizedCapsuleEdgeZ *
+                                                      boxNormalZ;
+                    var valid      = notParallel && math.abs(alignment) <= root2;
+                    var distanceSq = math.square(closestBx - closestAx) + math.square(closestBy - closestAy) + math.square(closestBz - closestAz);
+                    var inside     = math.abs(closestAx) <= box.halfSize.x && math.abs(closestAy) <= box.halfSize.y && math.abs(closestAz) <= box.halfSize.z;
+
+                    // Finalize result
+                    signedDistanceSqs[i] = math.select(float.MaxValue, math.select(distanceSq, -distanceSq, inside), valid);
+                    closestAxs[i]        = closestAx;
+                    closestAys[i]        = closestAy;
+                    closestAzs[i]        = closestAz;
+                    closestBxs[i]        = closestBx;
+                    closestBys[i]        = closestBy;
+                    closestBzs[i]        = closestBz;
+                }
+
+                // Todo: Might be more optimal to explicitly vectorize this reduction so that we don't have the weird integer shenanigans?
+                // But the codegen is very good this way, so there's not much to save.
+                ulong bestValue = ulong.MaxValue;
+                for (int i = 0; i < 12; i++)
+                {
+                    // Integers are required for reduction, and we always favor values close to 0. But we prefer negative, so we flip the sign
+                    // so that positive values convert into larger integers.
+                    ulong val = math.asuint(-signedDistanceSqs[i]);
+                    // Pack the index into the reduction variable, so that this can be autovectorized properly.
+                    val <<= 16;
+                    val  |= (uint)i;
+                    if (val < bestValue)
+                    {
+                        bestValue = val;
+                    }
+                }
+
+                var bestIndex         = (int)(bestValue & 0xf);
+                edgesSignedDistanceSq = signedDistanceSqs[bestIndex];
+                edgesPointOnSegment   = new float3(closestAxs[bestIndex], closestAys[bestIndex], closestAzs[bestIndex]);
+                edgesPointOnBox       = new float3(closestBxs[bestIndex], closestBys[bestIndex], closestBzs[bestIndex]);
+            }
+
+            // Step 3: Pick the better between points and edges
+            bool pointsBeatEdges      = (pointsSignedDistanceSq <= edgesSignedDistanceSq) ^ ((pointsSignedDistanceSq < 0f) | (edgesSignedDistanceSq < 0f));
+            pointsBeatEdges          |= edgesSignedDistanceSq == float.MaxValue;
+            var bestSignedDistanceSq  = math.select(edgesSignedDistanceSq, pointsSignedDistanceSq, pointsBeatEdges);
+            var bestPointOnSegment    = math.select(edgesPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
+            var bestPointOnBox        = math.select(edgesPointOnBox, pointsPointOnBox, pointsBeatEdges);
+
+            // Step 4: Create result
+            float3 boxNormal         = math.normalize(math.select(0f, 1f, bestPointOnBox == box.halfSize) + math.select(0f, -1f, bestPointOnBox == -box.halfSize));
+            float3 capsuleNormal     = math.normalizesafe(bestPointOnBox - bestPointOnSegment);
+            bool   capsuleDegenerate = capsuleNormal.Equals(float3.zero);
+            capsuleNormal            = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
+            result                   = new ColliderDistanceResultInternal
+            {
+                hitpointA    = bestPointOnBox + box.center,
+                hitpointB    = bestPointOnSegment + box.center + capsuleNormal * capsule.radius,
+                normalA      = boxNormal,
+                normalB      = capsuleNormal,
+                distance     = math.sign(bestSignedDistanceSq) * math.sqrt(math.abs(bestSignedDistanceSq)) - capsule.radius,
+                featureCodeA = PointRayBox.FeatureCodeFromBoxNormal(boxNormal),
+                featureCodeB = PointRayCapsule.FeatureCodeFromSegmentHitpoint(bestPointOnSegment, osPointA, osPointB)
+            };
+
+            if (Hint.Likely(!capsuleDegenerate))
+                return result.distance <= maxDistance;
+
+            var capsuleEdge = osPointB - osPointA;
+            if (capsuleEdge.Equals(float3.zero))
+            {
+                result.hitpointB -= boxNormal * capsule.radius;
+                result.normalB    = -boxNormal;
+                return result.distance <= maxDistance;
+            }
+
+            var edgeNormalized = math.normalize(capsuleEdge);
+            edgeNormalized     = math.select(edgeNormalized, -edgeNormalized, result.featureCodeB == 1);
+            if (result.featureCodeB < 2 && math.dot(result.normalA, edgeNormalized) >= 0f)
+            {
+                result.hitpointB -= boxNormal * capsule.radius;
+                result.normalB    = -boxNormal;
+                return result.distance <= maxDistance;
+            }
+
+            result.normalB    = math.normalize(math.cross(math.cross(capsuleEdge, -boxNormal), capsuleEdge));
+            result.hitpointB += result.normalB * capsule.radius;
+            return result.distance <= maxDistance;
+        }
+
+#if LATIOS_PSYSHOCK_REFERENCE
+        private static bool BoxCapsuleDistanceReference(in BoxCollider box, in CapsuleCollider capsule, float maxDistance, out ColliderDistanceResultInternal result)
+        {
+            float3 osPointA = capsule.pointA - box.center;  //os = origin space
+            float3 osPointB = capsule.pointB - box.center;
+            float3 pointsPointOnBox;
+            float3 pointsPointOnSegment;
+            float axisDistance;
+            // Step 1: Points vs Planes
+            {
+                float3 distancesToMin = math.max(osPointA, osPointB) + box.halfSize;
+                float3 distancesToMax = box.halfSize - math.min(osPointA, osPointB);
+                float3 bestDistances  = math.min(distancesToMin, distancesToMax);
+                float bestDistance   = math.cmin(bestDistances);
+                bool3 bestAxisMask   = bestDistance == bestDistances;
+                // Prioritize y first, then z, then x if multiple distances perfectly match.
+                // Todo: Should this be configurabe?
+                bestAxisMask.xz &= !bestAxisMask.y;
+                bestAxisMask.x  &= !bestAxisMask.z;
+                float3 zeroMask   = math.select(0f, 1f, bestAxisMask);
+                bool useMin     = (bestDistances * zeroMask).Equals(distancesToMin * zeroMask);
+                float aOnAxis    = math.dot(osPointA, zeroMask);
+                float bOnAxis    = math.dot(osPointB, zeroMask);
+                bool aIsGreater = aOnAxis > bOnAxis;
+                pointsPointOnSegment = math.select(osPointA, osPointB, useMin ^ aIsGreater);
+                pointsPointOnBox     = math.select(pointsPointOnSegment, math.select(box.halfSize, -box.halfSize, useMin), bestAxisMask);
+                pointsPointOnBox     = math.clamp(pointsPointOnBox, -box.halfSize, box.halfSize);
+                axisDistance         = -bestDistance;
             }
             float signedDistanceSq = math.distancesq(pointsPointOnSegment, pointsPointOnBox);
-            signedDistanceSq       = math.select(signedDistanceSq, -signedDistanceSq, axisDistance <= 0f);
+            signedDistanceSq = math.select(signedDistanceSq, -signedDistanceSq, axisDistance <= 0f);
 
             // Step 2: Edge vs Edges
             // Todo: We could inline the SegmentSegment invocations to simplify the initial dot products.
-            float3     capsuleEdge     = osPointB - osPointA;
-            simdFloat3 simdCapsuleEdge = new simdFloat3(capsuleEdge);
-            simdFloat3 simdOsPointA    = new simdFloat3(osPointA);
+            float3 capsuleEdge  = osPointB - osPointA;
+            simdFloat3 simdOsPointA = new simdFloat3(osPointA);
+            simdFloat3 simdOsPointB = new simdFloat3(osPointB);
             // x-axes
-            simdFloat3 boxPointsX = new simdFloat3(new float3(-box.halfSize.x, box.halfSize.y, box.halfSize.z),
-                                                   new float3(-box.halfSize.x, box.halfSize.y, -box.halfSize.z),
-                                                   new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
-                                                   new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
-            simdFloat3 boxEdgesX = new simdFloat3(new float3(2f * box.halfSize.x, 0f, 0f));
-            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsX, boxEdgesX, out simdFloat3 edgesClosestAsX, out simdFloat3 edgesClosestBsX);
+            simdFloat3 boxPointsAx = new simdFloat3(new float3(-box.halfSize.x, box.halfSize.y, box.halfSize.z),
+                                                    new float3(-box.halfSize.x, box.halfSize.y, -box.halfSize.z),
+                                                    new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
+                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
+            simdFloat3 boxPointsBx = boxPointsAx;
+            boxPointsBx.x = -boxPointsBx.x;
+            CapsuleCapsule.SegmentSegment(simdOsPointA, simdOsPointB, boxPointsAx, boxPointsBx, out simdFloat3 edgesClosestAsX, out simdFloat3 edgesClosestBsX);
             simdFloat3 boxNormalsX = new simdFloat3(new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f),
                                                     new float3(0f, math.SQRT2 / 2f, -math.SQRT2 / 2f),
                                                     new float3(0f, -math.SQRT2 / 2f, math.SQRT2 / 2f),
@@ -380,95 +764,96 @@ namespace Latios.Psyshock
             // Orientations of the line which do penetrate are not valid.
             // If we constrain the capsule edge to be perpendicular, normalize it, and then compute the dot product, we can compare that to the necessary 45 degree angle
             // where penetration occurs. Parallel lines are excluded because either we want to record a capsule point (step 1) or a perpendicular edge on the box.
-            bool   notParallelX       = !capsuleEdge.yz.Equals(float2.zero);
+            bool notParallelX       = !capsuleEdge.yz.Equals(float2.zero);
             float4 alignmentsX        = simd.dot(math.normalize(new float3(0f, capsuleEdge.yz)), boxNormalsX);
-            bool4  validsX            = (math.abs(alignmentsX) <= math.SQRT2 / 2f) & notParallelX;
+            bool4 validsX            = (math.abs(alignmentsX) <= math.SQRT2 / 2f) & notParallelX;
             float4 signedDistancesSqX = simd.distancesq(edgesClosestAsX, edgesClosestBsX);
-            bool4  insidesX           =
+            bool4 insidesX           =
                 (math.abs(edgesClosestAsX.x) <= box.halfSize.x) & (math.abs(edgesClosestAsX.y) <= box.halfSize.y) & (math.abs(edgesClosestAsX.z) <= box.halfSize.z);
             signedDistancesSqX = math.select(signedDistancesSqX, -signedDistancesSqX, insidesX);
 
             // y-axis
-            simdFloat3 boxPointsY = new simdFloat3(new float3(box.halfSize.x, -box.halfSize.y, box.halfSize.z),
-                                                   new float3(box.halfSize.x, -box.halfSize.y, -box.halfSize.z),
-                                                   new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
-                                                   new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
-            simdFloat3 boxEdgesY = new simdFloat3(new float3(0f, 2f * box.halfSize.y, 0f));
-            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsY, boxEdgesY, out simdFloat3 edgesClosestAsY, out simdFloat3 edgesClosestBsY);
+            simdFloat3 boxPointsAy = new simdFloat3(new float3(box.halfSize.x, -box.halfSize.y, box.halfSize.z),
+                                                    new float3(box.halfSize.x, -box.halfSize.y, -box.halfSize.z),
+                                                    new float3(-box.halfSize.x, -box.halfSize.y, box.halfSize.z),
+                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
+            simdFloat3 boxPointsBy = boxPointsAy;
+            boxPointsBy.y = -boxPointsBy.y;
+            CapsuleCapsule.SegmentSegment(simdOsPointA, simdOsPointB, boxPointsAy, boxPointsBy, out simdFloat3 edgesClosestAsY, out simdFloat3 edgesClosestBsY);
             simdFloat3 boxNormalsY = new simdFloat3(new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f),
                                                     new float3(math.SQRT2 / 2f, 0f, -math.SQRT2 / 2f),
                                                     new float3(-math.SQRT2 / 2f, 0f, math.SQRT2 / 2f),
                                                     new float3(-math.SQRT2 / 2f, 0f, -math.SQRT2 / 2f));
-            bool   notParallelY       = !capsuleEdge.xz.Equals(float2.zero);
+            bool notParallelY       = !capsuleEdge.xz.Equals(float2.zero);
             float4 alignmentsY        = simd.dot(math.normalize(new float3(capsuleEdge.x, 0f, capsuleEdge.z)), boxNormalsY);
-            bool4  validsY            = (math.abs(alignmentsY) <= math.SQRT2 / 2f) & notParallelY;
+            bool4 validsY            = (math.abs(alignmentsY) <= math.SQRT2 / 2f) & notParallelY;
             float4 signedDistancesSqY = simd.distancesq(edgesClosestAsY, edgesClosestBsY);
-            bool4  insidesY           =
+            bool4 insidesY           =
                 (math.abs(edgesClosestAsY.x) <= box.halfSize.x) & (math.abs(edgesClosestAsY.y) <= box.halfSize.y) & (math.abs(edgesClosestAsY.z) <= box.halfSize.z);
             signedDistancesSqY = math.select(signedDistancesSqY, -signedDistancesSqY, insidesY);
 
             // z-axis
-            simdFloat3 boxPointsZ = new simdFloat3(new float3(box.halfSize.x, box.halfSize.y, -box.halfSize.z),
-                                                   new float3(box.halfSize.x, -box.halfSize.y, -box.halfSize.z),
-                                                   new float3(-box.halfSize.x, box.halfSize.y, -box.halfSize.z),
-                                                   new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
-            simdFloat3 boxEdgesZ = new simdFloat3(new float3(0f, 0f, 2f * box.halfSize.z));
-            CapsuleCapsule.SegmentSegmentOld(simdOsPointA, simdCapsuleEdge, boxPointsZ, boxEdgesZ, out simdFloat3 edgesClosestAsZ, out simdFloat3 edgesClosestBsZ);
+            simdFloat3 boxPointsAz = new simdFloat3(new float3(box.halfSize.x, box.halfSize.y, -box.halfSize.z),
+                                                    new float3(box.halfSize.x, -box.halfSize.y, -box.halfSize.z),
+                                                    new float3(-box.halfSize.x, box.halfSize.y, -box.halfSize.z),
+                                                    new float3(-box.halfSize.x, -box.halfSize.y, -box.halfSize.z));
+            simdFloat3 boxPointsBz = boxPointsAz;
+            boxPointsBz.z = -boxPointsBz.z;
+            CapsuleCapsule.SegmentSegment(simdOsPointA, simdOsPointB, boxPointsAz, boxPointsBz, out simdFloat3 edgesClosestAsZ, out simdFloat3 edgesClosestBsZ);
             simdFloat3 boxNormalsZ = new simdFloat3(new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f),
                                                     new float3(math.SQRT2 / 2f, -math.SQRT2 / 2f, 0f),
                                                     new float3(-math.SQRT2 / 2f, math.SQRT2 / 2f, 0f),
                                                     new float3(-math.SQRT2 / 2f, -math.SQRT2 / 2f, 0f));
-            bool   notParallelZ       = !capsuleEdge.xy.Equals(float2.zero);
+            bool notParallelZ       = !capsuleEdge.xy.Equals(float2.zero);
             float4 alignmentsZ        = simd.dot(math.normalize(new float3(capsuleEdge.xy, 0f)), boxNormalsZ);
-            bool4  validsZ            = (math.abs(alignmentsZ) <= math.SQRT2 / 2f) & notParallelZ;
+            bool4 validsZ            = (math.abs(alignmentsZ) <= math.SQRT2 / 2f) & notParallelZ;
             float4 signedDistancesSqZ = simd.distancesq(edgesClosestAsZ, edgesClosestBsZ);
-            bool4  insidesZ           =
+            bool4 insidesZ           =
                 (math.abs(edgesClosestAsZ.x) <= box.halfSize.x) & (math.abs(edgesClosestAsZ.y) <= box.halfSize.y) & (math.abs(edgesClosestAsZ.z) <= box.halfSize.z);
             signedDistancesSqZ = math.select(signedDistancesSqZ, -signedDistancesSqZ, insidesZ);
 
             //Step 3: Find best result
-            float4     bestAxisSignedDistancesSq  = signedDistancesSqX;
-            simdFloat3 bestAxisPointsOnSegment    = edgesClosestAsX;
-            simdFloat3 bestAxisPointsOnBox        = edgesClosestBsX;
-            bool4      yWins                      = (signedDistancesSqY < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqY < 0f));
-            yWins                                &= validsY;
-            bestAxisSignedDistancesSq             = math.select(bestAxisSignedDistancesSq, signedDistancesSqY, yWins);
-            bestAxisPointsOnSegment               = simd.select(bestAxisPointsOnSegment, edgesClosestAsY, yWins);
-            bestAxisPointsOnBox                   = simd.select(bestAxisPointsOnBox, edgesClosestBsY, yWins);
-            bool4 zWins                           = (signedDistancesSqZ < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqZ < 0f));
-            zWins                                &= validsZ;
-            bestAxisSignedDistancesSq             = math.select(bestAxisSignedDistancesSq, signedDistancesSqZ, zWins);
-            bestAxisPointsOnSegment               = simd.select(bestAxisPointsOnSegment, edgesClosestAsZ, zWins);
-            bestAxisPointsOnBox                   = simd.select(bestAxisPointsOnBox, edgesClosestBsZ, zWins);
-            var  validsAxes                       = validsX | validsY | validsZ;
-            bool bBeatsA                          = (bestAxisSignedDistancesSq.y < bestAxisSignedDistancesSq.x) ^ (math.any(bestAxisSignedDistancesSq.xy < 0f));
-            bBeatsA                              &= validsAxes.y;
-            bool dBeatsC                          = (bestAxisSignedDistancesSq.w < bestAxisSignedDistancesSq.z) ^ (math.any(bestAxisSignedDistancesSq.zw < 0f));
-            dBeatsC                              &= validsAxes.w;
-            float  bestAbSignedDistanceSq         = math.select(bestAxisSignedDistancesSq.x, bestAxisSignedDistancesSq.y, bBeatsA);
-            float  bestCdSignedDistanceSq         = math.select(bestAxisSignedDistancesSq.z, bestAxisSignedDistancesSq.w, dBeatsC);
-            float3 bestAbPointOnSegment           = math.select(bestAxisPointsOnSegment.a, bestAxisPointsOnSegment.b, bBeatsA);
-            float3 bestCdPointOnSegment           = math.select(bestAxisPointsOnSegment.c, bestAxisPointsOnSegment.d, dBeatsC);
-            float3 bestAbPointOnBox               = math.select(bestAxisPointsOnBox.a, bestAxisPointsOnBox.b, bBeatsA);
-            float3 bestCdPointOnBox               = math.select(bestAxisPointsOnBox.c, bestAxisPointsOnBox.d, dBeatsC);
-            bool   cdBeatsAb                      = (bestCdSignedDistanceSq < bestAbSignedDistanceSq) ^ ((bestCdSignedDistanceSq < 0f) | (bestAbSignedDistanceSq < 0f));
-            cdBeatsAb                            &= math.any(validsAxes.zw);
-            float  bestSignedDistanceSq           = math.select(bestAbSignedDistanceSq, bestCdSignedDistanceSq, cdBeatsAb);
-            float3 bestPointOnSegment             = math.select(bestAbPointOnSegment, bestCdPointOnSegment, cdBeatsAb);
-            float3 bestPointOnBox                 = math.select(bestAbPointOnBox, bestCdPointOnBox, cdBeatsAb);
-            bool   pointsBeatEdges                = (signedDistanceSq <= bestSignedDistanceSq) ^ ((signedDistanceSq < 0f) | (bestSignedDistanceSq < 0f));
-            pointsBeatEdges                      |= !math.any(validsAxes);
-            var oldBestSignedDistanceSq           = bestSignedDistanceSq;
-            bestSignedDistanceSq                  = math.select(bestSignedDistanceSq, signedDistanceSq, pointsBeatEdges);
-            bestPointOnSegment                    = math.select(bestPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
-            bestPointOnBox                        = math.select(bestPointOnBox, pointsPointOnBox, pointsBeatEdges);
+            float4 bestAxisSignedDistancesSq = signedDistancesSqX;
+            simdFloat3 bestAxisPointsOnSegment   = edgesClosestAsX;
+            simdFloat3 bestAxisPointsOnBox       = edgesClosestBsX;
+            bool4 yWins                     = (signedDistancesSqY < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqY < 0f));
+            yWins                    &= validsY;
+            bestAxisSignedDistancesSq = math.select(bestAxisSignedDistancesSq, signedDistancesSqY, yWins);
+            bestAxisPointsOnSegment   = simd.select(bestAxisPointsOnSegment, edgesClosestAsY, yWins);
+            bestAxisPointsOnBox       = simd.select(bestAxisPointsOnBox, edgesClosestBsY, yWins);
+            bool4 zWins = (signedDistancesSqZ < bestAxisSignedDistancesSq) ^ ((bestAxisSignedDistancesSq < 0f) | (signedDistancesSqZ < 0f));
+            zWins                    &= validsZ;
+            bestAxisSignedDistancesSq = math.select(bestAxisSignedDistancesSq, signedDistancesSqZ, zWins);
+            bestAxisPointsOnSegment   = simd.select(bestAxisPointsOnSegment, edgesClosestAsZ, zWins);
+            bestAxisPointsOnBox       = simd.select(bestAxisPointsOnBox, edgesClosestBsZ, zWins);
+            var validsAxes = validsX | validsY | validsZ;
+            bool bBeatsA    = (bestAxisSignedDistancesSq.y < bestAxisSignedDistancesSq.x) ^ (math.any(bestAxisSignedDistancesSq.xy < 0f));
+            bBeatsA &= validsAxes.y;
+            bool dBeatsC = (bestAxisSignedDistancesSq.w < bestAxisSignedDistancesSq.z) ^ (math.any(bestAxisSignedDistancesSq.zw < 0f));
+            dBeatsC &= validsAxes.w;
+            float bestAbSignedDistanceSq = math.select(bestAxisSignedDistancesSq.x, bestAxisSignedDistancesSq.y, bBeatsA);
+            float bestCdSignedDistanceSq = math.select(bestAxisSignedDistancesSq.z, bestAxisSignedDistancesSq.w, dBeatsC);
+            float3 bestAbPointOnSegment   = math.select(bestAxisPointsOnSegment.a, bestAxisPointsOnSegment.b, bBeatsA);
+            float3 bestCdPointOnSegment   = math.select(bestAxisPointsOnSegment.c, bestAxisPointsOnSegment.d, dBeatsC);
+            float3 bestAbPointOnBox       = math.select(bestAxisPointsOnBox.a, bestAxisPointsOnBox.b, bBeatsA);
+            float3 bestCdPointOnBox       = math.select(bestAxisPointsOnBox.c, bestAxisPointsOnBox.d, dBeatsC);
+            bool cdBeatsAb              = (bestCdSignedDistanceSq < bestAbSignedDistanceSq) ^ ((bestCdSignedDistanceSq < 0f) | (bestAbSignedDistanceSq < 0f));
+            cdBeatsAb &= math.any(validsAxes.zw);
+            float bestSignedDistanceSq = math.select(bestAbSignedDistanceSq, bestCdSignedDistanceSq, cdBeatsAb);
+            float3 bestPointOnSegment   = math.select(bestAbPointOnSegment, bestCdPointOnSegment, cdBeatsAb);
+            float3 bestPointOnBox       = math.select(bestAbPointOnBox, bestCdPointOnBox, cdBeatsAb);
+            bool pointsBeatEdges      = (signedDistanceSq <= bestSignedDistanceSq) ^ ((signedDistanceSq < 0f) | (bestSignedDistanceSq < 0f));
+            pointsBeatEdges     |= !math.any(validsAxes);
+            bestSignedDistanceSq = math.select(bestSignedDistanceSq, signedDistanceSq, pointsBeatEdges);
+            bestPointOnSegment   = math.select(bestPointOnSegment, pointsPointOnSegment, pointsBeatEdges);
+            bestPointOnBox       = math.select(bestPointOnBox, pointsPointOnBox, pointsBeatEdges);
 
             // Step 4: Create result
             float3 boxNormal         = math.normalize(math.select(0f, 1f, bestPointOnBox == box.halfSize) + math.select(0f, -1f, bestPointOnBox == -box.halfSize));
             float3 capsuleNormal     = math.normalizesafe(bestPointOnBox - bestPointOnSegment);
-            bool   capsuleDegenerate = capsuleNormal.Equals(float3.zero);
-            capsuleNormal            = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
-            result                   = new ColliderDistanceResultInternal
+            bool capsuleDegenerate = capsuleNormal.Equals(float3.zero);
+            capsuleNormal = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
+            result        = new ColliderDistanceResultInternal
             {
                 hitpointA    = bestPointOnBox + box.center,
                 hitpointB    = bestPointOnSegment + box.center + capsuleNormal * capsule.radius,
@@ -492,7 +877,7 @@ namespace Latios.Psyshock
             }
 
             var edgeNormalized = math.normalize(capsuleEdge);
-            edgeNormalized     = math.select(edgeNormalized, -edgeNormalized, result.featureCodeB == 1);
+            edgeNormalized = math.select(edgeNormalized, -edgeNormalized, result.featureCodeB == 1);
             if (result.featureCodeB < 2 && math.dot(result.normalA, edgeNormalized) >= 0f)
             {
                 result.hitpointB -= boxNormal * capsule.radius;
@@ -504,6 +889,7 @@ namespace Latios.Psyshock
             result.hitpointB += result.normalB * capsule.radius;
             return result.distance <= maxDistance;
         }
+#endif
     }
 }
 

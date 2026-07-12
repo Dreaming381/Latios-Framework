@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -6,9 +7,9 @@ namespace Latios.Psyshock
     internal static class SphereSphere
     {
         public static bool AreOverlapping(in SphereCollider sphereA,
-                                         in RigidTransform aTransform,
-                                         in SphereCollider sphereB,
-                                         in RigidTransform bTransform)
+                                          in RigidTransform aTransform,
+                                          in SphereCollider sphereB,
+                                          in RigidTransform bTransform)
         {
             return WithinDistance(in sphereA, in aTransform, in sphereB, in bTransform, 0f);
         }
@@ -87,6 +88,49 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
+        public static int LatiosContactsBetween(Span<LatiosSim.Contact>   contacts,
+                                                float3 contactNormal,
+                                                in SphereCollider sphereA,
+                                                in RigidTransform aTransform,
+                                                in SphereCollider sphereB,
+                                                in RigidTransform bTransform,
+                                                in ColliderDistanceResult distanceResult)
+        {
+            if (contacts.Length == 0)
+                return 0;
+            var dot = math.dot(contactNormal, distanceResult.normalA);
+            if (dot > 0.999f)
+            {
+                contacts[0] = new LatiosSim.Contact
+                {
+                    contactOnA  = distanceResult.hitpointA,
+                    distanceToB = distanceResult.distance
+                };
+                return 1;
+            }
+            if (dot <= 0f)
+                return 0;
+            var   castDistance = math.abs(distanceResult.distance) + sphereA.radius + sphereB.radius;
+            var   castStart    = bTransform;
+            float castOffset   = 0f;
+            if (distanceResult.distance <= 0f)
+            {
+                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castStart.pos += contactNormal * castOffset;
+            }
+            if (ColliderCast(in sphereB, in castStart, castStart.pos - castDistance * contactNormal, in sphereA, in aTransform, out var castResult))
+            {
+                castResult.distance += castOffset;
+                contacts[0]          = new LatiosSim.Contact
+                {
+                    contactOnA  = castResult.hitpoint,
+                    distanceToB = castResult.distance
+                };
+                return 1;
+            }
+            return 0;
         }
 
         internal static bool SphereSphereDistance(in SphereCollider sphereA,

@@ -93,7 +93,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in terrainToCast, in castStart, in targetTerrain, in targetTerrainTransform, 0f, out _))
+            if (AreOverlapping(in terrainToCast, in castStart, in targetTerrain, in targetTerrainTransform))
             {
                 return false;
             }

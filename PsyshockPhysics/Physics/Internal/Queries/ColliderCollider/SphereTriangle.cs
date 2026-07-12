@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -6,9 +7,9 @@ namespace Latios.Psyshock
     internal static class SphereTriangle
     {
         public static bool AreOverlapping(in TriangleCollider triangle,
-                                         in RigidTransform triangleTransform,
-                                         in SphereCollider sphere,
-                                         in RigidTransform sphereTransform)
+                                          in RigidTransform triangleTransform,
+                                          in SphereCollider sphere,
+                                          in RigidTransform sphereTransform)
         {
             return WithinDistance(in triangle, in triangleTransform, in sphere, in sphereTransform, 0f);
         }
@@ -127,6 +128,53 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
+        public static int LatiosContactsBetween(Span<LatiosSim.Contact>   contacts,
+                                                float3 contactNormal,
+                                                in TriangleCollider triangle,
+                                                in RigidTransform triangleTransform,
+                                                in SphereCollider sphere,
+                                                in RigidTransform sphereTransform,
+                                                in ColliderDistanceResult distanceResult)
+        {
+            if (contacts.Length == 0)
+                return 0;
+            var dot = math.dot(contactNormal, distanceResult.normalA);
+            if (dot > 0.999f)
+            {
+                contacts[0] = new LatiosSim.Contact
+                {
+                    contactOnA  = distanceResult.hitpointA,
+                    distanceToB = distanceResult.distance
+                };
+                return 1;
+            }
+            if (dot <= 0f)
+                return 0;
+            var triangleCenter = (triangle.pointA + triangle.pointB + triangle.pointC) / 3f;
+            var triangleRadius =
+                math.sqrt(math.max(math.distancesq(triangle.pointA, triangleCenter),
+                                   math.max(math.distancesq(triangle.pointB, triangleCenter), math.distancesq(triangle.pointC, triangleCenter))));
+            var   castDistance = math.abs(distanceResult.distance) + triangleRadius + sphere.radius;
+            var   castStart    = sphereTransform;
+            float castOffset   = 0f;
+            if (distanceResult.distance <= 0f)
+            {
+                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castStart.pos += contactNormal * castOffset;
+            }
+            if (ColliderCast(in sphere, in castStart, castStart.pos - castDistance * contactNormal, in triangle, in triangleTransform, out var castResult))
+            {
+                castResult.distance += castOffset;
+                contacts[0]          = new LatiosSim.Contact
+                {
+                    contactOnA  = castResult.hitpoint,
+                    distanceToB = castResult.distance
+                };
+                return 1;
+            }
+            return 0;
         }
 
         internal static bool TriangleSphereDistance(in TriangleCollider triangle, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)

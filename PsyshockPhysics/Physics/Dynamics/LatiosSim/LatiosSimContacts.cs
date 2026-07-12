@@ -63,8 +63,8 @@ namespace Latios.Psyshock
         /// <returns>The number of contacts found</returns>
         // Todo: Make public once ready
         internal static int ContactsBetween(Span<Contact> contactsOutput, float3 contactNormal,
-                                          in Collider colliderA, in TransformQvvs transformA, in Collider colliderB, in TransformQvvs transformB,
-                                          in ColliderDistanceResult distanceResult)
+                                            in Collider colliderA, in TransformQvvs transformA, in Collider colliderB, in TransformQvvs transformB,
+                                            in ColliderDistanceResult distanceResult)
         {
             throw new NotImplementedException();
         }

@@ -231,20 +231,24 @@ namespace Latios.Transforms
                 for (int i = 1; i < selectFrom.Length; i++)
                 {
                     var parentIndex = selectFrom[i].parentIndex;
-                    var val         = parentIndex != int.MaxValue ? srcToDst[selectFrom[i].parentIndex] : int.MaxValue;
+                    var val         = parentIndex != int.MaxValue ? srcToDst[parentIndex] : int.MaxValue;
                     if (val < bestValue)
                     {
                         bestValue = val;
                         bestIndex = i;
                     }
                 }
-                ref var best                  = ref selectFrom[bestIndex];
-                ref var dstElement            = ref dstBuffer[dst];
-                dstElement.m_descendantEntity = best.m_descendantEntity;
-                dstElement.m_flags            = best.m_flags;
-                dstElement.m_parentIndex      = bestValue;
-                dstElement.m_childCount       = 0;
-                srcToDst[bestIndex]           = dst;
+                ref var best                     = ref selectFrom[bestIndex];
+                ref var dstElement               = ref dstBuffer[dst];
+                dstElement.m_descendantEntity    = best.m_descendantEntity;
+                dstElement.m_flags               = best.m_flags;
+                dstElement.m_parentIndex         = bestValue;
+                dstElement.m_childCount          = 0;
+                dstElement.m_localPosition       = best.m_localPosition;
+                dstElement.m_localScale          = best.m_localScale;
+                dstElement.m_tickedLocalPosition = best.m_tickedLocalPosition;
+                dstElement.m_tickedLocalScale    = best.m_tickedLocalScale;
+                srcToDst[bestIndex]              = dst;
                 dstBuffer[bestValue].m_childCount++;
                 best.m_parentIndex = int.MaxValue;
             }

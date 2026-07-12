@@ -355,7 +355,7 @@ namespace Latios.Psyshock
 
                 var terrainTriangle = PointRayTerrain.CreateLocalTriangle(ref blob, terrainTriangleHeightIndices, heightOffset, scale);
                 // Check that we don't start already intersecting.
-                if (TriangleTriangle.DistanceBetween(in terrainTriangle, in terrainTransform, in triangle, in castStart, 0f, out _))
+                if (TriangleTriangle.AreOverlapping(in terrainTriangle, in terrainTransform, in triangle, in castStart))
                 {
                     invalid = true;
                     return;

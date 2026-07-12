@@ -1,3 +1,4 @@
+using System;
 using Latios.Transforms;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
@@ -8,9 +9,9 @@ namespace Latios.Psyshock
     internal static class SphereTriMesh
     {
         public static bool AreOverlapping(in TriMeshCollider triMesh,
-                                         in RigidTransform triMeshTransform,
-                                         in SphereCollider sphere,
-                                         in RigidTransform sphereTransform)
+                                          in RigidTransform triMeshTransform,
+                                          in SphereCollider sphere,
+                                          in RigidTransform sphereTransform)
         {
             return WithinDistance(in triMesh, in triMeshTransform, in sphere, in sphereTransform, 0f);
         }
@@ -191,6 +192,18 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
+        public static int LatiosContactsBetween(Span<LatiosSim.Contact>   contacts,
+                                                float3 contactNormal,
+                                                in TriMeshCollider triMesh,
+                                                in RigidTransform triMeshTransform,
+                                                in SphereCollider sphere,
+                                                in RigidTransform sphereTransform,
+                                                in ColliderDistanceResult distanceResult)
+        {
+            var triangle = Physics.ScaleStretchCollider(triMesh.triMeshColliderBlob.Value.triangles[distanceResult.subColliderIndexA], 1f, triMesh.scale);
+            return SphereTriangle.LatiosContactsBetween(contacts, contactNormal, in triangle, in triMeshTransform, in sphere, in sphereTransform, in distanceResult);
         }
 
         unsafe struct DistanceAllProcessor<T> : TriMeshColliderBlob.IFindTrianglesProcessor where T : unmanaged, IDistanceBetweenAllProcessor

@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
@@ -126,6 +127,49 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
+        public static int LatiosContactsBetween(Span<LatiosSim.Contact>   contacts,
+                                                float3 contactNormal,
+                                                in CapsuleCollider capsule,
+                                                in RigidTransform capsuleTransform,
+                                                in SphereCollider sphere,
+                                                in RigidTransform sphereTransform,
+                                                in ColliderDistanceResult distanceResult)
+        {
+            if (contacts.Length == 0)
+                return 0;
+            var dot = math.dot(contactNormal, distanceResult.normalA);
+            if (dot > 0.999f)
+            {
+                contacts[0] = new LatiosSim.Contact
+                {
+                    contactOnA  = distanceResult.hitpointA,
+                    distanceToB = distanceResult.distance
+                };
+                return 1;
+            }
+            if (dot <= 0f)
+                return 0;
+            var   castDistance = math.abs(distanceResult.distance) + capsule.radius + sphere.radius;
+            var   castStart    = sphereTransform;
+            float castOffset   = 0f;
+            if (distanceResult.distance <= 0f)
+            {
+                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castStart.pos += contactNormal * castOffset;
+            }
+            if (ColliderCast(in sphere, in castStart, castStart.pos - castDistance * contactNormal, in capsule, in capsuleTransform, out var castResult))
+            {
+                castResult.distance += castOffset;
+                contacts[0]          = new LatiosSim.Contact
+                {
+                    contactOnA  = castResult.hitpoint,
+                    distanceToB = castResult.distance
+                };
+                return 1;
+            }
+            return 0;
         }
 
         private static bool CapsuleSphereDistance(in CapsuleCollider capsule, in SphereCollider sphere, float maxDistance, out ColliderDistanceResultInternal result)

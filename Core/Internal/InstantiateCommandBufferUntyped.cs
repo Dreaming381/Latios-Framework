@@ -502,17 +502,19 @@ namespace Latios
                 NativeList<Entity> toDestroy  = default;
                 for (int i = 0; i < icb.m_state->commandFunctions.Length; i++)
                 {
-                    var context = new IInstantiateCommand.Context
+                    var commandSize = icb.m_state->typesSizes[icb.m_state->typesWithData.Length + i];
+                    var context     = new IInstantiateCommand.Context
                     {
                         entityManager        = em,
                         entities             = instantiatedEntities,
                         commandOffset        = commandOffset,
                         dataPtrs             = sortedDataPtrs,
-                        expectedSize         = icb.m_state->typesSizes[icb.m_state->typesWithData.Length + i],
+                        expectedSize         = commandSize,
                         requestToDestroyList = toDestroy,
                     };
                     icb.m_state->commandFunctions[i].Invoke(ref context);
-                    toDestroy = context.requestToDestroyList;
+                    toDestroy      = context.requestToDestroyList;
+                    commandOffset += commandSize;
                 }
                 if (toDestroy.IsCreated)
                     em.DestroyEntity(toDestroy.AsArray());

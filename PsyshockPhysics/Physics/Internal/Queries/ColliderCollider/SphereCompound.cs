@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -96,7 +97,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in targetCompound, in targetCompoundTransform, in sphereToCast, in castStart, 0f, out _))
+            if (AreOverlapping(in targetCompound, in targetCompoundTransform, in sphereToCast, in castStart))
             {
                 return false;
             }
@@ -129,7 +130,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in compoundToCast, in castStart, in targetSphere, in targetSphereTransform, 0f, out _))
+            if (AreOverlapping(in compoundToCast, in castStart, in targetSphere, in targetSphereTransform))
             {
                 return false;
             }
@@ -159,6 +160,29 @@ namespace Latios.Psyshock
                                                                           in ColliderDistanceResult distanceResult)
         {
             return ContactManifoldHelpers.GetSingleContactManifold(in distanceResult);
+        }
+
+        public static int LatiosContactsBetween(Span<LatiosSim.Contact>   contacts,
+                                                float3 contactNormal,
+                                                in CompoundCollider compound,
+                                                in RigidTransform compoundTransform,
+                                                in SphereCollider sphere,
+                                                in RigidTransform sphereTransform,
+                                                in ColliderDistanceResult distanceResult)
+        {
+            compound.GetScaledStretchedSubCollider(distanceResult.subColliderIndexA, out var blobCollider, out var blobTransform);
+            var subTransform = math.mul(compoundTransform, blobTransform);
+            switch (blobCollider.type)
+            {
+                case ColliderType.Sphere:
+                    return SphereSphere.LatiosContactsBetween(contacts, contactNormal, in blobCollider.m_sphere, in subTransform, in sphere, in sphereTransform, in distanceResult);
+                case ColliderType.Capsule:
+                    return SphereCapsule.LatiosContactsBetween(contacts, contactNormal, in blobCollider.m_capsule, in subTransform, in sphere, in sphereTransform,
+                                                               in distanceResult);
+                case ColliderType.Box:
+                    return SphereBox.LatiosContactsBetween(contacts, contactNormal, in blobCollider.m_box, in subTransform, in sphere, in sphereTransform, in distanceResult);
+            }
+            return 0;
         }
 
         // We use a reduced set dispatch here so that Burst doesn't have to try to make these methods re-entrant.

@@ -1,3 +1,4 @@
+using System;
 using Latios.Calci;
 using Unity.Burst;
 using Unity.Mathematics;
@@ -298,6 +299,81 @@ namespace Latios.Psyshock
             return result;
         }
 
+        private static bool BoxBoxOverlapping(float3 halfSizeA,
+                                              float3 halfSizeB,
+                                              in RigidTransform bInASpace,
+                                              in RigidTransform aInBSpace)
+        {
+            var         bInARotMat = new float3x3(bInASpace.rot);
+            Span<float> axesX      =
+                stackalloc float[] { 1f, 0f, 0f, -1f, 0f, 0f, 1f, 0f, 0f, 0f, bInARotMat.c0.z, bInARotMat.c1.z, bInARotMat.c2.z, -bInARotMat.c0.y, -bInARotMat.c1.y,
+                                     -bInARotMat.c2.y };
+            Span<float> axesY =
+                stackalloc float[] { 0f, 1f, 0f, 0f, -1f, 0f, 0f, -bInARotMat.c0.z, -bInARotMat.c1.z, -bInARotMat.c2.z, 0f, 0f, 0f, bInARotMat.c0.x, bInARotMat.c1.x,
+                                     bInARotMat.c2.x };
+            Span<float> axesZ =
+                stackalloc float[] { 0f, 0f, 1f, 0f, 0f, -1f, 0f, bInARotMat.c0.y, bInARotMat.c1.y, bInARotMat.c2.y, -bInARotMat.c0.x, -bInARotMat.c1.x, -bInARotMat.c2.x, 0f, 0f,
+                                     0f };
+            // Burst is doing something stupid that is preventing LLVM from doing vector early-out.
+            int result = 0;
+            for (int i = 0; i < 16; i++)
+            {
+                var axisX     = axesX[i];
+                var axisY     = axesY[i];
+                var axisZ     = axesZ[i];
+                var axisLenSq = axisX * axisX + axisY * axisY + axisZ * axisZ;
+                var valid     = axisLenSq > math.FLT_MIN_NORMAL;
+
+                var aSupportX = math.chgsign(halfSizeA.x, axisX);
+                var aSupportY = math.chgsign(halfSizeA.y, axisY);
+                var aSupportZ = math.chgsign(halfSizeA.z, axisZ);
+
+                var tx       = 2f * (aInBSpace.rot.value.y * axisZ - aInBSpace.rot.value.z * axisY);
+                var ty       = 2f * (aInBSpace.rot.value.z * axisX - aInBSpace.rot.value.x * axisZ);
+                var tz       = 2f * (aInBSpace.rot.value.x * axisY - aInBSpace.rot.value.y * axisX);
+                var axisInBX = axisX + aInBSpace.rot.value.w * tx + (aInBSpace.rot.value.y * tz - aInBSpace.rot.value.z * ty);
+                var axisInBY = axisY + aInBSpace.rot.value.w * ty + (aInBSpace.rot.value.z * tx - aInBSpace.rot.value.x * tz);
+                var axisInBZ = axisZ + aInBSpace.rot.value.w * tz + (aInBSpace.rot.value.x * ty - aInBSpace.rot.value.y * tx);
+
+                var bSupportInBX  = math.chgsign(halfSizeB.x, -axisInBX);
+                var bSupportInBY  = math.chgsign(halfSizeB.y, -axisInBY);
+                var bSupportInBZ  = math.chgsign(halfSizeB.z, -axisInBZ);
+                tx                = 2f * (bInASpace.rot.value.y * bSupportInBZ - bInASpace.rot.value.z * bSupportInBY);
+                ty                = 2f * (bInASpace.rot.value.z * bSupportInBX - bInASpace.rot.value.x * bSupportInBZ);
+                tz                = 2f * (bInASpace.rot.value.x * bSupportInBY - bInASpace.rot.value.y * bSupportInBX);
+                var bSupportRelBX = bSupportInBX + bInASpace.rot.value.w * tx + (bInASpace.rot.value.y * tz - bInASpace.rot.value.z * ty);
+                var bSupportRelBY = bSupportInBY + bInASpace.rot.value.w * ty + (bInASpace.rot.value.z * tx - bInASpace.rot.value.x * tz);
+                var bSupportRelBZ = bSupportInBZ + bInASpace.rot.value.w * tz + (bInASpace.rot.value.x * ty - bInASpace.rot.value.y * tx);
+                var bSupportX     = bInASpace.pos.x + bSupportRelBX;
+                var bSupportY     = bInASpace.pos.y + bSupportRelBY;
+                var bSupportZ     = bInASpace.pos.z + bSupportRelBZ;
+
+                var aSupportDot = aSupportX * axisX + aSupportY * axisY + aSupportZ * axisZ;
+                var bSupportDot = bSupportX * axisX + bSupportY * axisY + bSupportZ * axisZ;
+                if (bSupportDot > aSupportDot)
+                    //return false;
+                    result++;
+
+                var negBSupportX   = bInASpace.pos.x - bSupportRelBX;
+                var negBSupportY   = bInASpace.pos.y - bSupportRelBY;
+                var negBSupportZ   = bInASpace.pos.z - bSupportRelBZ;
+                var negASupportDot = -aSupportDot;
+                var negBSupportDot = negBSupportX * axisX + negBSupportY * axisY + negBSupportZ * axisZ;
+                if (negASupportDot > negBSupportDot)
+                    //return false;
+                    result++;
+            }
+            return result == 0;
+        }
+
+        // This custom algorithm is really weird, but is faster than GJK+EPA. It is a mix of SAT and Lin-Canny.
+        // The first step is to perform SAT to determine if the boxes are intersecting or not. If they are, and
+        // the minimum axis is along the face normal, then we try to find a penetrating vertex that projects onto
+        // the face. Otherwise, we find an edge-edge penetration.
+        // If SAT determines an outside hit, we use a Lin-Canny feature pair test with a couple massive shortcuts.
+        // For any vertex on one box, we can find the closest point on the other box (and thus the closest feature)
+        // simply by transforming the vertex into the other box's local space, and then clamping it to the box volume.
+        // For edge-edge tests, we know the closest points lie on the closest edges along the separating axis.
         private static bool BoxBoxDistance(float3 halfSizeA,
                                            float3 halfSizeB,
                                            in RigidTransform bInASpace,

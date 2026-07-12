@@ -246,6 +246,13 @@ namespace Latios.Psyshock
             return math.mul(quaternion.LookRotationSafe(axis, csoOutwardDir), math.up());
         }
 
+        internal static ushort FeatureCodeFromSegmentHitpoint(float3 hitpoint, float3 endpointA, float3 endpointB)
+        {
+            bool isB       = hitpoint.Equals(endpointB);
+            int  pointCode = math.select(0, 1, isB);
+            return (ushort)math.select(0x4000, pointCode, isB || hitpoint.Equals(endpointA));
+        }
+
         internal static ushort FeatureCodeFromGjk(byte count, byte a)
         {
             return count switch

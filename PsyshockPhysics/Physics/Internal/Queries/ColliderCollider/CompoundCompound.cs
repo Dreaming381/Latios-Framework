@@ -124,7 +124,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in compoundToCast, in castStart, in targetCompound, in targetCompoundTransform, 0f, out _))
+            if (AreOverlapping(in compoundToCast, in castStart, in targetCompound, in targetCompoundTransform))
             {
                 return false;
             }

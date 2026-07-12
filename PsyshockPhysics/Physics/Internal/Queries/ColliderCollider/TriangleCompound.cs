@@ -97,7 +97,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in targetCompound, in targetCompoundTransform, in triangleToCast, in castStart, 0f, out _))
+            if (AreOverlapping(in targetCompound, in targetCompoundTransform, in triangleToCast, in castStart))
             {
                 return false;
             }
@@ -126,7 +126,7 @@ namespace Latios.Psyshock
             bool hit        = false;
             result          = default;
             result.distance = float.MaxValue;
-            if (DistanceBetween(in compoundToCast, in castStart, in targetTriangle, in targetTriangleTransform, 0f, out _))
+            if (AreOverlapping(in compoundToCast, in castStart, in targetTriangle, in targetTriangleTransform))
             {
                 return false;
             }
