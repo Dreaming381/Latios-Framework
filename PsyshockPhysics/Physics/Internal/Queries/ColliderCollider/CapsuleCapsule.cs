@@ -361,12 +361,15 @@ namespace Latios.Psyshock
             return fracA != 0f & fracA != 1f & fracB != 0f & fracB != 1f;
         }
 
-        public static bool4 SegmentSegmentInvalidateEndpointsOld(simdFloat3 pointA,
-                                                                 simdFloat3 edgeA,
-                                                                 simdFloat3 pointB,
-                                                                 simdFloat3 edgeB,
-                                                                 out simdFloat3 closestAOut,
-                                                                 out simdFloat3 closestBOut)
+        // Returns true for each segment pair whose result does not include an endpoint on either segment of the pair.
+        // Unlike the above, this implementation assumes that closestAOut and closestBOut will be disregarded at endpoints.
+        // Thus, it skips patching those values with endpoints, and instead accepts points and edges as inputs.
+        public static bool4 SegmentSegmentInvalidateEndpointsPointEdge(simdFloat3 pointA,
+                                                                       simdFloat3 edgeA,
+                                                                       simdFloat3 pointB,
+                                                                       simdFloat3 edgeB,
+                                                                       out simdFloat3 closestAOut,
+                                                                       out simdFloat3 closestBOut)
         {
             simdFloat3 diff = pointB - pointA;
 

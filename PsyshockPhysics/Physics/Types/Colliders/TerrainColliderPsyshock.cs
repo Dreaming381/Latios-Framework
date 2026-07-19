@@ -518,7 +518,7 @@ namespace Latios.Psyshock
             packedSearchDomain     = math.clamp(packedSearchDomain, 0, new int4(quadsPerRow - 1, quadRows - 1, quadsPerRow - 1, quadRows - 1));
             if (math.all(packedSearchDomain.xy == packedSearchDomain.zw))
             {
-                var     quadIndex      = minY * quadsPerRow + minX;
+                var     quadIndex      = packedSearchDomain.y * quadsPerRow + packedSearchDomain.x;
                 var     patchIndex2D   = packedSearchDomain.xy / 8;
                 ref var patch          = ref patches[patchIndex2D.y * patchesPerRow + patchIndex2D.x];
                 var     offsetsInPatch = packedSearchDomain.xy % 8;

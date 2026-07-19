@@ -10,6 +10,17 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.15.11] – 2026-7-18
+
+Officially supports Entities [1.4.8]
+
+### Changed
+
+-   Updated Core to v0.15.11
+-   Updated Calci to v0.15.11
+-   Updated Psyshock to v0.15.11
+-   Updated Kinemation to v0.15.11
+
 ## [0.15.10] – 2026-7-11
 
 Officially supports Entities [1.4.7]

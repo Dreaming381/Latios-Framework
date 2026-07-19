@@ -51,6 +51,15 @@ namespace Latios.Calci
             return result;
         }
 
+        public static simdFloat3 select(simdFloat3 a, simdFloat3 b, bool3 c)
+        {
+            simdFloat3 result = default;
+            result.x          = math.select(a.x, b.x, c.x);
+            result.y          = math.select(a.y, b.y, c.y);
+            result.z          = math.select(a.z, b.z, c.z);
+            return result;
+        }
+
         public static simdFloat3 select(simdFloat3 a, simdFloat3 b, bool4 xSelect, bool4 ySelect, bool4 zSelect)
         {
             simdFloat3 result = default;

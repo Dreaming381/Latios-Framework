@@ -364,7 +364,10 @@ namespace Latios
             static void PlaybackOnThread(InstantiateCommandBufferUntyped icb, EntityManager em)
             {
                 // Step 1: Get the prefabs and sort keys
-                int count              = icb.Count();
+                int count = icb.Count();
+                if (count == 0)
+                    return;
+
                 var prefabSortkeyArray = new NativeArray<PrefabSortkey>(count, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
                 icb.m_prefabSortkeyBlockList->GetElementValues(prefabSortkeyArray);
                 // Step 2: Get the component and command data pointers

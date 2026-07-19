@@ -16,6 +16,15 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct ForceInitializeUninitializedOptimizedSkeletonsSystem : ISystem
     {
+        EntityQuery m_query;
+
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            state.Fluent().With<OptimizedSkeletonHierarchyBlobReference>(true).With<OptimizedSkeletonState, OptimizedBoneTransform, WorldTransform>(false)
+            .Without<OptimizedSkeletonTag>().Build();
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
@@ -29,9 +38,9 @@ namespace Latios.Kinemation.Systems
                                                                          ref state),
                 socketLookup = GetComponentLookup<Socket>(true)
             };
-            job.Schedule();
-            state.Dependency = job.transformHandle.ScheduleChunkGrouping(state.Dependency);
-            state.Dependency = job.GetTransformsScheduler().ScheduleParallel(state.Dependency);
+            var jh           = job.transformHandle.ScheduleChunkCaptureForQuery(m_query, state.Dependency);
+            jh               = job.transformHandle.ScheduleChunkGrouping(jh);
+            state.Dependency = job.GetTransformsScheduler().ScheduleParallel(jh);
         }
 
 #if LATIOS_BURST_DETERMINISM
@@ -39,33 +48,39 @@ namespace Latios.Kinemation.Systems
 #else
         [BurstCompile]
 #endif
-        [WithAll(typeof(WorldTransform))]
-        [WithNone(typeof(OptimizedSkeletonTag))]
-        partial struct Job : IJobEntity, IJobEntityChunkBeginEnd, IJobChunkParallelTransform
+        struct Job : IJobChunk, IJobChunkParallelTransform
         {
-            public TransformAspectParallelChunkHandle transformHandle;
-            [ReadOnly] public ComponentLookup<Socket> socketLookup;
+            public TransformAspectParallelChunkHandle                                      transformHandle;
+            [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference> hierarchyHandle;
+            [ReadOnly] public BufferTypeHandle<DependentSkinnedMesh>                       skinnedMeshesHandle;
+            [ReadOnly] public ComponentLookup<Socket>                                      socketLookup;
+            public ComponentTypeHandle<OptimizedSkeletonState>                             stateHandle;
+            public BufferTypeHandle<OptimizedBoneTransform>                                boneTransformHandle;
 
             public ref TransformAspectParallelChunkHandle transformAspectHandleAccess => ref transformHandle.RefAccess();
 
-            public void Execute([EntityIndexInChunk] int indexInChunk,
-                                ref DynamicBuffer<OptimizedBoneTransform>          bones,
-                                ref DynamicBuffer<OptimizedBoneInertialBlendState> blends,
-                                RefRW<OptimizedSkeletonState>                      state,
-                                RefRO<OptimizedSkeletonHierarchyBlobReference>     blobRef,
-                                in DynamicBuffer<DependentSkinnedMesh>             deps)
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var transform = transformHandle[indexInChunk];
-                var _         = new OptimizedSkeletonAspect(transform, ref socketLookup, blobRef, state, ref bones, ref blends, deps);
-            }
+                transformHandle.OnChunkBegin(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
 
-            public bool OnChunkBegin(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
-            {
-                return transformHandle.OnChunkBegin(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
-            }
+                var hierarchies        = chunk.GetNativeArray(ref hierarchyHandle);
+                var boneBuffers        = chunk.GetBufferAccessor(ref boneTransformHandle);
+                var states             = chunk.GetNativeArray(ref stateHandle);
+                var skinnedMeshBuffers = chunk.GetBufferAccessor(ref skinnedMeshesHandle);
 
-            public void OnChunkEnd(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask, bool chunkWasExecuted)
-            {
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var                                            boneBuffer       = boneBuffers[i];
+                    DynamicBuffer<OptimizedBoneInertialBlendState> dummyBlendBuffer = default;
+
+                    _ = new OptimizedSkeletonAspect(transformHandle[i],
+                                                    ref socketLookup,
+                                                    new RefRO<OptimizedSkeletonHierarchyBlobReference>(hierarchies, i),
+                                                    new RefRW<OptimizedSkeletonState>(states, i),
+                                                    ref boneBuffer,
+                                                    ref dummyBlendBuffer,
+                                                    skinnedMeshBuffers.Length > 0 ? skinnedMeshBuffers[i] : default);
+                }
             }
         }
     }
@@ -80,10 +95,26 @@ namespace Latios.Kinemation.Systems
     [BurstCompile]
     public partial struct ForceInitializeUninitializedOptimizedSkeletonsSystem : ISystem
     {
+        EntityQuery m_query;
+
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
+        {
+            state.Fluent().With<OptimizedSkeletonHierarchyBlobReference, Unity.Transforms.LocalToWorld>(true).With<OptimizedSkeletonState, OptimizedBoneTransform>(false)
+            .Without<OptimizedSkeletonTag>().Build();
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            new Job().ScheduleParallel();
+            var job = new Job
+            {
+                boneTransformHandle = GetBufferTypeHandle<OptimizedBoneTransform>(false),
+                hierarchyHandle     = GetComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference>(true),
+                stateHandle         = GetComponentTypeHandle<OptimizedSkeletonState>(false),
+                transformHandle     = GetComponentTypeHandle<Unity.Transforms.LocalToWorld>(true),
+            };
+            state.Dependency = job.ScheduleParallel(m_query, state.Dependency);
         }
 
 #if LATIOS_BURST_DETERMINISM
@@ -91,17 +122,32 @@ namespace Latios.Kinemation.Systems
 #else
         [BurstCompile]
 #endif
-        [WithNone(typeof(OptimizedSkeletonTag))]
-        partial struct Job : IJobEntity
+        struct Job : IJobChunk
         {
-            public void Execute(in Unity.Transforms.LocalToWorld ltw,
-                                ref DynamicBuffer<OptimizedBoneTransform>          bones,
-                                ref DynamicBuffer<OptimizedBoneInertialBlendState> blends,
-                                RefRW<OptimizedSkeletonState>                      state,
-                                RefRO<OptimizedSkeletonHierarchyBlobReference>     blobRef,
-                                in DynamicBuffer<DependentSkinnedMesh>             deps)
+            [ReadOnly] public ComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference> hierarchyHandle;
+            [ReadOnly] public ComponentTypeHandle<Unity.Transforms.LocalToWorld> transformHandle;
+            public ComponentTypeHandle<OptimizedSkeletonState> stateHandle;
+            public BufferTypeHandle<OptimizedBoneTransform> boneTransformHandle;
+
+            public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                var _ = new OptimizedSkeletonAspect(ltw, blobRef, state, ref bones, ref blends, deps);
+                var ltws        = chunk.GetComponentDataPtrRO(ref transformHandle);
+                var hierarchies = chunk.GetNativeArray(ref hierarchyHandle);
+                var boneBuffers = chunk.GetBufferAccessor(ref boneTransformHandle);
+                var states      = chunk.GetNativeArray(ref stateHandle);
+
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var boneBuffer       = boneBuffers[i];
+                    DynamicBuffer<OptimizedBoneInertialBlendState> dummyBlendBuffer = default;
+
+                    _ = new OptimizedSkeletonAspect(in transformHandle[i],
+                                                    new RefRO<OptimizedSkeletonHierarchyBlobReference>(hierarchies, i),
+                                                    new RefRW<OptimizedSkeletonState>(states, i),
+                                                    ref boneBuffer,
+                                                    ref dummyBlendBuffer,
+                                                    default);
+                }
             }
         }
     }

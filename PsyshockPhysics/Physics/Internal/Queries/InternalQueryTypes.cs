@@ -11,7 +11,7 @@ namespace Latios.Psyshock
         public ushort featureCode;
     }
 
-    public struct ColliderDistanceResultInternal
+    internal struct ColliderDistanceResultInternal
     {
         public float3   hitpointA;
         public float3   hitpointB;
