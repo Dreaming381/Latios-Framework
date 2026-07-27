@@ -245,6 +245,7 @@ namespace Latios.Kinemation
             uint                                   m_currentSize;
             uint                                   m_stride;
             GraphicsBuffer.Target                  m_bindingTarget;
+            bool                                   m_warnedOversize;
 
             static readonly SharedStatic<CopyShaderNames> s_copyShaderNames = SharedStatic<CopyShaderNames>.GetOrCreate<PersistentBuffer>();
 
@@ -271,13 +272,14 @@ namespace Latios.Kinemation
                                     UnityObjectRef<ComputeShader>          copyShader,
                                     NativeList<BufferQueuedForDestruction> destructionQueue)
             {
-                uint size          = math.ceilpow2(initialSize);
+                uint size          = SafeCeilPow2Elements(initialSize, stride);
                 m_currentBuffer    = new GraphicsBufferUnmanaged(bufferType, GraphicsBuffer.UsageFlags.None, (int)size, (int)stride);
                 m_copyShader       = copyShader;
                 m_destructionQueue = destructionQueue;
                 m_currentSize      = size;
                 m_stride           = stride;
                 m_bindingTarget    = bufferType;
+                m_warnedOversize   = false;
             }
 
             public void Dispose()
@@ -296,12 +298,13 @@ namespace Latios.Kinemation
                 if (requiredSize <= m_currentSize)
                     return m_currentBuffer;
 
-                uint size = math.ceilpow2(requiredSize);
-                if (requiredSize * m_stride > 1024 * 1024 * 1024)
-                    Debug.LogWarning("Attempted to allocate a persistent graphics buffer over 1 GB. Rendering artifacts may occur.");
-                if (requiredSize * m_stride < 1024 * 1024 * 1024 && size * m_stride > 1024 * 1024 * 1024)
-                    size        = 1024 * 1024 * 1024 / m_stride;
-                var prevBuffer  = m_currentBuffer;
+                // The old 1 GB guard computed requiredSize * m_stride in 32 bits, which wrapped
+                // for exactly the oversized requests it was meant to catch, and ceilpow2
+                // overflows to 0 above 2^31, producing a zero-length buffer. Do the size math
+                // in 64 bits and clamp instead.
+                requiredSize    = ClampBufferElements(requiredSize, m_stride, ref m_warnedOversize);
+                uint size       = SafeCeilPow2Elements(requiredSize, m_stride);
+                var  prevBuffer = m_currentBuffer;
                 m_currentBuffer = new GraphicsBufferUnmanaged(m_bindingTarget, GraphicsBuffer.UsageFlags.None, (int)size, (int)m_stride);
                 if (m_copyShader.IsValid())
                 {
@@ -331,6 +334,43 @@ namespace Latios.Kinemation
             public uint                    frameId;
         }
 
+        internal const ulong kMaxBufferBytes = 1024UL * 1024UL * 1024UL;
+
+        // math.ceilpow2 overflows a uint to 0 for anything above 2^31, and requiredSize * stride
+        // computed in 32 bits wraps for the very requests a size guard is supposed to catch.
+        // All buffer size requests funnel through these two helpers so a garbage size gets
+        // clamped instead of reaching the graphics driver.
+        internal static uint ClampBufferElements(uint requiredSize, uint stride, ref bool warned)
+        {
+            if (stride == 0)
+                return math.max(1u, requiredSize);
+
+            if ((ulong)requiredSize * stride > kMaxBufferBytes)
+            {
+                if (!warned)
+                {
+                    warned = true;
+                    FixedString512Bytes msg = "Kinemation graphics buffer request of ";
+                    msg.Append(requiredSize);
+                    msg.Append((FixedString64Bytes)" elements exceeds the 1 GB sanity ceiling; clamping instead of allocating. Stride: ");
+                    msg.Append(stride);
+                    UnityEngine.Debug.LogWarning(msg);
+                }
+                requiredSize = (uint)(kMaxBufferBytes / stride);
+            }
+            return math.max(1u, requiredSize);
+        }
+
+        internal static uint SafeCeilPow2Elements(uint requiredSize, uint stride)
+        {
+            uint size = math.ceilpow2(math.max(1u, requiredSize));
+            if (size == 0)  // ceilpow2 overflowed
+                size = requiredSize;
+            if (stride != 0 && (ulong)size * stride > kMaxBufferBytes)
+                size = (uint)(kMaxBufferBytes / stride);
+            return math.max(1u, size);
+        }
+
         struct UploadPool : IDisposable
         {
             struct TrackedBuffer
@@ -344,6 +384,7 @@ namespace Latios.Kinemation
             GraphicsBuffer.Target     m_type;
             NativeList<TrackedBuffer> m_buffersInPool;
             NativeList<TrackedBuffer> m_buffersInFlight;
+            bool                      m_warnedOversize;
 
             public UploadPool(uint stride, GraphicsBuffer.Target bufferType, AllocatorManager.AllocatorHandle allocator)
             {
@@ -351,12 +392,17 @@ namespace Latios.Kinemation
                 m_type            = bufferType;
                 m_buffersInPool   = new NativeList<TrackedBuffer>(allocator);
                 m_buffersInFlight = new NativeList<TrackedBuffer>(allocator);
+                m_warnedOversize  = false;
             }
 
             public bool valid => m_buffersInPool.IsCreated;
 
             public GraphicsBufferUnmanaged GetBuffer(uint requiredSize, uint frameId)
             {
+                // Clamp before the pool search so a garbage request cannot skip every pooled
+                // buffer and force a huge fresh allocation.
+                requiredSize = ClampBufferElements(requiredSize, m_stride, ref m_warnedOversize);
+
                 for (int i = 0; i < m_buffersInPool.Length; i++)
                 {
                     if (m_buffersInPool[i].size >= requiredSize)
@@ -375,7 +421,7 @@ namespace Latios.Kinemation
                     m_buffersInPool.RemoveAtSwapBack(0);
                 }
 
-                uint size       = math.ceilpow2(requiredSize);
+                uint size       = SafeCeilPow2Elements(requiredSize, m_stride);
                 var  newTracked = new TrackedBuffer
                 {
                     buffer  = new GraphicsBufferUnmanaged(m_type, GraphicsBuffer.UsageFlags.LockBufferForWrite, (int)size, (int)m_stride),
