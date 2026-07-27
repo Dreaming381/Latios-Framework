@@ -44,6 +44,7 @@ namespace Latios.Kinemation
         TWrite                      written;
         BlackboardEntity            worldBlackboardEntity;
         CullingComputeDispatchState nextExpectedState;
+        bool                        desyncReported;
 
 #if LATIOS_BL_FORK
         JobHandle previousUpdateJH;
@@ -59,6 +60,7 @@ namespace Latios.Kinemation
             written               = default;
             worldBlackboardEntity = latiosWorld.worldBlackboardEntity;
             nextExpectedState     = CullingComputeDispatchState.Collect;
+            desyncReported        = false;
 
 #if LATIOS_BL_FORK
             previousUpdateJH = default;
@@ -74,13 +76,12 @@ namespace Latios.Kinemation
         public void DoUpdate<TSystem>(ref SystemState state, ref TSystem system) where TSystem : ICullingComputeDispatchSystem<TCollect, TWrite>
         {
             var activeState = worldBlackboardEntity.GetComponentData<CullingComputeDispatchActiveState>();
-            if (activeState.state != nextExpectedState)
-            {
-                UnityEngine.Debug.LogError("The CullingComputeDispatch expected state does not match the current state. Behavior may not be correct.");
-            }
 #if LATIOS_BL_FORK
             previousUpdateJH.Complete();
 #endif
+            if (activeState.state != nextExpectedState && !TryRealign(activeState.state))
+                return;
+
             switch (activeState.state)
             {
                 case CullingComputeDispatchState.Collect:
@@ -94,11 +95,41 @@ namespace Latios.Kinemation
                 case CullingComputeDispatchState.Dispatch:
                     system.Dispatch(ref state, ref written);
                     nextExpectedState = CullingComputeDispatchState.Collect;
+                    written           = default;
+                    desyncReported    = false;
                     break;
             }
 #if LATIOS_BL_FORK
             previousUpdateJH = state.Dependency;
 #endif
+        }
+
+        /// <summary>
+        /// Recovers from a phase desync instead of executing a phase out of order.
+        /// nextExpectedState only advances when this system's OnUpdate actually runs, so anything
+        /// that skips a single update while the round robin keeps cycling (an empty
+        /// RequireForUpdate query on one phase, an early return, an aborted job) leaves the system
+        /// permanently one phase behind. Running the mismatched phase anyway meant Dispatch could
+        /// execute without its matching Write and unlock GraphicsBuffers that were never locked.
+        /// Dropping the stale hand-off payload and rejoining at the next Collect costs at most one
+        /// round of work and self-corrects.
+        /// </summary>
+        /// <returns>True if the caller should execute the phase, false to skip it.</returns>
+        bool TryRealign(CullingComputeDispatchState activeState)
+        {
+            if (!desyncReported)
+            {
+                UnityEngine.Debug.LogWarning(
+                    "The CullingComputeDispatch expected state does not match the current state. Realigning at the next Collect phase; up to one round of work is dropped.");
+                desyncReported = true;
+            }
+
+            // A stale WriteState must never reach Dispatch, as that is what corrupts
+            // GraphicsBuffer lock state.
+            written           = default;
+            nextExpectedState = CullingComputeDispatchState.Collect;
+
+            return activeState == CullingComputeDispatchState.Collect;
         }
 
         /// <summary>
@@ -110,13 +141,12 @@ namespace Latios.Kinemation
         public void DoUpdateManaged<TSystem>(ref SystemState state, TSystem system) where TSystem : ICullingComputeDispatchSystem<TCollect, TWrite>
         {
             var activeState = worldBlackboardEntity.GetComponentData<CullingComputeDispatchActiveState>();
-            if (activeState.state != nextExpectedState)
-            {
-                UnityEngine.Debug.LogError("The CullingComputeDispatch expected state does not match the current state. Behavior may not be correct.");
-            }
 #if LATIOS_BL_FORK
             previousUpdateJH.Complete();
 #endif
+            if (activeState.state != nextExpectedState && !TryRealign(activeState.state))
+                return;
+
             switch (activeState.state)
             {
                 case CullingComputeDispatchState.Collect:
@@ -130,6 +160,8 @@ namespace Latios.Kinemation
                 case CullingComputeDispatchState.Dispatch:
                     system.Dispatch(ref state, ref written);
                     nextExpectedState = CullingComputeDispatchState.Collect;
+                    written           = default;
+                    desyncReported    = false;
                     break;
             }
 #if LATIOS_BL_FORK

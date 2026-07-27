@@ -211,6 +211,11 @@ namespace Latios.Kinemation.Systems
 
         public WriteState Write(ref SystemState state, ref CollectState collectState)
         {
+            // If Collect was skipped this round, the containers were never created.
+            // Degrade to "no work" instead of throwing on an uncreated NativeReference.
+            if (!collectState.layouts.IsCreated)
+                return default;
+
             var layouts = collectState.layouts.Value;
             if (layouts.requiredUploadTransforms == 0)
             {
