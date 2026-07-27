@@ -223,9 +223,13 @@ namespace Latios.Kinemation.Systems
             m_worldTransformHandle.Update(ref state);
             m_worldTransformLookup.Update(ref state);
 
-            var skinningMetaBuffer   = graphicsBroker.GetMetaUint4UploadBuffer(layouts.requiredMetaSize);
+            // requiredMetaSize can be 0 while requiredUploadTransforms > 0 when only vertex
+            // skinning materials are present, and locking zero elements throws. The dispatch
+            // loops read their counts from layouts, so the dummy element is never consumed.
+            var metaSizeClamped      = math.max(1u, layouts.requiredMetaSize);
+            var skinningMetaBuffer   = graphicsBroker.GetMetaUint4UploadBuffer(metaSizeClamped);
             var boneTransformsBuffer = graphicsBroker.GetBonesBuffer(layouts.requiredUploadTransforms);
-            var skinningMetaArray    = skinningMetaBuffer.LockBufferForWrite<uint4>(0, (int)layouts.requiredMetaSize);
+            var skinningMetaArray    = skinningMetaBuffer.LockBufferForWrite<uint4>(0, (int)metaSizeClamped);
             var boneTransformsArray  = boneTransformsBuffer.LockBufferForWrite<TransformQvvs>(0, (int)layouts.requiredUploadTransforms);
 
             var boneOffsetsBuffer = latiosWorld.worldBlackboardEntity.GetCollectionComponent<BoneOffsetsGpuManager>(true).offsets.AsDeferredJobArray();
@@ -271,7 +275,8 @@ namespace Latios.Kinemation.Systems
             var boneTransformsBuffer = writeState.boneTransformsBuffer;
             var layouts              = writeState.layouts;
 
-            skinningMetaBuffer.UnlockBufferAfterWrite<uint4>((int)layouts.requiredMetaSize);
+            // Must match the clamped lock count in Write.
+            skinningMetaBuffer.UnlockBufferAfterWrite<uint4>((int)math.max(1u, layouts.requiredMetaSize));
             boneTransformsBuffer.UnlockBufferAfterWrite<TransformQvvs>((int)layouts.requiredUploadTransforms);
 
             var requiredDeformSizes    = latiosWorld.worldBlackboardEntity.GetComponentData<MaxRequiredDeformData>();
