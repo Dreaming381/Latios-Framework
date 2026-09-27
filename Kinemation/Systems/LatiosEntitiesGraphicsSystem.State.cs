@@ -115,7 +115,8 @@ namespace Latios.Kinemation.Systems
 
             // Burst accessible variants for each shared component index
             public NativeParallelHashMap<int, BatchFilterSettings> m_FilterSettings;
-            public NativeParallelHashMap<int, BRGRenderMeshArray>  m_brgRenderMeshArrays;  // Not owned
+            public NativeParallelHashMap<int, BRGRenderMeshArray>      m_brgRenderMeshArrays;  // Not owned
+            public NativeHashMap<int, BrgRenderMeshArrayIdToIndexMaps> m_brgRenderMeshArrayIdToIndexMaps;
 
             private ThreadLocalAllocator m_ThreadLocalAllocators;
 

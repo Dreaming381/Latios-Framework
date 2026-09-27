@@ -10,6 +10,17 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.16.1] – 2026-9-26
+
+Officially supports Entities [1.4.8]
+
+### Changed
+
+-   Updated Core to v0.16.1
+-   Updated QVVS Transforms to v0.16.1
+-   Updated Psyshock to v0.16.1
+-   Updated Kinemation to v0.16.1
+
 ## [0.16.0] – 2026-9-20
 
 Officially supports Entities [1.4.8]

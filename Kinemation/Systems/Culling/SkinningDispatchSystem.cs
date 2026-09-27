@@ -1065,6 +1065,8 @@ namespace Latios.Kinemation.Systems
 
             void ProcessChain(NativeArray<MeshSkinningRequest> requests, NativeArray<DependentSkinnedMesh> meshes, int indexInChunk, int skeletonBonesCount)
             {
+                if (requests.Length == 0)
+                    return;
                 uint firstMeshIndex    = requests[0].indexInSkeletonBuffer;
                 uint maxMeshBoneCount  = meshes[(int)firstMeshIndex].boneOffsetsCount;
                 bool hasMultipleMeshes = false;

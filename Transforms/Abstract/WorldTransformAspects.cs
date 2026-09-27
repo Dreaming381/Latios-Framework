@@ -11,7 +11,8 @@ using TransformComponent = Latios.Transforms.WorldTransform;
 
 namespace Latios.Transforms.Abstract
 {
-    public struct WorldTransformReadOnlyAspect : IAspect
+    [IJobEach.ParameterHandle(typeof(WorldTransformReadOnlyAspectParameterHandle), IJobEach.ScheduleModeMask.All)]
+    public struct WorldTransformReadOnlyAspect : IAspect, IJobEach.IParameter
     {
         RefRO<TransformComponent> worldTransform;
 
@@ -39,6 +40,69 @@ namespace Latios.Transforms.Abstract
         public bool isNativeQvvs => true;
         public float4x4 matrix4x4 => worldTransform.ValueRO.worldTransform.ToMatrix4x4();
 #endif
+
+        /// <summary>
+        /// Transforms a point from local space to world space, including scale and stretch.
+        /// </summary>
+        public float3 TransformPoint(float3 localPoint)
+        {
+#if LATIOS_TRANSFORMS_UNITY
+            return math.transform(worldTransform.ValueRO.Value, localPoint);
+#else
+            return qvvs.TransformPoint(in worldTransform.ValueRO.worldTransform, localPoint);
+#endif
+        }
+
+        /// <summary>
+        /// Transforms a point from world space to local space, including scale and stretch.
+        /// </summary>
+        public float3 InverseTransformPoint(float3 worldPoint)
+        {
+#if LATIOS_TRANSFORMS_UNITY
+            ref readonly float4x4 ltw = ref worldTransform.ValueRO.Value;
+            return math.mul(math.inverse(new float3x3(ltw)), worldPoint - ltw.c3.xyz);
+#else
+            return qvvs.InverseTransformPoint(in worldTransform.ValueRO.worldTransform, worldPoint);
+#endif
+        }
+
+        /// <summary>
+        /// Rotates a direction from local space to world space, ignoring scale and stretch.
+        /// </summary>
+        public float3 TransformDirection(float3 localDirection) => math.rotate(rotation, localDirection);
+
+        /// <summary>
+        /// Rotates a direction from world space to local space, ignoring scale and stretch.
+        /// </summary>
+        public float3 InverseTransformDirection(float3 worldDirection) => math.rotate(math.conjugate(rotation), worldDirection);
+
+        /// <summary>
+        /// Transforms a surface normal from local space to world space, so that it stays perpendicular to the surface under
+        /// non-uniform scale or stretch. The result is not normalized.
+        /// </summary>
+        public float3 TransformNormalUnnormalized(float3 localNormal)
+        {
+#if LATIOS_TRANSFORMS_UNITY
+            return math.mul(math.transpose(math.inverse(new float3x3(worldTransform.ValueRO.Value))), localNormal);
+#else
+            ref readonly var transform = ref worldTransform.ValueRO.worldTransform;
+            return qvvs.TransformNormalUnnormalized(in transform, localNormal);
+#endif
+        }
+
+        /// <summary>
+        /// Transforms a surface normal from world space to local space, so that it stays perpendicular to the surface under
+        /// non-uniform scale or stretch. The result is not normalized.
+        /// </summary>
+        public float3 InverseTransformNormalUnnormalized(float3 worldNormal)
+        {
+#if LATIOS_TRANSFORMS_UNITY
+            return math.mul(math.transpose(new float3x3(worldTransform.ValueRO.Value)), worldNormal);
+#else
+            ref readonly var transform = ref worldTransform.ValueRO.worldTransform;
+            return qvvs.InverseTransformNormalUnnormalized(in transform, worldNormal);
+#endif
+        }
 
         public WorldTransformReadOnlyAspect(RefRO<TransformComponent> worldTransformRefRO)
         {
@@ -177,6 +241,43 @@ namespace Latios.Transforms.Abstract
             entityManager.CompleteDependencyBeforeRO<TransformComponent>();
             worldTransform = entityManager.GetComponentLookup<TransformComponent>(true).GetRefRO(entity);
         }
+    }
+
+    /// <summary>
+    /// The backing handle for a WorldTransformReadOnlyAspect Execute() parameter.
+    /// </summary>
+    public struct WorldTransformReadOnlyAspectParameterHandle : IJobEach.IParameterHandle<WorldTransformReadOnlyAspect>
+    {
+        [Unity.Collections.ReadOnly] ComponentTypeHandle<TransformComponent> m_transformHandle;
+        // Job structs can't hold an unassigned NativeArray, so the chunk's array lives behind a pointer.
+        Latios.Unsafe.ThreadCache<Unity.Collections.NativeArray<TransformComponent> > m_chunkTransforms;
+
+        /// <inheritdoc />
+        public FluentQuery AppendToQuery(FluentQuery query) => query.With<TransformComponent>(true);
+
+        /// <inheritdoc />
+        public bool OnChunkBegin(in IJobEach.JobContext context)
+        {
+            if (!m_chunkTransforms.isCreated)
+                m_chunkTransforms   = new Latios.Unsafe.ThreadCache<Unity.Collections.NativeArray<TransformComponent> >(default);
+            m_chunkTransforms.cache = context.chunk.GetNativeArray(ref m_transformHandle);
+            return true;
+        }
+
+        /// <inheritdoc />
+        public void OnChunkEnd(in IJobEach.JobContext context, bool chunkWasExecuted)
+        {
+        }
+
+        /// <inheritdoc />
+        public WorldTransformReadOnlyAspect GetParameter(in IJobEach.JobContext context)
+        {
+            return new WorldTransformReadOnlyAspect(new RefRO<TransformComponent>(m_chunkTransforms.cache, context.indexInChunk));
+        }
+
+        void ILatiosApiGettable.CreateForApi(ref SystemState state) => m_transformHandle = state.GetComponentTypeHandle<TransformComponent>(true);
+
+        void ILatiosApiGettable.UpdateForApi(ref SystemState state) => m_transformHandle.Update(ref state);
     }
 }
 

@@ -35,11 +35,7 @@ namespace Latios
         /// Returns the CommandSpan as a .NET Span
         /// </summary>
         /// <returns></returns>
-        public Span<T> AsSpan()
-        {
-            CommandSpan.CheckNotNull(m_ptr);
-            return new Span<T>(m_ptr, length);
-        }
+        public Span<T> AsSpan() => new Span<T>(m_ptr, length);
 
         /// <summary>
         /// Implicitly converts this CommandSpan into a DynamicCommandSpan.

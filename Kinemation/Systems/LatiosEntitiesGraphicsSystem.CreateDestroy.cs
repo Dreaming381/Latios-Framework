@@ -212,7 +212,8 @@ namespace Latios.Kinemation.Systems
 
                 m_GraphicsArchetypes = new EntitiesGraphicsArchetypes(256);
 
-                m_FilterSettings = new NativeParallelHashMap<int, BatchFilterSettings>(256, Allocator.Persistent);
+                m_FilterSettings                  = new NativeParallelHashMap<int, BatchFilterSettings>(256, Allocator.Persistent);
+                m_brgRenderMeshArrayIdToIndexMaps = new NativeHashMap<int, BrgRenderMeshArrayIdToIndexMaps>(256, Allocator.Persistent);
 
                 // Some hardcoded mappings to avoid dependencies to Hybrid from DOTS (*cough Latios Transforms)
                 RegisterMaterialPropertyType<WorldToLocal_Tag>(                            "unity_WorldToObject",   overrideTypeSizeGPU: 4 * 4 * 3);
@@ -356,6 +357,9 @@ namespace Latios.Kinemation.Systems
                 m_GraphicsArchetypes.Dispose();
 
                 m_FilterSettings.Dispose();
+                foreach (var pair in m_brgRenderMeshArrayIdToIndexMaps)
+                    pair.Value.Dispose();
+                m_brgRenderMeshArrayIdToIndexMaps.Dispose();
 
                 if (!m_cullingCallbackFinalJobHandles.IsEmpty)
                     JobHandle.CompleteAll(m_cullingCallbackFinalJobHandles.AsArray());

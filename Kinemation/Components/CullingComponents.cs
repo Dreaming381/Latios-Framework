@@ -1,8 +1,10 @@
-using System;
 using System.Runtime.InteropServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Latios.Kinemation
@@ -239,6 +241,212 @@ namespace Latios.Kinemation
     public struct MaterialPropertyComponentType : IBufferElementData
     {
         public ComponentType type;
+    }
+
+    /// <summary>
+    /// Provides unmanaged RenderMeshArray view access to evaluate occluder candidates
+    /// </summary>
+    public struct OcclusionCullingContextAspect : ICollectionAspect<OcclusionCullingContextAspect>
+    {
+        [ReadOnly] internal NativeParallelHashMap<int, BRGRenderMeshArray>      brgRenderMeshArrays;
+        [ReadOnly] internal NativeHashMap<int, BrgRenderMeshArrayIdToIndexMaps> brgRenderMeshArraysIdToIndexMaps;
+        HasChecker<UseMmiRangeLodTag>                                           useMmiRangeLodChecker;
+        HasChecker<OverrideMeshInRangeTag>                                      overrideMeshInRangeChecker;
+
+        /// <summary>
+        /// Gets a resolver for the chunk that can evaluate MaterialMeshInfo instances within the chunk
+        /// </summary>
+        /// <param name="chunk">The chunk to evaluate</param>
+        /// <param name="renderMeshArrayTypeHandle"></param>
+        /// <returns></returns>
+        public ChunkMaterialMeshInfoResolver GetResolver(in ArchetypeChunk chunk, ref SharedComponentTypeHandle<RenderMeshArray> renderMeshArrayTypeHandle)
+        {
+            BRGRenderMeshArray              rma         = default;
+            BrgRenderMeshArrayIdToIndexMaps maps        = default;
+            var                             sharedIndex = chunk.GetSharedComponentIndex(renderMeshArrayTypeHandle);
+            var                             valid       = sharedIndex != -1 &&
+                              brgRenderMeshArrays.TryGetValue(sharedIndex, out rma) && brgRenderMeshArraysIdToIndexMaps.TryGetValue(sharedIndex,
+                                                                                                                                    out maps);
+            return new ChunkMaterialMeshInfoResolver
+            {
+                rma                 = rma,
+                idToIndexMaps       = maps,
+                valid               = valid,
+                useMmiRangeLod      = useMmiRangeLodChecker[chunk],
+                overrideMeshInRange = overrideMeshInRangeChecker[chunk],
+            };
+        }
+
+        /// <summary>
+        /// A per-chunk structure that can identify all meshes, materials, and submeshes within a MaterialMeshInfo
+        /// that are about to be rendered
+        /// </summary>
+        public struct ChunkMaterialMeshInfoResolver
+        {
+            internal BRGRenderMeshArray              rma;
+            internal BrgRenderMeshArrayIdToIndexMaps idToIndexMaps;
+            internal bool                            valid;
+            internal bool                            useMmiRangeLod;
+            internal bool                            overrideMeshInRange;
+
+            /// <summary>
+            /// Gets the meshes, materials, and submeshes as well as their RenderMeshArray indices and appends them
+            /// to the resultsList
+            /// </summary>
+            /// <param name="materialMeshInfo">The MaterialMeshInfo to extract from</param>
+            /// <param name="resultsList">The list that results are appended to. This method does not clear this list.</param>
+            public void Resolve(MaterialMeshInfo materialMeshInfo, ref UnsafeList<MaterialMeshSubmesh> resultsList)
+            {
+                if (!valid)
+                {
+                    if (materialMeshInfo.HasMaterialMeshIndexRange)
+                        return;
+                    if (!materialMeshInfo.IsRuntimeMesh)
+                        return;
+                    if (!materialMeshInfo.IsRuntimeMaterial)
+                        return;
+                    resultsList.Add(new MaterialMeshSubmesh
+                    {
+                        meshID           = materialMeshInfo.MeshID,
+                        meshRmaIndex     = -1,
+                        materialID       = materialMeshInfo.MaterialID,
+                        materialRmaIndex = -1,
+                        submeshIndex     = materialMeshInfo.SubMesh
+                    });
+                    return;
+                }
+                if (!materialMeshInfo.HasMaterialMeshIndexRange)
+                {
+                    var meshRmaIndex = materialMeshInfo.MeshArrayIndex;
+                    var meshID       = meshRmaIndex == -1 ? materialMeshInfo.MeshID : rma.GetMeshID(materialMeshInfo);
+                    if (meshID == BatchMeshID.Null)
+                        return;
+                    var materialRmaIndex = materialMeshInfo.MaterialArrayIndex;
+                    var materialID       = materialRmaIndex == -1 ? materialMeshInfo.MaterialID : rma.GetMaterialID(materialMeshInfo);
+                    if (materialID == BatchMaterialID.Null)
+                        return;
+                    resultsList.Add(new MaterialMeshSubmesh
+                    {
+                        meshID           = meshID,
+                        meshRmaIndex     = meshRmaIndex,
+                        materialID       = materialID,
+                        materialRmaIndex = materialRmaIndex,
+                        submeshIndex     = materialMeshInfo.SubMesh
+                    });
+                }
+                else
+                {
+                    RangeInt matMeshIndexRange = materialMeshInfo.MaterialMeshIndexRange;
+                    if (matMeshIndexRange.length == 127)
+                    {
+                        int newLength             = (rma.MaterialMeshSubMeshes[matMeshIndexRange.start + 1].SubMeshIndex >> 16) & 0xff;
+                        newLength                |= (rma.MaterialMeshSubMeshes[matMeshIndexRange.start + 2].SubMeshIndex >> 8) & 0xff00;
+                        newLength                |= rma.MaterialMeshSubMeshes[matMeshIndexRange.start + 3].SubMeshIndex & 0xff0000;
+                        matMeshIndexRange.length  = newLength;
+                    }
+
+                    int hiResMask = 0;
+                    if (useMmiRangeLod)
+                    {
+                        materialMeshInfo.GetCurrentLodRegion(out var hiResLodIndex, out var isMmiCrossfading);
+                        if (isMmiCrossfading)
+                            return;
+                        hiResMask = 1 << hiResLodIndex;
+
+                        // Late check if any of the elements are in the LOD. We'd prefer to filter these out sooner, but it is still good to check here.
+                        if (matMeshIndexRange.length > 0)
+                        {
+                            var combinedMask = (rma.MaterialMeshSubMeshes[matMeshIndexRange.start].SubMeshIndex >> 16) & 0xff;
+                            if ((combinedMask & hiResMask) == 0)
+                                return;
+                        }
+                    }
+
+                    BatchMeshID overrideMesh = default;
+                    if (overrideMeshInRange)
+                        overrideMesh = materialMeshInfo.IsRuntimeMesh ? materialMeshInfo.MeshID : rma.GetMeshID(materialMeshInfo);
+
+                    for (int i = 0; i < matMeshIndexRange.length; i++)
+                    {
+                        int matMeshSubMeshIndex = matMeshIndexRange.start + i;
+
+                        // Drop the draw command if OOB. Errors should have been reported already so no need to log anything
+                        if (matMeshSubMeshIndex >= rma.MaterialMeshSubMeshes.Length)
+                            continue;
+
+                        BatchMaterialMeshSubMesh matMeshSubMesh = rma.MaterialMeshSubMeshes[matMeshSubMeshIndex];
+
+                        if (useMmiRangeLod)
+                        {
+                            var  mmsmMask = matMeshSubMesh.SubMeshIndex >> 24;
+                            bool isHi     = (mmsmMask & hiResMask) != 0;
+                            if (!isHi)
+                                continue;
+                        }
+
+                        int meshRmaIndex = -1;
+                        if (overrideMeshInRange)
+                            matMeshSubMesh.Mesh = overrideMesh;
+                        if (!idToIndexMaps.meshIdToRmaIndex.TryGetValue(matMeshSubMesh.Mesh, out meshRmaIndex))
+                            continue;
+
+                        if (!idToIndexMaps.materialIdToRmaIndex.TryGetValue(matMeshSubMesh.Material, out var materialRmaIndex))
+                            continue;
+
+                        resultsList.Add(new MaterialMeshSubmesh
+                        {
+                            meshID           = matMeshSubMesh.Mesh,
+                            meshRmaIndex     = meshRmaIndex,
+                            materialID       = matMeshSubMesh.Material,
+                            materialRmaIndex = materialRmaIndex,
+                            submeshIndex     = (ushort)(matMeshSubMesh.SubMeshIndex & 0xffff)
+                        });
+                    }
+                }
+            }
+        }
+
+        public struct MaterialMeshSubmesh
+        {
+            /// <summary>
+            /// The BatchMeshID being used
+            /// </summary>
+            public BatchMeshID meshID;
+            /// <summary>
+            /// The index of the mesh in the RenderMeshArray. -1 if not present in the RenderMeshArray.
+            /// </summary>
+            public int meshRmaIndex;
+            /// <summary>
+            /// The BatchMaterialID being used
+            /// </summary>
+            public BatchMaterialID materialID;
+            /// <summary>
+            /// The index of the material in the RenderMeshArray. -1 if not present in the RenderMeshArray.
+            /// </summary>
+            public int materialRmaIndex;
+            /// <summary>
+            /// The index of the submesh within the mesh
+            /// </summary>
+            public ushort submeshIndex;
+        }
+
+        FluentQuery ICollectionAspect<OcclusionCullingContextAspect>.AppendToQuery(FluentQuery query)
+        {
+            // Todo: Can't query for the Exists component directly since it is in the same assembly.
+            return query.With<CullingContext, WorldBlackboardTag>(true);
+        }
+
+        OcclusionCullingContextAspect ICollectionAspect<OcclusionCullingContextAspect>.CreateCollectionAspect(LatiosWorldUnmanaged latiosWorld,
+                                                                                                              EntityManager entityManager,
+                                                                                                              Entity entity)
+        {
+            var context = latiosWorld.GetCollectionComponent<BrgCullingContext>(latiosWorld.worldBlackboardEntity, true);
+            return new OcclusionCullingContextAspect
+            {
+                brgRenderMeshArrays              = context.brgRenderMeshArrays,
+                brgRenderMeshArraysIdToIndexMaps = context.brgRenderMeshArrayIdToIndexMaps
+            };
+        }
     }
 }
 

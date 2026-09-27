@@ -49,8 +49,8 @@ namespace Latios
             data = (byte)(intdata & 0xff);
         }
 
-        public static int GetBits(int data, int firstBitIndex, int bitCount) 
-            => math.asint(new BitField32(math.asuint(data)).GetBits(firstBitIndex, bitCount));
+        public static int GetBits(int data, int firstBitIndex, int bitCount)
+        => math.asint(new BitField32(math.asuint(data)).GetBits(firstBitIndex, bitCount));
         public static void SetBits(ref int data, int firstBitIndex, int bitCount, int newValue)
         {
             uint udata = math.asuint(data);
@@ -60,13 +60,13 @@ namespace Latios
         public static uint GetBits(uint data, int firstBitIndex, int bitCount) => new BitField32(data).GetBits(firstBitIndex, bitCount);
         public static void SetBits(ref uint data, int firstBitIndex, int bitCount, uint newValue)
         {
-            var mask = 0xffffffffu >> (32 - bitCount);
+            var mask    = (uint)(0xfffffffful >> (32 - bitCount));
             var newPart = (newValue & mask) << firstBitIndex;
             var oldPart = data & ~(mask << firstBitIndex);
-            data = newPart | oldPart;
+            data        = newPart | oldPart;
         }
         public static long GetBits(long data, int firstBitIndex, int bitCount)
-            => math.aslong(new BitField64(math.asulong(data)).GetBits(firstBitIndex, bitCount));
+        => math.aslong(new BitField64(math.asulong(data)).GetBits(firstBitIndex, bitCount));
         public static void SetBits(ref long data, int firstBitIndex, int bitCount,  long newValue)
         {
             ulong udata = math.asulong(data);
@@ -76,13 +76,14 @@ namespace Latios
         public static ulong GetBits(ulong data, int firstBitIndex, int bitCount) => new BitField64(data).GetBits(firstBitIndex, bitCount);
         public static void SetBits(ref ulong data, int firstBitIndex, int bitCount, ulong newValue)
         {
-            var mask = (~0x0ul) >> (64 - bitCount);
-            var newPart = (newValue & mask) << firstBitIndex;
-            var oldPart = data & ~(mask << firstBitIndex);
-            data = newPart | oldPart;
+            var mask     = 1ul << bitCount;
+            mask        -= ((ulong)bitCount >> 6) ^ 1ul;
+            var newPart  = (newValue & mask) << firstBitIndex;
+            var oldPart  = data & ~(mask << firstBitIndex);
+            data         = newPart | oldPart;
         }
         public static ushort GetBits(ushort data, int firstBitIndex, int bitCount)
-            => (ushort)(0xffff & GetBits((uint)data, firstBitIndex, bitCount));
+        => (ushort)(0xffff & GetBits((uint)data, firstBitIndex, bitCount));
         public static void SetBits(ref ushort data, int firstBitIndex, int bitCount,  ushort newValue)
         {
             uint intdata = data;
@@ -90,7 +91,7 @@ namespace Latios
             data = (ushort)(intdata & 0xffff);
         }
         public static byte GetBits(byte data, int firstBitIndex, int bitCount)
-            => (byte)(0xff & GetBits((uint)data, firstBitIndex, bitCount));
+        => (byte)(0xff & GetBits((uint)data, firstBitIndex, bitCount));
         public static void SetBits(ref byte data, int firstBitIndex, int bitCount,  byte newValue)
         {
             uint intdata = data;
@@ -99,3 +100,4 @@ namespace Latios
         }
     }
 }
+

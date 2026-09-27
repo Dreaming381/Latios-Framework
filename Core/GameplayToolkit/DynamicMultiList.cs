@@ -230,7 +230,7 @@ namespace Latios
                 var oldHeader = m_multiList.m_headers[m_index];
                 var basePtr   = (T*)m_multiList.m_elements.GetUnsafePtr();
                 var arrayPtr  = (T*)newElems.GetUnsafeReadOnlyPtr();
-                if (arrayPtr > basePtr && arrayPtr < basePtr + m_multiList.m_elements.Length)
+                if (arrayPtr >= basePtr && arrayPtr < basePtr + m_multiList.m_elements.Length)
                 {
                     // Aliased insertion.
                     int  srcStart               = (int)(arrayPtr - basePtr);
@@ -249,13 +249,15 @@ namespace Latios
                         ThrowStrangeAddRangeAlias(srcStart, srcCount, oldHeader.startOffset, oldHeader.length);
                     }
                     ResizeUninitialized(oldHeader.length + srcCount);
+                    basePtr = (T*)m_multiList.m_elements.GetUnsafePtr();
                     if (offsetByCapacityChange)
                         srcStart += Capacity - oldHeader.capacity;
                     UnsafeUtility.MemCpy(basePtr + oldHeader.startOffset + oldHeader.length, basePtr + srcStart, (long)UnsafeUtility.SizeOf<T>() * srcCount);
                     return;
                 }
                 ResizeUninitialized(oldHeader.length + newElems.Length);
-                UnsafeUtility.MemCpy(basePtr + oldHeader.length, newElems.GetUnsafeReadOnlyPtr(), (long)UnsafeUtility.SizeOf<T>() * newElems.Length);
+                basePtr = (T*)m_multiList.m_elements.GetUnsafePtr();
+                UnsafeUtility.MemCpy(basePtr + oldHeader.startOffset + oldHeader.length, newElems.GetUnsafeReadOnlyPtr(), (long)UnsafeUtility.SizeOf<T>() * newElems.Length);
             }
 
             /// <summary>

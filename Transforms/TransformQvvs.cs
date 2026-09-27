@@ -544,6 +544,24 @@ namespace Latios.Transforms
             result.context32 = context32;
             return result;
         }
+
+        /// <summary>
+        /// Transforms a surface normal from local space to world space, so that it stays perpendicular to the surface under
+        /// non-uniform scale or stretch. The result is not normalized.
+        /// </summary>
+        public static float3 TransformNormalUnnormalized(in TransformQvvs qvvs, float3 localNormal)
+        {
+            return math.rotate(qvvs.rotation, localNormal * math.rcp(qvvs.stretch * qvvs.scale));
+        }
+
+        /// <summary>
+        /// Transforms a surface normal from world space to local space, so that it stays perpendicular to the surface under
+        /// non-uniform scale or stretch. The result is not normalized.
+        /// </summary>
+        public static float3 InverseTransformNormalUnnormalized(in TransformQvvs qvvs, float3 worldNormal)
+        {
+            return InverseTransformDirection(in qvvs, worldNormal) * qvvs.stretch * qvvs.scale;
+        }
     }
 }
 

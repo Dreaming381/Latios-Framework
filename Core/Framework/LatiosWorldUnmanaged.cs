@@ -322,7 +322,7 @@ namespace Latios
             else
                 em.AddComponent(entity, new ComponentTypeSet(collectionComponent.componentType, collectionComponent.cleanupType));
             m_impl->m_worldUnmanaged.EntityManager.AddComponent(entity, collectionComponent.cleanupType);
-            var replaced = m_impl->m_collectionComponentStorage.AddOrSetCollectionComponentAndDisposeOld(entity, collectionComponent, out var disposeHandle, out var newRef);
+            var replaced = !m_impl->m_collectionComponentStorage.AddOrSetCollectionComponentAndDisposeOld(entity, collectionComponent, out var disposeHandle, out var newRef);
             m_impl->m_collectionDependencies.Add(new LatiosWorldUnmanagedImpl.CollectionDependency
             {
                 handle                    = newRef.collectionHandle,

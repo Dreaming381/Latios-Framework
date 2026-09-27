@@ -14,7 +14,14 @@ namespace Latios.Psyshock
 
             public float3 axisInB;
 
-            public float3 targetInIntertialPoseBSpace;
+            public float3 targetInInertialPoseBSpace;
+
+            [System.Obsolete("Misspelled. Use targetInInertialPoseBSpace instead.")]
+            public float3 targetInIntertialPoseBSpace
+            {
+                get => targetInInertialPoseBSpace;
+                set => targetInInertialPoseBSpace = value;
+            }
 
             // Position error at the beginning of the step
             public float initialError;
@@ -57,7 +64,7 @@ namespace Latios.Psyshock
             parameters.jointPositionInInertialPoseBSpace = jointTransformInInertialPoseBSpace.pos;
             parameters.maxImpulseOfMotor                 = maxImpulse;
             parameters.axisInB                           = new float3x3(jointTransformInInertialPoseBSpace.rot)[motorizedAxisIndex];
-            parameters.targetInIntertialPoseBSpace       = parameters.axisInB * targetVelocity;  // is velocity vector relative to bodyB, in m/s
+            parameters.targetInInertialPoseBSpace        = parameters.axisInB * targetVelocity;  // is velocity vector relative to bodyB, in m/s
         }
 
         /// <summary>
@@ -69,7 +76,10 @@ namespace Latios.Psyshock
         }
 
         /// <summary>
-        /// Solves the velocity motor for the pair of bodies
+        /// Solves the velocity motor for the pair of bodies, matching Unity Physics. This drives the center-of-mass velocity of A
+        /// toward the target velocity vector on all three axes, so it also drives the velocity perpendicular to the motor axis toward zero.
+        /// And it ignores the velocity of B. Use the overload with a scalar accumulatedImpulse for a motor that drives only the relative
+        /// velocity along the motor axis.
         /// </summary>
         /// <param name="velocityA">The velocity of the first body</param>
         /// <param name="inertialPoseWorldTransformA">The world-space center of mass and inertia tensor diagonal orientation of the first body</param>
@@ -77,6 +87,7 @@ namespace Latios.Psyshock
         /// <param name="velocityB">The velocity of the second body</param>
         /// <param name="inertialPoseWorldTransformB">The world-space center of mass and inertia tensor diagonal orientation of the second body</param>
         /// <param name="massB">The mass of the second body</param>
+        /// <param name="accumulatedImpulse">The impulse accumulated by the motor so far this step, which should be initialized to zero</param>
         /// <param name="parameters">The constraint data</param>
         /// <param name="deltaTime">The timestep over which this constraint is being solved</param>
         /// <param name="inverseDeltaTime">The reciprocal of deltaTime, should be: 1f / deltaTime</param>
@@ -112,11 +123,10 @@ namespace Latios.Psyshock
 
             float3x3 effectiveMass = BuildSymmetricMatrix(effectiveMassDiag, effectiveMassOffDiag);
 
-            // Todo: This doesn't take into account the velocity of B at all, which seems weird to me.
-            var    targetFromOrientationB = math.mul(inertialPoseWorldTransformB.rot, parameters.targetInIntertialPoseBSpace);  // Target vector is shifted based on the orientation of body B
+            var    targetFromOrientationB = math.mul(inertialPoseWorldTransformB.rot, parameters.targetInInertialPoseBSpace);  // Target vector is shifted based on the orientation of body B
             float3 solveError             = (targetFromOrientationB - velocityA.linear) * parameters.damping;  //in world space, units: m/s
 
-            float3 impulse = math.mul(effectiveMass, solveError) * inverseDeltaTime;
+            float3 impulse = math.mul(effectiveMass, solveError);
             impulse        = CapImpulse(impulse, ref accumulatedImpulse, parameters.maxImpulseOfMotor);
 
             // Apply the impulse
@@ -140,6 +150,53 @@ namespace Latios.Psyshock
                 float3 angularImpulse  = impulse.x * ang0 + impulse.y * ang1 + impulse.z * ang2;
                 velocity.angular      += angularImpulse * mass.inverseInertia;
             }
+        }
+
+        /// <summary>
+        /// Solves the velocity motor for the pair of bodies as a true single-axis motor. Unlike the Unity Physics variant, this:
+        /// <list type="bullet">
+        /// <item>drives the velocity of A relative to B rather than the world-space velocity of A,</item>
+        /// <item>measures that velocity at the joint positions, where the impulse is applied, rather than at the center of mass of A,</item>
+        /// <item>only drives along the motor axis, leaving the velocity along the other axes to other constraints.</item>
+        /// </list>
+        /// </summary>
+        /// <param name="velocityA">The velocity of the first body</param>
+        /// <param name="inertialPoseWorldTransformA">The world-space center of mass and inertia tensor diagonal orientation of the first body</param>
+        /// <param name="massA">The mass of the first body</param>
+        /// <param name="velocityB">The velocity of the second body</param>
+        /// <param name="inertialPoseWorldTransformB">The world-space center of mass and inertia tensor diagonal orientation of the second body</param>
+        /// <param name="massB">The mass of the second body</param>
+        /// <param name="accumulatedImpulse">The impulse accumulated by the motor so far this step, which should be initialized to zero</param>
+        /// <param name="parameters">The constraint data</param>
+        /// <param name="deltaTime">The timestep over which this constraint is being solved</param>
+        /// <param name="inverseDeltaTime">The reciprocal of deltaTime, should be: 1f / deltaTime</param>
+        /// <returns>The impulse applied to A along the world-space motor axis. B receives the negative of this impulse.</returns>
+        public static float SolveJacobian(ref Velocity velocityA, in RigidTransform inertialPoseWorldTransformA, in Mass massA,
+                                          ref Velocity velocityB, in RigidTransform inertialPoseWorldTransformB, in Mass massB,
+                                          ref float accumulatedImpulse, in LinearVelocity1DMotorJacobianParameters parameters, float deltaTime, float inverseDeltaTime)
+        {
+            var futureTransformA = IntegrateWithoutDamping(inertialPoseWorldTransformA, in velocityA, deltaTime);
+            var futureTransformB = IntegrateWithoutDamping(inertialPoseWorldTransformB, in velocityB, deltaTime);
+
+            float3 axisInWorld = math.mul(inertialPoseWorldTransformB.rot, parameters.axisInB);
+            float3 angA        = math.cross(parameters.jointPositionInInertialPoseASpace, math.InverseRotateFast(futureTransformA.rot, axisInWorld));
+            float3 angB        = math.cross(parameters.jointPositionInInertialPoseBSpace, math.InverseRotateFast(futureTransformB.rot, axisInWorld));
+
+            float invEffectiveMass = massA.inverseMass + math.csum(angA * angA * massA.inverseInertia) +
+                                     massB.inverseMass + math.csum(angB * angB * massB.inverseInertia);
+            float effectiveMass = math.select(1f / invEffectiveMass, 0f, invEffectiveMass == 0f);
+
+            float targetSpeed   = math.dot(parameters.targetInInertialPoseBSpace, parameters.axisInB);
+            float relativeSpeed = math.dot(velocityA.linear - velocityB.linear, axisInWorld) + math.dot(velocityA.angular, angA) - math.dot(velocityB.angular, angB);
+
+            float impulse = effectiveMass * (targetSpeed - relativeSpeed) * parameters.damping;
+            impulse       = CapImpulse(impulse, ref accumulatedImpulse, parameters.maxImpulseOfMotor);
+
+            velocityA.linear  += impulse * massA.inverseMass * axisInWorld;
+            velocityA.angular += impulse * angA * massA.inverseInertia;
+            velocityB.linear  -= impulse * massB.inverseMass * axisInWorld;
+            velocityB.angular -= impulse * angB * massB.inverseInertia;
+            return impulse;
         }
     }
 }

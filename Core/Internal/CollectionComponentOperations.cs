@@ -195,7 +195,7 @@ namespace Latios.InternalSourceGen
             if (needsAdd)
                 context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.AddComponent(context->addQuery, t);
             if (needsRemove)
-                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(context->addQuery, t);
+                context->latiosWorld.m_impl->m_worldUnmanaged.EntityManager.RemoveComponent(context->removeQuery, t);
         }
 
         static void DisposeCollectionStorage<T>(DisposeCollectionStorageContext* context) where T : unmanaged, ICollectionComponent, StaticAPI.ICollectionComponentSourceGenerated

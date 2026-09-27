@@ -585,7 +585,7 @@ namespace Latios
                         if (writePromote && a.AccessModeType != b.AccessModeType)
                         {
                             b.AccessModeType = ComponentType.AccessMode.ReadWrite;
-                            typesToRemove[i] = b;
+                            typesToRemove[j] = b;
                         }
                         listToFilter.RemoveAtSwapBack(i);
                         i--;
@@ -611,7 +611,7 @@ namespace Latios
                         if (writePromote && a.AccessModeType != b.AccessModeType)
                         {
                             b.AccessModeType = ComponentType.AccessMode.ReadWrite;
-                            typesToRemove[i] = b;
+                            typesToRemove[j] = b;
                         }
                         listToFilter.RemoveAtSwapBack(i);
                         i--;
@@ -637,7 +637,7 @@ namespace Latios
                         if (writePromote && a.AccessModeType != b.AccessModeType)
                         {
                             b.AccessModeType = ComponentType.AccessMode.ReadWrite;
-                            typesToRemove[i] = b;
+                            typesToRemove[j] = b;
                         }
                         listToFilter.RemoveAtSwapBack(i);
                         i--;

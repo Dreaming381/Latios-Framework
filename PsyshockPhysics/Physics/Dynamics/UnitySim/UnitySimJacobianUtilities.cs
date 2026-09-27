@@ -68,11 +68,9 @@ namespace Latios.Psyshock
         }
 
         // Returns the amount of error for the solver to correct, where initialError is the pre-integration error and predictedError is the expected post-integration error
-        // If (predicted > initial) HAVE overshot target = (Predicted - initial)*damping + initial*tau
-        // If (predicted < initial) HAVE NOT met target = predicted * tau (ie: damping not used if target not met)
         static float CalculateCorrection(float predictedError, float initialError, float tau, float damping)
         {
-            return math.max(predictedError - initialError, 0.0f) * damping + math.min(predictedError, initialError) * tau;
+            return (predictedError - initialError) * damping + initialError * tau;
         }
 
         /// <summary>

@@ -544,7 +544,7 @@ namespace Latios.Unsafe.InternalSourceGen
             };
             s_lookup.Data.Add(key, functionPtr);
             var stableHash = math.aslong(TypeHash.CalculateStableTypeHash(typeof(TStruct)));
-            s_structToStableLookup.Data.Add(key.structHash, stableHash);
+            s_structToStableLookup.Data.TryAdd(key.structHash, stableHash);
             key.structHash = stableHash;
             s_stableLookup.Data.Add(key, functionPtr);
         }

@@ -483,7 +483,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TransformAspect of the handle powered by EntityManager.
         /// </summary>
-        public static unsafe TransformAspect GetTransfromAspect(this EntityManager em, EntityInHierarchyHandle handle)
+        public static unsafe TransformAspect GetTransformAspect(this EntityManager em, EntityInHierarchyHandle handle)
         {
             var worldTransform = em.GetComponentDataRW<WorldTransform>(handle.entity);
             return new TransformAspect
@@ -499,7 +499,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TransformAspect of the entity powered by EntityManager.
         /// </summary>
-        public static unsafe TransformAspect GetTransfromAspect(this EntityManager em, Entity entity)
+        public static unsafe TransformAspect GetTransformAspect(this EntityManager em, Entity entity)
         {
             var worldTransform = em.GetComponentDataRW<WorldTransform>(entity);
             var handle         = TransformTools.GetHierarchyHandle(entity, em);
@@ -530,7 +530,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TransformReadAspect of the handle powered by EntityManager.
         /// </summary>
-        public static unsafe TransformReadAspect GetTransfromReadAspect(this EntityManager em, EntityInHierarchyHandle handle)
+        public static unsafe TransformReadAspect GetTransformReadAspect(this EntityManager em, EntityInHierarchyHandle handle)
         {
             var worldTransform = em.GetComponentDataRO<WorldTransform>(handle.entity);
             return new TransformReadAspect
@@ -546,7 +546,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TransformReadAspect of the entity powered by EntityManager.
         /// </summary>
-        public static unsafe TransformReadAspect GetTransfromReadAspect(this EntityManager em, Entity entity)
+        public static unsafe TransformReadAspect GetTransformReadAspect(this EntityManager em, Entity entity)
         {
             var worldTransform = em.GetComponentDataRO<WorldTransform>(entity);
             var handle         = TransformTools.GetHierarchyHandle(entity, em);
@@ -564,6 +564,18 @@ namespace Latios.Transforms
                 };
             }
         }
+
+        [System.Obsolete("Misspelled. Use GetTransformAspect() instead.")]
+        public static TransformAspect GetTransfromAspect(this EntityManager em, EntityInHierarchyHandle handle) => em.GetTransformAspect(handle);
+
+        [System.Obsolete("Misspelled. Use GetTransformAspect() instead.")]
+        public static TransformAspect GetTransfromAspect(this EntityManager em, Entity entity) => em.GetTransformAspect(entity);
+
+        [System.Obsolete("Misspelled. Use GetTransformReadAspect() instead.")]
+        public static TransformReadAspect GetTransfromReadAspect(this EntityManager em, EntityInHierarchyHandle handle) => em.GetTransformReadAspect(handle);
+
+        [System.Obsolete("Misspelled. Use GetTransformReadAspect() instead.")]
+        public static TransformReadAspect GetTransfromReadAspect(this EntityManager em, Entity entity) => em.GetTransformReadAspect(entity);
 
         /// <summary>
         /// Gets the TransformAspect of the handle powered by a ComponentBroker. The ComponentBroker

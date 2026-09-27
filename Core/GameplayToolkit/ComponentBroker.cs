@@ -905,6 +905,10 @@ namespace Latios
         {
             esil.Update(ref state);
 
+            // Clear these in case of main thread use.
+            currentChunk                           = default;
+            currentEntity                          = default;
+            currentIndexInChunk                    = default;
             fixed (DynamicComponentTypeHandle* ptr = &c0)
             {
                 for (int i = 0; i < readWriteCount; i++)

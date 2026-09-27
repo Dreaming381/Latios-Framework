@@ -484,7 +484,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TickedTransformAspect of the handle powered by EntityManager.
         /// </summary>
-        public static unsafe TickedTransformAspect GetTickedTransfromAspect(this EntityManager em, EntityInHierarchyHandle handle)
+        public static unsafe TickedTransformAspect GetTickedTransformAspect(this EntityManager em, EntityInHierarchyHandle handle)
         {
             var tickedWorldTransform = em.GetComponentDataRW<TickedWorldTransform>(handle.entity);
             return new TickedTransformAspect
@@ -500,7 +500,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TickedTransformAspect of the entity powered by EntityManager.
         /// </summary>
-        public static unsafe TickedTransformAspect GetTickedTransfromAspect(this EntityManager em, Entity entity)
+        public static unsafe TickedTransformAspect GetTickedTransformAspect(this EntityManager em, Entity entity)
         {
             var tickedWorldTransform = em.GetComponentDataRW<TickedWorldTransform>(entity);
             var handle               = TransformTools.GetHierarchyHandle(entity, em);
@@ -531,7 +531,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TickedTransformReadAspect of the handle powered by EntityManager.
         /// </summary>
-        public static unsafe TickedTransformReadAspect GetTickedTransfromReadAspect(this EntityManager em, EntityInHierarchyHandle handle)
+        public static unsafe TickedTransformReadAspect GetTickedTransformReadAspect(this EntityManager em, EntityInHierarchyHandle handle)
         {
             var worldTransform = em.GetComponentDataRO<TickedWorldTransform>(handle.entity);
             return new TickedTransformReadAspect
@@ -547,7 +547,7 @@ namespace Latios.Transforms
         /// <summary>
         /// Gets the TickedTransformReadAspect of the entity powered by EntityManager.
         /// </summary>
-        public static unsafe TickedTransformReadAspect GetTickedTransfromReadAspect(this EntityManager em, Entity entity)
+        public static unsafe TickedTransformReadAspect GetTickedTransformReadAspect(this EntityManager em, Entity entity)
         {
             var worldTransform = em.GetComponentDataRO<TickedWorldTransform>(entity);
             var handle         = TransformTools.GetHierarchyHandle(entity, em);
@@ -565,6 +565,18 @@ namespace Latios.Transforms
                 };
             }
         }
+
+        [System.Obsolete("Misspelled. Use GetTickedTransformAspect() instead.")]
+        public static TickedTransformAspect GetTickedTransfromAspect(this EntityManager em, EntityInHierarchyHandle handle) => em.GetTickedTransformAspect(handle);
+
+        [System.Obsolete("Misspelled. Use GetTickedTransformAspect() instead.")]
+        public static TickedTransformAspect GetTickedTransfromAspect(this EntityManager em, Entity entity) => em.GetTickedTransformAspect(entity);
+
+        [System.Obsolete("Misspelled. Use GetTickedTransformReadAspect() instead.")]
+        public static TickedTransformReadAspect GetTickedTransfromReadAspect(this EntityManager em, EntityInHierarchyHandle handle) => em.GetTickedTransformReadAspect(handle);
+
+        [System.Obsolete("Misspelled. Use GetTickedTransformReadAspect() instead.")]
+        public static TickedTransformReadAspect GetTickedTransfromReadAspect(this EntityManager em, Entity entity) => em.GetTickedTransformReadAspect(entity);
 
         /// <summary>
         /// Gets the TickedTransformAspect of the handle powered by a ComponentBroker. The ComponentBroker

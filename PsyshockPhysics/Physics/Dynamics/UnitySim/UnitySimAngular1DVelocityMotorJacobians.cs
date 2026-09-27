@@ -83,7 +83,6 @@ namespace Latios.Psyshock
             quaternion futureMotionBFromA = IntegrateOrientationBFromA(parameters.inertialRotationAInInertialPoseBSpace, velocityA.angular, velocityB.angular, deltaTime);
 
             // Calculate the effective mass
-            // Todo: Unity flips the sign of axisInIertialPoseASpace in Rotation1D but not here. Why?
             float3 axisInMotionB = math.mul(futureMotionBFromA, parameters.axisInInertialPoseASpace);
             float  effectiveMass;
             {
@@ -104,7 +103,7 @@ namespace Latios.Psyshock
             impulse       = CapImpulse(impulse, ref accumulatedImpulse, parameters.maxImpulseOfMotor);
 
             velocityA.angular += impulse * parameters.axisInInertialPoseASpace * massA.inverseInertia;
-            velocityB.angular += impulse * axisInMotionB * massB.inverseInertia;
+            velocityB.angular -= impulse * axisInMotionB * massB.inverseInertia;
         }
     }
 }

@@ -406,7 +406,7 @@ namespace Latios
                         int pruneIndex = 0;
                         for (int i = 0; i < count; i++)
                         {
-                            if (i == pruneIndices[pruneIndex])
+                            if (pruneIndex < pruneIndices.Length && i == pruneIndices[pruneIndex])
                                 pruneIndex++;
                             else
                             {
@@ -415,6 +415,7 @@ namespace Latios
                             }
                         }
                         unsortedComponentDataPtrs = newPtrs;
+                        count                     = newPtrs.Length;
                     }
 
                     // Step 4: Add components to the targets

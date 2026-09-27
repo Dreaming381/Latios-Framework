@@ -174,7 +174,9 @@ namespace Latios
         public bool IsHandleValid(in CollectionComponentHandle handle)
         {
             var key = new Key { entity = handle.entity, typeHash = handle.typeHash };
-            return m_twoLevelLookup.ContainsKey(key);
+            if (m_twoLevelLookup.TryGetValue(key, out var value))
+                return handle.cachedIndexInStorage == value.y;
+            return false;
         }
 
         // Returns true if added
@@ -500,6 +502,7 @@ namespace Latios
         public long typeHash => m_typeHash;
         public ref JobHandle writeHandle => ref m_writeHandles.ElementAt(m_indexInStorage);
         public ref FixedList512Bytes<JobHandle> readHandles => ref m_readHandles.ElementAt(m_indexInStorage);
+        public int cachedIndexInStorage => m_indexInStorage;
     }
 }
 

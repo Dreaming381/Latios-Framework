@@ -40,6 +40,7 @@ namespace Latios.Kinemation.Systems
             Profiler.EndSample();
 
             m_unmanaged.BeforeOnUpdate(ref CheckedStateRef);
+            m_unmanaged.m_brgRenderMeshArrays = m_registerMaterialsAndMeshesSystem.BRGRenderMeshArrays;
 
             //m_unmanaged.OnUpdate(ref CheckedStateRef);
             fixed (Unmanaged* unmanaged = &m_unmanaged)
@@ -50,7 +51,6 @@ namespace Latios.Kinemation.Systems
 #if ENABLE_MATERIALMESHINFO_BOUNDS_CHECKING
                 m_registerMaterialsAndMeshesSystem.LogBoundsCheckErrorMessages();
 #endif
-                m_unmanaged.m_brgRenderMeshArrays = m_registerMaterialsAndMeshesSystem.BRGRenderMeshArrays;
             }
             finally
             {
@@ -148,6 +148,8 @@ namespace Latios.Kinemation.Systems
                 CompleteJobs();
                 sCompleteJobsMarker.End();
 
+                UpdateBrgRenderMeshArrayIdToIndexMaps();
+
                 int renderersChunkCount = 0;
                 var finalJh             = new JobHandle();
                 try
@@ -174,6 +176,30 @@ namespace Latios.Kinemation.Systems
 
                 state.Dependency   = finalJh;
                 m_needsFirstUpdate = false;
+            }
+
+            private void UpdateBrgRenderMeshArrayIdToIndexMaps()
+            {
+                if (!m_brgRenderMeshArrays.IsCreated)
+                    return;
+
+                var staleKeys = new UnsafeList<int>(m_brgRenderMeshArrayIdToIndexMaps.Count, Allocator.Temp);
+                foreach (var pair in m_brgRenderMeshArrayIdToIndexMaps)
+                {
+                    if (!m_brgRenderMeshArrays.TryGetValue(pair.Key, out var brgRenderMeshArray) || !pair.Value.Matches(in brgRenderMeshArray))
+                        staleKeys.Add(pair.Key);
+                }
+                foreach (var key in staleKeys)
+                {
+                    m_brgRenderMeshArrayIdToIndexMaps[key].Dispose();
+                    m_brgRenderMeshArrayIdToIndexMaps.Remove(key);
+                }
+
+                foreach (var pair in m_brgRenderMeshArrays)
+                {
+                    if (!m_brgRenderMeshArrayIdToIndexMaps.ContainsKey(pair.Key))
+                        m_brgRenderMeshArrayIdToIndexMaps.Add(pair.Key, new BrgRenderMeshArrayIdToIndexMaps(in pair.Value, Allocator.Persistent));
+                }
             }
 
             private void EnsureHaveSpaceForNewBatch()

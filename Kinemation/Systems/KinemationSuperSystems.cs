@@ -264,6 +264,15 @@ namespace Latios.Kinemation.Systems
             base.OnUpdate();
             World.SetGroupAllocator(old);
         }
+
+        internal void InstallOcclusionCullingSystem(SystemHandle handle)
+        {
+            var drawCommandsSystem = World.GetExistingSystem<GenerateBrgDrawCommandsSystem>();
+            RemoveSystemFromUpdateList(drawCommandsSystem);
+            SortSystems();  // Applies the removal.
+            AddSystemToUpdateList(handle);
+            AddSystemToUpdateList(drawCommandsSystem);
+        }
     }
 
     /// <summary>

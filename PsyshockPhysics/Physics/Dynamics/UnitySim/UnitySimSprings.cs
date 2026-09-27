@@ -23,7 +23,7 @@ namespace Latios.Psyshock
         /// <returns>A frequency of oscillation that the spring exhibits when no damping is present</returns>
         public static float SpringFrequencyFrom(float springConstant, float inverseMass)
         {
-            return springConstant * inverseMass * rcpTwoPI;
+            return math.sqrt(springConstant * inverseMass) * rcpTwoPI;
         }
 
         /// <summary>
@@ -34,7 +34,8 @@ namespace Latios.Psyshock
         /// <returns>The spring force constant, as specified by Hooke's Law</returns>
         public static float SpringConstantFrom(float springFrequency, float mass)
         {
-            return springFrequency * mass * 2f * math.PI;
+            var angularFrequency = springFrequency * 2f * math.PI;
+            return angularFrequency * angularFrequency * mass;
         }
 
         /// <summary>

@@ -107,12 +107,7 @@ namespace Latios.Kinemation
             foreach (var array in newArrays)
                 m_sharedIndexToUnmanagedArrayMap.Add(array.sharedComponentIndex, array);
 
-            var brgRmaMap    = api.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(true).brgRenderMeshArrays;
-            state.Dependency = new RebuildBatchToIndexMapsJob
-            {
-                sharedIndexToArrayMap              = m_sharedIndexToUnmanagedArrayMap,
-                sharedIndexToBrgRenderMeshArrayMap = brgRmaMap
-            }.Schedule(state.Dependency);
+            var brgCullingContext = api.worldBlackboardEntity.GetCollectionComponent<BrgCullingContext>(true);
 
             var textureToStateIndexMap = new NativeHashMap<UnityObjectRef<Texture2D>, int>(256, state.WorldUpdateAllocator);
             var dispatchContext        = api.worldBlackboardEntity.GetComponentData<DispatchContext>();
@@ -133,7 +128,8 @@ namespace Latios.Kinemation
                 newLevelsPerThread                 = newLevelsPerThread,
                 renderMeshArrayHandle              = SystemAPI.ManagedAPI.GetSharedComponentTypeHandle<RenderMeshArray>(),
                 sharedIndexToArrayMap              = m_sharedIndexToUnmanagedArrayMap,
-                sharedIndexToBrgRenderMeshArrayMap = brgRmaMap,
+                sharedIndexToBrgRenderMeshArrayMap = brgCullingContext.brgRenderMeshArrays,
+                sharedIndexToIdToIndexMaps         = brgCullingContext.brgRenderMeshArrayIdToIndexMaps,
                 streamingMipMapArrayHandle         = SystemAPI.ManagedAPI.GetSharedComponentTypeHandle<StreamingMipMapArray>(),
                 textureStates                      = m_textureStates,
                 textureToStateIndexMap             = textureToStateIndexMap,
@@ -204,8 +200,6 @@ namespace Latios.Kinemation
             public UnsafeList<StreamingTextureInMaterial> streamingTextures;
             public UnsafeList<RangeByMaterial>            ranges;
             public UnsafeList<MeshMetric>                 meshMetrics;
-            public UnsafeHashMap<BatchMeshID, int>        batchMeshToRmaIndexMap;
-            public UnsafeHashMap<BatchMaterialID, int>    batchMaterialToRmaIndexMap;
             public uint4                                  renderMeshArrayHash;
             public uint4                                  metadataHash;
             public int                                    sharedComponentIndex;
@@ -216,8 +210,6 @@ namespace Latios.Kinemation
                 streamingTextures.Dispose();
                 ranges.Dispose();
                 meshMetrics.Dispose();
-                batchMeshToRmaIndexMap.Dispose();
-                batchMaterialToRmaIndexMap.Dispose();
             }
 
             public unsafe UnmanagedStreamingMipMapArray(StreamingMipMapArray managed, SharedValueMetadata metadata)
@@ -247,9 +239,6 @@ namespace Latios.Kinemation
                 metadataHash         = managed.metadataHash;
                 sharedComponentIndex = metadata.index;
                 version              = metadata.version;
-
-                batchMaterialToRmaIndexMap = default;
-                batchMeshToRmaIndexMap     = default;
             }
         }
 
@@ -260,42 +249,6 @@ namespace Latios.Kinemation
             public int                       assignedLevel;
             public int                       evaluatedLevel;
             public int4                      oneTwoThreeFourAgo;
-        }
-
-        [BurstCompile]
-        struct RebuildBatchToIndexMapsJob : IJob
-        {
-            public NativeHashMap<int, UnmanagedStreamingMipMapArray>         sharedIndexToArrayMap;
-            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray> sharedIndexToBrgRenderMeshArrayMap;
-
-            public void Execute()
-            {
-                foreach (var pair in sharedIndexToArrayMap)
-                {
-                    ref var array = ref pair.Value;
-                    if (array.batchMeshToRmaIndexMap.IsEmpty && !array.meshMetrics.IsEmpty)
-                    {
-                        var rma = GetRmaForSmma(in array);
-
-                        array.batchMeshToRmaIndexMap = new UnsafeHashMap<BatchMeshID, int>(array.meshMetrics.Length, Allocator.Persistent);
-                        for (int i = 0; i < rma.UniqueMeshes.Length; i++)
-                            array.batchMeshToRmaIndexMap.Add(rma.UniqueMeshes[i], i);
-                        array.batchMaterialToRmaIndexMap = new UnsafeHashMap<BatchMaterialID, int>(array.ranges.Length, Allocator.Persistent);
-                        for (int i = 0; i < rma.UniqueMaterials.Length; i++)
-                            array.batchMaterialToRmaIndexMap.Add(rma.UniqueMaterials[i], i);
-                    }
-                }
-            }
-
-            BRGRenderMeshArray GetRmaForSmma(in UnmanagedStreamingMipMapArray smma)
-            {
-                foreach (var pair in sharedIndexToBrgRenderMeshArrayMap)
-                {
-                    if (pair.Value.Hash128.Equals(smma.renderMeshArrayHash))
-                        return pair.Value;
-                }
-                return default;
-            }
         }
 
         [BurstCompile]
@@ -398,16 +351,17 @@ namespace Latios.Kinemation
         [BurstCompile]
         partial struct EvaluateEntitiesJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] ComponentTypeHandle<ChunkPerFrameCullingMask>    perFrameMaskHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<MaterialMeshInfo>            materialMeshInfoHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<WorldRenderBounds>           worldRenderBoundsHandle;
-            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>        renderMeshArrayHandle;
-            [ReadOnly] public SharedComponentTypeHandle<StreamingMipMapArray>   streamingMipMapArrayHandle;
-            [ReadOnly] public NativeHashMap<int, UnmanagedStreamingMipMapArray> sharedIndexToArrayMap;
-            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray>    sharedIndexToBrgRenderMeshArrayMap;
-            [ReadOnly] public NativeHashMap<UnityObjectRef<Texture2D>, int>     textureToStateIndexMap;
-            [ReadOnly, Inject] BufferLookup<MipMapCameraParameters>             cameraParametersLookup;
-            [ReadOnly] public NativeList<TextureState>                          textureStates;
+            [ReadOnly, Inject] ComponentTypeHandle<ChunkPerFrameCullingMask>      perFrameMaskHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<MaterialMeshInfo>              materialMeshInfoHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<WorldRenderBounds>             worldRenderBoundsHandle;
+            [ReadOnly] public SharedComponentTypeHandle<RenderMeshArray>          renderMeshArrayHandle;
+            [ReadOnly] public SharedComponentTypeHandle<StreamingMipMapArray>     streamingMipMapArrayHandle;
+            [ReadOnly] public NativeHashMap<int, UnmanagedStreamingMipMapArray>   sharedIndexToArrayMap;
+            [ReadOnly] public NativeParallelHashMap<int, BRGRenderMeshArray>      sharedIndexToBrgRenderMeshArrayMap;
+            [ReadOnly] public NativeHashMap<int, BrgRenderMeshArrayIdToIndexMaps> sharedIndexToIdToIndexMaps;
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Texture2D>, int>       textureToStateIndexMap;
+            [ReadOnly, Inject] BufferLookup<MipMapCameraParameters>               cameraParametersLookup;
+            [ReadOnly] public NativeList<TextureState>                            textureStates;
 
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeList<int> > newLevelsPerThread;
 
@@ -429,14 +383,17 @@ namespace Latios.Kinemation
                 if ((mask.lower.Value | mask.upper.Value) == 0)
                     return;
 
+                var rmaIndex = chunk.GetSharedComponentIndex(renderMeshArrayHandle);
+                if (!sharedIndexToBrgRenderMeshArrayMap.TryGetValue(rmaIndex, out var rma) || !sharedIndexToIdToIndexMaps.TryGetValue(rmaIndex, out var idMaps))
+                    return;
+                var smmaIndex = chunk.GetSharedComponentIndex(streamingMipMapArrayHandle);
+                if (!sharedIndexToArrayMap.TryGetValue(smmaIndex, out var smma) || smma.meshMetrics.IsEmpty)
+                    return;
+
                 bool useMmiRangeLod   = useMmiRangeLodChecker[chunk];
                 bool hasOverrideMesh  = overrideMeshInRangeChecker[chunk];
                 var  mmiArray         = chunk.GetComponentDataPtrRO(ref materialMeshInfoHandle);
                 var  worldBoundsArray = chunk.GetComponentDataPtrRO(ref worldRenderBoundsHandle);
-                var  rmaIndex         = chunk.GetSharedComponentIndex(renderMeshArrayHandle);
-                sharedIndexToBrgRenderMeshArrayMap.TryGetValue(rmaIndex, out var rma);
-                var smmaIndex = chunk.GetSharedComponentIndex(streamingMipMapArrayHandle);
-                sharedIndexToArrayMap.TryGetValue(smmaIndex, out var smma);
 
                 var cameraParametersArray = cameraParametersLookup[worldBlackboardEntity].AsNativeArray();
 
@@ -471,7 +428,7 @@ namespace Latios.Kinemation
                             {
                                 if (mmi.IsRuntimeMesh)
                                 {
-                                    if (!smma.batchMeshToRmaIndexMap.TryGetValue(mmi.MeshID, out overrideMeshIndex))
+                                    if (!idMaps.meshIdToRmaIndex.TryGetValue(mmi.MeshID, out overrideMeshIndex))
                                         continue; // Runtime meshes are not supported
                                 }
                                 else
@@ -487,8 +444,11 @@ namespace Latios.Kinemation
                                     continue;
 
                                 BatchMaterialMeshSubMesh matMeshSubMesh = rma.MaterialMeshSubMeshes[matMeshSubMeshIndex];
-                                var                      meshIndex      = hasOverrideMesh ? overrideMeshIndex : smma.batchMeshToRmaIndexMap[matMeshSubMesh.Mesh];
-                                var                      materialIndex  = smma.batchMaterialToRmaIndexMap[matMeshSubMesh.Material];
+                                var                      meshIndex      = overrideMeshIndex;
+                                if (!hasOverrideMesh && !idMaps.meshIdToRmaIndex.TryGetValue(matMeshSubMesh.Mesh, out meshIndex))
+                                    continue;
+                                if (!idMaps.materialIdToRmaIndex.TryGetValue(matMeshSubMesh.Material, out var materialIndex))
+                                    continue;
 
                                 EvaluateDrawInstance(ref smma, cameraParametersArray, in worldBounds, meshIndex, materialIndex);
                             }
@@ -498,7 +458,7 @@ namespace Latios.Kinemation
                             var meshIndex = 0;
                             if (mmi.IsRuntimeMesh)
                             {
-                                if (!smma.batchMeshToRmaIndexMap.TryGetValue(mmi.MeshID, out meshIndex))
+                                if (!idMaps.meshIdToRmaIndex.TryGetValue(mmi.MeshID, out meshIndex))
                                     continue; // Runtime meshes are not supported
                             }
                             else
@@ -507,7 +467,7 @@ namespace Latios.Kinemation
                             var materialIndex = 0;
                             if (mmi.IsRuntimeMaterial)
                             {
-                                if (!smma.batchMaterialToRmaIndexMap.TryGetValue(mmi.MaterialID, out materialIndex))
+                                if (!idMaps.materialIdToRmaIndex.TryGetValue(mmi.MaterialID, out materialIndex))
                                     continue; // Runtime materials are not supported
                             }
                             else
@@ -599,7 +559,7 @@ namespace Latios.Kinemation
                     }
                     if (bestIndex >= 0)
                     {
-                        if (bestIndex > 64)
+                        if (bestIndex >= 64)
                             mask.upper.SetBits(bestIndex - 64, true);
                         else
                             mask.lower.SetBits(bestIndex, true);

@@ -50,15 +50,9 @@ namespace Latios
                 if (with.GetTypeIndex(i) == TypeManager.GetTypeIndex<Disabled>())
                     options |= EntityQueryOptions.IncludeDisabledEntities;
             }
-            withAnyTypes      = withAny;
-            bool anyHasChunk  = false;
-            bool anyHasBuffer = false;
+            withAnyTypes = withAny;
             for (int i = 0; i < withAny.Length; i++)
             {
-                if (withAny.GetTypeIndex(i).IsChunkComponent)
-                    anyHasChunk = true;
-                if (withAny.GetTypeIndex(i).IsBuffer)
-                    anyHasBuffer = true;
                 if (withAny.GetTypeIndex(i) == TypeManager.GetTypeIndex<Prefab>())
                     options |= EntityQueryOptions.IncludePrefab;
                 if (withAny.GetTypeIndex(i) == TypeManager.GetTypeIndex<ChunkHeader>())
@@ -66,10 +60,6 @@ namespace Latios
                 if (withAny.GetTypeIndex(i) == TypeManager.GetTypeIndex<Disabled>())
                     options |= EntityQueryOptions.IncludeDisabledEntities;
             }
-            if (anyHasChunk)
-                requiredChunkTypeCount++;
-            if (anyHasBuffer)
-                requiredBufferTypeCount++;
             withoutTypes       = without;
             packedQueryOptions = (byte)options;
         }
@@ -155,11 +145,6 @@ namespace Latios
                 for (int i = 0; i < archetype.TypesCount; i++)
                 {
                     var archetypeType = archetype.GetTypeAtIndex(i);
-                    if (archetypeType.Value == currentQueryType.Value)
-                    {
-                        found = true;
-                        break;
-                    }
                     while (archetypeType.Value > currentQueryType.Value)
                     {
                         queryTypeIndex++;
@@ -168,6 +153,11 @@ namespace Latios
                             break;
                         }
                         currentQueryType = withAnyTypes.GetTypeIndex(queryTypeIndex);
+                    }
+                    if (archetypeType.Value == currentQueryType.Value)
+                    {
+                        found = true;
+                        break;
                     }
                 }
                 if (!found)
@@ -182,11 +172,6 @@ namespace Latios
                 for (int i = 0; i < archetype.TypesCount; i++)
                 {
                     var archetypeType = archetype.GetTypeAtIndex(i);
-                    if (archetypeType.Value == currentQueryType.Value)
-                    {
-                        found = true;
-                        break;
-                    }
                     while (archetypeType.Value > currentQueryType.Value)
                     {
                         queryTypeIndex++;
@@ -195,6 +180,11 @@ namespace Latios
                             break;
                         }
                         currentQueryType = withoutTypes.GetTypeIndex(queryTypeIndex);
+                    }
+                    if (archetypeType.Value == currentQueryType.Value)
+                    {
+                        found = true;
+                        break;
                     }
                 }
                 if (found)
@@ -437,12 +427,13 @@ namespace Latios
             // Note: A default instance will return false here.
             if (!indexEnumerator.NextRange(out var rangeStart, out var rangeCount))
             {
-                if (chunkEnumerator.MoveNext())
+                while (chunkEnumerator.MoveNext())
                 {
                     var chunk       = chunkEnumerator.Current;
                     entities        = chunk.chunk.GetNativeArray(chunkEnumerator.entityStorageInfoLookup.AsEntityTypeHandle());
                     indexEnumerator = new ChunkEntityBatchEnumerator(chunk.useEnabledMask, chunk.enabledMask, chunk.chunk.Count);
-                    indexEnumerator.NextRange(out rangeStart, out rangeCount);
+                    if (!indexEnumerator.NextRange(out rangeStart, out rangeCount))
+                        continue;
                     currentIndex    = rangeStart;
                     currentRangeEnd = rangeStart + rangeCount;
                     return true;

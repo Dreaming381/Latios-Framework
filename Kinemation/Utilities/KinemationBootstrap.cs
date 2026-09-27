@@ -81,6 +81,18 @@ namespace Latios.Kinemation
                 BootstrapTools.InjectSystem(TypeManager.GetSystemTypeIndex<KinemationAfterLiveBakingSuperSystem>(), world);
 #endif
         }
+
+        /// <summary>
+        /// Install a created CPU occlusion culling system into Kinemation's culling loop.
+        /// This is installed after frustum culling and LODs have been processed, and before draw commands are generated.
+        /// </summary>
+        /// <param name="world">The world Kinemation is installed in</param>
+        /// <param name="system">The system that should be inserted into the culling loop</param>
+        public static void InstallOcclusionCullingSystem(World world, SystemHandle system)
+        {
+            var cullingSuperSystem = world.GetExistingSystemManaged<KinemationCullingSuperSystem>();
+            cullingSuperSystem.InstallOcclusionCullingSystem(system);
+        }
     }
 }
 
