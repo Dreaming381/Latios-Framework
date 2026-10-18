@@ -71,7 +71,7 @@ namespace Latios.Calci
                 var t       = i / 32f;
                 var t2      = t * t;
                 var t3      = t2 * t;
-                var coeffsX = -t3 + 3f * t2 - 2f * t + 1f;
+                var coeffsX = -t3 + 3f * t2 - 3f * t + 1f;
                 var coeffsY = 3f * t3 - 6f * t2 + 3f * t;
                 var coeffsZ = -3f * t3 + 3f * t2;
                 //var coeffsW = t3;
@@ -132,11 +132,12 @@ namespace Latios.Calci
                 if (distance <= sum)
                     break;
             }
+            segment = math.min(segment, 31);
             // sum is the distance from the start of the curve to the end of the found segment.
             var distanceEnd     = sum;
             var distanceStart   = sum - lengths.lengths[segment];
             var distanceClamped = math.clamp(distance, distanceStart, distanceEnd);
-            var tSegment        = math.unlerp(distanceStart, distanceEnd, distanceClamped);
+            var tSegment        = distanceEnd > distanceStart? math.unlerp(distanceStart, distanceEnd, distanceClamped) : 0f;
             return (segment + tSegment) / 32f;
         }
 
@@ -162,9 +163,10 @@ namespace Latios.Calci
         /// <returns>The approximate distance traveled along the curve from the start to the sample factor t</returns>
         public static unsafe float DistanceAlongApproximately(in BezierCurve.SegmentLengths lengths, float t)
         {
-            var factor       = math.modf(32f * t, out var integerAsFloat);
-            var segmentIndex = (int)integerAsFloat;
-            var sum          = 0f;
+            var indexAndFraction = math.saturate(t) * 32f;
+            var segmentIndex     = math.min((int)indexAndFraction, 31);
+            var factor           = indexAndFraction - segmentIndex;
+            var sum              = 0f;
             for (int i = 0; i < segmentIndex; i++)
                 sum += lengths.lengths[i];
             return sum + factor * lengths.lengths[segmentIndex];

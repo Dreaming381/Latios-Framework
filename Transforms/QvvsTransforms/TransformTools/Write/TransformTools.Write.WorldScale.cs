@@ -64,7 +64,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform           = currentTransform;
                 return;
             }
-            SetWorldScale(handle, newWorldScale, ref componentBroker);
+            SetWorldScale(handle, newWorldScale, key, ref componentBroker);
         }
 
         /// <summary>
@@ -185,13 +185,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<WorldTransform> refRW            = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<WorldTransform> refRW            = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs         currentTransform = refRW.ValueRO.worldTransform;
                 currentTransform.scale                 = newWorldScale;
                 refRW.ValueRW.worldTransform           = currentTransform;
                 return;
             }
-            SetWorldScale(handle, newWorldScale, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetWorldScale(handle, newWorldScale, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -307,7 +307,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform                 = currentTransform;
                 return;
             }
-            SetTickedWorldScale(handle, newWorldScale, ref componentBroker);
+            SetTickedWorldScale(handle, newWorldScale, key, ref componentBroker);
         }
 
         /// <summary>
@@ -428,13 +428,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<TickedWorldTransform> refRW            = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<TickedWorldTransform> refRW            = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs               currentTransform = refRW.ValueRO.worldTransform;
                 currentTransform.scale                       = newWorldScale;
                 refRW.ValueRW.worldTransform                 = currentTransform;
                 return;
             }
-            SetTickedWorldScale(handle, newWorldScale, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetTickedWorldScale(handle, newWorldScale, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

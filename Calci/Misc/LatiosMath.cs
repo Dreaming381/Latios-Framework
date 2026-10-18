@@ -71,7 +71,7 @@ namespace Latios.Calci
             else if (t > b)
             {
                 float modTime = (t - b) * 0.5f / (1 - b) + 0.5f;
-                return (SmoothStep(modTime) - 0.5f) * (1f - h) / h + h;
+                return (SmoothStep(modTime) - 0.5f) * (1f - h) / 0.5f + h;
             }
             else
             {

@@ -49,7 +49,7 @@ namespace Latios.Unika
 
         public bool Equals(ScriptRef<T> other) => this == other;
 
-        public override bool Equals(object obj) => ((ScriptRef)this).Equals(obj);
+        public override bool Equals(object obj) => obj is ScriptRef<T> other && Equals(other);
 
         public override int GetHashCode() => new int2(m_entity.GetHashCode(), m_instanceId).GetHashCode();
 

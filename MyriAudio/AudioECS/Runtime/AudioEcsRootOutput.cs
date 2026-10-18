@@ -219,7 +219,8 @@ namespace Latios.Myri
 
             var shutdownContext = new IAudioEcsSystemRunner.ShutdownContext
             {
-                auxWorld = m_auxWorld,
+                auxWorld              = m_auxWorld,
+                worldBlackboardEntity = m_worldBlackboardEntity,
             };
             m_runner.OnShutdown(ref shutdownContext);
 

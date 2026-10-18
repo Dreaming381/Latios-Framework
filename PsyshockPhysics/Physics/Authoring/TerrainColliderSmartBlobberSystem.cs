@@ -61,8 +61,8 @@ namespace Latios.Psyshock.Authoring
                     $"Psyshock failed to bake the terrain {name}. The number of heights {heightsRowMajor.Length} is not a multiple of (quads per row {quadsPerRow} + 1)");
                 return false;
             }
-            var rowCount         = heightsRowMajor.Length / (quadsPerRow + 1);
-            var quadCount        = quadsPerRow * rowCount;
+            var quadRows         = heightsRowMajor.Length / (quadsPerRow + 1) - 1;
+            var quadCount        = quadsPerRow * quadRows;
             var expectedElements = CollectionHelper.Align(quadCount, 32) / 32;
             if (quadTriangleSplitParitiesRowMajor.Length < expectedElements)
             {

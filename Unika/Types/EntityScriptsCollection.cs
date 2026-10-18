@@ -28,7 +28,7 @@ namespace Latios.Unika
         /// <summary>
         /// Returns true if this entity has no scripts.
         /// </summary>
-        public bool isEmpty => m_buffer.Length == 0;
+        public bool isEmpty => length == 0;
 
         /// <summary>
         /// Retrives a resolved untyped script at the specified index

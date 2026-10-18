@@ -217,6 +217,7 @@ namespace Latios.Myri.Authoring.Systems
 
         [WithOptions(EntityQueryOptions.IncludePrefab | EntityQueryOptions.IncludeDisabledEntities)]
         [BurstCompile]
+        [Without(typeof(CustomAudioClipRightSample))]
         partial struct MonoJob : IJobEntity
         {
             public void Execute(ref SmartBlobberResult result, in CustomAudioClipParametersBlobBakeData parameters, ref DynamicBuffer<CustomAudioClipLeftOrMonoSample> monoSamples)
@@ -244,6 +245,7 @@ namespace Latios.Myri.Authoring.Systems
                 root.sampleRate = parameters.sampleRate;
                 root.name       = parameters.name;
                 root.isStereo   = false;
+                root.codec      = parameters.codec;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent));
 
@@ -292,6 +294,8 @@ namespace Latios.Myri.Authoring.Systems
                 root.codec      = parameters.codec;
 
                 result.blob = UnsafeUntypedBlobAssetReference.Create(builder.CreateBlobAssetReference<AudioClipBlob>(Allocator.Persistent));
+
+                context.threadStackAllocator.Dispose();
             }
         }
     }

@@ -284,6 +284,7 @@ namespace Latios.Transforms
                         {
                             m_worldTransform = transform,
                             m_handle         = default,
+                            m_esil           = esil,
                             m_access         = cache.chunkEntities + indexInChunk
                         };
                     case Role.Root:

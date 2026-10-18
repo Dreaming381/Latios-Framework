@@ -134,7 +134,7 @@ namespace Latios.LifeFX.Systems
                 uint dispatchCount = math.min(dispatchesRemaining, 65535);
                 uint elementCount  = math.min(countRemaining, 65535 * 64);
                 m_uploadShader.SetInt(_start, (int)(start * 64));
-                m_uploadShader.SetInt(_count, (int)countRemaining);
+                m_uploadShader.SetInt(_count, (int)copySize);
                 m_uploadShader.Dispatch(0, (int)dispatchCount, 1, 1);
                 dispatchesRemaining -= dispatchCount;
                 countRemaining      -= elementCount;

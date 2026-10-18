@@ -107,8 +107,9 @@ namespace Latios.AuxEcs
 
                 var indexInStore = archetype.GetComponentIndicesForEntityIndex(location.indexInArchetype)[0];
                 componentStore->Remove(indexInStore);
-                archetype.Remove(location.indexInArchetype);
+                var removeOp = archetype.Remove(location.indexInArchetype);
                 entityStore.Remove(entity);
+                UpdateStoreWithRemoval(removeOp, location.indexInArchetype);
                 return;
             }
 
@@ -116,13 +117,14 @@ namespace Latios.AuxEcs
             if (typeIndexInArchetype < 0)
                 return;
 
-            var       oldTypes   = archetype.typeIds;
-            var       oldIndices = archetype.GetComponentIndicesForEntityIndex(location.indexInArchetype);
-            Span<int> newTypes   = stackalloc int[oldTypes.Length - 1];
-            Span<int> newIndices = stackalloc int[oldIndices.Length - 1];
+            var       oldTypes            = archetype.typeIds;
+            var       oldIndices          = archetype.GetComponentIndicesForEntityIndex(location.indexInArchetype);
+            var       removedIndexInStore = oldIndices[typeIndexInArchetype];
+            Span<int> newTypes            = stackalloc int[oldTypes.Length - 1];
+            Span<int> newIndices          = stackalloc int[oldIndices.Length - 1];
             oldTypes.Slice(0, typeIndexInArchetype).CopyTo(newTypes.Slice(0, typeIndexInArchetype));
             oldIndices.Slice(0, typeIndexInArchetype).CopyTo(newIndices.Slice(0, typeIndexInArchetype));
-            if (typeIndexInArchetype + 1 < newTypes.Length)
+            if (typeIndexInArchetype < newTypes.Length)
             {
                 var start     = typeIndexInArchetype + 1;
                 var remainder = oldTypes.Length - start;
@@ -131,6 +133,7 @@ namespace Latios.AuxEcs
             }
 
             ChangeArchetype(ref archetype, entity, in location, newTypes, newIndices);
+            componentStore->Remove(removedIndexInStore);
         }
 
         public void RemoveAllComponents(Entity entity)
@@ -146,8 +149,9 @@ namespace Latios.AuxEcs
                 ref var componentStore = ref allComponentsStore[typeIds[i]];
                 componentStore.Remove(indicesInStore[i]);
             }
-            archetype.Remove(location.indexInArchetype);
+            var removeOp = archetype.Remove(location.indexInArchetype);
             entityStore.Remove(entity);
+            UpdateStoreWithRemoval(removeOp, location.indexInArchetype);
             return;
         }
 
@@ -174,8 +178,9 @@ namespace Latios.AuxEcs
 
         public AuxComponentEnumerator<T> AllOf<T>() where T : unmanaged
         {
-            var componentStore = allComponentsStore.TryGetStore<T>(out _);
-            return new AuxComponentEnumerator<T>(componentStore);
+            allComponentsStore.TryGetStore<T>(out var typeId);
+            fixed (AllComponentsStore* comps = &allComponentsStore)
+            return new AuxComponentEnumerator<T>(comps, typeId);
         }
 
         public AuxQueryEnumerator<T0> AllWith<T0>()
@@ -273,17 +278,22 @@ namespace Latios.AuxEcs
         void ChangeArchetype(ref ArchetypeStore archetype, Entity entity, in EntityStore.Location location, in ReadOnlySpan<int> newTypes, in ReadOnlySpan<int> newIndices)
         {
             var removeOp = archetype.Remove(location.indexInArchetype);
-            if (removeOp.swappedBackEntity != Entity.Null)
-                entityStore.SetLocation(removeOp.swappedBackEntity, new EntityStore.Location
-                {
-                    archetypeIndex   = location.archetypeIndex,
-                    indexInArchetype = removeOp.newIndex
-                });
+            UpdateStoreWithRemoval(removeOp, location.archetypeIndex);
 
             var entityIndexInArchetype = allArchetypesStore.GetOrAddArchetype(newTypes, out var archetypeIndex).Add(
                 entity,
                 newIndices);
             entityStore.SetLocation(entity, new EntityStore.Location { archetypeIndex = archetypeIndex, indexInArchetype = entityIndexInArchetype });
+        }
+
+        void UpdateStoreWithRemoval(ArchetypeStore.RemoveOperation removeOp, int removedIndex)
+        {
+            if (removeOp.swappedBackEntity != Entity.Null)
+                entityStore.SetLocation(removeOp.swappedBackEntity, new EntityStore.Location
+                {
+                    archetypeIndex   = removedIndex,
+                    indexInArchetype = removeOp.newIndex
+                });
         }
     }
 }

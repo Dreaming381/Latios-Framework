@@ -73,8 +73,10 @@ namespace Latios.Systems
                         missingReferenceQuery = state.Fluent().Without<TickingOnlyEntityTag>().With(typeInfo.TypeIndex, !attribute.copyData).Without(referenceTypeIndex)
                                                 .IncludeDisabledEntities().IncludePrefabs().Build(),
                         removeTickingQuery   = state.Fluent().Without<TickedEntityTag>().With(typeInfo.TypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
-                        removeReferenceQuery = state.Fluent().With<TickingOnlyEntityTag>().With(referenceTypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
-                        copyData             = attribute.copyData
+                        removeReferenceQuery = state.Fluent().With<TickingOnlyEntityTag>().With(referenceTypeIndex,
+                                                                                                true).IncludeDisabledEntities().IncludePrefabs().Build(),
+                        copyData                     = attribute.copyData,
+                        removeReferenceInTickingOnly = true,
                     });
                 }
                 else
@@ -87,10 +89,11 @@ namespace Latios.Systems
                         tickingHandle       = attribute.copyData ? state.GetDynamicComponentTypeHandle(tickingType) : default,
                         missingTickingQuery = state.Fluent().With<TickedEntityTag>(true).With(referenceTypeIndex, !attribute.copyData).Without(typeInfo.TypeIndex)
                                               .IncludeDisabledEntities().IncludePrefabs().Build(),
-                        missingReferenceQuery = state.Fluent().Without(referenceTypeIndex).With(typeInfo.TypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
-                        removeTickingQuery    = state.Fluent().Without<TickedEntityTag>().With(typeInfo.TypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
-                        removeReferenceQuery  = default,
-                        copyData              = attribute.copyData
+                        missingReferenceQuery        = state.Fluent().Without(referenceTypeIndex).With(typeInfo.TypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
+                        removeTickingQuery           = state.Fluent().Without<TickedEntityTag>().With(typeInfo.TypeIndex, true).IncludeDisabledEntities().IncludePrefabs().Build(),
+                        removeReferenceQuery         = default,
+                        copyData                     = attribute.copyData,
+                        removeReferenceInTickingOnly = false
                     });
                 }
             }
@@ -204,7 +207,7 @@ namespace Latios.Systems
                     }
                     else
                     {
-                        state.EntityManager.AddComponent(typePairState.missingTickingQuery, typePairState.tickingType);
+                        state.EntityManager.AddComponent(typePairState.missingReferenceQuery, typePairState.referenceType);
                     }
                 }
                 if (!typePairState.removeTickingQuery.IsEmptyIgnoreFilter)

@@ -42,7 +42,7 @@ namespace Latios.Myri
 
         internal void Write(Ids ids)
         {
-            var packed = ids.feedbackIdStarted + (((long)ids.maxCommandIdConsumed) << 32);
+            var packed = ((long)(uint)ids.feedbackIdStarted) | ((long)ids.maxCommandIdConsumed << 32);
             Interlocked.Exchange(ref *m_atomicPackedIds, packed);
         }
     }

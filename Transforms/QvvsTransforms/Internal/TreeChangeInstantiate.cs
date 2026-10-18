@@ -209,7 +209,7 @@ namespace Latios.Transforms
                 workState.parentIsDead = !esil.IsAlive(workState.parent);
                 if (workState.parentIsDead)
                 {
-                    children[i] = new ChildWorkState { parentIsDead = true };
+                    children[i] = workState;
                     return;
                 }
 
@@ -279,7 +279,7 @@ namespace Latios.Transforms
                 if (liveBakedChecker[childChunk] && !liveAddedParentChecker[childChunk])
                     addSet.liveAddedParent = true;
 #endif
-                var isTicked = tickedEntityChecker[childChunk];
+                var isTicked = hasTickedTransform || tickedEntityChecker[childChunk];
                 var isNormal = hasWorldTransform;
                 if (!isTicked && !isNormal)
                 {
@@ -366,14 +366,21 @@ namespace Latios.Transforms
                                             SetParentOptions options,
                                             out bool addedLeg)
             {
-                var  parentAddSet         = GetParentComponentsToAdd(hierarchy[parentClassification.indexInHierarchy].entity, parentClassification.role, childAddSet, options);
-                bool allTransformsPresent = false;
+                var parentInHierarchy                = hierarchy[parentClassification.indexInHierarchy];
+                var parentAddSet                     = GetParentComponentsToAdd(parentInHierarchy.entity, parentClassification.role, childAddSet, options);
+                parentAddSet.addSet.indexInHierarchy = parentClassification.indexInHierarchy;
+                parentAddSet.addSet.parent           = hierarchy[parentInHierarchy.parentIndex].entity;
+                if (parentInHierarchy.m_flags.HasCopyParent())
+                    parentAddSet.addSet.isCopyParent = true;
+                bool allTransformsPresent            = false;
                 if (!parentAddSet.addSet.noChange)
                 {
                     batchAddSetsStream.Write(parentAddSet);
 
                     for (int index = hierarchy[parentClassification.indexInHierarchy].parentIndex; index > 0; index = hierarchy[index].parentIndex)
                     {
+                        if (!esil.IsAlive(hierarchy[index].entity))
+                            continue;
                         var newAddSet = GetParentComponentsToAdd(hierarchy[index].entity, TreeKernels.TreeClassification.TreeRole.InternalWithChildren, childAddSet, options);
                         if (newAddSet.addSet.noChange)
                         {
@@ -388,8 +395,12 @@ namespace Latios.Transforms
                     }
                 }
 
-                var rootAddSet = GetParentComponentsToAdd(parentClassification.root, TreeKernels.TreeClassification.TreeRole.Root, childAddSet, options, !allTransformsPresent);
-                addedLeg       = rootAddSet.addSet.linkedEntityGroup;
+                BatchedAddSet rootAddSet;
+                if (parentClassification.isRootAlive)
+                    rootAddSet = GetParentComponentsToAdd(parentClassification.root, TreeKernels.TreeClassification.TreeRole.Root, childAddSet, options, !allTransformsPresent);
+                else
+                    rootAddSet = new BatchedAddSet { addSet = new TreeKernels.ComponentAddSet { entity = parentClassification.root } };
+                addedLeg                                                                               = rootAddSet.addSet.linkedEntityGroup;
                 batchAddSetsStream.Write(rootAddSet);
             }
 
@@ -657,9 +668,13 @@ namespace Latios.Transforms
                     batchAddSetStream.EndForEachIndex();
                 }
 
-                var oldHierarchy = TreeKernels.CopyHierarchyEntities(ref tsa, hierarchy.AsNativeArray());
-                var rootLeg      = esi.Chunk.Has(ref legHandle) ? esi.Chunk.GetBufferAccessorRW(ref legHandle)[esi.IndexInChunk] : default;
-                TreeKernels.RemoveDeadDescendantsFromHierarchyAndLeg(ref tsa, ref hierarchy, ref rootLeg, esil, ref worldTransformLookup, ref tickedWorldTransformLookup);
+                var  oldHierarchy = TreeKernels.CopyHierarchyEntities(ref tsa, hierarchy.AsNativeArray());
+                bool hasRootLeg   = esi.Chunk.Has(ref legHandle);
+                var  rootLeg      = hasRootLeg ? esi.Chunk.GetBufferAccessorRW(ref legHandle)[esi.IndexInChunk] : default;
+                if (hasRootLeg)
+                    TreeKernels.RemoveDeadDescendantsFromHierarchyAndLeg(ref tsa, ref hierarchy, ref rootLeg, esil, ref worldTransformLookup, ref tickedWorldTransformLookup);
+                else
+                    TreeKernels.RemoveDeadDescendantsFromHierarchy(ref tsa, ref hierarchy, esil, ref worldTransformLookup, ref tickedWorldTransformLookup);
                 var cleanedAnything = hierarchy.Length != oldHierarchy.Length;
                 if (hierarchy.Length == 0)
                 {
@@ -676,7 +691,7 @@ namespace Latios.Transforms
                         m_tickedLocalScale    = 1f,
                     });
                 }
-                bool hadEnoughLegBefore = rootLeg.Length >= 2;
+                bool hadEnoughLegBefore = hasRootLeg && rootLeg.Length >= 2;
                 foreach (var childIndex in rootChildrenIndices)
                 {
                     var childWorkState = childWorkStates[childIndex];
@@ -796,7 +811,7 @@ namespace Latios.Transforms
                     if (worldTransformLookup.HasComponent(childWorkState.child))
                         TransformTools.SetLocalTransform(handle, childWorkState.localTransform, ref worldTransformLookup, ref esil);
                     if (tickedWorldTransformLookup.HasComponent(childWorkState.child))
-                        TransformTools.SetTickedLocalTransform(handle, childWorkState.localTransform, ref tickedWorldTransformLookup, ref esil);
+                        TransformTools.SetTickedLocalTransform(handle, childWorkState.tickedLocalTransform, ref tickedWorldTransformLookup, ref esil);
                 }
 
                 if (hadEnoughLegBefore && rootLeg.Length < 2)
@@ -845,9 +860,10 @@ namespace Latios.Transforms
 
                 if (addSet.linkedEntityGroup)
                 {
-                    var esi                               = esil[addSet.entity];
-                    var leg                               = esi.Chunk.GetBufferAccessorRW(ref legHandle)[esi.IndexInChunk];
-                    leg.Add(new LinkedEntityGroup { Value = addSet.entity });
+                    var esi = esil[addSet.entity];
+                    var leg = esi.Chunk.GetBufferAccessorRW(ref legHandle)[esi.IndexInChunk];
+                    if (leg.IsEmpty)
+                        leg.Add(new LinkedEntityGroup { Value = addSet.entity });
                 }
             }
 
@@ -864,8 +880,11 @@ namespace Latios.Transforms
                 int i = 0;
                 foreach (var element in hierarchy)
                 {
-                    if (element.parentIndex < 0 && !esil.IsAlive(element.entity))
+                    if (element.parentIndex < 0 || !esil.IsAlive(element.entity))
+                    {
+                        i++;
                         continue;
+                    }
 
                     var chunk       = esil[element.entity].Chunk;
                     var hasNormal   = worldTransformLookup.HasComponent(element.entity);
@@ -889,7 +908,7 @@ namespace Latios.Transforms
                             wasMissingSomething    = true;
                             bitArray[parentIndex] += needsNormalBit;
                         }
-                        if (needsTicked && (bitArray[parentIndex] & hasTickedBit) == 0)
+                        if (needsTicked && (bitArray[parentIndex] & needsTickedBit) == 0)
                         {
                             wasMissingSomething    = true;
                             bitArray[parentIndex] += needsTickedBit;
@@ -907,7 +926,7 @@ namespace Latios.Transforms
                     var bits = bitArray[i];
                     if ((bits & (hasNormalBit + needsNormalBit)) == hasNormalBit)
                         ecb.RemoveComponent(sortKey, entity, new TypePack<WorldTransform, PreviousTransform, TwoAgoTransform>());
-                    if ((bits & (hasTickedBit + needsTickedBit)) == needsTickedBit)
+                    if ((bits & (hasTickedBit + needsTickedBit)) == hasTickedBit)
                         ecb.RemoveComponent(sortKey, entity,
                                             new TypePack<TickedWorldTransform, TickedPreviousTransform, TickedPreviousLocalTransformCache, TickedTwoAgoTransform>());
                     i++;

@@ -114,7 +114,7 @@ namespace Latios.Transforms
         {
             if (oldIndex < hierarchy.Length && hierarchy[oldIndex].entity == entity)
                 return oldIndex;
-            for (int i = 1; i <= hierarchy.Length; i++)
+            for (int i = 1; i < hierarchy.Length; i++)
                 if (hierarchy[i].entity == entity)
                     return i;
             return -1;
@@ -433,11 +433,13 @@ namespace Latios.Transforms
                         break;
                     }
                 }
-                matchedAll |= matched;
+                matchedAll &= matched;
             }
             return resultBuffer.Slice(0, resultCount);
         }
 
+        // Todo: We could deduplicate entities here if the user uses mixed removal and re-add modes. However, this is rare and adds cost.
+        // This needs to be re-evaluated during the TreeChange optimization effort.
         public static void AddEntityToLeg(ref DynamicBuffer<LinkedEntityGroup> leg, Entity entity)
         {
             leg.Add(new LinkedEntityGroup { Value = entity });

@@ -13,7 +13,7 @@ namespace Latios.Transforms
         /// entity in the hierarchy present in its own LinkedEntityGroup is added to to the new root's LinkedEntityGroup.
         /// If no LinkedEntityGroup exists on the child nor its root, then only the child is added to the new root's
         /// LinkedEntityGroup. EntityInHierarchyCleanup is added to the new root if not all entities in the child's
-        /// descendants are added to the new root.
+        /// descendants are added to the new root. New LinkedEntityGroup elements do NOT check for duplicates.
         /// </summary>
         AttachLinkedEntityGroup,
         /// <summary>

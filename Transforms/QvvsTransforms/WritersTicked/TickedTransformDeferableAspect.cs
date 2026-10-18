@@ -338,13 +338,20 @@ namespace Latios.Transforms
         #region Modification Methods
         /// <summary>
         /// Moves the entity by the amount specified in translation along the world-space axes.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform,
+        /// and the actual application of the translation is deferred.
         /// </summary>
         /// <param name="translation">The world-space x, y, and z signed amounts to move the entity</param>
-        public void TranslateWorld(float3 translation) => worldPosition += translation;
+        public void TranslateWorld(float3 translation)
+        {
+            if (transform.entityInHierarchyHandle.isNull)
+                transform.worldPosition += translation;
+            else
+                commands.Add(TickedTransformBatchWriteCommand.TranslateWorld(transform, translation));
+        }
         /// <summary>
         /// Moves the entity by the amount specified in x, y, and z along the world-space axes.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// </summary>
         /// <param name="x">The signed amount to move the entity along the positive x axis</param>
         /// <param name="y">The signed amount to move the entity along the positive y axis</param>
@@ -352,7 +359,7 @@ namespace Latios.Transforms
         public void TranslateWorld(float x, float y, float z) => TranslateWorld(new float3(x, y, z));
         /// <summary>
         /// Moves the entity by the amount specified in translation along the Entity's local-space axes relative to its parent.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// If the entity does not have a parent, this is equivalent to TranslateWorld().
         /// </summary>
         /// <param name="translation">The local-space x, y, and z signed amounts to move the entity</param>
@@ -365,7 +372,7 @@ namespace Latios.Transforms
         }
         /// <summary>
         /// Moves the entity by the amount specified in x, y, and z along the Entity's local-space axes relative to its parent.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// If the entity does not have a parent, this is equivalent to TranslateWorld().
         /// </summary>
         /// <param name="x">The signed amount to move the entity along the positive x axis</param>
@@ -375,14 +382,21 @@ namespace Latios.Transforms
 
         /// <summary>
         /// Rotates the entity's orientation by the specified rotation, where the axis of rotation is defined in world-space.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform,
+        /// and the actual application of the rotation delta is deferred.
         /// </summary>
         /// <param name="rotation">The amount to rotate by, where the innate axis of rotation of the quaternion is specified relative to world-space.</param>
-        public void RotateWorld(quaternion rotation) => worldRotation = math.normalize(math.mul(rotation, worldRotation));
+        public void RotateWorld(quaternion rotation)
+        {
+            if (transform.entityInHierarchyHandle.isNull)
+                transform.worldRotation = math.normalize(math.mul(rotation, transform.worldRotation));
+            else
+                commands.Add(TickedTransformBatchWriteCommand.RotateWorld(transform, rotation));
+        }
 
         /// <summary>
         /// Rotates the entity's orientation by the specified rotation, where the axis of rotation is defined in the entity's local-space axes relative to its parent.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// If the entity does not have a parent, this is equivalent to RotateWorld().
         /// </summary>
         /// <param name="rotation">The amount to rotate by, where the innate axis of rotation of the quaternion is specified in the entity's local space relative to its parent.</param>
@@ -396,7 +410,7 @@ namespace Latios.Transforms
 
         /// <summary>
         /// Sets both the world-space position and rotation of the entity in a single operation.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// </summary>
         /// <param name="worldPosition">The new world-space position to apply</param>
         /// <param name="worldRotation">The new world-space rotation to apply</param>
@@ -410,7 +424,7 @@ namespace Latios.Transforms
 
         /// <summary>
         /// Sets both the local-space position and rotation of the entity relative to its parent in a single operation.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// If the entity does not have a parent, this is equivalent to SetWorldPositionAndRotation().
         /// </summary>
         /// <param name="localPosition">The new local-space position to apply</param>
@@ -427,7 +441,7 @@ namespace Latios.Transforms
         /// Moves and rotates the entity by the specified deltas in a single operation, where both the translation and the
         /// axis of rotation are defined in world-space. This is equivalent to calling TranslateWorld() and RotateWorld()
         /// separately, but propagates to children only once instead of twice.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's TickedWorldTransform.
         /// </summary>
         /// <param name="translation">The world-space x, y, and z signed amounts to move the entity</param>
         /// <param name="rotation">The amount to rotate by, where the innate axis of rotation of the quaternion is specified relative to world-space.</param>

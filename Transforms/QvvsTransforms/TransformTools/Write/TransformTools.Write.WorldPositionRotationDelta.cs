@@ -71,7 +71,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform            = currentTransform;
                 return;
             }
-            TranslateRotateWorld(handle, translation, rotation, ref componentBroker);
+            TranslateRotateWorld(handle, translation, rotation, key, ref componentBroker);
         }
 
         /// <summary>
@@ -200,14 +200,14 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<WorldTransform> refRW             = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<WorldTransform> refRW             = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs         currentTransform  = refRW.ValueRO.worldTransform;
                 currentTransform.position              += translation;
                 currentTransform.rotation               = math.normalize(math.mul(rotation, currentTransform.rotation));
                 refRW.ValueRW.worldTransform            = currentTransform;
                 return;
             }
-            TranslateRotateWorld(handle, translation, rotation, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            TranslateRotateWorld(handle, translation, rotation, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -333,7 +333,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform                  = currentTransform;
                 return;
             }
-            TranslateRotateTickedWorld(handle, translation, rotation, ref componentBroker);
+            TranslateRotateTickedWorld(handle, translation, rotation, key, ref componentBroker);
         }
 
         /// <summary>
@@ -466,14 +466,14 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<TickedWorldTransform> refRW             = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<TickedWorldTransform> refRW             = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs               currentTransform  = refRW.ValueRO.worldTransform;
                 currentTransform.position                    += translation;
                 currentTransform.rotation                     = math.normalize(math.mul(rotation, currentTransform.rotation));
                 refRW.ValueRW.worldTransform                  = currentTransform;
                 return;
             }
-            TranslateRotateTickedWorld(handle, translation, rotation, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            TranslateRotateTickedWorld(handle, translation, rotation, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

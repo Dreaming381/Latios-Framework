@@ -24,7 +24,7 @@ namespace Latios.Systems
             tickDeltaTime = 1f / 60f;
             timeInTick    = 0f;
 
-            api.worldBlackboardEntity.AddComponentData(new TickingState { previousEvaluatedTick = -1 });
+            api.worldBlackboardEntity.AddComponentData(new TickingState { tick = -1, previousEvaluatedTick = -1 });
         }
 
         [BurstCompile]
@@ -46,6 +46,7 @@ namespace Latios.Systems
             {
                 // We did not advance the tick. Roll back.
                 var newState                      = oldState;
+                newState.tick                     = math.max(newState.tick, 0);
                 newState.deltaTime                = tickDeltaTime;
                 newState.ticksThisFrame           = 1;
                 newState.firstTickThisFrame       = newState.tick;
@@ -61,6 +62,7 @@ namespace Latios.Systems
             else if (snapInputToTick || oldState.finalTickFraction > 0.9999f)
             {
                 var newState                       = oldState;
+                newState.tick                      = math.max(newState.tick, 0);
                 newState.elapsedTime              += tickDeltaTime;
                 newState.deltaTime                 = tickDeltaTime;
                 newState.ticksThisFrame            = rollovers;
@@ -75,18 +77,18 @@ namespace Latios.Systems
                 newState.previousEvaluatedTick = oldState.tick;
                 api.worldBlackboardEntity.SetComponentData(newState);
             }
-            else
+            else  // Resim tick and roll over
             {
-                var newState                       = oldState;
-                newState.elapsedTime              += tickDeltaTime;
-                newState.deltaTime                 = tickDeltaTime;
-                newState.ticksThisFrame            = rollovers + 1;
-                newState.firstTickThisFrame        = oldState.tick;
-                newState.newTick                   = newState.firstTickThisFrame + 1;
-                newState.inputTick                 = newState.firstTickThisFrame;
-                newState.inputTickFraction         = oldState.finalTickFraction;
-                newState.finalTickFraction         = timeInTick / tickDeltaTime;
-                newState.presentationTickFraction  = math.select(newState.finalTickFraction, oldState.finalTickFraction, isDeferredSimulation);
+                var newState                      = oldState;
+                newState.tick                     = math.max(newState.tick, 0);
+                newState.deltaTime                = tickDeltaTime;
+                newState.ticksThisFrame           = rollovers + 1;
+                newState.firstTickThisFrame       = oldState.tick;
+                newState.newTick                  = newState.firstTickThisFrame + 1;
+                newState.inputTick                = newState.firstTickThisFrame;
+                newState.inputTickFraction        = oldState.finalTickFraction;
+                newState.finalTickFraction        = timeInTick / tickDeltaTime;
+                newState.presentationTickFraction = math.select(newState.finalTickFraction, oldState.finalTickFraction, isDeferredSimulation);
                 newState.frameCounter++;
                 newState.previousEvaluatedTick = oldState.tick;
                 api.worldBlackboardEntity.SetComponentData(newState);

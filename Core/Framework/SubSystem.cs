@@ -76,7 +76,7 @@ namespace Latios
         internal abstract void OnUpdateInternal();
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
-        public EntityQuery GetEntityQuery(EntityQueryBuilder desc) => GetEntityQuery(desc);
+        public EntityQuery GetEntityQuery(EntityQueryBuilder desc) => base.GetEntityQuery(desc);
 
         public abstract void OnNewScene();
 

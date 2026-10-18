@@ -77,7 +77,7 @@ namespace Latios
         public static void SetBits(ref ulong data, int firstBitIndex, int bitCount, ulong newValue)
         {
             var mask     = 1ul << bitCount;
-            mask        -= ((ulong)bitCount >> 6) ^ 1ul;
+            mask        -= 1ul + ((ulong)bitCount >> 6);
             var newPart  = (newValue & mask) << firstBitIndex;
             var oldPart  = data & ~(mask << firstBitIndex);
             data         = newPart | oldPart;

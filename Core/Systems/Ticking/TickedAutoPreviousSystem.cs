@@ -145,11 +145,20 @@ namespace Latios.Systems
                         UnsafeUtility.MemCpy(dstPtr, srcPtr, length * (long)size);
                     }
                 }
-                else
+                else if (!srcType.IsZeroSized)
                 {
                     var src = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref srcHandle, size);
                     var dst = chunk.GetDynamicComponentDataArrayReinterpret<byte>(ref dstHandle, size);
                     dst.CopyFrom(src);
+                }
+                if (srcType.IsEnableable)
+                {
+                    var srcBits = chunk.GetEnabledMask(ref srcHandle);
+                    var dstBits = chunk.GetEnabledMask(ref dstHandle);
+                    for (int i = 0; i < chunk.Count; i++)
+                    {
+                        dstBits[i] = srcBits[i];
+                    }
                 }
             }
         }

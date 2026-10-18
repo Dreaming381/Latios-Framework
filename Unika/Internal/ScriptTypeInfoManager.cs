@@ -54,6 +54,13 @@ namespace Latios.Unika
             ScriptMetadata.s_metadataArray.Data.Dispose();
             ScriptMetadata.s_names.Data.Dispose();
             ScriptMetadata.s_offsets.Data.Dispose();
+
+            // Not necessary, but here as a reminder for the future lifecycle API changes when the supported Unity version advances.
+            runtimeInterfaceCounter = 1;
+            runtimeScriptCounter    = 1;
+            s_capturedInterfaces.Clear();
+            ScriptTypeExtraction.extractors.Clear();
+            ScriptTypeExtraction.extractors.Add(null);
         }
 
         public static void InitializeInterface<T>() where T : IUnikaInterface

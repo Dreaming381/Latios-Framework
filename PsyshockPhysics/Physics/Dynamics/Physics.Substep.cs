@@ -87,7 +87,7 @@ namespace Latios.Psyshock
             public float substepTimeDuration;
             public int   substepIndex;
 
-            public void Deconstruct(out float time, out float index)
+            public void Deconstruct(out float time, out int index)
             {
                 time  = substepTimeDuration;
                 index = substepIndex;
@@ -165,7 +165,7 @@ namespace Latios.Psyshock
                 world.PushTime(new Unity.Core.TimeData(time.ElapsedTime - time.DeltaTime, time.DeltaTime));
                 var deltaTime         = time.DeltaTime;
                 deltaTime             = math.min(deltaTime, m_maxSubsteps * m_maxSubstepTime);
-                m_enumerator          = Physics.Substep(time.DeltaTime, (int)math.ceil(deltaTime / m_maxSubstepTime));
+                m_enumerator          = Physics.Substep(deltaTime, (int)math.ceil(deltaTime / m_maxSubstepTime));
                 m_currentSubstepIndex = 0;
                 m_previousAllocators  = world.CurrentGroupAllocators;
                 world.SetGroupAllocator(group.RateGroupAllocators);

@@ -213,12 +213,12 @@ namespace Latios.Psyshock
 
         private static Aabb AabbFrom(in TerrainCollider terrain, in RigidTransform transform)
         {
-            int  dimInt       = terrain.terrainColliderBlob.Value.quadsPerRow;
-            int  minHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.minHeight;
-            int  maxHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.maxHeight;
-            int3 minInt       = new int3(0, minHeightInt, 0);
-            int3 maxInt       = new int3(dimInt, maxHeightInt, dimInt);
-            var  localAabb    = new Aabb(minInt * terrain.scale, maxInt * terrain.scale);
+            ref var blob         = ref terrain.terrainColliderBlob.Value;
+            int     minHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.minHeight;
+            int     maxHeightInt = terrain.baseHeightOffset + terrain.terrainColliderBlob.Value.maxHeight;
+            int3    minInt       = new int3(0, minHeightInt, 0);
+            int3    maxInt       = new int3(blob.quadsPerRow, maxHeightInt, blob.quadRows);
+            var     localAabb    = new Aabb(minInt * terrain.scale, maxInt * terrain.scale);
             return TransformAabb(new TransformQvvs(transform), localAabb);
         }
 
@@ -239,18 +239,22 @@ namespace Latios.Psyshock
                     GetCenterExtents(local, out var c, out var e);
                     BoxCollider box = new BoxCollider(c, e);
                     ScaleStretchCollider(ref box, compound.scale, compound.stretch);
-                    var transformed = AabbFrom(in box, transform);
-                    GetCenterExtents(transformed, out c, out e);
-                    e += radialExtents;
-                    return new Aabb(c - e, c + e);
+                    var transformed  = AabbFrom(in box, transform);
+                    transformed.min -= radialExtents;
+                    transformed.max += radialExtents;
+                    return transformed;
                 }
                 case CompoundCollider.StretchMode.IgnoreStretch:
                 {
-                    var local = compound.compoundColliderBlob.Value.anchorsAabb;
+                    var radialExtents = compound.scale * compound.compoundColliderBlob.Value.maxOffsetFromAnchors;
+                    var local         = compound.compoundColliderBlob.Value.anchorsAabb;
                     GetCenterExtents(local, out var c, out var e);
                     BoxCollider box = new BoxCollider(c, e);
                     ScaleStretchCollider(ref box, compound.scale, 1f);
-                    return AabbFrom(in box, transform);
+                    var transformed  = AabbFrom(in box, transform);
+                    transformed.min -= radialExtents;
+                    transformed.max += radialExtents;
+                    return transformed;
                 }
                 case CompoundCollider.StretchMode.StretchPositionsOnly:
                 {

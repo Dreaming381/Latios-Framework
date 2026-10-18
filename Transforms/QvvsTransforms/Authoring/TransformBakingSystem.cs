@@ -133,6 +133,7 @@ namespace Latios.Transforms.Authoring.Systems
                 transformAuthoringLookup          = GetComponentLookup<TransformAuthoring>(true),
                 inheritanceFlagsLookup            = GetComponentLookup<MergedInheritanceFlags>(true),
                 bakedLocalTransformOverrideLookup = GetComponentLookup<BakedLocalTransformOverride>(true),
+                esil                              = GetEntityStorageInfoLookup(),
                 worldTransformLookup              = GetComponentLookup<WorldTransform>(false),
                 rootReferenceLookup               = GetComponentLookup<RootReference>(false),
                 entityInHierarchyLookup           = GetBufferLookup<EntityInHierarchy>(false),
@@ -204,10 +205,8 @@ namespace Latios.Transforms.Authoring.Systems
                 ref var node  = ref nodes.ElementAt(index);
                 if (node.children.IsCreated)
                 {
-                    foreach (var child in node.children)
-                    {
-                        ChangeParent(child, -1, Entity.Null, ref dirtyRoots);
-                    }
+                    while (node.children.Length > 0)
+                        ChangeParent(node.children[node.children.Length - 1], -1, Entity.Null, ref dirtyRoots);
                     node.children.Dispose();
                 }
                 if (node.parent != Entity.Null)
@@ -310,6 +309,8 @@ namespace Latios.Transforms.Authoring.Systems
             {
                 foreach (var entity in deadEntities)
                     hierarchy.Remove(entity, ref dirtyRoots);
+                foreach (var entity in deadEntities)
+                    dirtyRoots.Remove(entity);
                 foreach (var entity in newEntities)
                     hierarchy.Add(entity);
             }
@@ -647,6 +648,7 @@ namespace Latios.Transforms.Authoring.Systems
             [ReadOnly] public ComponentLookup<TransformAuthoring>                        transformAuthoringLookup;
             [ReadOnly] public ComponentLookup<MergedInheritanceFlags>                    inheritanceFlagsLookup;
             [ReadOnly] public ComponentLookup<BakedLocalTransformOverride>               bakedLocalTransformOverrideLookup;
+            [ReadOnly] public EntityStorageInfoLookup                                    esil;
             [NativeDisableParallelForRestriction] public ComponentLookup<WorldTransform> worldTransformLookup;
             [NativeDisableParallelForRestriction] public ComponentLookup<RootReference>  rootReferenceLookup;
             [NativeDisableParallelForRestriction] public BufferLookup<EntityInHierarchy> entityInHierarchyLookup;
@@ -654,6 +656,8 @@ namespace Latios.Transforms.Authoring.Systems
             UnsafeQueue<EnqueuedChild> queue;
             UnsafeList<TransformQvvs>  computedTransforms;
             UnsafeList<EnqueuedChild>  childrenToSort;
+
+            HasChecker<BakedParentOverride> parentOverrideChecker;
 
             public void Execute(int index)
             {
@@ -770,7 +774,7 @@ namespace Latios.Transforms.Authoring.Systems
                 var transformAuthoring = transformAuthoringLookup[child];
                 TransformBakeUtils.GetScaleAndStretch(transformAuthoring.LocalScale, out var scale, out var stretch);
                 var workingTransform = new TransformQvvs(transformAuthoring.LocalPosition, transformAuthoring.LocalRotation, scale, stretch);
-                if (parent == transformAuthoring.AuthoringParent)
+                if (parent == transformAuthoring.AuthoringParent || parentOverrideChecker[esil[child].Chunk])
                 {
                     localTransform = new TransformQvs(transformAuthoring.LocalPosition, transformAuthoring.LocalRotation, scale);
                     return qvvs.mulclean(parentTransform, workingTransform);
@@ -783,7 +787,7 @@ namespace Latios.Transforms.Authoring.Systems
                     TransformBakeUtils.GetScaleAndStretch(intermediateAuthoring.LocalScale, out var interScale, out var interStretch);
                     var interTransform = new TransformQvvs(intermediateAuthoring.LocalPosition, intermediateAuthoring.LocalRotation, interScale, interStretch);
                     workingTransform   = qvvs.mulclean(interTransform, workingTransform);
-                    nextParent         = transformAuthoring.AuthoringParent;
+                    nextParent         = intermediateAuthoring.AuthoringParent;
                 }
                 localTransform = new TransformQvs(workingTransform.position, workingTransform.rotation, workingTransform.scale);
                 return qvvs.mulclean(parentTransform, workingTransform);

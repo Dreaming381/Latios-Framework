@@ -7,7 +7,7 @@ namespace Latios
 {
     public static class BlobBuilderExtensions
     {
-        public static BlobBuilderArray<T> ConstructFromNativeArray<T>(this BlobBuilder builder, ref BlobArray<T> ptr, NativeArray<T> array) where T : struct
+        public static BlobBuilderArray<T> ConstructFromNativeArray<T>(ref this BlobBuilder builder, ref BlobArray<T> ptr, NativeArray<T> array) where T : struct
         {
             var result = builder.Allocate(ref ptr, array.Length);
             for (int i = 0; i < array.Length; i++)
@@ -15,7 +15,7 @@ namespace Latios
             return result;
         }
 
-        public static BlobBuilderArray<T> ConstructFromSpan<T>(this BlobBuilder blobBuilder, ref BlobArray<T> ptr, ReadOnlySpan<T> span) where T : struct
+        public static BlobBuilderArray<T> ConstructFromSpan<T>(ref this BlobBuilder blobBuilder, ref BlobArray<T> ptr, ReadOnlySpan<T> span) where T : struct
         {
             var result = blobBuilder.Allocate(ref ptr, span.Length);
             for (int i = 0; i < span.Length; i++)
@@ -23,7 +23,7 @@ namespace Latios
             return result;
         }
 
-        public static BlobBuilderArray<T> ConstructFromList<T>(this BlobBuilder blobBuilder, ref BlobArray<T> ptr, System.Collections.Generic.List<T> list) where T : struct
+        public static BlobBuilderArray<T> ConstructFromList<T>(ref this BlobBuilder blobBuilder, ref BlobArray<T> ptr, System.Collections.Generic.List<T> list) where T : struct
         {
             var result = blobBuilder.Allocate(ref ptr, list.Count);
             for (int i = 0; i < list.Count; i++)
@@ -33,11 +33,12 @@ namespace Latios
 
         unsafe public static void AllocateFixedString<T>(ref this BlobBuilder builder, ref BlobString blobStr, T fixedString) where T : INativeList<byte>, IUTF8Bytes
         {
-            var res = builder.Allocate(ref UnsafeUtility.As<BlobString, BlobArray<byte> >(ref blobStr), fixedString.Length);
+            var res = builder.Allocate(ref UnsafeUtility.As<BlobString, BlobArray<byte> >(ref blobStr), fixedString.Length + 1);
             for (int i = 0; i < fixedString.Length; i++)
             {
                 res[i] = fixedString[i];
             }
+            res[fixedString.Length] = 0;
         }
 
         // Todo: Find a new home for this?
@@ -52,7 +53,7 @@ namespace Latios.Unsafe
 {
     public static class BlobBuilderUnsafeExtensions
     {
-        public static unsafe BlobBuilderArray<T> ConstructFromNativeArray<T>(this BlobBuilder builder, ref BlobArray<T> ptr, T* array, int length) where T : unmanaged
+        public static unsafe BlobBuilderArray<T> ConstructFromNativeArray<T>(ref this BlobBuilder builder, ref BlobArray<T> ptr, T* array, int length) where T : unmanaged
         {
             var result = builder.Allocate(ref ptr, length);
             for (int i = 0; i < length; i++)

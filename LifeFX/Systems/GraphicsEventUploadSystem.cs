@@ -16,7 +16,8 @@ namespace Latios.LifeFX.Systems
     [UpdateInGroup(typeof(DispatchRoundRobinLateExtensionsSuperSystem))]
     [DisableAutoCreation]
     [BurstCompile]
-    public partial struct GraphicsEventUploadSystem : ISystem, ILatiosApi, ICullingComputeDispatchSystem<GraphicsEventUploadSystem.CollectState, GraphicsEventUploadSystem.WriteState>
+    public partial struct GraphicsEventUploadSystem : ISystem, ILatiosApi, ICullingComputeDispatchSystem<GraphicsEventUploadSystem.CollectState,
+                                                                                                         GraphicsEventUploadSystem.WriteState>
     {
         CullingComputeDispatchData<CollectState, WriteState> m_data;
         EntityQuery                                          m_destinationsQuery;
@@ -179,7 +180,7 @@ namespace Latios.LifeFX.Systems
             if (!written.broker.isCreated)
                 return;
 
-            var api = this.GetApi(ref state);
+            var     api   = this.GetApi(ref state);
             ref var metas = ref GraphicsEventTypeRegistry.s_eventMetadataList.Data;
             for (int typeIndex = 0; typeIndex < written.eventCountByTypeIndex.Length; typeIndex++)
             {
@@ -235,14 +236,16 @@ namespace Latios.LifeFX.Systems
         static void DispatchManagedFromManaged(UnityObjectRef<GraphicsEventBufferReceptor> requestor, GraphicsBufferUnmanaged buffer, int start, int count, ref bool isBurst)
         {
             isBurst = false;
-            requestor.Value.PublishInternal(buffer.ToManaged(), start, count);
+            if (requestor != null)
+                requestor.Value.PublishInternal(buffer.ToManaged(), start, count);
         }
 
         [MonoPInvokeCallback(typeof(DispatchDestinationDelegate))]
         static unsafe void DispatchManaged(IntPtr dispatchData)
         {
             ref var data = ref *(DispatchData*)dispatchData;
-            data.requestor.Value.PublishInternal(data.buffer.ToManaged(), data.start, data.count);
+            if (data.requestor != null)
+                data.requestor.Value.PublishInternal(data.buffer.ToManaged(), data.start, data.count);
         }
 
         static void Initialize()
@@ -304,7 +307,7 @@ namespace Latios.LifeFX.Systems
         [BurstCompile]
         partial struct CollectDestinationsJob : IJob, IInjectable
         {
-            [ReadOnly] public NativeArray<ArchetypeChunk>                      chunks;
+            [ReadOnly] public NativeArray<ArchetypeChunk>                       chunks;
             [ReadOnly, Inject] BufferTypeHandle<GraphicsEventTunnelDestination> destinationHandle;
 
             public NativeList<GraphicsEventTunnelDestination>           destinations;

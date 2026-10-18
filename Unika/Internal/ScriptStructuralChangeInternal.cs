@@ -26,6 +26,7 @@ namespace Latios.Unika
 
             if (currentScriptCount == 0)
             {
+                int nextInstanceId = 1;
                 if (scriptBuffer.IsEmpty)
                 {
                     scripts.Add(new ScriptHeader
@@ -35,12 +36,34 @@ namespace Latios.Unika
                         lastUsedInstanceId = 1
                     });
                 }
+                else
+                {
+                    ref var masterHeader = ref scripts.ElementAt(0);
+                    if ((ulong)masterHeader.lastUsedInstanceId == ScriptHeader.kMaxInstanceId)
+                    {
+                        if (s_instanceIdWarning.Data == 0)
+                        {
+                            UnityEngine.Debug.LogWarning(
+                                "Exhausted all instance IDs in a Unika entity. Instance IDs will be reused, which may result in stale references incorrectly referencing new scripts. This message will be disabled to prevent spamming.");
+                            s_instanceIdWarning.Data = 1;
+                        }
+                        // Since there are no scripts, just use the ID of 1
+                        masterHeader.lastUsedInstanceId = 1;
+                    }
+                    else
+                    {
+                        masterHeader.lastUsedInstanceId++;
+                        nextInstanceId = masterHeader.lastUsedInstanceId;
+                    }
+                    masterHeader.bloomMask     = mask;
+                    masterHeader.instanceCount = 1;
+                }
 
                 var newCapacity = math.ceilpow2(1);
                 scripts.Add(new ScriptHeader
                 {
                     bloomMask  = mask,
-                    instanceId = 1,
+                    instanceId = nextInstanceId,
                     scriptType = scriptType,
                     byteOffset = 0
                 });
@@ -167,8 +190,8 @@ namespace Latios.Unika
             int   usedBytesPreceeding = 0;
             for (int i = 0; i < scriptIndex; i++)
             {
-                var header      = scripts[i + 1];
-                accumulatedMask = header.bloomMask;
+                var header       = scripts[i + 1];
+                accumulatedMask |= header.bloomMask;
                 if (i + 1 == scriptIndex)
                     usedBytesPreceeding = header.byteOffset + ScriptTypeInfoManager.GetSizeAndAlignement((short)header.scriptType).x;
             }
@@ -176,10 +199,10 @@ namespace Latios.Unika
             // Accumulate masks for subsequent scripts and move each script one-by-one, as alignment may be different
             for (int i = scriptIndex; i < currentScriptCount - 1; i++)
             {
-                ref var header       = ref scripts.ElementAt(i + 1);
-                accumulatedMask      = header.bloomMask;
-                var sizeAndAlignment = ScriptTypeInfoManager.GetSizeAndAlignement((short)header.scriptType);
-                var newOffset        = CollectionHelper.Align(usedBytesPreceeding, sizeAndAlignment.y);
+                ref var header        = ref scripts.ElementAt(i + 1);
+                accumulatedMask      |= header.bloomMask;
+                var sizeAndAlignment  = ScriptTypeInfoManager.GetSizeAndAlignement((short)header.scriptType);
+                var newOffset         = CollectionHelper.Align(usedBytesPreceeding, sizeAndAlignment.y);
                 UnsafeUtility.MemMove(newBasePtr + newOffset, oldBasePtr + header.byteOffset, sizeAndAlignment.x);
                 header.byteOffset   = newOffset;
                 usedBytesPreceeding = newOffset + sizeAndAlignment.x;

@@ -310,7 +310,6 @@ namespace Latios.Myri
                     secondRange.CopyTo(samples.Slice(samplesToEnd, leftoverSamples));
                 }
             }
-            context.threadStackAllocator.Dispose();
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]

@@ -67,8 +67,8 @@ namespace Latios.LifeFX.Systems
 
             var job = new CollectDestinationsJob
             {
-                chunks            = m_destinationsQuery.ToArchetypeChunkListAsync(allocator, out var jh).AsDeferredJobArray(),
-                destinations      = destinations,
+                chunks       = m_destinationsQuery.ToArchetypeChunkListAsync(allocator, out var jh).AsDeferredJobArray(),
+                destinations = destinations,
             }.Inject(api);
             state.Dependency = job.Schedule(JobHandle.CombineDependencies(state.Dependency, jh));
 
@@ -93,7 +93,7 @@ namespace Latios.LifeFX.Systems
             if (!written.destinations.IsCreated)
                 return;
 
-            var api = this.GetApi(ref state);
+            var                     api              = this.GetApi(ref state);
             var                     propertyMap      = api.worldBlackboardEntity.GetCollectionComponent<ShaderPropertyToGlobalBufferMap>(false);
             var                     broker           = written.broker;
             var                     previousProperty = 0;
@@ -135,14 +135,16 @@ namespace Latios.LifeFX.Systems
         static void DispatchManagedFromManaged(UnityObjectRef<GraphicsGlobalBufferReceptor> requestor, GraphicsBufferUnmanaged buffer, ref bool isBurst)
         {
             isBurst = false;
-            requestor.Value.PublishInternal(buffer.ToManaged());
+            if (requestor != null)
+                requestor.Value.PublishInternal(buffer.ToManaged());
         }
 
         [MonoPInvokeCallback(typeof(DispatchDestinationDelegate))]
         static unsafe void DispatchManaged(IntPtr dispatchData)
         {
             ref var data = ref *(DispatchData*)dispatchData;
-            data.requestor.Value.PublishInternal(data.buffer.ToManaged());
+            if (data.requestor != null)
+                data.requestor.Value.PublishInternal(data.buffer.ToManaged());
         }
 
         static void Initialize()
@@ -193,7 +195,7 @@ namespace Latios.LifeFX.Systems
         [BurstCompile]
         partial struct CollectDestinationsJob : IJob, IInjectable
         {
-            [ReadOnly] public NativeArray<ArchetypeChunk>                       chunks;
+            [ReadOnly] public NativeArray<ArchetypeChunk>                        chunks;
             [ReadOnly, Inject] BufferTypeHandle<GraphicsGlobalBufferDestination> destinationHandle;
 
             public NativeList<GraphicsGlobalBufferDestination> destinations;

@@ -149,17 +149,18 @@ namespace Latios.Transforms
                     continue;
                 if (hierarchy[element.parentIndex].m_firstChildIndex == int.MaxValue)
                 {
+                    var parent = FindRealParentAmongMarked(hierarchy, element.parentIndex);
                     if (em.HasComponent<WorldTransform>(element.entity))
                     {
-                        var local               = TransformTools.LocalTransformFrom(element.entity, em, out _);
-                        element.m_localPosition = local.position;
-                        element.m_localScale    = local.scale;
+                        var wt              = em.GetComponentData<WorldTransform>(element.entity);
+                        var parentTransform = em.IsAlive(parent) ? em.GetComponentData<WorldTransform>(parent).worldTransform : TransformQvvs.identity;
+                        WorldLocalOps.UpdateLocalTransformForCleanedParent(in parentTransform, in wt.worldTransform, ref element, false);
                     }
                     if (em.HasComponent<TickedWorldTransform>(element.entity))
                     {
-                        var local                     = TransformTools.TickedLocalTransformFrom(element.entity, em, out _);
-                        element.m_tickedLocalPosition = local.position;
-                        element.m_tickedLocalScale    = local.scale;
+                        var wt              = em.GetComponentData<TickedWorldTransform>(element.entity);
+                        var parentTransform = em.IsAlive(parent) ? em.GetComponentData<TickedWorldTransform>(parent).worldTransform : TransformQvvs.identity;
+                        WorldLocalOps.UpdateLocalTransformForCleanedParent(in parentTransform, in wt.worldTransform, ref element, true);
                     }
                 }
             }
@@ -178,12 +179,14 @@ namespace Latios.Transforms
                     var parent = FindRealParentAmongMarked(hierarchy, element.parentIndex);
                     if (worldLookup.TryGetComponent(element.entity, out var wt))
                     {
-                        var parentTransform = worldLookup[parent];
+                        if (!worldLookup.TryGetComponent(parent, out var parentTransform))
+                            parentTransform.worldTransform = TransformQvvs.identity;
                         WorldLocalOps.UpdateLocalTransformForCleanedParent(in parentTransform.worldTransform, in wt.worldTransform, ref element, false);
                     }
                     if (tickedLookup.TryGetComponent(element.entity, out var tt))
                     {
-                        var parentTransform = worldLookup[parent];
+                        if (!tickedLookup.TryGetComponent(parent, out var parentTransform))
+                            parentTransform.worldTransform = TransformQvvs.identity;
                         WorldLocalOps.UpdateLocalTransformForCleanedParent(in parentTransform.worldTransform, in tt.worldTransform, ref element, true);
                     }
                 }

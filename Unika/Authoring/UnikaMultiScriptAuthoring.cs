@@ -54,13 +54,13 @@ namespace Latios.Unika.Authoring
                 if (ReferenceEquals(s, this))
                 {
                     var scriptsToGenerate = GetScriptCountToGenerate();
-                    if (scriptsToGenerate > 0 && scriptsToGenerate > nthScriptIndex)
+                    if (scriptsToGenerate >= 0 && nthScriptIndex < scriptsToGenerate)
                     {
                         return new ScriptRef
                         {
                             m_entity            = baker.GetEntity(this, transformUsageFlags),
                             m_instanceId        = validBefore + 1 + nthScriptIndex,
-                            m_cachedHeaderIndex = validBefore + 1 + nthScriptIndex
+                            m_cachedHeaderIndex = validBefore + nthScriptIndex
                         };
                     }
                     else
@@ -105,7 +105,7 @@ namespace Latios.Unika.Authoring
 
         int IUnikaAuthoringScriptCounter.CountScripts()
         {
-            return enabled ? GetScriptCountToGenerate() : 0;
+            return enabled ? math.max(GetScriptCountToGenerate(), 0) : 0;
         }
     }
 

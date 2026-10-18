@@ -125,9 +125,9 @@ namespace Latios.Psyshock
                                                                           in RigidTransform bTransform,
                                                                           in ColliderDistanceResult distanceResult)
         {
-            var triangleIndices = terrainB.terrainColliderBlob.Value.GetTriangle(distanceResult.subColliderIndexA);
+            var triangleIndices = terrainB.terrainColliderBlob.Value.GetTriangle(distanceResult.subColliderIndexB);
             var triangle        = PointRayTerrain.CreateLocalTriangle(ref terrainB.terrainColliderBlob.Value, triangleIndices, terrainB.baseHeightOffset, terrainB.scale);
-            return TriangleTerrain.UnityContactsBetween(in terrainA, in aTransform, in triangle, in bTransform, distanceResult.ToFlipped()).ToFlipped();
+            return TriangleTerrain.UnityContactsBetween(in terrainA, in aTransform, in triangle, in bTransform, distanceResult);
         }
     }
 }

@@ -102,6 +102,7 @@ namespace Latios.Transforms
                 {
                     m_worldTransform = transform,
                     m_handle         = default,
+                    m_esil           = esil,
                     m_access         = cache.chunkEntities + indexInChunk
                 };
             }
@@ -121,6 +122,7 @@ namespace Latios.Transforms
             ref var cache         = ref threadCache.cache;
             var     chunk         = context.chunk;
             cache.chunkTransforms = chunk.GetNativeArray(ref cache.transformHandle);
+            cache.chunkEntities   = chunk.GetEntityDataPtrRO(esil.AsEntityTypeHandle());
             cache.isRoot          = chunk.Has(ref cache.entityInHierarchyHandle);
             if (cache.isRoot)
             {
@@ -447,7 +449,7 @@ namespace Latios.Transforms
             if (!threadCache.isCreated)
             {
                 threadCache                                      = new ThreadCache<Cache>(default);
-                threadCache.cache.transformHandle                = transformLookup.ToHandle(false);
+                threadCache.cache.transformHandle                = transformLookup.ToHandle(true);
                 threadCache.cache.entityInHierarchyHandle        = hierarchyLookup.ToHandle(true);
                 threadCache.cache.entityInHierarchyCleanupHandle = cleanupLookup.ToHandle(true);
             }

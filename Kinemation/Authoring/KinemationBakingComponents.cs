@@ -149,6 +149,12 @@ namespace Latios.Kinemation.Authoring
         public float                uv0Metric;
         public float3               localBoundsExtents;
     }
+
+    [BakingType]
+    internal struct BakingLodGroupReferencePoint : IComponentData
+    {
+        public float3 worldPosition;
+    }
     #endregion
 }
 

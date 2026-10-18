@@ -51,7 +51,7 @@ namespace Latios.Calci
         public static BezierKnot FromCurveEndpointB(in BezierCurve curve)
         {
             var tangentIn = curve.controlB - curve.endpointB;
-            return new BezierKnot(curve.endpointA, tangentIn, -tangentIn);
+            return new BezierKnot(curve.endpointB, tangentIn, -tangentIn);
         }
 
         /// <summary>
@@ -299,8 +299,8 @@ namespace Latios.Calci
             UnityEngine.WeightedMode mode         = (inIsHermite, outIsHermite) switch
             {
                 (false, false) => UnityEngine.WeightedMode.Both,
-                (false, true) => UnityEngine.WeightedMode.Out,
-                (true, false) => UnityEngine.WeightedMode.In,
+                (true, false) => UnityEngine.WeightedMode.Out,
+                (false, true) => UnityEngine.WeightedMode.In,
                 (true, true) => UnityEngine.WeightedMode.None
             };
             return new UnityEngine.Keyframe

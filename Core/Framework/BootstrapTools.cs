@@ -71,13 +71,15 @@ namespace Latios
                 var type = system.GetManagedType();
                 if (type.Namespace == null)
                 {
-                    if (!silenceWarnings && type.Assembly.FullName.Contains("Unity"))
+                    if (type.Assembly.FullName.Contains("Unity"))
                     {
-                        Debug.LogWarning($"Hey Unity Devs! You forgot a namespace for {type}");
+                        if (!silenceWarnings)
+                            Debug.LogWarning($"Hey Unity Devs! You forgot a namespace for {type}");
                     }
-                    else if (!silenceWarnings && type.Assembly.FullName.Contains("Havok"))
+                    else if (type.Assembly.FullName.Contains("Havok"))
                     {
-                        Debug.LogWarning($"Hey Havok Devs! You forgot a namespace for {type}");
+                        if (!silenceWarnings)
+                            Debug.LogWarning($"Hey Havok Devs! You forgot a namespace for {type}");
                     }
                     else
                         continue;
@@ -220,6 +222,8 @@ namespace Latios
             {
                 newSystem.systemHandle = world.GetOrCreateSystem(type);
             }
+            if (TypeManager.GetSystemAttributes(type.GetManagedType(), typeof(NoGroupInjectionAttribute)).Length > 0)
+                return newSystem;
             if (groups.Length == 0 && defaultGroup != null)
             {
                 if (isManaged)
@@ -229,9 +233,6 @@ namespace Latios
             }
             foreach (var g in groups)
             {
-                if (TypeManager.GetSystemAttributes(newSystem.GetType(), typeof(NoGroupInjectionAttribute)).Length > 0)
-                    break;
-
                 var group = FindOrCreateGroup(world, type, g, defaultGroup, groupRemap);
                 if (group != null)
                 {
@@ -272,16 +273,11 @@ namespace Latios
                 // Skip the built-in root-level system groups
                 var type = types[typesIndex];
 
-                if (type.IsManaged)
-                {
-                    var managedSystem             = world.AsManagedSystem(system);
-                    var noUpdateInGroupAttributes = TypeManager.GetSystemAttributes(managedSystem.GetType(), typeof(NoGroupInjectionAttribute));
-                    if (noUpdateInGroupAttributes.Length > 0)
-                        continue;
-                }
+                if (TypeManager.GetSystemAttributes(type.GetManagedType(), typeof(NoGroupInjectionAttribute)).Length > 0)
+                    continue;
 
                 var updateInGroupAttributes = type.GetUpdateInGroupTargets();
-                if (updateInGroupAttributes.Length == 0)
+                if (updateInGroupAttributes.Length == 0 && defaultGroup != null)
                 {
                     if (defaultGroup.SystemHandle != system)
                         defaultGroup.AddSystemToUpdateList(system);
@@ -388,7 +384,7 @@ namespace Latios
             {
                 if (IsGroup(system))
                     continue;
-                if (!typeof(ComponentSystemBase).IsAssignableFrom(system))
+                if (!typeof(ComponentSystemBase).IsAssignableFrom(system) && !typeof(ISystem).IsAssignableFrom(system))
                     continue;
                 foreach (var targetGroup in groupList)
                 {

@@ -209,7 +209,7 @@ namespace Latios.Myri.Authoring
                 {
                     dspsRight[i] = new ListenerProfileBlob.ChannelDsp
                     {
-                        volume = volumesPerLeftChannel[i],
+                        volume = volumesPerRightChannel[i],
                     };
                     rightChannelFilters[i].ptr = (FrequencyFilter*)builder.Allocate(ref dspsRight[i].filters, rightFilterCountsByChannel[i]).GetUnsafePtr();
                 }

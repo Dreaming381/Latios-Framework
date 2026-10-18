@@ -101,6 +101,15 @@ namespace Latios.Kinemation
     }
 
     /// <summary>
+    /// The LOD Group reference point in local space to be paired with a LodHeightPercentages or LodHieghtPercentagesWithCrossfadeMargins.
+    /// This reference point assumes a static relative relationship between group members. If absent, the value is assumed to be default.
+    /// </summary>
+    public struct LodGroupReferencePoint : IComponentData
+    {
+        public float3 localPosition;
+    }
+
+    /// <summary>
     /// Specifies that this crossfade should use SpeedTree-style crossfades which only ever renders the higher-res LOD
     /// and morphs it to perceptually match the lower-res LOD.
     /// </summary>

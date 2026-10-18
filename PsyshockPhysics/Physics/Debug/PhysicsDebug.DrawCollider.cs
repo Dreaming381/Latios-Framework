@@ -169,19 +169,7 @@ namespace Latios.Psyshock
             float3 capA = float3.zero;
             float3 capB = new float3(0f, math.distance(capsule.pointA, capsule.pointB), 0f);
 
-            quaternion rotation;
-            if (math.all((math.abs(capsule.pointB - capsule.pointA)).xz <= math.EPSILON))
-            {
-                rotation = quaternion.identity;
-            }
-            else if (math.all((math.abs(capsule.pointB - capsule.pointA)).xy <= math.EPSILON))
-            {
-                rotation = quaternion.RotateX(math.PI / 2f);
-            }
-            else
-            {
-                rotation = quaternion.LookRotationSafe(math.forward(), capsule.pointB - capsule.pointA);
-            }
+            var rotation       = mathex.FromToRotation(math.up(), math.normalize(capsule.pointB - capsule.pointA));
             var localTransform = new RigidTransform(rotation, capsule.pointA);
 
             for (int segment = 0; segment < segmentsPerPi; segment++)
@@ -611,7 +599,11 @@ namespace Latios.Psyshock
 
         struct EdgeIndexComparer : IComparer<int2>
         {
-            public int Compare(int2 x, int2 y) => x.x.CompareTo(y.x);
+            public int Compare(int2 x, int2 y)
+            {
+                var result = x.x.CompareTo(y.x);
+                return result != 0 ? result : x.y.CompareTo(y.y);
+            }
         }
 
         /// <summary>

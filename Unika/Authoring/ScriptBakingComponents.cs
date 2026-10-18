@@ -22,5 +22,11 @@ namespace Latios.Unika.Authoring
 
     [BakingType]
     internal struct AuthoredBufferTag : IComponentData { }
+
+    [BakingType]
+    internal struct PreviousBakedScripts : IBufferElementData
+    {
+        public UnikaScripts scripts;
+    }
 }
 

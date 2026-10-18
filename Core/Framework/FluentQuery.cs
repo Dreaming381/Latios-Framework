@@ -447,13 +447,11 @@ namespace Latios
         {
             if ((m_options & EntityQueryOptions.IgnoreComponentEnabledState) == EntityQueryOptions.IgnoreComponentEnabledState)
             {
-                // Move any WithEnabled to With
+                // Move any WithEnabled to With. Unfortunately, we can't do any merging for withoutEnabled because Unity handles that in a special way.
                 m_with.AddRange(m_withEnabled.AsArray());
                 m_withEnabled.Clear();
                 m_with.AddRange(m_withDisabled.AsArray());
                 m_withDisabled.Clear();
-                m_with.AddRange(m_withoutEnabled.AsArray());
-                m_withoutEnabled.Clear();
             }
 
             // Remove all duplicates
@@ -462,6 +460,25 @@ namespace Latios
             RemoveDuplicates(m_anyEnabled);
             RemoveDuplicates(m_without);
             RemoveDuplicates(m_withoutEnabled);
+
+            // A With + WithoutEnabled = WithDisabled. Reclassify before deduplicating WithDisabled
+            for (int i = 0; i < m_withoutEnabled.Length; i++)
+            {
+                var a = m_withoutEnabled[i];
+                for (int j = 0; j < m_with.Length; j++)
+                {
+                    var b = m_with[j];
+                    if (b.IsEnableable && a.TypeIndex == b.TypeIndex && a.IsChunkComponent == b.IsChunkComponent)
+                    {
+                        var d = a.AccessModeType == ComponentType.AccessMode.ReadWrite ? a : b;
+                        m_withDisabled.Add(d);
+                        m_with.RemoveAtSwapBack(j);
+                        m_withoutEnabled.RemoveAtSwapBack(i);
+                        i--;
+                        break;
+                    }
+                }
+            }
             RemoveDuplicates(m_withDisabled);
 
             // Filter and merge WithoutEnabled

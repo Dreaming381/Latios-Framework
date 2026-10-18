@@ -57,7 +57,7 @@ namespace Latios.Transforms.Systems
                 {
                     rootsSet = rootsSet,
                     stream   = stream.AsWriter(),
-                }.Inject(api).ScheduleParallel(m_newRootsJobQuery, jh);
+                }.Inject(api).ScheduleParallel(m_newChildrenJobQuery, jh);
                 m_allQuery.ResetFilter();
                 m_allQuery.AddChangedVersionFilter(ComponentType.ReadOnly<TickedWorldTransform>());
                 jh = new RestoreExistingFromHistoryJob().Inject(api).ScheduleParallel(m_allQuery, jh);
@@ -217,13 +217,13 @@ namespace Latios.Transforms.Systems
                     if (prevWorlds[i].rotation.value.Equals(float4.zero))
                         continue;
                     if (!wroteWorldTransform)
-                        wroteWorldTransform           = prevWorlds[i].worldTransform.Equals(worldTransforms[i].worldTransform);
+                        wroteWorldTransform           = !prevWorlds[i].worldTransform.Equals(worldTransforms[i].worldTransform);
                     worldTransforms[i].worldTransform = prevWorlds[i].worldTransform;
 
                     if (prevLocals != null)
                     {
-                        var handle    = rootReferences[i].ToHandle(ref entityInHierarchyLookup, ref entityInHierarchyCleanupLookup);
-                        prevLocals[i] = WorldLocalOps.CopyTickedLocalToCache(in handle);
+                        var handle = rootReferences[i].ToHandle(ref entityInHierarchyLookup, ref entityInHierarchyCleanupLookup);
+                        WorldLocalOps.RestoreFromTickedLocalCache(in handle, in prevLocals[i]);
                     }
                 }
                 if (wroteWorldTransform)

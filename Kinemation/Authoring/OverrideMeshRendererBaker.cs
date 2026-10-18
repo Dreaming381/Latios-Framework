@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Latios.Transforms;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Entities.Hybrid.Baking;
@@ -161,6 +162,11 @@ namespace Latios.Kinemation.Authoring
         /// </summary>
         public bool isSpeedTree;
 
+        /// <summary>
+        /// The world-space LOD reference point of the LOD Group
+        /// </summary>
+        public float3 lodGroupReferencePoint;
+
         public bool Equals(LodSettings other)
         {
             return localHeight.Equals(other.localHeight) &&
@@ -169,7 +175,8 @@ namespace Latios.Kinemation.Authoring
                    minScreenHeightPercentAtCrossfadeEdge.Equals(other.minScreenHeightPercentAtCrossfadeEdge) &&
                    maxScreenHeightPercentAtCrossfadeEdge.Equals(other.maxScreenHeightPercentAtCrossfadeEdge) &&
                    lowestResLodLevel.Equals(other.lowestResLodLevel) &&
-                   isSpeedTree.Equals(other.isSpeedTree);
+                   isSpeedTree.Equals(other.isSpeedTree) &&
+                   lodGroupReferencePoint.Equals(other.lodGroupReferencePoint);
         }
     }
 
@@ -393,12 +400,14 @@ namespace Latios.Kinemation.Authoring
                 var rendererTransform = baker.GetComponent<Transform>(renderer);
                 var groupTransform    = baker.GetComponent<Transform>(group);
                 var relativeTransform = Transforms.Authoring.Abstract.AbstractBakingUtilities.ExtractTransformRelativeTo(rendererTransform, groupTransform);
-                if (math.lengthsq(relativeTransform.position) > math.EPSILON)
-                {
-                    Debug.LogWarning(
-                        $"LOD renderer {renderer.gameObject.name} has a different world position than the LOD Group {group.gameObject.name} it belongs to. This is currently not supported and artifacts may occur. If you are seeing this message, please report it to the Latios Framework developers so that we can better understand your use case.");
-                }
-                lodSettings.localHeight = group.size / math.cmax(relativeTransform.scale * relativeTransform.stretch);
+                // If the renderer isn't co-located with the LOD Group, we are probably dealing with an HLOD setup.
+                // The trick to avoid an entity lookup at runtime is to bake the reference point in the renderer's
+                // own local space. If the renderer is static relative to the HLOD root, this allows the whole HLOD
+                // root to be moved without extra lookups. If the renderer is dynamic, then the result is silently
+                // slightly wrong compared to Unity, but is probably close enough that no one will notice.
+                var referencePoint                 = (float3)groupTransform.TransformPoint(group.localReferencePoint);
+                lodSettings.lodGroupReferencePoint = referencePoint;
+                lodSettings.localHeight            = group.size / math.cmax(relativeTransform.scale * relativeTransform.stretch);
             }
         }
 
@@ -426,6 +435,9 @@ namespace Latios.Kinemation.Authoring
                     lodSettings.minScreenHeightPercent *= new half(-1f);
                 if (negMax)
                     lodSettings.maxScreenHeightPercent *= new half(-1f);
+
+                baker.AddComponent(                        targetEntity, new BakingLodGroupReferencePoint { worldPosition = lodSettings.lodGroupReferencePoint });
+                baker.AddComponent<LodGroupReferencePoint>(targetEntity);
 
                 if (lodSettings.minScreenHeightPercentAtCrossfadeEdge > 0f || lodSettings.maxScreenHeightPercentAtCrossfadeEdge > 0f)
                 {

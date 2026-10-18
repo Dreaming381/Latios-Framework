@@ -64,14 +64,14 @@ namespace Latios.Transforms
                 {
                     m_hierarchy      = hierarchy.AsNativeArray(),
                     m_extraHierarchy = (EntityInHierarchy*)cleanup.GetUnsafeReadOnlyPtr(),
-                    m_index          = 0
+                    m_index          = rootRef.indexInHierarchy
                 };
             }
             return new EntityInHierarchyHandle
             {
                 m_hierarchy      = cleanup.Reinterpret<EntityInHierarchy>().AsNativeArray(),
                 m_extraHierarchy = null,
-                m_index          = 0
+                m_index          = rootRef.indexInHierarchy
             };
         }
         #endregion

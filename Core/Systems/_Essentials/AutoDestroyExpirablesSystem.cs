@@ -175,6 +175,8 @@ namespace Latios.Systems
                 else if (Hint.Likely(enabledMask.ULong0 == ones && enabledMask.ULong1 == ones))
                 {
                     // All the entities in the chunk need to be kept alive. Early out.
+                    destroyedEntitiesStream.EndForEachIndex();
+                    removedFromLegStream.EndForEachIndex();
                     return;
                 }
                 else if (!chunk.Has(ref legHandle))
@@ -233,7 +235,9 @@ namespace Latios.Systems
                 for (int i = 1; i < linkedEntities.Length; i++)
                 {
                     var linked = linkedEntities[i].Value;
-                    var info   = esil[linked];
+                    if (!esil.Exists(linked))
+                        continue; // Block esil[linked] from throwing. TryGetValue() below will return false for cleanup archetypes.
+                    var info = esil[linked];
                     if (chunkMasksMap.TryGetValue(info.Chunk, out var mask))
                     {
                         if (info.IndexInChunk >= 64 && new BitField64(mask.ULong1).IsSet(info.IndexInChunk - 64))
@@ -246,7 +250,7 @@ namespace Latios.Systems
                             });
                             i--;
                         }
-                        else if (new BitField64(mask.ULong0).IsSet(info.IndexInChunk))
+                        else if (info.IndexInChunk < 64 && new BitField64(mask.ULong0).IsSet(info.IndexInChunk))
                         {
                             linkedEntities.RemoveAtSwapBack(i);
                             removedFromLegStream.Write(new AutoDestroyExpirationJournal.RemovedFromLinkedEntityGroup

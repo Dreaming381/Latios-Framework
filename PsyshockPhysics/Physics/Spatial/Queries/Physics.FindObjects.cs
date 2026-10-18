@@ -358,7 +358,8 @@ namespace Latios.Psyshock
                 else
                 {
                     layerIndex++;
-                    enumerator = new FindObjectsEnumerator(in aabb, in collisionLayers[layerIndex], layerIndex);
+                    if (layerIndex < collisionLayers.Length)
+                        enumerator = new FindObjectsEnumerator(in aabb, in collisionLayers[layerIndex], layerIndex);
                 }
             }
             return false;

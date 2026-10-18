@@ -63,12 +63,19 @@ namespace Latios.LifeFX
                 if (lockForReading)
                     throw new System.InvalidOperationException("Cannot add a new GraphicsEventTunnel while a system is using it.");
 
-                if (firstRegisteredMap.TryGetValue(hash, out var target))
+                // There's a few cases going on here. In a build, Unity may reload the ScriptableObject multiple times as separate instances.
+                // Therefore, we capture its hash and point all hashes at the first index when registering. The deduplicateTargetMap translates
+                // any instance into the instance that should be used (including itself). The firstRegisteredMap for hashes is only used by
+                // this method to populate deduplicateTargetMap.
+                // But of course, in the editor, not everything gets assigned a valid hash right away. So in that case, we don't deduplicate
+                // the invalid hash value. There can't be duplicates in the editor anyways.
+                if (hash.IsValid && firstRegisteredMap.TryGetValue(hash, out var target))
                     deduplicateTargetMap.TryAdd(instance, target);
                 else
                 {
-                    firstRegisteredMap.Add(hash, instance);
-                    deduplicateTargetMap.Add(instance, instance);
+                    if (hash.IsValid)
+                        firstRegisteredMap.Add(hash, instance);
+                    deduplicateTargetMap.TryAdd(instance, instance);
                 }
             }
 

@@ -69,11 +69,11 @@ namespace Latios
             CreateSystems();
 
             if (!m_overrideSystemSortingPreference)
-                base.EnableSystemSorting = !latiosWorld.useExplicitSystemOrdering;
+                base.EnableSystemSorting = latiosWorld == null || !latiosWorld.useExplicitSystemOrdering;
         }
 
         public EntityQuery GetEntityQuery(EntityQueryDesc desc) => GetEntityQuery(new EntityQueryDesc[] { desc });
-        public EntityQuery GetEntityQuery(EntityQueryBuilder desc) => GetEntityQuery(desc);
+        public EntityQuery GetEntityQuery(EntityQueryBuilder desc) => base.GetEntityQuery(desc);
 
         #region API
         /// <summary>

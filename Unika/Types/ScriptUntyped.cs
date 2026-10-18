@@ -63,12 +63,17 @@ namespace Latios.Unika
             set => m_header.userFlagB = value;
         }
 
-        public static implicit operator ScriptRef(Script script) => new ScriptRef
+        public static implicit operator ScriptRef(Script script)
         {
-            m_entity            = script.m_entity,
-            m_instanceId        = script.m_headerRO.instanceId,
-            m_cachedHeaderIndex = (script.m_headerOffset / UnsafeUtility.SizeOf<ScriptHeader>()) - 1
-        };
+            if (!script.m_scriptBuffer.IsCreated)
+                return default;
+            return new ScriptRef
+            {
+                m_entity            = script.m_entity,
+                m_instanceId        = script.m_headerRO.instanceId,
+                m_cachedHeaderIndex = (script.m_headerOffset / UnsafeUtility.SizeOf<ScriptHeader>()) - 1
+            };
+        }
         #endregion
 
         #region Type operations
@@ -83,7 +88,11 @@ namespace Latios.Unika
         {
             var result = m_entity.CompareTo(other.m_entity);
             if (result == 0)
+            {
+                if (!m_scriptBuffer.IsCreated && !other.m_scriptBuffer.IsCreated) // If only one of these are true, the user has a dangling Script, which should be safety checked.
+                    return 0;
                 return m_headerRO.instanceId.CompareTo(other.m_headerRO.instanceId);
+            }
             return result;
         }
 
@@ -91,13 +100,18 @@ namespace Latios.Unika
 
         public override bool Equals(object obj)
         {
-            if (!typeof(Script).IsAssignableFrom(obj.GetType()))
+            if (obj == null || !typeof(Script).IsAssignableFrom(obj.GetType()))
                 return false;
             Script other = (Script)obj;
             return Equals(other);
         }
 
-        public override int GetHashCode() => new int2(m_entity.GetHashCode(), m_headerRO.instanceId).GetHashCode();
+        public override int GetHashCode()
+        {
+            if (m_scriptBuffer.IsCreated)
+                return new int2(m_entity.GetHashCode(), m_headerRO.instanceId).GetHashCode();
+            return int2.zero.GetHashCode();
+        }
 
         public override string ToString()
         {

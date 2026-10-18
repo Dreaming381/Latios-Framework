@@ -61,7 +61,7 @@ namespace Latios.Transforms.Systems
                         }
                         else if (twoAgoRO[i].rotation.value.Equals(float4.zero))
                         {
-                            startIndex = i;
+                            startIndex = math.min(startIndex, i);
                         }
                     }
 

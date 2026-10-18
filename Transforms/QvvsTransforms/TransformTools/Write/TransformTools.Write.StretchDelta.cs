@@ -65,7 +65,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform            = currentTransform;
                 return;
             }
-            Stretch(handle, stretchFactors, ref componentBroker);
+            Stretch(handle, stretchFactors, key, ref componentBroker);
         }
 
         /// <summary>
@@ -186,13 +186,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<WorldTransform> refRW             = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<WorldTransform> refRW             = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs         currentTransform  = refRW.ValueRO.worldTransform;
                 currentTransform.stretch               *= stretchFactors;
                 refRW.ValueRW.worldTransform            = currentTransform;
                 return;
             }
-            Stretch(handle, stretchFactors, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            Stretch(handle, stretchFactors, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -308,7 +308,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform                  = currentTransform;
                 return;
             }
-            StretchTicked(handle, stretchFactors, ref componentBroker);
+            StretchTicked(handle, stretchFactors, key, ref componentBroker);
         }
 
         /// <summary>
@@ -429,13 +429,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<TickedWorldTransform> refRW             = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<TickedWorldTransform> refRW             = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs               currentTransform  = refRW.ValueRO.worldTransform;
                 currentTransform.stretch                     *= stretchFactors;
                 refRW.ValueRW.worldTransform                  = currentTransform;
                 return;
             }
-            StretchTicked(handle, stretchFactors, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            StretchTicked(handle, stretchFactors, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

@@ -56,7 +56,7 @@ namespace Latios.Transforms
                 componentBroker.GetRW<WorldTransform>(entity, key).ValueRW.worldTransform = newLocalTransform;
                 return;
             }
-            SetLocalTransform(handle, in newLocalTransform, ref componentBroker);
+            SetLocalTransform(handle, in newLocalTransform, key, ref componentBroker);
         }
 
         /// <summary>
@@ -177,7 +177,7 @@ namespace Latios.Transforms
                 transformLookupRW.GetCheckedLookup(handle.root.entity, key)[entity] = new WorldTransform { worldTransform = newLocalTransform };
                 return;
             }
-            SetLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -287,7 +287,7 @@ namespace Latios.Transforms
                 componentBroker.GetRW<TickedWorldTransform>(entity, key).ValueRW.worldTransform = newLocalTransform;
                 return;
             }
-            SetTickedLocalTransform(handle, in newLocalTransform, ref componentBroker);
+            SetTickedLocalTransform(handle, in newLocalTransform, key, ref componentBroker);
         }
 
         /// <summary>
@@ -408,7 +408,7 @@ namespace Latios.Transforms
                 transformLookupRW.GetCheckedLookup(handle.root.entity, key)[entity] = new TickedWorldTransform { worldTransform = newLocalTransform };
                 return;
             }
-            SetTickedLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetTickedLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

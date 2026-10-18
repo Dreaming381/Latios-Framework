@@ -105,7 +105,7 @@ namespace Latios.Transforms
             if (em.HasComponent<LiveBakedTag>(child) && !em.HasComponent<LiveAddedParentTag>(child))
                 addSet.liveAddedParent = true;
 #endif
-            var isTicked = em.HasComponent<TickedEntityTag>(child);
+            var isTicked = em.HasComponent<TickedEntityTag>(child) || em.HasComponent<TickedWorldTransform>(child);
             var isNormal = em.HasComponent<WorldTransform>(child);
             if (!isTicked && !isNormal)
             {
@@ -187,10 +187,15 @@ namespace Latios.Transforms
                                                                        ComponentAddSet childAddSet,
                                                                        SetParentOptions options)
         {
-            var  resultBuffer         = tsa.AllocateAsSpan<ComponentAddSet>(parentClassification.indexInHierarchy + 1);
-            var  resultCount          = 0;
-            var  parentAddSet         = GetParentComponentsToAdd(em, hierarchy[parentClassification.indexInHierarchy].entity, parentClassification.role, childAddSet, options);
-            bool allTransformsPresent = false;
+            var resultBuffer              = tsa.AllocateAsSpan<ComponentAddSet>(parentClassification.indexInHierarchy + 1);
+            var resultCount               = 0;
+            var parentInHierarchy         = hierarchy[parentClassification.indexInHierarchy];
+            var parentAddSet              = GetParentComponentsToAdd(em, parentInHierarchy.entity, parentClassification.role, childAddSet, options);
+            parentAddSet.indexInHierarchy = parentClassification.indexInHierarchy;
+            parentAddSet.parent           = hierarchy[parentInHierarchy.parentIndex].entity;
+            if (parentInHierarchy.m_flags.HasCopyParent())
+                parentAddSet.isCopyParent = true;
+            bool allTransformsPresent     = false;
             if (!parentAddSet.noChange)
             {
                 resultBuffer[0] = parentAddSet;
@@ -198,6 +203,8 @@ namespace Latios.Transforms
 
                 for (int index = hierarchy[parentClassification.indexInHierarchy].parentIndex; index > 0; index = hierarchy[index].parentIndex)
                 {
+                    if (!em.IsAlive(hierarchy[index].entity))
+                        continue;
                     var newAddSet = GetParentComponentsToAdd(em, hierarchy[index].entity, TreeClassification.TreeRole.InternalWithChildren, childAddSet, options);
                     if (newAddSet.noChange)
                     {
@@ -213,8 +220,12 @@ namespace Latios.Transforms
                 }
             }
 
-            var rootAddSet            = GetParentComponentsToAdd(em, parentClassification.root, TreeClassification.TreeRole.Root, childAddSet, options, !allTransformsPresent);
-            resultBuffer[resultCount] = rootAddSet;
+            ComponentAddSet rootAddSet;
+            if (parentClassification.isRootAlive)
+                rootAddSet = GetParentComponentsToAdd(em, parentClassification.root, TreeClassification.TreeRole.Root, childAddSet, options, !allTransformsPresent);
+            else
+                rootAddSet = new ComponentAddSet { entity = parentClassification.root };
+            resultBuffer[resultCount]                     = rootAddSet;
             resultCount++;
             return resultBuffer.Slice(0, resultCount);
         }
@@ -380,7 +391,11 @@ namespace Latios.Transforms
             }
 
             if (addSet.linkedEntityGroup)
-                em.GetBuffer<LinkedEntityGroup>(addSet.entity).Add(new LinkedEntityGroup { Value = addSet.entity });
+            {
+                var leg = em.GetBuffer<LinkedEntityGroup>(addSet.entity);
+                if (leg.IsEmpty)
+                    leg.Add(new LinkedEntityGroup { Value = addSet.entity });
+            }
         }
 
         public static void RemoveUnnecessaryTransformComponents(ref ThreadStackAllocator parentTsa, EntityManager em, ReadOnlySpan<EntityInHierarchy> hierarchy)
@@ -396,8 +411,11 @@ namespace Latios.Transforms
             int i = 0;
             foreach (var element in hierarchy)
             {
-                if (element.parentIndex < 0 && !em.IsAlive(element.entity))
+                if (element.parentIndex < 0 || !em.IsAlive(element.entity))
+                {
+                    i++;
                     continue;
+                }
 
                 var hasNormal   = em.HasComponent<WorldTransform>(element.entity);
                 var hasTicked   = em.HasComponent<TickedWorldTransform>(element.entity);
@@ -420,7 +438,7 @@ namespace Latios.Transforms
                         wasMissingSomething    = true;
                         bitArray[parentIndex] += needsNormalBit;
                     }
-                    if (needsTicked && (bitArray[parentIndex] & hasTickedBit) == 0)
+                    if (needsTicked && (bitArray[parentIndex] & needsTickedBit) == 0)
                     {
                         wasMissingSomething    = true;
                         bitArray[parentIndex] += needsTickedBit;
@@ -438,7 +456,7 @@ namespace Latios.Transforms
                 var bits = bitArray[i];
                 if ((bits & (hasNormalBit + needsNormalBit)) == hasNormalBit)
                     em.RemoveComponent(entity, new TypePack<WorldTransform, PreviousTransform, TwoAgoTransform>());
-                if ((bits & (hasTickedBit + needsTickedBit)) == needsTickedBit)
+                if ((bits & (hasTickedBit + needsTickedBit)) == hasTickedBit)
                     em.RemoveComponent(entity, new TypePack<TickedWorldTransform, TickedPreviousTransform, TickedPreviousLocalTransformCache, TickedTwoAgoTransform>());
                 i++;
             }

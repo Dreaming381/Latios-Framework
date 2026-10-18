@@ -28,7 +28,7 @@ namespace Latios.Transforms
                 {
                     // We got a mismatch. Try to compute the local position. This can be somewhat lossy over many frames.
                     // If we get a bad calculation, fall back to whatever we had previously.
-                    var newPosition = qvvs.InverseTransformPoint(in parent, pos);
+                    var newPosition = qvvs.InverseTransformPoint(in parent, child.position);
                     pos             = math.select(pos, newPosition, math.isfinite(newPosition));
                 }
             }
@@ -49,7 +49,7 @@ namespace Latios.Transforms
                 if (math.distance(child.scale, qvvs.TransformScale(in parent, scale)) >= 1e-5f)
                 {
                     // We got a scale mismatch.
-                    var newScale = qvvs.InverseTransformScale(in parent, scale);
+                    var newScale = qvvs.InverseTransformScale(in parent, child.scale);
                     scale        = math.select(scale, newScale, math.isfinite(newScale));
                 }
             }
@@ -88,13 +88,13 @@ namespace Latios.Transforms
                 {
                     // We got a mismatch. Try to compute the local position. This can be somewhat lossy over many frames.
                     // If we get a bad calculation, fall back to whatever we had previously.
-                    var newPosition = qvvs.InverseTransformPoint(in parent, pos);
+                    var newPosition = qvvs.InverseTransformPoint(in parent, child.position);
                     pos             = math.select(pos, newPosition, math.isfinite(newPosition));
                 }
                 if (math.distance(child.scale, qvvs.TransformScale(in parent, scale)) >= 1e-5f)
                 {
                     // We got a scale mismatch.
-                    var newScale = qvvs.InverseTransformScale(in parent, scale);
+                    var newScale = qvvs.InverseTransformScale(in parent, child.scale);
                     scale        = math.select(scale, newScale, math.isfinite(newScale));
                 }
             }
@@ -155,7 +155,7 @@ namespace Latios.Transforms
                 worldOffset              = math.select(worldOffset, originalWorldOffset, keepWorld);
                 newLocalPosition         = math.InverseRotateFast(parent.rotation, worldOffset);
                 // This select here avoids precision loss for the axes we want to keep.
-                worldPosition = math.select(parent.position + worldOffset, worldOffset, keepWorld);
+                worldPosition = math.select(parent.position + worldOffset, worldPosition, keepWorld);
             }
             child.position = worldPosition;
             WriteLocalPosition(in childHandle, isTicked, newLocalPosition);
@@ -202,7 +202,7 @@ namespace Latios.Transforms
                 worldOffset              = math.select(worldOffset, originalWorldOffset, keepWorldPosition);
                 newLocalPosition         = math.InverseRotateFast(parent.rotation, worldOffset);
                 // This select here avoids precision loss for the axes we want to keep.
-                worldTransform.position = math.select(parent.position + worldOffset, worldOffset, keepWorldPosition);
+                worldTransform.position = math.select(parent.position + worldOffset, worldTransform.position, keepWorldPosition);
 
                 // There is a likely but not certain probability that scale is zero.
                 if (!math.isfinite(newLocalScale))
@@ -314,6 +314,7 @@ namespace Latios.Transforms
             // If the passed in transform had zero scaling, we just set the world positions and scales to 0.
             newWorld.position = math.select(float3.zero, newWorld.position, math.isfinite(newWorld.position));
             newWorld.scale    = math.select(0f, newWorld.scale, math.isfinite(newWorld.scale));
+            SetWorldTransform(newWorld, in parent, ref child, in childHandle, isTicked);
         }
 
         public static void SetCopyParentTransform(in TransformQvvs parent, ref TransformQvvs child, in EntityInHierarchyHandle childHandle, bool isTicked)
@@ -380,6 +381,10 @@ namespace Latios.Transforms
                 SetWorldScale(newWorld.scale, in newParent, ref propagatedWorld, in childHandle, isTicked);
                 SetWorldRotation(newWorld.rotation, ref propagatedWorld);
             }
+            else
+            {
+                SetWorldRotation(newWorld.rotation, ref propagatedWorld);
+            }
             child = propagatedWorld;
 
             static quaternion ComputeMixedRotation(quaternion originalWorldRotation, quaternion hierarchyWorldRotation, InheritanceFlags flags)
@@ -427,13 +432,13 @@ namespace Latios.Transforms
             {
                 // We got a mismatch. Try to compute the local position. This can be somewhat lossy over many frames.
                 // If we get a bad calculation, fall back to whatever we had previously.
-                var newPosition = qvvs.InverseTransformPoint(in newParent, pos);
+                var newPosition = qvvs.InverseTransformPoint(in newParent, child.position);
                 pos             = math.select(pos, newPosition, math.isfinite(newPosition));
             }
             if (math.distance(child.scale, qvvs.TransformScale(in newParent, scale)) >= 1e-5f)
             {
                 // We got a scale mismatch.
-                var newScale = qvvs.InverseTransformScale(in newParent, scale);
+                var newScale = qvvs.InverseTransformScale(in newParent, child.scale);
                 scale        = math.select(scale, newScale, math.isfinite(newScale));
             }
         }

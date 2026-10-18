@@ -59,7 +59,7 @@ namespace Latios.Kinemation
             get
             {
                 var mask = (byte)(m_skeletonState.ValueRO.state & OptimizedSkeletonState.Flags.RotationMask);
-                return OptimizedSkeletonState.PreviousFromMask[mask] * boneCount * 2;
+                return OptimizedSkeletonState.TwoAgoFromMask[mask] * boneCount * 2;
             }
         }
 

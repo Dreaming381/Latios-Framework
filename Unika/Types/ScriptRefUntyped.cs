@@ -43,9 +43,9 @@ namespace Latios.Unika
 
         public override bool Equals(object obj)
         {
-            if (!typeof(Script).IsAssignableFrom(obj.GetType()))
+            if (obj == null || !typeof(ScriptRef).IsAssignableFrom(obj.GetType()))
                 return false;
-            Script other = (Script)obj;
+            ScriptRef other = (ScriptRef)obj;
             return Equals(other);
         }
 

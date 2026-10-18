@@ -99,15 +99,16 @@ namespace Latios
             if (requiredCapacity * 2 <= m_capacity)
                 return;
 
+            var newCapacity = math.max(2, math.ceilpow2(requiredCapacity * 2));  // * 2 so that all elements with same hash still fit
             if (isEmpty)
             {
-                m_capacity = math.max(2, math.ceilpow2(requiredCapacity));
-                m_buffer.Resize(m_capacity, NativeArrayOptions.ClearMemory);
+                m_capacity = newCapacity;
+                m_buffer.Clear();
                 Tidy();
                 return;
             }
 
-            ReallocUp(math.max(2, math.ceilpow2(requiredCapacity)));
+            ReallocUp(newCapacity);
         }
 
         /// <summary>

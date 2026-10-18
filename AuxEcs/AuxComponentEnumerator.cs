@@ -11,21 +11,23 @@ namespace Latios.AuxEcs
     /// <typeparam name="T">The type of arbitrary struct component to iterate</typeparam>
     public unsafe struct AuxComponentEnumerator<T> where T : unmanaged
     {
-        AuxRef<T>       auxRef;
-        ComponentStore* store;
-        int             currentIndex;
+        AuxRef<T>           auxRef;
+        AllComponentsStore* store;
+        int                 typeId;
+        int                 currentIndex;
 
-        internal AuxComponentEnumerator(ComponentStore* store)
+        internal AuxComponentEnumerator(AllComponentsStore* store, int typeId)
         {
             auxRef       = default;
             this.store   = store;
+            this.typeId  = typeId;
             currentIndex = -1;
         }
 
         /// <summary>
         /// The number of components of this type present in the AuxWorld at the time of access
         /// </summary>
-        public int count => store->instanceCount;
+        public int count => store != null ? (*store)[typeId].instanceCount : 0;
 
         public AuxComponentEnumerator<T> GetEnumerator() => this;
 
@@ -35,10 +37,10 @@ namespace Latios.AuxEcs
         {
             if (store == null)
                 return false;
-            while (currentIndex + 1 < store->maxIndex)
+            while (currentIndex + 1 < (*store)[typeId].maxIndex)
             {
                 currentIndex++;
-                auxRef = store->GetRef<T>(currentIndex);
+                auxRef = (*store)[typeId].GetRef<T>(currentIndex);
                 if ((auxRef.version & 1) == 1)
                     return true;
             }

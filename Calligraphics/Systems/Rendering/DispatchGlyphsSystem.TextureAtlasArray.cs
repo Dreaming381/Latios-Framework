@@ -33,12 +33,13 @@ namespace Latios.Calligraphics.Systems
 
                 this.renderFormat                      = format;
                 var rtrw                               = linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB;
-                renderTexture2DArray                   = new RenderTexture(dimension, dimension, initialAtlasCount, renderFormat, rtrw);
+                renderTexture2DArray                   = new RenderTexture(dimension, dimension, 0, renderFormat, rtrw);
                 renderTexture2DArray.dimension         = TextureDimension.Tex2DArray;
                 renderTexture2DArray.volumeDepth       = initialAtlasCount;
                 renderTexture2DArray.enableRandomWrite = true;
                 renderTexture2DArray.useMipMap         = useMipmapping;
                 renderTexture2DArray.autoGenerateMips  = false;
+                renderTexture2DArray.hideFlags         = HideFlags.HideAndDontSave;
 
                 CommandBuffer cmd = new CommandBuffer();
                 cmd.SetRenderTarget(new RenderTargetIdentifier(renderTexture2DArray));
@@ -71,12 +72,13 @@ namespace Latios.Calligraphics.Systems
                 {
                     oldRenderArray                         = renderTexture2DArray;
                     var rtrw                               = linear ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB;
-                    renderTexture2DArray                   = new RenderTexture(dimension, dimension, atlasesNeeded, renderFormat, rtrw);
+                    renderTexture2DArray                   = new RenderTexture(dimension, dimension, 0, renderFormat, rtrw);
                     renderTexture2DArray.dimension         = TextureDimension.Tex2DArray;
                     renderTexture2DArray.volumeDepth       = atlasesNeeded;
                     renderTexture2DArray.enableRandomWrite = true;
                     renderTexture2DArray.useMipMap         = useMipmapping;
                     renderTexture2DArray.autoGenerateMips  = false;
+                    renderTexture2DArray.hideFlags         = HideFlags.HideAndDontSave;
 
                     for (int i = 0; i < atlasesNeeded; i++)
                     {

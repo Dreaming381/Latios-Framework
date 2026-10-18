@@ -20,6 +20,8 @@ namespace Latios.Calci
         /// <returns>The first index greater or equal, or the length if all values are less than the search value</returns>
         public static int FirstGreaterOrEqual<T>(in ReadOnlySpan<T> array, T searchValue) where T : unmanaged, IComparable<T>
         {
+            if (array.IsEmpty)
+                return 0;
             fixed (T* ptr = &array[0])
             return FirstGreaterOrEqual(ptr, array.Length, searchValue);
         }
@@ -35,6 +37,8 @@ namespace Latios.Calci
         /// <returns>The first index greater or equal, or the length if all values are less than the search value</returns>
         public static int FirstGreaterOrEqual<T, U>(in ReadOnlySpan<T> array, T searchValue, U comparer) where T : unmanaged where U : unmanaged, IComparer<T>
         {
+            if (array.IsEmpty)
+                return 0;
             fixed (T* ptr = &array[0])
             return FirstGreaterOrEqual(ptr, array.Length, searchValue, comparer);
         }
@@ -93,19 +97,11 @@ namespace Latios.Calci
         public static int FirstGreaterOrEqual<T, U>(T* array, [AssumeRange(0, int.MaxValue)] int arrayLength, T searchValue, U comparer) where T : unmanaged where U : unmanaged,
         IComparer<T>
         {
+            if (arrayLength == 0)
+                return 0;
             //   The implementation as follows is a C# and Burst adaptation of Paul-Virak Khuong and Pat Morin's
             //   optimized sequential order binary search: https://github.com/patmorin/arraylayout/blob/master/src/sorted_array.h
             //   This code is licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)
-            bool isBurst = true;
-            SkipWithoutBurst(ref isBurst);
-            if (isBurst)
-            {
-                for (int i = 1; i < arrayLength; i++)
-                {
-                    Hint.Assume(comparer.Compare(array[i], searchValue) >= 0);
-                }
-            }
-
             var  basePtr = array;
             uint n       = (uint)arrayLength;
             while (Hint.Likely(n > 1))
@@ -127,9 +123,6 @@ namespace Latios.Calci
 
             return (int)(basePtr - array);
         }
-
-        [BurstDiscard]
-        static void SkipWithoutBurst(ref bool isBurst) => isBurst = false;
     }
 }
 

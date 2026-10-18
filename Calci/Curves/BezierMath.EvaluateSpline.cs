@@ -52,6 +52,7 @@ namespace Latios.Calci
                     knotAIndex          = i - 1;
                     return;
                 }
+                accumulatedDistance += curveLength;
             }
             t = 1f;
             return;

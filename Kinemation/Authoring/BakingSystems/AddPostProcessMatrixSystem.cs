@@ -9,6 +9,7 @@ using Unity.Mathematics;
 using static Unity.Entities.SystemAPI;
 
 // Note: This system is only added to baking in QVVS Transforms.
+// Todo: Replace this with an explicit authoring component, and make it work in prefabs.
 
 namespace Latios.Kinemation.Authoring.Systems
 {

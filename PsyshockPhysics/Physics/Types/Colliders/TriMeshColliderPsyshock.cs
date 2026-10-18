@@ -104,12 +104,11 @@ namespace Latios.Psyshock
             if (math.any(math.isnan(scaledTriMeshSpaceAabb.min) | math.isnan(scaledTriMeshSpaceAabb.max) | math.isnan(triMeshScale)))
                 return;
 
-            var inverseScale  = math.rcp(triMeshScale);
-            var aabb          = scaledTriMeshSpaceAabb;
-            aabb.min         *= inverseScale;
-            aabb.max         *= inverseScale;
-            aabb.min          = math.select(aabb.min, float.MinValue, math.isnan(aabb.min));
-            aabb.max          = math.select(aabb.max, float.MaxValue, math.isnan(aabb.max));
+            var inverseScale = math.rcp(triMeshScale);
+            var aabb         = scaledTriMeshSpaceAabb;
+            aabb             = Physics.AabbFrom(aabb.min * inverseScale, aabb.max * inverseScale);  // Account for negative scaling
+            aabb.min         = math.select(aabb.min, float.MinValue, math.isnan(aabb.min));
+            aabb.max         = math.select(aabb.max, float.MaxValue, math.isnan(aabb.max));
             FindTriangles(in aabb, ref processor);
         }
 

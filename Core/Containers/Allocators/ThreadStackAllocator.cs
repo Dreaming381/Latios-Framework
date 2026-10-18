@@ -158,7 +158,8 @@ namespace Latios.Unsafe
                     }
                 }
                 // At this point, we simply want to allocate a new block at the end of the list.
-                var bytesRequiredForBlock = math.max(neededBytes, (ulong)s_settings.Data.defaultBlockSize);
+                // We align the block to 64 bytes, which is Persistent's minimum alignment.
+                var bytesRequiredForBlock = CollectionHelper.Align(math.max(neededBytes, (ulong)s_settings.Data.defaultBlockSize), 64);
                 var newBlock              = new Block
                 {
                     ptr  = (byte*)UnsafeUtility.MallocTracked((long)bytesRequiredForBlock, (int)alignOfElement, Allocator.Persistent, 0),

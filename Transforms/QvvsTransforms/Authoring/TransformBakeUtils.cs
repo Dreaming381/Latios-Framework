@@ -10,13 +10,13 @@ namespace Latios.Transforms.Authoring
         public static TransformQvvs GetWorldSpaceQvvs(this Transform current)
         {
             GetScaleAndStretch(current.localScale, out var scale, out var stretch);
-            var currentQvvs = new TransformQvvs(current.position, current.rotation, scale, stretch);
+            var currentQvvs = new TransformQvvs(current.localPosition, current.localRotation, scale, stretch);
 
             while (current.parent != null)
             {
                 current = current.parent;
                 GetScaleAndStretch(current.localScale, out scale, out stretch);
-                var parentQvvs = new TransformQvvs(current.position, current.rotation, scale, stretch);
+                var parentQvvs = new TransformQvvs(current.localPosition, current.localRotation, scale, stretch);
                 currentQvvs    = qvvs.mulclean(in parentQvvs, in currentQvvs);
             }
             return currentQvvs;
@@ -45,7 +45,7 @@ namespace Latios.Transforms.Authoring
             GetScaleAndStretch(targetSpace.localScale, out scale, out stretch);
             var targetToWorldQvvs = new TransformQvvs(targetSpace.localPosition, targetSpace.localRotation, scale, stretch);
 
-            while (targetSpace.parent != null && targetSpace != original)
+            while (targetSpace.parent != null)
             {
                 targetSpace = targetSpace.parent;
                 GetScaleAndStretch(targetSpace.localScale, out scale, out stretch);
@@ -53,16 +53,8 @@ namespace Latios.Transforms.Authoring
                 targetToWorldQvvs = qvvs.mulclean(in parentQvvs, in targetToWorldQvvs);
             }
 
-            if (targetSpace == original)
-            {
-                var qvs = qvvs.inversemulclean(in targetToWorldQvvs, in TransformQvvs.identity);
-                return new TransformQvvs(qvs.position, qvs.rotation, qvs.scale, targetToWorldQvvs.stretch);
-            }
-            else
-            {
-                var qvs = qvvs.inversemulclean(in targetToWorldQvvs, in currentQvvs);
-                return new TransformQvvs(qvs.position, qvs.rotation, qvs.scale, currentQvvs.stretch);
-            }
+            var qvs = qvvs.inversemulclean(in targetToWorldQvvs, in currentQvvs);
+            return new TransformQvvs(qvs.position, qvs.rotation, qvs.scale, currentQvvs.stretch);
         }
     }
 }

@@ -217,6 +217,11 @@ namespace Latios.Psyshock
                 CompoundCollider compound = collider;
                 writer.Write(compound.compoundColliderBlob);
             }
+            else if (collider.type == ColliderType.Terrain)
+            {
+                TerrainCollider terrain = collider;
+                writer.Write(terrain.terrainColliderBlob);
+            }
         }
 
         unsafe static void WriteTransform<T>(this ref T writer, TransformQvvs transform) where T : unmanaged, BinaryWriter

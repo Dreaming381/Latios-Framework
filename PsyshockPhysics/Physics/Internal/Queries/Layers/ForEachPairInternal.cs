@@ -317,7 +317,7 @@ namespace Latios.Psyshock
                     var stream                             = streamIndicesAndCounts[currentStream];
                     uniqueIslandIndices[island.x]          = stream.x;
 
-                    if (stream.y < math.max(lowestCountInAPreviousStream, countInNextStream))
+                    if (stream.y < math.min(lowestCountInAPreviousStream, countInNextStream))
                         continue;
 
                     if (countInNextStream <= lowestCountInAPreviousStream)
@@ -379,6 +379,7 @@ namespace Latios.Psyshock
                 pairStream.data.pairHeaders.Write(header, baseStream + targetStream);
             }
 
+            pairStream.data.pairHeaders.ClearIndex(aggregateStream);
             pairStream.data.state->needsIslanding = false;
         }
 

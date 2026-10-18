@@ -20,10 +20,12 @@ float3x3 new_float3x3(quaternion q)
 float3x4 TRS(float3 translation, quaternion rotation, float3 scale)
 {
 	float3x3 r = new_float3x3(rotation);
-	return float3x4((r._m00_m10_m20 * scale.x),
-                    (r._m01_m11_m21 * scale.y),
-                    (r._m02_m12_m22 * scale.z),
-                    (translation));
+    float3x4 result;
+    result._m00_m10_m20 = r._m00_m10_m20 * scale.x;
+    result._m01_m11_m21 = r._m01_m11_m21 * scale.y;
+    result._m02_m12_m22 = r._m02_m12_m22 * scale.z;
+    result._m03_m13_m23 = translation;
+    return result;
 }
 
 float3 InverseRotateFast(quaternion normalizedRotation, float3 v)

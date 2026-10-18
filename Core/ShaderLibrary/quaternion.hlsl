@@ -238,7 +238,7 @@ quaternion RotateZ(float angle)
 quaternion LookRotation(float3 forward, float3 up)
 {
 	float3 t = normalize(cross(up, forward));
-	return new_quaternion(float3x3(t, cross(forward, t), forward));
+    return new_quaternion(transpose(float3x3(t, cross(forward, t), forward))); // Different from Unity.Mathematics due to hlsl row-packing rule
 }
 
 quaternion LookRotationSafe(float3 forward, float3 up)
@@ -257,7 +257,7 @@ quaternion LookRotationSafe(float3 forward, float3 up)
 	float mx = max(max(forwardLengthSq, upLengthSq), tLengthSq);
 
 	bool accept = mn > 1e-35f && mx < 1e35f && isfinite(forwardLengthSq) && isfinite(upLengthSq) && isfinite(tLengthSq);
-	return new_quaternion(select(float4(0.0f, 0.0f, 0.0f, 1.0f), new_quaternion(float3x3(t, cross(forward, t), forward)).value, accept));
+    return new_quaternion(select(float4(0.0f, 0.0f, 0.0f, 1.0f), new_quaternion(transpose(float3x3(t, cross(forward, t), forward))).value, accept)); // Different from Unity.Mathematics due to hlsl row-packing rule
 }
 
 quaternion conjugate(quaternion q)

@@ -186,7 +186,7 @@ namespace Latios.Myri
             {
                 case Codec.Uncompressed:
                 {
-                    return 1f;
+                    return float.MaxValue;
                 }
                 case Codec.ADPCM:
                 {

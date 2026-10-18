@@ -113,7 +113,7 @@ namespace Latios.Unika
         /// <returns>True if the resolve succeeded, false otherwise</returns>
         public static bool TryResolve(this ref ScriptRef scriptRef, in EntityScriptCollection allScripts, out Script script)
         {
-            if (allScripts.entity != scriptRef.entity || allScripts.m_buffer.Length == 0)
+            if (allScripts.entity != scriptRef.entity || allScripts.isEmpty)
             {
                 script = default;
                 return false;

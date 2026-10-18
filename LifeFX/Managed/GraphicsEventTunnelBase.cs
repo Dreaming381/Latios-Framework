@@ -1,5 +1,4 @@
 using Unity.Collections;
-using UnityEditor;
 using UnityEngine;
 
 namespace Latios.LifeFX
@@ -44,7 +43,7 @@ namespace Latios.LifeFX
 #if UNITY_6000_3_OR_NEWER
             var instanceIdArray = array.GetSubArray(1, 1).Reinterpret<EntityId>(16).GetSubArray(0, 1);
             instanceIdArray[0] = GetEntityId();
-            AssetDatabase.EntityIdsToGUIDs(instanceIdArray, guidArray);
+            UnityEditor.AssetDatabase.EntityIdsToGUIDs(instanceIdArray, guidArray);
 #else
             var instanceIdArray = array.GetSubArray(1, 1).Reinterpret<int>(16).GetSubArray(0, 1);
             instanceIdArray[0] = GetInstanceID();
@@ -53,7 +52,7 @@ namespace Latios.LifeFX
             if (hash != array[0])
             {
                 hash = array[0];
-                EditorUtility.SetDirty(this);
+                UnityEditor.EditorUtility.SetDirty(this);
             }
         }
 #endif

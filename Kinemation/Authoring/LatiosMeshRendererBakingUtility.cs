@@ -205,6 +205,7 @@ namespace Latios.Kinemation.Authoring
                     mmsBuffer.Capacity = s_validIndexCache.Count;
 
                     s_bakingStreamingTextureCache.Clear();
+                    s_bakingStreamingTextureMeshUv0MetricCache.Clear();
                     foreach (var i in s_validIndexCache)
                     {
                         var src = meshMaterialSubmeshes[i];

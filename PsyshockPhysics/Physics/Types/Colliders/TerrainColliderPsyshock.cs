@@ -142,10 +142,12 @@ namespace Latios.Psyshock
 
                         for (int quadInRow = 0; quadInRow < 8; quadInRow++)
                         {
-                            var  quadInPatch  = 8 * quadRow + quadInRow;
-                            var  quadOffset   = (patch.startY + quadRow) * root.quadsPerRow + math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
-                            var  vertexOffset = (patch.startY + quadRow) * (root.quadsPerRow + 1) + math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
-                            bool valid        = patch.startX + quadInRow < root.quadsPerRow;
+                            var  quadInPatch      = 8 * quadRow + quadInRow;
+                            var  clampedRow       = math.min(patch.startY + quadRow, root.quadRows - 1);
+                            var  clampedQuadInRow = math.min(patch.startX + quadInRow, root.quadsPerRow - 1);
+                            var  quadOffset       = clampedRow * root.quadsPerRow + clampedQuadInRow;
+                            var  vertexOffset     = clampedRow * (root.quadsPerRow + 1) + clampedQuadInRow;
+                            bool valid            = patch.startX + quadInRow < root.quadsPerRow && patch.startY + quadRow < root.quadRows;
 
                             var quadElement = quadOffset / 32;
                             var parityBit   = quadOffset % 32;
@@ -407,10 +409,10 @@ namespace Latios.Psyshock
                     var maxs    = X86.Avx.mm256_set1_epi16(maxHeight);
                     var a       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minA, minC), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxA, maxC)));
                     var b       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minB, minD), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxB, maxD)));
-                    var result  = (ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(a, b));
+                    var result  = (ulong)math.asuint(X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(a, b)));
                     var c       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minE, minG), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxE, maxG)));
                     var d       = X86.Avx2.mm256_or_si256(X86.Avx2.mm256_cmpgt_epi16(new v256(minF, minH), maxs), X86.Avx2.mm256_cmpgt_epi16(mins, new v256(maxF, maxH)));
-                    result     |= ((ulong)X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(c, d))) << 32;
+                    result     |= ((ulong)math.asuint(X86.Avx2.mm256_movemask_epi8(X86.Avx2.mm256_packs_epi16(c, d)))) << 32;
                     result      = ~result;
                     return result & (isFirstTriangleOrChildPatchValid | isSecondTriangleValid);
                 }

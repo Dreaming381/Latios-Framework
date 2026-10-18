@@ -57,9 +57,9 @@ namespace Latios.Transforms
             public bool HasWorldTransform(Entity entity) => lookup.HasComponent(entity);
             public bool isTicked => true;
 
-            public static ref LookupWorldTransform From(ref ComponentLookup<TickedWorldTransform> lookup)
+            public static ref LookupTickedWorldTransform From(ref ComponentLookup<TickedWorldTransform> lookup)
             {
-                return ref UnsafeUtility.As<ComponentLookup<TickedWorldTransform>, LookupWorldTransform>(ref lookup);
+                return ref UnsafeUtility.As<ComponentLookup<TickedWorldTransform>, LookupTickedWorldTransform>(ref lookup);
             }
         }
         #endregion

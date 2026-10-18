@@ -97,7 +97,7 @@ TransformQvvs new_TransformQvvs(RigidTransform rigidTransform)
 	return new_TransformQvvs(rigidTransform.pos, rigidTransform.rot);
 }
 
-#define TransformQvvs_identity new_TransformQvvs(RigidTransform_identity);
+#define TransformQvvs_identity new_TransformQvvs(RigidTransform_identity)
 
 struct TransformQvs
 {
@@ -184,12 +184,12 @@ float3 TransformDirection(in TransformQvvs qvvs, float3 direction)
 float3 TransformDirectionWithStretch(in TransformQvvs qvvs, float3 direction)
 {
 	float magnitude = length(direction);
-	return normalizesafe(rotate(qvvs.rotation, direction) * qvvs.stretch) * magnitude;
+    return normalizesafe(rotate(qvvs.rotation, direction * qvvs.stretch)) * magnitude;
 }
 
 float3 TransformDirectionScaledAndStretched(in TransformQvvs qvvs, float3 direction)
 {
-	return rotate(qvvs.rotation, direction) * qvvs.stretch * qvvs.scale;
+    return rotate(qvvs.rotation, direction * qvvs.stretch * qvvs.scale);
 }
 
 float3 InverseTransformDirection(in TransformQvvs qvvs, float3 direction)

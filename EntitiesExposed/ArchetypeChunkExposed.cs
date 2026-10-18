@@ -93,7 +93,7 @@ namespace Unity.Entities.Exposed
         {
             var                     esil = entityStorageInfoLookup;
             EntityStorageInfoLookup def  = default;
-            return UnsafeUtility.MemCmp(&esil, &def, UnsafeUtility.SizeOf<EntityStorageInfoLookup>()) == 0;
+            return UnsafeUtility.MemCmp(&esil, &def, UnsafeUtility.SizeOf<EntityStorageInfoLookup>()) != 0;
         }
 
         public static unsafe ComponentTypeHandle<T> ToHandle<T>(this ComponentLookup<T> lookup, bool isReadOnly) where T : unmanaged, IComponentData

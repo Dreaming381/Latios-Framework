@@ -65,6 +65,7 @@ namespace Latios.Psyshock
             archetypeStartsAndCountsByBucket.Dispose();
             archetypeBodyIndicesByBucket.Dispose();
             archetypeIntervalTreesByBucket.Dispose();
+            worldIndex = 0;
         }
 
         /// <summary>

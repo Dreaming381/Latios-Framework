@@ -1,9 +1,9 @@
 using System;
 using System.Reflection;
 using Latios.Unika.Authoring;
+using Object = UnityEngine.Object;
 using UnityEditor;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace Latios.Unika.Editor
 {
@@ -41,7 +41,9 @@ namespace Latios.Unika.Editor
         {
             if (fieldType.IsArray)
                 fieldType = fieldType.GetElementType();
-            if (fieldType.IsGenericType)
+            else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(System.Collections.Generic.List<>))
+                fieldType = fieldType.GetGenericArguments()[0];
+            if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(InterfaceAuthoring<>))
                 return fieldType.GetGenericArguments()[0];
             return null;
         }
@@ -54,15 +56,21 @@ namespace Latios.Unika.Editor
                 EditorGUI.LabelField(position, label, new GUIContent("Unsupported field type for InterfaceAuthoringDrawer"));
                 return;
             }
-            var hintInterfaceType     = interfaceRefType.DeclaringType;
+            var hintInterfaceType      = interfaceRefType.DeclaringType;
             var authoringInterfaceType = typeof(IUnikaInterfaceAuthoring<>).MakeGenericType(interfaceRefType);
-            var pRef                  = property.FindPropertyRelative("authoringReference");
+            var pRef                   = property.FindPropertyRelative("authoringReference");
 
             bool TryFindMatch(Object[] references, out UnikaScriptAuthoringBase result)
             {
                 result = null;
                 foreach (var reference in references)
                 {
+                    if (reference is UnikaScriptAuthoringBase direct && authoringInterfaceType.IsInstanceOfType(direct))
+                    {
+                        result = direct;
+                        return true;
+                    }
+
                     var go = reference as GameObject;
                     if (go == null && reference is Component component)
                         go = component.gameObject;
@@ -87,6 +95,7 @@ namespace Latios.Unika.Editor
                 property.serializedObject.ApplyModifiedProperties();
             }
 
+            label = EditorGUI.BeginProperty(position, label, pRef);
             var controlId = GUIUtility.GetControlID(FocusType.Keyboard, position);
 
             var totalPos  = position;
@@ -198,6 +207,7 @@ namespace Latios.Unika.Editor
                     EditorGUIUtility.SetIconSize(prevSize);
                     break;
             }
+            EditorGUI.EndProperty();
 
             void Ping(bool doubleClick)
             {
@@ -228,3 +238,4 @@ namespace Latios.Unika.Editor
         }
     }
 }
+

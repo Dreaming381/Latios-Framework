@@ -200,7 +200,7 @@ namespace Latios.Myri.DSP
             m_delayQueueR      = new SampleQueue(lookaheadSampleCount, m_allocator);
             m_delayAmplitudeDB = new SampleQueue(lookaheadSampleCount, m_allocator);
 
-            int countToTransfer = m_delayQueueL.count;
+            int countToTransfer = oldLeft.count;
             for (int i = 0; i < countToTransfer; i++)
             {
                 m_delayQueueL.Enqueue(oldLeft.Dequeue());

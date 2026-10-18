@@ -65,7 +65,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform           = currentTransform;
                 return;
             }
-            RotateLocal(handle, rotationToApply, ref componentBroker);
+            RotateLocal(handle, rotationToApply, key, ref componentBroker);
         }
 
         /// <summary>
@@ -186,13 +186,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<WorldTransform> refRW            = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<WorldTransform> refRW            = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs         currentTransform = refRW.ValueRO.worldTransform;
                 currentTransform.rotation              = math.normalize(math.mul(rotationToApply, currentTransform.rotation));
                 refRW.ValueRW.worldTransform           = currentTransform;
                 return;
             }
-            RotateLocal(handle, rotationToApply, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            RotateLocal(handle, rotationToApply, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -307,7 +307,7 @@ namespace Latios.Transforms
                 refRW.ValueRW.worldTransform                 = currentTransform;
                 return;
             }
-            RotateTickedLocal(handle, rotationToApply, ref componentBroker);
+            RotateTickedLocal(handle, rotationToApply, key, ref componentBroker);
         }
 
         /// <summary>
@@ -428,13 +428,13 @@ namespace Latios.Transforms
             var handle = GetHierarchyHandle(entity, ref rootReferenceLookupRO, ref entityInHierarchyLookupRO, ref entityInHierarchyCleanupLookupRO);
             if (handle.isNull)
             {
-                RefRW<TickedWorldTransform> refRW            = transformLookupRW.GetCheckedLookup(handle.root.entity, key).GetRefRW(entity);
+                RefRW<TickedWorldTransform> refRW            = transformLookupRW.GetCheckedLookup(entity, key).GetRefRW(entity);
                 TransformQvvs               currentTransform = refRW.ValueRO.worldTransform;
                 currentTransform.rotation                    = math.normalize(math.mul(rotationToApply, currentTransform.rotation));
                 refRW.ValueRW.worldTransform                 = currentTransform;
                 return;
             }
-            RotateTickedLocal(handle, rotationToApply, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            RotateTickedLocal(handle, rotationToApply, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

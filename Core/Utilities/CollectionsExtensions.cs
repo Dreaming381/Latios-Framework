@@ -32,6 +32,8 @@ namespace Latios
 
         public static unsafe JobHandle CombineDependencies(Span<JobHandle> jobHandles)
         {
+            if (jobHandles.IsEmpty)
+                return default;
             return JobHandleUnsafeUtility.CombineDependencies((JobHandle*)UnsafeUtility.AddressOf(ref jobHandles[0]), jobHandles.Length);
         }
 
@@ -43,6 +45,8 @@ namespace Latios
 
         public static unsafe void Sort<T>(this Span<T> span) where T : unmanaged, IComparable<T>
         {
+            if (span.Length < 2)
+                return;
             fixed (T* ptr = &span[0])
             {
                 NativeSortExtension.Sort(ptr, span.Length);
@@ -52,6 +56,8 @@ namespace Latios
         public static unsafe void Sort<TElement, TComparer>(this Span<TElement> span, TComparer comparer) where TElement : unmanaged where TComparer : unmanaged,
         IComparer<TElement>
         {
+            if (span.Length < 2)
+                return;
             fixed (TElement* ptr = &span[0])
             {
                 NativeSortExtension.Sort(ptr, span.Length, comparer);

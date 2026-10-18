@@ -78,6 +78,7 @@ namespace Latios.Transforms
                     {
                         m_worldTransform = tickedWorldTransform,
                         m_handle         = handle,
+                        m_esil           = esil,
                         m_access         = entityPtr
                     };
                 }

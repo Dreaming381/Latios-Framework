@@ -35,7 +35,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var api                = this.GetApi(ref state);
+            var api               = this.GetApi(ref state);
             var lastSystemVersion = state.LastSystemVersion;
             var skeletonJh        = new InitSkeletonJob
             {
@@ -62,8 +62,8 @@ namespace Latios.Kinemation.Systems
 #endif
         partial struct InitSkeletonJob : IJobChunk, IInjectable
         {
-            [Inject] BufferTypeHandle<OptimizedBoneTransform>                                bonesHandle;
-            [Inject] ComponentTypeHandle<OptimizedSkeletonState>                             stateHandle;
+            [Inject] BufferTypeHandle<OptimizedBoneTransform>                               bonesHandle;
+            [Inject] ComponentTypeHandle<OptimizedSkeletonState>                            stateHandle;
             [ReadOnly, Inject] ComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference> blobHandle;
 
             public uint lastSystemVersion;
@@ -140,14 +140,16 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct InitBlendShapesJob : IJobChunk, IInjectable
         {
-            [Inject] BufferTypeHandle<BlendShapeWeight>        weightsHandle;
+            [Inject] BufferTypeHandle<BlendShapeWeight>       weightsHandle;
             [ReadOnly, Inject] ComponentTypeHandle<BoundMesh> blobHandle;
 
             public uint lastSystemVersion;
 
+            HasChecker<LiveBakedTag> liveBakedChecker;
+
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.DidOrderChange(lastSystemVersion))
+                if (!chunk.DidOrderChange(lastSystemVersion) && (!liveBakedChecker[chunk] || !chunk.DidChange(ref weightsHandle, lastSystemVersion)))
                     return;
 
                 var  blobs      = chunk.GetNativeArray(ref blobHandle);
@@ -197,14 +199,16 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct InitMeshJob : IJobChunk, IInjectable
         {
-            [Inject] BufferTypeHandle<DynamicMeshVertex>       verticesHandle;
+            [Inject] BufferTypeHandle<DynamicMeshVertex>      verticesHandle;
             [ReadOnly, Inject] ComponentTypeHandle<BoundMesh> blobHandle;
 
             public uint lastSystemVersion;
 
+            HasChecker<LiveBakedTag> liveBakedChecker;
+
             public unsafe void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
-                if (!chunk.DidOrderChange(lastSystemVersion))
+                if (!chunk.DidOrderChange(lastSystemVersion) && (!liveBakedChecker[chunk] || !chunk.DidChange(ref verticesHandle, lastSystemVersion)))
                     return;
 
                 var  blobs      = chunk.GetNativeArray(ref blobHandle);

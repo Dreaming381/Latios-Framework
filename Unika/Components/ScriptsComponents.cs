@@ -103,5 +103,23 @@ namespace Latios.Unika
     {
         public BlobArray<ulong> stableHashBySerializedTypeId;
     }
+
+    // Used to detect live baking patches into the runtime or editor world so that entities and blob references can be
+    // deserialized.
+    internal struct UnikaLiveBakedScriptsState : IComponentData
+    {
+        // Bit 0 toggles whenever the baked scripts change so that live baking patches this component alongside them.
+        // Bit 7 is always set by baking and cleared after deserialization.
+        // Other bits are unused.
+        internal byte packed;
+
+        public bool deserializationRequested
+        {
+            get => Bits.GetBit(packed, 7);
+            set => Bits.SetBit(ref packed, 7, value);
+        }
+
+        public void ToggleChangeBit() => packed ^= 1;
+    }
 }
 

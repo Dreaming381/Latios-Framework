@@ -123,7 +123,7 @@ namespace Latios.Authoring
     [UpdateInGroup(typeof(PreBakingSystemGroup))]
     internal partial class BakingBootstrapSystem : SystemBase, IRateManager
     {
-        static BakingOverride s_bakingOverride;
+        internal static BakingOverride s_bakingOverride;
 
         public float Timestep { get; set; }
 
@@ -191,17 +191,15 @@ namespace Latios.Authoring
     [WorldSystemFilter(WorldSystemFilterFlags.EntitySceneOptimizations)]
     internal partial class BakingOptimizationBootstrapSystem : SystemBase, IRateManager
     {
-        static BakingOverride s_bakingOverride;
-
         public float Timestep { get; set; }
 
         ComponentSystemGroup m_group;
 
         protected override void OnCreate()
         {
-            if (s_bakingOverride == null)
+            if (BakingBootstrapSystem.s_bakingOverride == null)
             {
-                s_bakingOverride = new BakingOverride();
+                BakingBootstrapSystem.s_bakingOverride = new BakingOverride();
             }
 
             System.Type targetGroupType = null;
@@ -230,9 +228,9 @@ namespace Latios.Authoring
         {
             if (!m_initialized)
             {
-                if (s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
+                if (BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
                 {
-                    foreach (var disableType in s_bakingOverride.m_optimizationSystemTypesToDisable)
+                    foreach (var disableType in BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToDisable)
                     {
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)
@@ -242,16 +240,16 @@ namespace Latios.Authoring
                     }
                 }
 
-                if (s_bakingOverride.m_optimizationSystemTypesToInject.IsCreated)
-                    BootstrapTools.InjectSystems(s_bakingOverride.m_optimizationSystemTypesToInject, World, m_group);
+                if (BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToInject.IsCreated)
+                    BootstrapTools.InjectSystems(BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToInject, World, m_group);
 
                 m_initialized = true;
             }
             else
             {
-                if (s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
+                if (BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToDisable.IsCreated)
                 {
-                    foreach (var disableType in s_bakingOverride.m_optimizationSystemTypesToDisable)
+                    foreach (var disableType in BakingBootstrapSystem.s_bakingOverride.m_optimizationSystemTypesToDisable)
                     {
                         var handle = World.GetExistingSystem(disableType);
                         if (handle != SystemHandle.Null)

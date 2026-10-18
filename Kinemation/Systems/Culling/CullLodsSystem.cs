@@ -61,6 +61,11 @@ using Unity.Rendering;
 // their LOD Group (except for maybe scale, which we can encode into the exponent
 // part of our lodGroupLodScreenHeightPercent). Because of this, we make the assumption
 // that the worldTransform of the LOD Entity is also the lodReferencePoint.
+//
+// The one exception to this assumption is an HLOD setup. In that case, we still
+// assume that all LODs are static relative to the group, and thus we can represent
+// the reference point in each LODs local space. That allows for an HLOD to be placed
+// at runtime without any effort.
 
 namespace Latios.Kinemation.Systems
 {
@@ -163,6 +168,7 @@ namespace Latios.Kinemation.Systems
             [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle                       worldTransformHandle;
             [ReadOnly, Inject] ComponentTypeHandle<LodHeightPercentages>                     lodHeightPercentagesHandle;
             [ReadOnly, Inject] ComponentTypeHandle<LodHeightPercentagesWithCrossfadeMargins> lodHeightPercentagesWithCrossfadeMarginsHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<LodGroupReferencePoint>                   hlodReferencePointHandle;
 
             [Inject] ComponentTypeHandle<EntitiesGraphicsChunkInfo> chunkInfoHandle;
             [Inject] ComponentTypeHandle<LodCrossfade>              crossfadeHandle;
@@ -181,6 +187,8 @@ namespace Latios.Kinemation.Systems
 
                 var                               transforms          = worldTransformHandle.Resolve(chunk);
                 var                               percentsWithMargins = chunk.GetNativeArray(ref lodHeightPercentagesWithCrossfadeMarginsHandle);
+                var                               hlodReferencePoints = chunk.GetNativeArray(ref hlodReferencePointHandle);
+                bool                              hasHLod             = hlodReferencePoints.Length > 0;
                 NativeArray<LodHeightPercentages> percents            = default;
                 NativeArray<LodCrossfade>         crossfades          = default;
                 bool                              hasCrossfades       = percentsWithMargins.Length > 0;
@@ -194,9 +202,11 @@ namespace Latios.Kinemation.Systems
 
                     for (int i = 0; i < chunk.Count; i++)
                     {
-                        var lodValues = percentsWithMargins[i];
-                        var transform = transforms[i].worldTransformQvvs;
-                        if (!TestInRange(lodValues.localSpaceHeight, lodValues.minPercent, lodValues.maxPercent, in transform, out var computedParams))
+                        var lodValues     = percentsWithMargins[i];
+                        var transformQvvs = transforms[i].worldTransformQvvs;
+                        if (hasHLod)
+                            transformQvvs.position = qvvs.TransformPoint(in transformQvvs, hlodReferencePoints[i].localPosition);
+                        if (!TestInRange(lodValues.localSpaceHeight, lodValues.minPercent, lodValues.maxPercent, in transformQvvs, out var computedParams))
                             continue;
 
                         float maxMargin = lodValues.maxCrossFadeEdge;
@@ -249,6 +259,8 @@ namespace Latios.Kinemation.Systems
                     {
                         var lodValues = percents[i];
                         var transform = transforms[i].worldTransformQvvs;
+                        if (hasHLod)
+                            transform.position = qvvs.TransformPoint(in transform, hlodReferencePoints[i].localPosition);
 
                         if (!TestInRange(lodValues.localSpaceHeight, lodValues.minPercent, lodValues.maxPercent, in transform, out var computedParams))
                             continue;

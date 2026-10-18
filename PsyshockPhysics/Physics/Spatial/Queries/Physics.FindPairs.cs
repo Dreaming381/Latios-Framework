@@ -425,8 +425,7 @@ namespace Latios.Psyshock
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         void CheckSafeEntityInRange(int index, int start, int count)
         {
-            var clampedIndex = math.clamp(index, start, start + count);
-            if (clampedIndex != index)
+            if (index < start || index >= start + count)
                 throw new ArgumentOutOfRangeException($"Index {index} is outside the bucket range of [{start}, {start + count - 1}].");
         }
 

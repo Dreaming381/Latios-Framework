@@ -274,7 +274,6 @@ namespace Latios
             ref var tcs = ref GetTypedCollectionStorage<T>(entity, out int index);
             if (index < 0)
             {
-                UnityEngine.Debug.Log($"Failed to find collection component. Getting default.");
                 if (tcs.freeStack.IsEmpty)
                 {
                     index = tcs.collectionComponents.Length;

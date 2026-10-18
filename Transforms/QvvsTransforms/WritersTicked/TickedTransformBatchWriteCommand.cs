@@ -467,7 +467,7 @@ namespace Latios.Transforms
                     sortedCommands[dst].sortId = dst;
                     dst++;
                 }
-                if (sortedCommands.Length == 0)
+                if (dst == 0)
                 {
                     tsa.Dispose();
                     return;
@@ -514,6 +514,8 @@ namespace Latios.Transforms
                     dst++;
                 }
             }
+            if (dst == 0)
+                return;
             data = data.Slice(0, dst);
             ops  = ops.Slice(0, dst);
             switch (firstAspect.m_accessType)

@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Burst;
 using Unity.Collections;
@@ -140,6 +142,7 @@ namespace Latios.Psyshock
                     short archetypeIndex;
                     if (!archetypeMap.TryGetValue(archetype, out archetypeIndex))
                     {
+                        CheckArchetypeCount(archetypeMap.Count);
                         archetypeIndex = (short)archetypeMap.Count;
                         archetypeMap.Add(archetype, archetypeIndex);
                     }
@@ -319,7 +322,7 @@ namespace Latios.Psyshock
                 archetypes                       = world.archetypesInLayer,
                 archetypeStartsAndCountsByBucket = world.archetypeStartsAndCountsByBucket,
                 sourceArchetypeIndices           = sourceArchetypeIndices,
-                bucketCountWithNaN               = IndexStrategies.BucketCountWithNaN(world.layer.count)
+                bucketCountWithNaN               = IndexStrategies.BucketCountWithNaN(world.layer.cellCount)
             }.Execute();
 
             new BuildCollisionLayerInternal.Part2Job
@@ -352,8 +355,9 @@ namespace Latios.Psyshock
 
             var p5 = new Part5FromAoSJob
             {
-                colliderAoS = colliderAoS,
-                layer       = world.layer,
+                colliderAoS          = colliderAoS,
+                layer                = world.layer,
+                worldIndexPreshifted = world.worldIndex << 24
             };
             for (int i = 0; i < world.layer.count; i++)
             {
@@ -370,7 +374,7 @@ namespace Latios.Psyshock
                 sourceArchetypeIndices           = sourceArchetypeIndices.AsArray(),
                 layer                            = world.layer,
             };
-            var bucketCount = IndexStrategies.BucketCountWithNaN(world.layer.count);
+            var bucketCount = IndexStrategies.BucketCountWithNaN(world.layer.cellCount);
             for (int i = 0; i < bucketCount; i++)
             {
                 p6.Execute(i);
@@ -450,6 +454,15 @@ namespace Latios.Psyshock
             }
         }
 
+        #endregion
+
+        #region Safety
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
+        static void CheckArchetypeCount(int count)
+        {
+            if (count >= short.MaxValue)
+                throw new InvalidOperationException("A CollisionWorld cannot contain more than 32767 distinct archetypes.");
+        }
         #endregion
     }
 }

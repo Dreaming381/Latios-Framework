@@ -1,3 +1,5 @@
+using System;
+using Unity.Collections;
 using Unity.Jobs.LowLevel.Unsafe;
 
 namespace Latios.Unsafe
@@ -8,10 +10,27 @@ namespace Latios.Unsafe
     /// Use this container in a SharedStatic for typed debug diagnostics, such as debug drawing or stats collection.
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public struct AtomicDoubleBuffer<T> where T : unmanaged
+    public struct AtomicDoubleBuffer<T> : IDisposable where T : unmanaged
     {
         private UnsafeParallelBlockList<T> writeBuffer;
         private UnsafeParallelBlockList<T> readBuffer;
+
+        /// <summary>
+        /// Constructs the AtomicDoubleBuffer<typeparamref name="T"/>'s backing blocklists
+        /// </summary>
+        /// <param name="elementsPerBlock">The number of elements per block, used to control allocation frequency</param>
+        /// <param name="allocator">The allocator to use for the blocklists</param>
+        public AtomicDoubleBuffer(int elementsPerBlock, AllocatorManager.AllocatorHandle allocator)
+        {
+            readBuffer  = new UnsafeParallelBlockList<T>(elementsPerBlock, allocator);
+            writeBuffer = new UnsafeParallelBlockList<T>(elementsPerBlock, allocator);
+        }
+
+        public void Dispose()
+        {
+            readBuffer.Dispose();
+            writeBuffer.Dispose();
+        }
 
         /// <summary>
         /// Gets a writer for the current thread, atomically locking the thread index.

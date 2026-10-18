@@ -41,7 +41,7 @@ namespace Latios.Psyshock
             if (math.any(isZeroExtent))
             {
                 //The ellipse has degenerated into a line segment.
-                return math.select(math.min(halfExtents, testPoint), 0f, isZeroExtent);
+                return math.select(math.clamp(testPoint, -halfExtents, halfExtents), 0f, isZeroExtent);
             }
 
             // The following code is an optimized version of the algorithm found here: https://github.com/0xfaded/ellipse_demo

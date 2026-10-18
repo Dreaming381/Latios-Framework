@@ -448,6 +448,7 @@ namespace Latios.Psyshock
             {
                 layer                  = new CollisionLayer(config.settings, allocator);
                 var filteredChunkCache = new NativeList<BuildCollisionLayerInternal.FilteredChunkCache>(config.query.CalculateChunkCountWithoutFiltering(), Allocator.TempJob);
+                config.query.CompleteDependency();
                 new BuildCollisionLayerInternal.Part0PrefilterQueryJob
                 {
                     filteredChunkCache = filteredChunkCache

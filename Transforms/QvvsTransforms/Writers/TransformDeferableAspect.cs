@@ -338,10 +338,17 @@ namespace Latios.Transforms
         #region Modification Methods
         /// <summary>
         /// Moves the entity by the amount specified in translation along the world-space axes.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform,
+        /// and the actual application of the translation is deferred.
         /// </summary>
         /// <param name="translation">The world-space x, y, and z signed amounts to move the entity</param>
-        public void TranslateWorld(float3 translation) => worldPosition += translation;
+        public void TranslateWorld(float3 translation)
+        {
+            if (transform.entityInHierarchyHandle.isNull)
+                transform.worldPosition += translation;
+            else
+                commands.Add(TransformBatchWriteCommand.TranslateWorld(transform, translation));
+        }
         /// <summary>
         /// Moves the entity by the amount specified in x, y, and z along the world-space axes.
         /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
@@ -375,10 +382,17 @@ namespace Latios.Transforms
 
         /// <summary>
         /// Rotates the entity's orientation by the specified rotation, where the axis of rotation is defined in world-space.
-        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform.
+        /// If the entity has a parent, the localTransform and worldTransform are synchronized using the parent's WorldTransform,
+        /// and the actual application of the rotation delta is deferred.
         /// </summary>
         /// <param name="rotation">The amount to rotate by, where the innate axis of rotation of the quaternion is specified relative to world-space.</param>
-        public void RotateWorld(quaternion rotation) => worldRotation = math.normalize(math.mul(rotation, worldRotation));
+        public void RotateWorld(quaternion rotation)
+        {
+            if (transform.entityInHierarchyHandle.isNull)
+                transform.worldRotation = math.normalize(math.mul(rotation, transform.worldRotation));
+            else
+                commands.Add(TransformBatchWriteCommand.RotateWorld(transform, rotation));
+        }
 
         /// <summary>
         /// Rotates the entity's orientation by the specified rotation, where the axis of rotation is defined in the entity's local-space axes relative to its parent.

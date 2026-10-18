@@ -103,9 +103,10 @@ namespace Latios.Psyshock
         /// <returns>True if there is a collider in which the point is within the specified distance, false otherwise</returns>
         public static bool WithinDistance(float3 point, in CollisionLayer layer, float maxDistance)
         {
-            bool hit       = false;
-            var  processor = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
-            FindObjects(AabbFrom(point, point), in layer, in processor).RunImmediate();
+            bool hit            = false;
+            var  processor      = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
+            var  offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), in layer, in processor).RunImmediate();
             return hit;
         }
 
@@ -120,9 +121,10 @@ namespace Latios.Psyshock
         /// <returns>True if there is a collider in which the point is within the specified distance, false otherwise</returns>
         public static bool WithinDistance(float3 point, in ReadOnlySpan<CollisionLayer> layers, float maxDistance)
         {
-            bool hit       = false;
-            var  processor = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
-            var  aabb      = AabbFrom(point, point);
+            bool hit            = false;
+            var  processor      = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
+            var  offsetDistance = math.max(maxDistance, 0f);
+            var  aabb           = AabbFrom(point - offsetDistance, point + offsetDistance);
             foreach (var layer in layers)
             {
                 FindObjects(in aabb, in layer, in processor).RunImmediate();
@@ -302,9 +304,10 @@ namespace Latios.Psyshock
         /// <returns>True if there is a collider in which the point is within the specified distance, false otherwise</returns>
         public static bool WithinDistance(float3 point, in CollisionWorld world, in CollisionWorld.Mask mask, float maxDistance)
         {
-            bool hit       = false;
-            var  processor = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
-            FindObjects(AabbFrom(point, point), in world, in processor).RunImmediate(mask);
+            bool hit            = false;
+            var  processor      = new LayerQueryProcessors.PointWithinImmediateProcessor(point, maxDistance, ref hit);
+            var  offsetDistance = math.max(maxDistance, 0f);
+            FindObjects(AabbFrom(point - offsetDistance, point + offsetDistance), in world, in processor).RunImmediate(mask);
             return hit;
         }
 

@@ -66,7 +66,7 @@ namespace Latios.Transforms
                 transform.scale    = newLocalTransform.scale;
                 return;
             }
-            SetLocalTransform(handle, in newLocalTransform, ref componentBroker);
+            SetLocalTransform(handle, in newLocalTransform, key, ref componentBroker);
         }
 
         /// <summary>
@@ -202,7 +202,7 @@ namespace Latios.Transforms
                 transform.scale    = newLocalTransform.scale;
                 return;
             }
-            SetLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace Latios.Transforms
                 transform.scale    = newLocalTransform.scale;
                 return;
             }
-            SetTickedLocalTransform(handle, in newLocalTransform, ref componentBroker);
+            SetTickedLocalTransform(handle, in newLocalTransform, key, ref componentBroker);
         }
 
         /// <summary>
@@ -462,7 +462,7 @@ namespace Latios.Transforms
                 transform.scale    = newLocalTransform.scale;
                 return;
             }
-            SetTickedLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(entity, key), ref entityStorageInfoLookup);
+            SetTickedLocalTransform(handle, in newLocalTransform, ref transformLookupRW.GetCheckedLookup(handle.root.entity, key), ref entityStorageInfoLookup);
         }
 
         /// <summary>

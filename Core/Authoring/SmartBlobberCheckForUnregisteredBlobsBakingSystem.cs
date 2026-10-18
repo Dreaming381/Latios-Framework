@@ -103,7 +103,7 @@ namespace Latios.Authoring.Systems
                 var resultArray = chunk.GetNativeArray(ref resultHandle);
                 for (int i = 0; i < chunk.Count; i++)
                 {
-                    if (trackingDataArray[i].isNull)
+                    if (trackingDataArray[i].isNull || !resultArray[i].blob.Reinterpret<int>().IsCreated)
                         continue;
 
                     blobsToDispose.Write(resultArray[i].blob, threadIndex);
@@ -126,35 +126,14 @@ namespace Latios.Authoring.Systems
                     return;
                 }
 
-                var set = new NativeHashSet<PtrWrapper>(blobCount, Allocator.Temp);
-
+                var set = new NativeHashSet<BlobAssetReference<int> >(blobCount, Allocator.Temp);
                 foreach (var blob in blobsToDispose)
-                {
-                    if (set.Contains(blob))
-                        continue;
-                    set.Add(blob);
-                    blob.Dispose();
-                }
-            }
-        }
+                    set.Add(blob.Reinterpret<int>());
 
-        unsafe struct PtrWrapper : IEquatable<PtrWrapper>
-        {
-            void* ptr;
+                foreach (var blob in set)
+                    blob.Dispose(); // Yes, it is safe to dispose a blob of the wrong type.
 
-            public bool Equals(PtrWrapper other)
-            {
-                return ptr == other.ptr;
-            }
-
-            public override int GetHashCode()
-            {
-                return ((ulong)ptr).GetHashCode();
-            }
-
-            public static implicit operator PtrWrapper(UnsafeUntypedBlobAssetReference blob)
-            {
-                return new PtrWrapper { ptr = blob.Reinterpret<int>().GetUnsafePtr() };
+                blobsToDispose.Dispose();
             }
         }
     }

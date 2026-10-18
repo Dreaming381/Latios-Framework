@@ -43,11 +43,9 @@ namespace Latios.Psyshock
                                                                       triangleIndices,
                                                                       terrain.baseHeightOffset,
                                                                       terrain.scale);
-            hit                                  = TriangleConvex.DistanceBetween(in convex, in convexTransform, in triangle, in terrainTransform, maxDistance, out result);
-            (result.hitpointA, result.hitpointB) = (result.hitpointB, result.hitpointA);
-            (result.normalA, result.normalB)     = (result.normalB, result.normalA);
-            result.subColliderIndexB             = result.subColliderIndexA;
-            result.subColliderIndexA             = processor.bestIndex;
+            hit                      = TriangleConvex.DistanceBetween(in convex, in convexTransform, in triangle, in terrainTransform, maxDistance, out result);
+            result                   = result.ToFlipped();
+            result.subColliderIndexA = processor.bestIndex;
             return hit;
         }
 
