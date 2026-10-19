@@ -212,20 +212,26 @@ namespace Latios.Psyshock
                     var compound = collider.m_compound();
                     Physics.ScaleStretchCollider(ref compound, transform.scale, transform.stretch);
                     compound.GetScaledStretchedSubCollider(subCollider, out var compoundCollider, out var subTransform);
-                    var compoundTransform = math.mul(rigidTransform, subTransform);
+                    var  compoundTransform = math.mul(rigidTransform, subTransform);
+                    bool compoundHit;
                     switch (compoundCollider.type)
                     {
                         case ColliderType.Sphere:
-                            return PointRaySphere.Raycast(in ray, in collider.m_sphere, compoundTransform, out result);
+                            compoundHit = PointRaySphere.Raycast(in ray, in compoundCollider.m_sphere, compoundTransform, out result);
+                            break;
                         case ColliderType.Capsule:
-                            return PointRayCapsule.Raycast(in ray, in collider.m_capsule, compoundTransform, out result);
+                            compoundHit = PointRayCapsule.Raycast(in ray, in compoundCollider.m_capsule, compoundTransform, out result);
+                            break;
                         case ColliderType.Box:
-                            return PointRayBox.Raycast(in ray, in collider.m_box, compoundTransform, out result);
+                            compoundHit = PointRayBox.Raycast(in ray, in compoundCollider.m_box, compoundTransform, out result);
+                            break;
                         default:
                             // Should never happen
                             result = default;
                             return false;
                     }
+                    result.subColliderIndex = subCollider;
+                    return compoundHit;
                 case ColliderType.Terrain:
                     var terrain                = collider.m_terrain();
                     var terrainTriangleIndices = terrain.terrainColliderBlob.Value.GetTriangle(subCollider);

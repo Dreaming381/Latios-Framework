@@ -10,6 +10,14 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.16.3] – 2026-10-18
+
+Officially supports Entities [1.4.8]
+
+### Changed
+
+-   Updated Psyshock to v0.16.3
+
 ## [0.16.2] – 2026-10-17
 
 Officially supports Entities [1.4.8]

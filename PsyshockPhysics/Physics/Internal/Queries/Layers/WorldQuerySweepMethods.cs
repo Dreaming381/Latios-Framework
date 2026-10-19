@@ -127,7 +127,7 @@ namespace Latios.Psyshock
                     }
 
                     var node = context.tree[(int)currentFrame.currentIndex];
-                    if (context.qxmin >= node.subtreeXmax)
+                    if (context.qxmin > node.subtreeXmax)
                     {
                         currentFrameIndex--;
                         continue;
@@ -329,7 +329,7 @@ namespace Latios.Psyshock
                                 }
 
                                 var node = m_tree[(int)currentFrame.currentIndex];
-                                if (outer.m_qxmin >= node.subtreeXmax)
+                                if (outer.m_qxmin > node.subtreeXmax)
                                 {
                                     m_currentFrameIndex--;
                                     continue;

@@ -140,7 +140,7 @@ namespace Latios.Psyshock
                 };
                 return 1;
             }
-            if (dot <= 0f)
+            if (dot <= math.EPSILON)
                 return 0;
             Physics.GetCenterExtents(Physics.AabbFrom(convex, convexTransform), out _, out var extents);
             var   castDistance = math.abs(distanceResult.distance) + math.length(extents) + sphere.radius;
@@ -148,12 +148,12 @@ namespace Latios.Psyshock
             float castOffset   = 0f;
             if (distanceResult.distance <= 0f)
             {
-                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castOffset     = (-distanceResult.distance / dot) * (1f + math.EPSILON) + math.EPSILON;
                 castStart.pos += contactNormal * castOffset;
             }
             if (ColliderCast(in sphere, in castStart, castStart.pos - castDistance * contactNormal, in convex, in convexTransform, out var castResult))
             {
-                castResult.distance += castOffset;
+                castResult.distance -= castOffset;
                 contacts[0]          = new LatiosSim.Contact
                 {
                     contactOnA  = castResult.hitpoint,
@@ -168,6 +168,7 @@ namespace Latios.Psyshock
         {
             bool   hit     = PointRayConvex.PointConvexDistance(sphere.center, in convex, maxDistance + sphere.radius, out PointDistanceResultInternal pointDistanceResult);
             float3 normalB = math.normalizesafe(pointDistanceResult.hitpoint - sphere.center, -pointDistanceResult.normal);
+            normalB        = math.chgsign(normalB, pointDistanceResult.distance);
             result         = new ColliderDistanceResultInternal
             {
                 distance     = pointDistanceResult.distance - sphere.radius,

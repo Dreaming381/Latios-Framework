@@ -56,16 +56,17 @@ namespace Latios.Psyshock
                                                         float maxDistance,
                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
         {
-            var aabb         = Physics.AabbFrom(compound, math.mul(math.inverse(terrainTransform), compoundTransform));
-            var inverseScale = math.rcp(terrain.scale);
-            var validAxes    = math.isfinite(inverseScale);
+            var aabb          = Physics.AabbFrom(compound, math.mul(math.inverse(terrainTransform), compoundTransform));
+            aabb.min         -= maxDistance;
+            aabb.max         += maxDistance;
+            var inverseScale  = math.rcp(terrain.scale);
+            var validAxes     = math.isfinite(inverseScale);
 
-            var crosses = (aabb.min < 0f) & (aabb.max > 0f);
-            if (math.any(!crosses & !validAxes))
+            var touches = (aabb.min <= 0f) & (aabb.max >= 0f);
+            if (math.any(!touches & !validAxes))
                 return;
 
             Physics.GetCenterExtents(aabb, out var center, out var extents);
-            extents        += maxDistance;
             center         *= inverseScale;
             extents        *= inverseScale;
             var min         = (int3)math.floor(center - extents);
@@ -86,8 +87,8 @@ namespace Latios.Psyshock
                     compound          = compound,
                     compoundTransform = compoundTransform,
                     maxDistance       = maxDistance,
-                    minHeight         = (short)minInt.y,
-                    maxHeight         = (short)maxInt.y,
+                    minHeight         = (short)math.clamp(minInt.y, short.MinValue, short.MaxValue),
+                    maxHeight         = (short)math.clamp(maxInt.y, short.MinValue, short.MaxValue),
                     heightOffset      = terrain.baseHeightOffset,
                     scale             = terrain.scale,
                     terrainTransform  = terrainTransform,
@@ -141,8 +142,8 @@ namespace Latios.Psyshock
                 castStart        = castStart,
                 castEnd          = castEnd,
                 terrainTransform = targetTerrainTransform,
-                minHeight        = (short)minInt.y,
-                maxHeight        = (short)maxInt.y,
+                minHeight        = (short)math.clamp(minInt.y, short.MinValue, short.MaxValue),
+                maxHeight        = (short)math.clamp(maxInt.y, short.MinValue, short.MaxValue),
                 heightOffset     = targetTerrain.baseHeightOffset,
                 scale            = targetTerrain.scale,
             };
@@ -218,11 +219,11 @@ namespace Latios.Psyshock
                 found            = false,
                 invalid          = false,
                 compound         = targetCompound,
-                castStart        = castStart,
-                castEnd          = castEnd,
+                castStart        = targetInCasterSpace,
+                castEnd          = reverseCastEnd,
                 terrainTransform = RigidTransform.identity,
-                minHeight        = (short)minInt.y,
-                maxHeight        = (short)maxInt.y,
+                minHeight        = (short)math.clamp(minInt.y, short.MinValue, short.MaxValue),
+                maxHeight        = (short)math.clamp(maxInt.y, short.MinValue, short.MaxValue),
                 heightOffset     = terrainToCast.baseHeightOffset,
                 scale            = terrainToCast.scale,
             };
@@ -308,14 +309,24 @@ namespace Latios.Psyshock
 
             public void Execute(ref TerrainColliderBlob blob, int3 triangleHeightIndices, int triangleIndex)
             {
-                var triangle = PointRayTerrain.CreateLocalTriangle(ref blob, triangleHeightIndices, heightOffset, scale);
-                var hit      =
-                    TriangleCompound.DistanceBetween(in compound, in compoundTransform, in triangle, in terrainTransform, maxDistance, out var tempResult);
-                tempResult.subColliderIndexB = triangleIndex;
-                tempResult                   = tempResult.ToFlipped();
-                if (hit)
+                var patcher  = new DistanceAllResultPatcher { processor = processor, subCollider = triangleIndex };
+                var triangle                                                                     = PointRayTerrain.CreateLocalTriangle(ref blob,
+                                                                                                                                       triangleHeightIndices,
+                                                                                                                                       heightOffset,
+                                                                                                                                       scale);
+                TriangleCompound.DistanceBetweenAll(in compound, in compoundTransform, in triangle, in terrainTransform, maxDistance, ref patcher);
+            }
+
+            struct DistanceAllResultPatcher : IDistanceBetweenAllProcessor
+            {
+                public T*  processor;
+                public int subCollider;
+
+                public void Execute(in ColliderDistanceResult result)
                 {
-                    processor->Execute(in tempResult);
+                    var forward               = result.ToFlipped();
+                    forward.subColliderIndexA = subCollider;
+                    processor->Execute(in forward);
                 }
             }
         }

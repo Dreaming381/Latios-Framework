@@ -72,17 +72,13 @@ namespace Latios.Psyshock
             foreach (var i in new PointRayCompound.CompoundAabbEnumerator(triMesh, triMeshTransform, compound, compoundTransform, maxDistance))
             {
                 compound.GetScaledStretchedSubCollider(i, out var blobCollider, out var blobTransform);
-                bool newHit = DistanceBetween(in blobCollider,
-                                              math.mul(compoundTransform, blobTransform),
-                                              in triMesh,
-                                              in triMeshTransform,
-                                              maxDistance,
-                                              out var newResult);
-
-                newResult.subColliderIndexA = i;
-
-                if (newHit)
-                    processor.Execute(in newResult);
+                DistanceBetweenAll(in blobCollider,
+                                   math.mul(compoundTransform, blobTransform),
+                                   i,
+                                   in triMesh,
+                                   in triMeshTransform,
+                                   maxDistance,
+                                   ref processor);
             }
         }
 
@@ -242,6 +238,62 @@ namespace Latios.Psyshock
                 default:
                     result = default;
                     return false;
+            }
+        }
+
+        unsafe struct DistanceAllResultPatcher<T> : IDistanceBetweenAllProcessor where T : unmanaged, IDistanceBetweenAllProcessor
+        {
+            public T*  processor;
+            public int subCollider;
+
+            public void Execute(in ColliderDistanceResult result)
+            {
+                var forward               = result.ToFlipped();
+                forward.subColliderIndexA = subCollider;
+                processor->Execute(in forward);
+            }
+        }
+
+        private static unsafe void DistanceBetweenAll<T>(in Collider collider,
+                                                         in RigidTransform colliderTransform,
+                                                         int subCollider,
+                                                         in TriMeshCollider triMesh,
+                                                         in RigidTransform triMeshTransform,
+                                                         float maxDistance,
+                                                         ref T processor) where T : unmanaged, IDistanceBetweenAllProcessor
+        {
+            fixed (T* processorPtr = &processor)
+            {
+                var patcher = new DistanceAllResultPatcher<T> { processor = processorPtr, subCollider = subCollider };
+                switch (collider.type)
+                {
+                    case ColliderType.Sphere:
+                        SphereTriMesh.DistanceBetweenAll(in triMesh,
+                                                         in triMeshTransform,
+                                                         in collider.m_sphere,
+                                                         in colliderTransform,
+                                                         maxDistance,
+                                                         ref patcher);
+                        break;
+                    case ColliderType.Capsule:
+                        CapsuleTriMesh.DistanceBetweenAll(in triMesh,
+                                                          in triMeshTransform,
+                                                          in collider.m_capsule,
+                                                          in colliderTransform,
+                                                          maxDistance,
+                                                          ref patcher);
+                        break;
+                    case ColliderType.Box:
+                        BoxTriMesh.DistanceBetweenAll(in triMesh,
+                                                      in triMeshTransform,
+                                                      in collider.m_box,
+                                                      in colliderTransform,
+                                                      maxDistance,
+                                                      ref patcher);
+                        break;
+                    default:
+                        return;
+                }
             }
         }
 

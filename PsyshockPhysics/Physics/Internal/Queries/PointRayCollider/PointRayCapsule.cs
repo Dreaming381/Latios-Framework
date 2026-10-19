@@ -54,8 +54,8 @@ namespace Latios.Psyshock
             // If the division fails, that means we somehow weren't closest to an endpoint, but the numbers are too small to calculate where inbetween, so we just use the exact middle.
             factor             = math.select(0.5f, factor, math.isfinite(factor));
             var pointOnSegment = math.select(capsule.pointA + ab * factor, capsule.pointB, dot == abLengthSq);
-            var threshold      = math.square(capsule.radius + maxDistance);
-            return math.distancesq(point, pointOnSegment) <= threshold;
+            var threshold      = capsule.radius + maxDistance;
+            return math.distancesq(point, pointOnSegment) <= threshold * threshold && threshold >= 0f;
         }
 
         internal static bool PointCapsuleDistance(float3 point, in CapsuleCollider capsule, float maxDistance, out PointDistanceResultInternal result)
@@ -98,7 +98,6 @@ namespace Latios.Psyshock
             mathex.GetDualPerpendicularNormalized(ab, out var capsuleNormal, out _);
             result.normal   = capsuleNormal;
             result.hitpoint = pointOnSegment + capsule.radius * capsuleNormal;
-            result.distance = 0f;
             return hit;
         }
 

@@ -148,19 +148,19 @@ namespace Latios.Psyshock
                 };
                 return 1;
             }
-            if (dot <= 0f)
+            if (dot <= math.EPSILON)
                 return 0;
             var   castDistance = math.abs(distanceResult.distance) + math.length(box.halfSize) + sphere.radius;
             var   castStart    = sphereTransform;
             float castOffset   = 0f;
             if (distanceResult.distance <= 0f)
             {
-                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castOffset     = (-distanceResult.distance / dot) * (1f + math.EPSILON) + math.EPSILON;
                 castStart.pos += contactNormal * castOffset;
             }
             if (ColliderCast(in sphere, in castStart, castStart.pos - castDistance * contactNormal, in box, in boxTransform, out var castResult))
             {
-                castResult.distance += castOffset;
+                castResult.distance -= castOffset;
                 contacts[0]          = new LatiosSim.Contact
                 {
                     contactOnA  = castResult.hitpoint,
@@ -175,6 +175,7 @@ namespace Latios.Psyshock
         {
             bool   hit     = PointRayBox.PointBoxDistance(sphere.center, in box, maxDistance + sphere.radius, out PointDistanceResultInternal pointDistanceResult);
             float3 normalB = math.normalizesafe(pointDistanceResult.hitpoint - sphere.center, -pointDistanceResult.normal);
+            normalB        = math.chgsign(normalB, pointDistanceResult.distance);
             result         = new ColliderDistanceResultInternal
             {
                 distance     = pointDistanceResult.distance - sphere.radius,

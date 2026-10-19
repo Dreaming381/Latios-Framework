@@ -276,7 +276,7 @@ namespace Latios.Psyshock
                     }
 
                     var node = intervalTree[(int)currentFrame.currentIndex];
-                    if (qxmin >= node.subtreeXmax)
+                    if (qxmin > node.subtreeXmax)
                     {
                         currentFrameIndex--;
                         continue;

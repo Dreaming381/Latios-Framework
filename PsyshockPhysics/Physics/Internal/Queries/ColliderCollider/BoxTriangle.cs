@@ -79,12 +79,12 @@ namespace Latios.Psyshock
                     result.hitpointB       = edgeResult.hitpointB;
                     if (edgeResult.featureCodeB == 0)
                     {
-                        result.featureCodeB = (ushort)math.bitmask(new bool4(boxEdgeA >= 0f, false));
+                        result.featureCodeB = (ushort)math.bitmask(new bool4(boxEdgeA - box.center < 0f, false));
                         result.normalB      = math.rotate(boxTransform.rot, PointRayBox.BoxNormalFromFeatureCode(result.featureCodeB));
                     }
                     else if (edgeResult.featureCodeB == 1)
                     {
-                        result.featureCodeB = (ushort)math.bitmask(new bool4(boxEdgeB >= 0f, false));
+                        result.featureCodeB = (ushort)math.bitmask(new bool4(boxEdgeB - box.center < 0f, false));
                         result.normalB      = math.rotate(boxTransform.rot, PointRayBox.BoxNormalFromFeatureCode(result.featureCodeB));
                     }
                     break;
@@ -102,8 +102,7 @@ namespace Latios.Psyshock
                     result.normalB          = edgeResult.normalA;
                     result.featureCodeB     = edgeResult.featureCodeA;
                     result.hitpointA        = edgeResult.hitpointB;
-                    var edgeFeatureType     = edgeResult.featureCodeB >> 14;
-                    if (edgeFeatureType < 2)
+                    if (edgeResult.featureCodeB < 0x4000)
                     {
                         float3 ab          = triangle.pointB - triangle.pointA;
                         float3 bc          = triangle.pointC - triangle.pointB;
@@ -112,7 +111,7 @@ namespace Latios.Psyshock
                         float3 abUnnormal  = math.cross(ab, planeNormal);
                         float3 bcUnnormal  = math.cross(bc, planeNormal);
                         float3 caUnnormal  = math.cross(ca, planeNormal);
-                        var    vertexIndex = (edgeFeatureType + (featureCodeA & 0x3)) % 3;
+                        var    vertexIndex = (edgeResult.featureCodeB + (featureCodeA & 0x3)) % 3;
                         switch (vertexIndex)
                         {
                             case 0:

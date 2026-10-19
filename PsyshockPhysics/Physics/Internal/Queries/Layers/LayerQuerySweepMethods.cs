@@ -1,4 +1,3 @@
-using GluonGui.Dialog;
 using Latios.Calci;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
@@ -91,7 +90,7 @@ namespace Latios.Psyshock
                 return;
 
             var node = context.bucket.intervalTree[(int)currentIndex];
-            if (context.qxmin >= node.subtreeXmax)
+            if (context.qxmin > node.subtreeXmax)
                 return;
 
             SearchTree(GetLeftChildIndex(currentIndex), ref context, ref processor);
@@ -140,7 +139,7 @@ namespace Latios.Psyshock
                     }
 
                     var node = context.bucket.intervalTree[(int)currentFrame.currentIndex];
-                    if (context.qxmin >= node.subtreeXmax)
+                    if (context.qxmin > node.subtreeXmax)
                     {
                         currentFrameIndex--;
                         continue;
@@ -315,7 +314,7 @@ namespace Latios.Psyshock
                     }
 
                     var node = m_bucket.intervalTree[(int)currentFrame.currentIndex];
-                    if (m_qxmin >= node.subtreeXmax)
+                    if (m_qxmin > node.subtreeXmax)
                     {
                         m_currentFrameIndex--;
                         continue;

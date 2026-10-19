@@ -363,9 +363,10 @@ namespace Latios.Psyshock
             // Extract simplex vertices
             var   ids           = new uint4(simplex.a.id, simplex.b.id, simplex.c.id, simplex.d.id);
             uint4 compressedIDs = default;
-            math.compress(&compressedIDs.x, 0, ids, coordinates != math.cmin(coordinates));
-            uint4 aIds = compressedIDs >> 16;
-            uint4 bIds = compressedIDs & 0xff;
+            var   validIdCount  = math.compress(&compressedIDs.x, 0, ids, coordinates != math.cmin(coordinates));
+            compressedIDs       = math.select(compressedIDs.x, compressedIDs, new int4(0, 1, 2, 3) < validIdCount);
+            uint4 aIds          = compressedIDs >> 16;
+            uint4 bIds          = compressedIDs & 0xff;
 
             result.simplexAVertexA = (byte)aIds.x;
             if (aIds.x != aIds.y)
@@ -385,7 +386,7 @@ namespace Latios.Psyshock
                 result.simplexAVertexCount = 2;
             }
             else
-                result.simplexBVertexCount = 1;
+                result.simplexAVertexCount = 1;
 
             result.simplexBVertexA = (byte)bIds.x;
             if (bIds.x != bIds.y)

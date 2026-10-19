@@ -52,7 +52,17 @@ namespace Latios.Psyshock
             var planeNormal = math.normalizesafe(math.cross(triangle.pointB - triangle.pointA, triangle.pointA - triangle.pointC));
             if (!planeNormal.Equals(float3.zero))
             {
-                return math.dot(point - triangle.pointA, planeNormal) == 0f;
+                if (math.dot(point - triangle.pointA, planeNormal) == 0f)
+                {
+                    var vertices      = triangle.AsSimdFloat3();
+                    var edges         = vertices.bcaa - vertices;
+                    var vp            = point - vertices;
+                    var edgeUnnormals = simd.cross(edges, planeNormal);
+                    var dots          = simd.dot(edgeUnnormals, vp);
+                    if (math.all(dots >= 0f))
+                        return true;
+                }
+                return false;
             }
             // Triangle is degenerate. Find the two extreme points to do point-capsule.
             var             abDistSq = math.distancesq(triangle.pointA, triangle.pointB);
@@ -70,6 +80,9 @@ namespace Latios.Psyshock
 
         internal static bool PointTriangleWithin(float3 point, in TriangleCollider triangle, float maxDistance)
         {
+            if (maxDistance < 0f)
+                return false;
+
             var vertices = triangle.AsSimdFloat3();
             var edges    = vertices.bcaa - vertices;
             var vp       = point - vertices;
@@ -82,6 +95,7 @@ namespace Latios.Psyshock
             var edgeUnnormals = simd.cross(edges, planeNormal);
             var dots          = simd.dot(edgeUnnormals, vp);
             int region        = math.bitmask(new bool4((dots < 0f).xyz, false));
+            region            = math.select(region, 7, planeNormal.Equals(float3.zero));
             switch (region)
             {
                 case 0:
@@ -170,6 +184,7 @@ namespace Latios.Psyshock
             var edgeUnnormals = simd.cross(edges, planeNormal);
             var dots          = simd.dot(edgeUnnormals, vp);
             int region        = math.bitmask(new bool4((dots < 0f).xyz, false));
+            region            = math.select(region, 7, planeNormal.Equals(float3.zero));
 
             switch (region)
             {
@@ -417,6 +432,7 @@ namespace Latios.Psyshock
                 simdFloat3 r           = doubleStart - (triPoints + triPoints.bcaa);
                 float3     dots        = simd.dot(r, edgeNormals).xyz;
                 outNormal              = math.select(normal, -normal, math.dot(normal, ray.displacement) >= 0f);
+                outNormal              = math.normalize(outNormal);
                 return math.all(dots <= 0f) || math.all(dots >= 0f);
             }
             else if (nDotAStart == 0f && nDotAEnd == 0f)
@@ -469,6 +485,7 @@ namespace Latios.Psyshock
                 float3 bestEdge = abbcca[math.min(2, math.csum(math.select(0, new int3(0, 1, 2), fraction == fractions)))];
                 outNormal       = math.cross(bestEdge, normal);
                 outNormal       = math.select(outNormal, -outNormal, math.dot(outNormal, ray.displacement) >= 0f);
+                outNormal       = math.normalizesafe(outNormal);
 
                 return math.any(hits);
             }
@@ -489,6 +506,7 @@ namespace Latios.Psyshock
                 simdFloat3 r           = doubleEnd - (triPoints + triPoints.bcda);
                 float3     dots        = simd.dot(r, edgeNormals).xyz;
                 outNormal              = math.select(normal, -normal, math.dot(normal, ray.displacement) >= 0f);
+                outNormal              = math.normalizesafe(outNormal);
                 return math.all(dots <= 0f) || math.all(dots >= 0f);
             }
             else
@@ -518,7 +536,10 @@ namespace Latios.Psyshock
             bool  triFaceHit  = math.any(triNormal);
             float triFraction = 2f;
             if (triFaceHit)
-                triFaceHit           = RaycastTriangle(in ray, triPoints + math.normalize(triNormal) * radius, out triFraction, out _);
+            {
+                triNormal  = math.normalize(triNormal);
+                triFaceHit = RaycastTriangle(in ray, triPoints + triNormal * radius, out triFraction, out _);
+            }
             triFraction              = math.select(2f, triFraction, triFaceHit);
             bool4 capsuleHits        = PointRayCapsule.Raycast4Capsules(in ray, in triPoints, triPoints.bcaa, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
             capsuleFractions         = math.select(2f, capsuleFractions, capsuleHits);
@@ -651,7 +672,10 @@ namespace Latios.Psyshock
             bool  quadFaceHit  = math.any(quadNormal);
             float quadFraction = 2f;
             if (quadFaceHit)
-                quadFaceHit          = RaycastQuad(in ray, quadPoints + math.normalize(quadNormal) * radius, out quadFraction);
+            {
+                quadNormal  = math.normalize(quadNormal);
+                quadFaceHit = RaycastQuad(in ray, quadPoints + quadNormal * radius, out quadFraction);
+            }
             quadFraction             = math.select(2f, quadFraction, quadFaceHit);
             bool4 capsuleHits        = PointRayCapsule.Raycast4Capsules(in ray, in quadPoints, quadPoints.bcda, radius, out float4 capsuleFractions, out simdFloat3 capsuleNormals);
             capsuleFractions         = math.select(2f, capsuleFractions, capsuleHits);

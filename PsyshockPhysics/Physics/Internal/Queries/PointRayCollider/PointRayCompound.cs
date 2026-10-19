@@ -153,28 +153,42 @@ namespace Latios.Psyshock
                                           in RigidTransform compoundTransform,
                                           float maxDistance)
             {
-                var queryInCompoundSpace  = math.mul(math.inverse(compoundTransform), queryTransform);
-                var queryAabb             = Physics.AabbFrom(in queryCollider, queryInCompoundSpace);
-                queryAabb.min            -= maxDistance;
-                queryAabb.max            += maxDistance;
-                var inverseScale          = math.rcp(compound.scale * compound.stretch);
-                queryAabb.min            *= inverseScale;
-                queryAabb.max            *= inverseScale;
-                queryAabb.min             = math.select(queryAabb.min, float.MinValue, math.isnan(queryAabb.min));
-                queryAabb.max             = math.select(queryAabb.max, float.MaxValue, math.isnan(queryAabb.max));
-                var radial                = compound.stretchMode switch
+                var queryInCompoundSpace = math.InverseTransformFast(in compoundTransform, in queryTransform);
+                var queryAabb            = Physics.AabbFrom(in queryCollider, queryInCompoundSpace);
+                // queryAabb right now is a worldQuery, and we need to solve a localQuery based on the following:
+                // worldCenter = localCenter * scale * stretch
+                // worldRadius = maxDistance + localRadius * abs(scale) * math.cmax(abs(stretch)) // stretch = 1f for positions only mode
+                // worldQuery.max < worldCenter - worldRadius || worldQuery.min > worldCenter + worldRadius
+                // worldQuery.max + worldRadius < worldCenter || worldQuery.min - worldRadius > worldCenter
+                // worldQuery.max + maxDistance + localRadius * abs(scale) * math.cmax(abs(stretch)) < localCenter * scale * stretch || ...
+                // localQuery.max < localCenter || localQuery.min > localCenter
+                // Let's define superWorldQuery to be the LHS of each inequality. Thus:
+                // superWorldQuery.max < localCenter * scale * stretch || superWorldQuery.min > localCenter * scale * stretch
+                // If we multiply each side by -1 folding into superWorldQuery and stretch values, the inequalities flip, but also,
+                // the semantics of min and max are also backwards. If we correct the semantics, we end up back with our original
+                // inequalities. Therefore, we can simply divide each side by (scale * stretch) and then adjust the semantics of min
+                // and max to get the true localQuery values.
+                ref var blob   = ref compound.compoundColliderBlob.Value;
+                var     radial = maxDistance + math.abs(compound.scale) * compound.stretchMode switch
                 {
-                    CompoundCollider.StretchMode.RotateStretchLocally => compound.scale * compound.compoundColliderBlob.Value.maxOffsetFromAnchors *
-                    math.cmax(math.abs(compound.stretch)),
-                    CompoundCollider.StretchMode.IgnoreStretch => compound.compoundColliderBlob.Value.maxOffsetFromAnchors,
-                    CompoundCollider.StretchMode.StretchPositionsOnly => compound.scale * compound.compoundColliderBlob.Value.maxOffsetFromAnchors,
+                    CompoundCollider.StretchMode.RotateStretchLocally => blob.maxOffsetFromAnchors * math.cmax(math.abs(compound.stretch)),
+                    CompoundCollider.StretchMode.IgnoreStretch => blob.maxOffsetFromAnchors,
+                    CompoundCollider.StretchMode.StretchPositionsOnly => blob.maxOffsetFromAnchors,
                     _ => 0f
                 };
-                queryAabb.min            -= radial;
-                queryAabb.max            += radial;
-                queryAabbInCompoundSpace  = queryAabb;
-                this.compound             = compound;
-                currentIndex              = Calci.BinarySearch.FirstGreaterOrEqual(compound.compoundColliderBlob.Value.boundingSphereCenterXs.AsSpan(), queryAabb.min.x) - 1;
+                queryAabb.min    -= radial;
+                queryAabb.max    += radial;
+                var stretch       = math.select(compound.stretch, 1f, compound.stretchMode == CompoundCollider.StretchMode.IgnoreStretch);
+                var inverseScale  = math.rcp(compound.scale * stretch);
+                queryAabb.min    *= inverseScale;
+                queryAabb.max    *= inverseScale;
+                queryAabb.min     = math.select(queryAabb.min, float.MinValue, math.isnan(queryAabb.min));
+                queryAabb.max     = math.select(queryAabb.max, float.MaxValue, math.isnan(queryAabb.max));
+                queryAabb         = Physics.AabbFrom(queryAabb.min, queryAabb.max);
+
+                queryAabbInCompoundSpace = queryAabb;
+                this.compound            = compound;
+                currentIndex             = Calci.BinarySearch.FirstGreaterOrEqual(blob.boundingSphereCenterXs.AsSpan(), queryAabb.min.x) - 1;
             }
 
             public bool MoveNext()

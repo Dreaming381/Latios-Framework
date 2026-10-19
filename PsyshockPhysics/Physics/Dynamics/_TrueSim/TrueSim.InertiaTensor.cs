@@ -90,7 +90,7 @@ namespace Latios.Psyshock
             float    m  = 0f;
             for (int i = 0; i < individualTransformedGyrationTensors.Length; i++)
             {
-                it += individualTransformedGyrationTensors[i] * m;
+                it += individualTransformedGyrationTensors[i] * individualMasses[i];
                 m  += individualMasses[i];
             }
             return it / m;

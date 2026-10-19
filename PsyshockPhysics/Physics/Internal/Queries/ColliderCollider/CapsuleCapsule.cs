@@ -26,7 +26,8 @@ namespace Latios.Psyshock
             var bInASpaceB         = math.transform(BinASpaceTransform, capsuleB.pointB);
 
             SegmentSegment(capsuleA.pointA, capsuleA.pointB, bInASpaceA, bInASpaceB, out var closestAOut, out var closestBOut, out _);
-            return math.distancesq(closestAOut, closestBOut) <= math.square(capsuleA.radius + capsuleB.radius + maxDistance);
+            var threshold = capsuleA.radius + capsuleB.radius + maxDistance;
+            return math.distancesq(closestAOut, closestBOut) <= threshold * threshold && threshold >= 0f;
         }
 
         public static bool DistanceBetween(in CapsuleCollider capsuleA,
@@ -127,8 +128,8 @@ namespace Latios.Psyshock
                 mathex.GetDualPerpendicularNormalized(edgeB, out var capsuleNormal, out _);
                 result.normalB   = capsuleNormal;
                 result.normalA   = -capsuleNormal;
-                result.hitpointB = closestB - capsuleB.radius * capsuleNormal;
-                result.hitpointA = closestA + capsuleA.radius * capsuleNormal;
+                result.hitpointB = closestB + capsuleB.radius * capsuleNormal;
+                result.hitpointA = closestA - capsuleA.radius * capsuleNormal;
                 return hit;
             }
             if (bIsSphere)
@@ -136,8 +137,8 @@ namespace Latios.Psyshock
                 mathex.GetDualPerpendicularNormalized(edgeA, out var capsuleNormal, out _);
                 result.normalA   = capsuleNormal;
                 result.normalB   = -capsuleNormal;
-                result.hitpointA = closestA - capsuleA.radius * capsuleNormal;
-                result.hitpointB = closestB + capsuleB.radius * capsuleNormal;
+                result.hitpointA = closestA + capsuleA.radius * capsuleNormal;
+                result.hitpointB = closestB - capsuleB.radius * capsuleNormal;
                 return hit;
             }
 
@@ -147,8 +148,8 @@ namespace Latios.Psyshock
                     mathex.GetDualPerpendicularNormalized(math.select(edgeA, edgeB, math.lengthsq(edgeB) > math.lengthsq(edgeA)), out capsuleNormal, out _);
                 result.normalA   = capsuleNormal;
                 result.normalB   = -capsuleNormal;
-                result.hitpointA = closestA - capsuleA.radius * capsuleNormal;
-                result.hitpointB = closestB + capsuleB.radius * capsuleNormal;
+                result.hitpointA = closestA + capsuleA.radius * capsuleNormal;
+                result.hitpointB = closestB - capsuleB.radius * capsuleNormal;
                 return hit;
             }
         }

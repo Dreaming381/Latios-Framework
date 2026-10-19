@@ -110,19 +110,19 @@ namespace Latios.Psyshock
                 };
                 return 1;
             }
-            if (dot <= 0f)
+            if (dot <= math.EPSILON)
                 return 0;
             var   castDistance = math.abs(distanceResult.distance) + sphereA.radius + sphereB.radius;
             var   castStart    = bTransform;
             float castOffset   = 0f;
             if (distanceResult.distance <= 0f)
             {
-                castOffset     = (-distanceResult.distance * (1f + math.EPSILON) + math.EPSILON);
+                castOffset     = (-distanceResult.distance / dot) * (1f + math.EPSILON) + math.EPSILON;
                 castStart.pos += contactNormal * castOffset;
             }
             if (ColliderCast(in sphereB, in castStart, castStart.pos - castDistance * contactNormal, in sphereA, in aTransform, out var castResult))
             {
-                castResult.distance += castOffset;
+                castResult.distance -= castOffset;
                 contacts[0]          = new LatiosSim.Contact
                 {
                     contactOnA  = castResult.hitpoint,

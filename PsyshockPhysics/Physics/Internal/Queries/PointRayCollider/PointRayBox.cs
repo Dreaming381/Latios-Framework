@@ -125,7 +125,7 @@ namespace Latios.Psyshock
                     // y in box, xz outside
                     // Closest feature is the y-axis edge
                     result.distance    = math.distance(ospPoint.xz, box.halfSize.xz);
-                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.y, box.halfSize.y);
+                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.y, box.halfSize.z);
                     result.normal      = new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f);
                     result.featureCode = (ushort)(0x4004 + math.bitmask(new bool4(isNegative.xz, false, false)));
                     break;

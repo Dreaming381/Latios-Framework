@@ -131,7 +131,7 @@ namespace Latios.Psyshock
             var        ray = new Ray(0f, math.rotate(castStartInverse, castStart.pos - castEnd));
             bool3      hitEdge;
             float3     fractionsEdge;
-            simdFloat3 targetSimd = new simdFloat3(targetA, targetB, targetA, targetB);
+            simdFloat3 targetSimd = new simdFloat3(targetA, targetB, targetB, targetA);
             simdFloat3 cso        = triPoints.aabb - targetSimd;
             hitEdge.x             = PointRayTriangle.RaycastRoundedQuad(in ray, in cso, targetCapsule.radius, out fractionsEdge.x, out _);
             cso                   = triPoints.bbcc - targetSimd;
@@ -257,7 +257,7 @@ namespace Latios.Psyshock
                     triNormal    = math.select(triNormal, -triNormal, (dot < 0f) ^ useCapB);
                     result       = new ColliderDistanceResultInternal
                     {
-                        distance     = -offsetDistance * capsule.radius,
+                        distance     = -(offsetDistance + capsule.radius),
                         hitpointA    = math.lerp(capsule.pointA, capsule.pointB, fraction),
                         hitpointB    = math.select(capsule.pointA, capsule.pointB, useCapB) - capsule.radius * triNormal,
                         normalA      = triNormal,
@@ -266,7 +266,7 @@ namespace Latios.Psyshock
                         featureCodeB = (ushort)math.select(0, 1, useCapB)
                     };
 
-                    return true;
+                    return result.distance <= maxDistance;
                 }
                 else
                 {
@@ -287,7 +287,7 @@ namespace Latios.Psyshock
                         CapsuleCapsule.CapsuleCapsuleDistance(in edgeCap, in capsule, float.MaxValue, out result);
                         result.featureCodeA  = (ushort)(result.featureCodeA + longestEdgeIndex);
                         result.featureCodeA -= (ushort)math.select(0, 3, (result.featureCodeA & 0xff) > 2);
-                        return true;
+                        return result.distance <= maxDistance;
                     }
 
                     // Check for the closest point on the triangle being a vertex
@@ -327,7 +327,7 @@ namespace Latios.Psyshock
                             featureCodeA = (ushort)index,
                             featureCodeB = 0x4000
                         };
-                        return true;
+                        return result.distance <= maxDistance;
                     }
 
                     {
@@ -345,7 +345,7 @@ namespace Latios.Psyshock
                             featureCodeA = (ushort)(0x4000 + math.select(math.select(0, 1, bIsBetter), 2, cIsBetter)),
                             featureCodeB = 0x4000
                         };
-                        return true;
+                        return result.distance <= maxDistance;
                     }
                 }
             }
@@ -422,7 +422,7 @@ namespace Latios.Psyshock
                     result              = bResult;
                     result.featureCodeB = 1;
                 }
-                return true;
+                return result.distance <= maxDistance;
             }
         }
     }

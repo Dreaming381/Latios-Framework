@@ -267,7 +267,7 @@ namespace Latios.Psyshock
             {
                 var triangle2 = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
                 // Check that we don't start already intersecting.
-                if (TriangleTriangle.AreOverlapping(in triangle, in targetTransform, in triangle2, in castStart))
+                if (TriangleTriangle.AreOverlapping(in triangle, in castStart, in triangle2, in targetTransform))
                 {
                     invalid = true;
                     return false;
