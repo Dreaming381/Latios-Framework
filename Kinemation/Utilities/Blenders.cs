@@ -107,11 +107,11 @@ namespace Latios.Kinemation
             var w = math.asfloat(localTransform.context32);
             w     = 1f / w;
 #if LATIOS_DISABLE_ACL
-            localTransform.rotation   = math.normalize(localTransform.rotation);
-            localTransform.position  *= w;
-            localTransform.stretch   *= w;
-            localTransform.scale     *= w;
-            localTransform.worldIndex = math.asint(1f);
+            localTransform.rotation  = math.normalize(localTransform.rotation);
+            localTransform.position *= w;
+            localTransform.stretch  *= w;
+            localTransform.scale    *= w;
+            localTransform.context32 = math.asint(1f);
 #else
             ref var t        = ref UnsafeUtility.As<TransformQvvs, AclUnity.Qvvs>(ref localTransform);
             t.rotation       = math.normalize(t.rotation);

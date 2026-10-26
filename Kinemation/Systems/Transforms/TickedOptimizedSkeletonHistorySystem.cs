@@ -26,7 +26,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            var api           = this.GetApi(ref state);
+            var api          = this.GetApi(ref state);
             state.Dependency = new Job
             {
                 lastSystemVersion = state.LastSystemVersion,
@@ -41,8 +41,8 @@ namespace Latios.Kinemation.Systems
 #endif
         partial struct Job : IJobChunk, IInjectable
         {
-            [Inject] BufferTypeHandle<TickedOptimizedBoneTransform>                          bonesHandle;
-            [Inject] ComponentTypeHandle<TickedOptimizedSkeletonState>                       stateHandle;
+            [Inject] BufferTypeHandle<TickedOptimizedBoneTransform>                         bonesHandle;
+            [Inject] ComponentTypeHandle<TickedOptimizedSkeletonState>                      stateHandle;
             [ReadOnly, Inject] ComponentTypeHandle<OptimizedSkeletonHierarchyBlobReference> blobHandle;
 
             public uint lastSystemVersion;
@@ -51,6 +51,7 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 Initialize(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
+                Update(in chunk, unfilteredChunkIndex, useEnabledMask, in chunkEnabledMask);
             }
 
             public void Initialize(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)

@@ -172,7 +172,7 @@ namespace Latios.Kinemation.Authoring.Systems
                     bindposesList.AddRange(bindposes.GetUnsafeReadOnlyPtr(), bindposes.Length);
                     builder.bindPoses = bindposesList;
                 }
-                bool requiresDeformWeights = (features & MeshDeformDataFeatures.Deform) != MeshDeformDataFeatures.None;
+                bool requiresDeformWeights = (features & (MeshDeformDataFeatures.Deform | MeshDeformDataFeatures.VertexSkinning)) != MeshDeformDataFeatures.None;
                 if (requiresDeformWeights && mesh.bindposeCount > 0)
                 {
                     var weightsArray = mesh.GetAllBoneWeights();
@@ -417,6 +417,9 @@ namespace Latios.Kinemation.Authoring.Systems
                         int weightStartCounter = 0;
                         for (int i = 0; i < verticesInBatch; i++)
                         {
+                            if (boneWeightCountsPerVertex[batchOffset + i] == 0)
+                                throw new System.InvalidOperationException(
+                                    $"Mesh {name} has a skinned vertex with no bone weights. The blob baking job has been terminated to avoid an infinite loop.");
                             // Find the first bone weight for each vertex in the batch in the source bone weights.
                             weightStartsPerCache[i]  = weightStartCounter;
                             weightStartCounter      += boneWeightCountsPerVertex[batchOffset + i];
@@ -497,7 +500,7 @@ namespace Latios.Kinemation.Authoring.Systems
                             // That deviation is applied to the maxRadialOffsets for that bone for culling.
                             float3 boneSpacePosition              = math.transform(bindPoses[srcWeight.boneIndex], positionsArray[i]);
                             maxRadialOffsets[srcWeight.boneIndex] = math.max(maxRadialOffsets[srcWeight.boneIndex], math.length(boneSpacePosition));
-                            aabb                                  = Psyshock.Physics.CombineAabb(verticesToSkin[i].position, aabb);
+                            aabb                                  = Psyshock.Physics.CombineAabb(positionsArray[i], aabb);
                         }
                         weightsProcessed += weightsCount;
                     }

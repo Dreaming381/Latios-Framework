@@ -17,7 +17,8 @@ namespace AclUnity
             internal NativeArray<byte> compressedData;
             internal NativeArray<byte> extraCompressedData;
 
-            public int sizeInBytes => compressedData.Length != 0 ? 16 + compressedData.Length + extraCompressedData.Length : 0;
+            int alignedLength => extraCompressedData.Length != 0 ? CollectionHelper.Align(compressedData.Length, 16) : compressedData.Length;
+            public int sizeInBytes => compressedData.Length != 0 ? 16 + alignedLength + extraCompressedData.Length : 0;
 
             public void CopyTo(NativeArray<byte> arrayToCopyTo)
             {

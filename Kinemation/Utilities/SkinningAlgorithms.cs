@@ -63,21 +63,11 @@ namespace Latios.Kinemation
         public static DynamicMeshVertex ApplyAllBlendShapes(int vertexIndex, DynamicMeshVertex vertex, NativeArray<float>.ReadOnly weightsByShape,
                                                             ref MeshBlendShapesBlob blendShapesBlob)
         {
-            uint previousGroup         = 0;
-            bool previousWeightWasZero = false;
             for (int i = 0; i < weightsByShape.Length; i++)
             {
                 if (weightsByShape[i] == 0f)
-                {
-                    previousWeightWasZero = true;
-                    previousGroup         = blendShapesBlob.shapes[i].permutationID;
                     continue;
-                }
-                if (previousWeightWasZero && blendShapesBlob.shapes[i].permutationID == previousGroup)
-                    continue;
-                previousGroup         = blendShapesBlob.shapes[i].permutationID;
-                previousWeightWasZero = false;
-                vertex                = ApplyBlendShape(vertexIndex, vertex, i, weightsByShape[i], ref blendShapesBlob);
+                vertex = ApplyBlendShape(vertexIndex, vertex, i, weightsByShape[i], ref blendShapesBlob);
             }
             return vertex;
         }
@@ -417,7 +407,7 @@ namespace Latios.Kinemation
             {
                 if (Hint.Unlikely(normalizationBlob.IsPositionDuplicate(src)))
                     continue;
-                uniquePositions[dst] = SkinVertexPosition(src, uniquePositions[src], skinMatrices, ref skinningBlob);
+                uniquePositions[dst] = SkinVertexPosition(src, uniquePositions[dst], skinMatrices, ref skinningBlob);
                 dst++;
             }
         }
@@ -590,19 +580,19 @@ namespace Latios.Kinemation
 
                 if (resetTangents)
                 {
-                    if (!normalizationBlob.IsTangentDuplicate(indices.x))
+                    if (indexA != indices.x && !normalizationBlob.IsTangentDuplicate(indices.x))
                     {
                         va                       = meshVertices[indices.x];
                         va.tangent              += uDir;
                         meshVertices[indices.x]  = va;
                     }
-                    if (!normalizationBlob.IsTangentDuplicate(indices.y))
+                    if (indexB != indices.y && !normalizationBlob.IsTangentDuplicate(indices.y))
                     {
                         vb                       = meshVertices[indices.y];
                         vb.tangent              += uDir;
                         meshVertices[indices.y]  = vb;
                     }
-                    if (!normalizationBlob.IsTangentDuplicate(indices.z))
+                    if (indexC != indices.z && !normalizationBlob.IsTangentDuplicate(indices.z))
                     {
                         vc                       = meshVertices[indices.z];
                         vc.tangent              += uDir;

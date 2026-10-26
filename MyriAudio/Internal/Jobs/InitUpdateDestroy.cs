@@ -369,6 +369,11 @@ namespace Latios.Myri
                         UnsafeUtility.CopyStructureToPtr(ref sampleRateMultiplier, ptr);
                         ptr += 8;
                     }
+                    if (channelGuids != null)
+                    {
+                        UnsafeUtility.CopyStructureToPtr(ref channelGuids[i], ptr);
+                        ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceChannelID>(), 8);
+                    }
                     if (falloffs != null)
                     {
                         var transform = transforms[i].worldTransformQvvs;
@@ -383,11 +388,6 @@ namespace Latios.Myri
                             UnsafeUtility.CopyStructureToPtr(ref cones[i], ptr);
                             ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceEmitterCone>(), 8);
                         }
-                    }
-                    if (channelGuids != null)
-                    {
-                        UnsafeUtility.CopyStructureToPtr(ref channelGuids[i], ptr);
-                        ptr += CollectionHelper.Align(UnsafeUtility.SizeOf<AudioSourceChannelID>(), 8);
                     }
                 }
                 stream.EndForEachIndex();

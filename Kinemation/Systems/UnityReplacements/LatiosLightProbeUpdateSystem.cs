@@ -80,7 +80,7 @@ namespace Latios.Kinemation.Systems
             }
             else if (!m_probeGridQuery.HasFilter())
             {
-                m_probeGridQuery.AddWorldTranformChangeFilter();
+                m_probeGridQuery.AddChangedVersionFilter(ComponentType.ReadOnly<WorldRenderBounds>());
                 m_probeGridQuery.AddChangedVersionFilter(ComponentType.ReadOnly<BlendProbeTag>());
             }
 

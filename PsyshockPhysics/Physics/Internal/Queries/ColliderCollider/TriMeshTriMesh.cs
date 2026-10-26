@@ -7,9 +7,9 @@ namespace Latios.Psyshock
     internal static class TriMeshTriMesh
     {
         public static bool AreOverlapping(in TriMeshCollider triMeshA,
-                                         in RigidTransform aTransform,
-                                         in TriMeshCollider triMeshB,
-                                         in RigidTransform bTransform)
+                                          in RigidTransform aTransform,
+                                          in TriMeshCollider triMeshB,
+                                          in RigidTransform bTransform)
         {
             return WithinDistance(in triMeshA, in aTransform, in triMeshB, in bTransform, 0f);
         }
@@ -147,11 +147,11 @@ namespace Latios.Psyshock
                     result = default;
                     return false;
                 }
-                if (bestIndexCast < 0 || processor.bestDistance < bestDistance)
+                if (processor.found && (bestIndexCast < 0 || processor.bestDistance < bestDistance))
                 {
                     bestDistance    = processor.bestDistance;
                     bestIndexCast   = i;
-                    bestIndexTarget = 0;
+                    bestIndexTarget = processor.bestIndex;
                 }
             }
 
@@ -162,7 +162,7 @@ namespace Latios.Psyshock
             }
 
             var hitTransform  = castStart;
-            hitTransform.pos += math.normalize(castEnd - castStart.pos) * processor.bestDistance;
+            hitTransform.pos += math.normalize(castEnd - castStart.pos) * bestDistance;
             var castTriangle  = Physics.ScaleStretchCollider(triMeshToCast.triMeshColliderBlob.Value.triangles[bestIndexCast], 1f, triMeshToCast.scale);
             var hitTriangle   = Physics.ScaleStretchCollider(targetTriMesh.triMeshColliderBlob.Value.triangles[bestIndexTarget], 1f, targetTriMesh.scale);
             TriangleTriangle.DistanceBetween(in castTriangle,
@@ -237,7 +237,7 @@ namespace Latios.Psyshock
             {
                 innerProcessor.triangleB = Physics.ScaleStretchCollider(blobB.Value.triangles[index], 1f, scaleB);
                 innerProcessor.found     = false;
-                innerProcessor.blobA.Value.FindTriangles(in aabbBinA, ref innerProcessor, scaleB);
+                innerProcessor.blobA.Value.FindTriangles(in aabbBinA, ref innerProcessor, innerProcessor.scaleA);
                 if (innerProcessor.found)
                 {
                     if (!found || innerProcessor.bestDistance < bestDistance)
@@ -288,7 +288,7 @@ namespace Latios.Psyshock
             {
                 processor.triangleB = Physics.ScaleStretchCollider(triMeshB.triMeshColliderBlob.Value.triangles[index], 1f, triMeshB.scale);
                 processor.bIndex    = index;
-                processor.triMeshA.triMeshColliderBlob.Value.FindTriangles(in aabbBinA, ref processor, triMeshB.scale);
+                processor.triMeshA.triMeshColliderBlob.Value.FindTriangles(in aabbBinA, ref processor, processor.triMeshA.scale);
 
                 return true;
             }

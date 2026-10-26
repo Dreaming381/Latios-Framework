@@ -10,6 +10,18 @@ You can find changelogs for the individual modules in the [official Latios
 Framework Documentation
 repository](https://github.com/Dreaming381/Latios-Framework-Documentation).
 
+## [0.16.4] – 2026-10-25
+
+Officially supports Entities [1.4.8]
+
+### Changed
+
+-   Updated Core to v0.16.4
+-   Updated Aux ECS to v0.16.4
+-   Updated Psyshock to v0.16.4
+-   Updated Myri to v0.16.4
+-   Updated Kinemation to v0.16.4
+
 ## [0.16.3] – 2026-10-18
 
 Officially supports Entities [1.4.8]

@@ -37,12 +37,24 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var             bInASpaceTransform = math.InverseTransformFast(in aTransform, in bTransform);
-            CapsuleCollider bInASpace          = new CapsuleCollider(math.transform(bInASpaceTransform, capsuleB.pointA),
-                                                                     math.transform(bInASpaceTransform, capsuleB.pointB),
-                                                                     capsuleB.radius);
-            bool hit = CapsuleCapsuleDistance(in capsuleA, in bInASpace, maxDistance, out ColliderDistanceResultInternal localResult);
-            result   = InternalQueryTypeUtilities.BinAResultToWorld(in localResult, in aTransform);
+            // Transform everything into world-space relative to A
+            var transformedA = new CapsuleCollider(math.rotate(aTransform.rot, capsuleA.pointA), math.rotate(aTransform.rot, capsuleA.pointB), capsuleA.radius);
+            var transformedB = new CapsuleCollider(bTransform.pos - aTransform.pos + math.rotate(bTransform.rot, capsuleB.pointA),
+                                                   bTransform.pos - aTransform.pos + math.rotate(bTransform.rot, capsuleB.pointB),
+                                                   capsuleB.radius);
+            var hit = CapsuleCapsuleDistance(in transformedA, in transformedB, maxDistance, out var localResult);
+            result  = new ColliderDistanceResult
+            {
+                hitpointA         = localResult.hitpointA + aTransform.pos,
+                hitpointB         = localResult.hitpointB + aTransform.pos,
+                normalA           = localResult.normalA,
+                normalB           = localResult.normalB,
+                distance          = localResult.distance,
+                subColliderIndexA = 0,
+                subColliderIndexB = 0,
+                featureCodeA      = localResult.featureCodeA,
+                featureCodeB      = localResult.featureCodeB,
+            };
             return hit;
         }
 
@@ -59,30 +71,31 @@ namespace Latios.Psyshock
                                         in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            var csoRadius           = capsuleToCast.radius + targetCapsule.radius;
-            var casterAInWorldSpace = math.transform(castStart, capsuleToCast.pointA);
-            var casterBInWorldSpace = math.transform(castStart, capsuleToCast.pointB);
-            var targetAInWorldSpace = math.transform(targetCapsuleTransform, targetCapsule.pointA);
-            var targetBInWorldSpace = math.transform(targetCapsuleTransform, targetCapsule.pointB);
-            var cso                 = new simdFloat3(casterAInWorldSpace - targetAInWorldSpace,
-                                                     casterAInWorldSpace - targetBInWorldSpace,
-                                                     casterBInWorldSpace - targetBInWorldSpace,
-                                                     casterBInWorldSpace - targetAInWorldSpace);
-            var  ray = new Ray(0f, castStart.pos - castEnd);
+            var csoRadius    = capsuleToCast.radius + targetCapsule.radius;
+            var casterA      = castStart.pos - targetCapsuleTransform.pos + math.rotate(castStart.rot, capsuleToCast.pointA);
+            var casterB      = castStart.pos - targetCapsuleTransform.pos + math.rotate(castStart.rot, capsuleToCast.pointB);
+            var targetA      = math.rotate(targetCapsuleTransform.rot, targetCapsule.pointA);
+            var targetB      = math.rotate(targetCapsuleTransform.rot, targetCapsule.pointB);
+            var cso          = new simdFloat3(casterA - targetA, casterA - targetB, casterB - targetB, casterB - targetA);
+            var displacement = castEnd - castStart.pos;
+            // If the target is ahead of the caster, than the Minkowski difference puts the CSO behind the origin, so our ray is reversed
+            var ray = new Ray(0f, -displacement);
+
             bool hit = PointRayTriangle.RaycastRoundedQuad(in ray, in cso, csoRadius, out float fraction, out float3 normal);
             if (hit)
             {
-                var hitTransform = castStart;
-                hitTransform.pos = math.lerp(castStart.pos, castEnd, fraction);
-                DistanceBetween(in capsuleToCast, in hitTransform, in targetCapsule, in targetCapsuleTransform, 1f, out var distanceResult);
+                var hitDisplacement = fraction * displacement;
+                SegmentSegment(casterA + hitDisplacement, casterB + hitDisplacement, targetA, targetB, out var closestOnCaster, out var closestOnTarget, out _);
+                // Taking the difference in segment points is more accurate than using the raycast normal, except for when the radii are both 0.
+                normal = math.normalizesafe(closestOnTarget - closestOnCaster, normal);
                 result = new ColliderCastResult
                 {
-                    hitpoint                 = distanceResult.hitpointA,
-                    normalOnCaster           = distanceResult.normalA,
-                    normalOnTarget           = distanceResult.normalB,
-                    subColliderIndexOnCaster = distanceResult.subColliderIndexA,
-                    subColliderIndexOnTarget = distanceResult.subColliderIndexB,
-                    distance                 = math.distance(hitTransform.pos, castStart.pos)
+                    hitpoint                 = closestOnTarget - normal * targetCapsule.radius + targetCapsuleTransform.pos,
+                    normalOnCaster           = normal,
+                    normalOnTarget           = -normal,
+                    subColliderIndexOnCaster = 0,
+                    subColliderIndexOnTarget = 0,
+                    distance                 = fraction * math.length(displacement)
                 };
                 return true;
             }
@@ -108,11 +121,11 @@ namespace Latios.Psyshock
             SphereCollider sphereB = new SphereCollider(closestB, capsuleB.radius);
             var            hit     = SphereSphere.SphereSphereDistance(in sphereA, in sphereB, maxDistance, out result, out bool degenerate);
             result.featureCodeA    = 0x4000;
-            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 0, isStartEndAB.x);
             result.featureCodeA    = (ushort)math.select(result.featureCodeA, 1, isStartEndAB.y);
+            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 0, isStartEndAB.x);
             result.featureCodeB    = 0x4000;
-            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 0, isStartEndAB.z);
             result.featureCodeB    = (ushort)math.select(result.featureCodeB, 1, isStartEndAB.w);
+            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 0, isStartEndAB.z);
             if (Hint.Likely(!degenerate))
                 return hit;
 
@@ -151,6 +164,105 @@ namespace Latios.Psyshock
                 result.hitpointA = closestA + capsuleA.radius * capsuleNormal;
                 result.hitpointB = closestB - capsuleB.radius * capsuleNormal;
                 return hit;
+            }
+        }
+
+        internal static void SegmentSegmentNew(float3 startSegmentA,
+                                               float3 endSegmentA,
+                                               float3 startSegmentB,
+                                               float3 endSegmentB,
+                                               out float3 closestAOut,
+                                               out float3 closestBOut,
+                                               out bool4 isStartEndAB,
+                                               out float3 closestAToBPrecise)
+        {
+            float3 edgeA                     = endSegmentA - startSegmentA;
+            float3 edgeB                     = endSegmentB - startSegmentB;
+            float3 perpendicularUnnormalized = math.cross(edgeA, edgeB);
+            float3 startAToStartB            = startSegmentB - startSegmentA;
+            // This is the derivation for the optimized implementation
+            // edgeB x perpendicular creates a plane. The closest points on the infinite edges is based on where edgeA crosses that plane.
+            //float3 bPlaneUnnormal = math.cross(edgeB, perpendicularUnnormalized);
+            // Project startSegmentA onto the plane normal to get the distance of startSegmentA to the plane.
+            // We use startSegmentB as a reference point.
+            //float  startADistanceToPlane = math.dot(startAToStartB, bPlaneUnnormal);
+            // Project edgeA onto the plane normal to determine how much distance it travels relative to the plane normal.
+            //float edgeAProjectionDistance = math.dot(edgeA, bPlaneUnnormal);
+            // We never had to normalize bPlaneUnnormal because is magnitude is canceled out by this division.
+            //float fractionAlongA = startADistanceToPlane / edgeAProjectionDistance;
+            // Find the clamped point along segment A using the original distances rather than the fraction to avoid precision loss from the division.
+            //float3 pointOnA = startSegmentA + edgeA * fractionAlongA;
+            //pointOnA        = math.select(pointOnA, endSegmentA, startADistanceToPlane >= edgeAProjectionDistance);
+            // Note: For parallel edges, this picks startSegmentA, and for degenerate edges, it prefers startSegmentA over endSegmentA.
+            //pointOnA = math.select(startSegmentA, pointOnA, startADistanceToPlane > 0f);
+
+            // The issue with the above is that we don't detect coincidence of endpoints cleanly across the segments.
+            // However, we can recognize that startADistanceToPlane is really: dot(startAToStartB, cross(edgeB, perpendicularUnnormalized)).
+            // Using the triple product rule, we can rearrange that as dot(perpendicularUnnormalized, cross(startAToStartB, edgeB)).
+            // The benefit of this approach is that the cross product is exactly zero if startSegmentA is either of B's endpoints.
+            // We can then apply the trick for endSegmentA. The difference of these signed distances results in the total edgeAProjectionDistance.
+            float3 endAToStartB           = startSegmentB - endSegmentA;
+            float  startADistanceToPlane  = math.dot(perpendicularUnnormalized, math.cross(startAToStartB, edgeB));
+            float  endADistanceToPlane    = math.dot(perpendicularUnnormalized, math.cross(endAToStartB, edgeB));
+            float  edgeProjectionDistance = startADistanceToPlane - endADistanceToPlane;
+            float  fractionAlongA         = startADistanceToPlane / edgeProjectionDistance;
+            float3 pointOnA               = startSegmentA + edgeA * fractionAlongA;
+            // For there to be an intersection, the signed distance from the start should be positive and from the end should be negative.
+            // If either is violated, we clamp.
+            pointOnA = math.select(pointOnA, endSegmentA, endADistanceToPlane >= 0f);
+            pointOnA = math.select(pointOnA, startSegmentA, startADistanceToPlane <= 0f);
+
+            // Find the closest point on segment B by projecting pointOnA onto edgeB.
+            float  edgeBLengthSq  = math.lengthsq(edgeB);
+            float  aAlongB        = math.dot(pointOnA - startSegmentB, edgeB);
+            float  fractionAlongB = aAlongB / edgeBLengthSq;
+            float3 pointOnB       = startSegmentB + edgeB * fractionAlongB;
+            bool   isStartB       = aAlongB <= 0f;
+            bool   isEndB         = aAlongB >= edgeBLengthSq;
+            pointOnB              = math.select(pointOnB, endSegmentB, isEndB);
+            pointOnB              = math.select(startSegmentB, pointOnB, !isStartB);
+
+            // Re-find the closest point on segment A.
+            float edgeALengthSq = math.lengthsq(edgeA);
+            float bAlongA       = math.dot(pointOnB - startSegmentA, edgeA);
+            fractionAlongA      = bAlongA / edgeALengthSq;
+            pointOnA            = startSegmentA + edgeA * fractionAlongA;
+            bool isStartA       = bAlongA <= 0f;
+            bool isEndA         = bAlongA >= edgeALengthSq;
+            pointOnA            = math.select(pointOnA, endSegmentA, isEndA);
+            pointOnA            = math.select(startSegmentA, pointOnA, !isStartA);
+            isStartEndAB        = new bool4(isStartA, isEndA, isStartB, isEndB);
+
+            closestAOut        = pointOnA;
+            closestBOut        = pointOnB;
+            closestAToBPrecise = closestBOut - closestAOut;
+
+            // Refine results by projecting the errors
+            bool aNotEndpoint = !(isStartA | isEndA);
+            bool bNotEndpoint = !(isStartB | isEndB);
+            if (!aNotEndpoint && !bNotEndpoint)
+                return;
+
+            // See PointRayCapsule.PointCapsuleDistance() for explanation of what we are doing here.
+            float distanceSq = math.lengthsq(closestAToBPrecise);
+            if (!bNotEndpoint) // only aNotEndpoint is true
+                closestAToBPrecise -= edgeA * (math.dot(closestAToBPrecise, edgeA) / edgeALengthSq);
+            else if (!aNotEndpoint) // only bNotEndpoint is true
+                closestAToBPrecise -= edgeB * (math.dot(closestAToBPrecise, edgeB) / edgeBLengthSq);
+            else  // both aNotEndpoint and bNotEndpoint are true
+            {
+                float perpendicularSq = math.lengthsq(perpendicularUnnormalized);
+                // The precision of the perpendicular is determined by the splay. We use a conservative metric here.
+                if (perpendicularSq > 2f * distanceSq * (edgeALengthSq + edgeBLengthSq))
+                {
+                    // Project closest onto the perpendicular
+                    closestAToBPrecise = perpendicularUnnormalized * (math.dot(closestAToBPrecise, perpendicularUnnormalized) / perpendicularSq);
+                }
+                else
+                {
+                    // The perpendicular itself is too noisy, likely because the segments are nearly parallel. Clean based on A
+                    closestAToBPrecise -= edgeA * (math.dot(closestAToBPrecise, edgeA) / edgeALengthSq);
+                }
             }
         }
 

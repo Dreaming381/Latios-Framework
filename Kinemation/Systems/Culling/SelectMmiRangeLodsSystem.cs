@@ -158,8 +158,8 @@ namespace Latios.Kinemation.Systems
                         if (rangeLodFlagsArray != null)
                         {
                             var flags     = rangeLodFlagsArray[i];
-                            nullSelect.y &= !flags.disableLod1ShadowCasting;
-                            nullSelect.z &= !flags.disableLod2ShadowCasting;
+                            nullSelect.y |= flags.disableLod1ShadowCasting;
+                            nullSelect.z |= flags.disableLod2ShadowCasting;
                         }
 
                         float  height = math.cmax(boundsArray[i].Value.Extents) * 2f;

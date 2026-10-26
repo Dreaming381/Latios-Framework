@@ -201,10 +201,11 @@ namespace Latios.Kinemation
                 var parent = math.max(0, parentIndices[i]);
                 var local  = localTransforms[i];
                 local.NormalizeBone();
-                var context32     = rootTransforms[i].context32;
-                var temp          = qvvs.mul(rootTransforms[parent], in local);
-                temp.context32    = context32;
-                rootTransforms[i] = temp;
+                localTransforms[i] = local;
+                var context32      = rootTransforms[i].context32;
+                var temp           = qvvs.mul(rootTransforms[parent], in local);
+                temp.context32     = context32;
+                rootTransforms[i]  = temp;
             }
             {
                 var local = localTransforms[0];
@@ -363,6 +364,18 @@ namespace Latios.Kinemation
                 result = m_queue[m_next];
                 m_count--;
                 m_next++;
+                return true;
+            }
+
+            public bool TryPeek(out ParentChild result)
+            {
+                if (m_count == 0)
+                {
+                    result = default;
+                    return false;
+                }
+
+                result = m_queue[m_next];
                 return true;
             }
         }
@@ -570,7 +583,7 @@ namespace Latios.Kinemation
             }
         }
 
-        internal void ApplyRootTransformChanges(Span<TransformQvvs> rootTransformsWithIndices, int currentRootBaseIndex)
+        internal void ApplyRootTransformChanges(Span<TransformQvvs> rootTransformsWithIndices)
         {
             rootTransformsWithIndices.Sort(new TransformWithIndicesComparer());
             var     firstChangedBoneIndex = rootTransformsWithIndices[0].context32;
@@ -579,11 +592,12 @@ namespace Latios.Kinemation
             var     queue                 = new PropagationQueue(stackalloc ParentChild[childrenIndicesBlob.Length - firstChangedBoneIndex]);
             int     transformSpanIndex    = 0;
             var     bones                 = m_boneTransforms.AsNativeArray().AsSpan();
+            var     currentRootBaseIndex  = m_currentRootIndexWrite;
             var     socketUpdater         = new SocketUpdater(m_skeletonWorldTransform, m_socketCount);
             while (true)
             {
                 var hasDirtyTransform = transformSpanIndex < rootTransformsWithIndices.Length;
-                var hasNextChild      = queue.TryDequeue(out var parentChild);
+                var hasNextChild      = queue.TryPeek(out var parentChild);
                 if (!hasDirtyTransform && !hasNextChild)
                     break;
 
@@ -592,13 +606,24 @@ namespace Latios.Kinemation
                 if (nextChildIndex < nextTransformBoneIndex)
                 {
                     // Do normal propagate from parent
-                    ref var childLocal                = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
-                    ref var childRoot                 = ref bones[currentRootBaseIndex + parentChild.child];
-                    ref var parentRoot                = ref bones[currentRootBaseIndex + parentChild.parent];
-                    var     context32                 = childRoot.boneTransform.context32;
-                    childRoot.boneTransform           = qvvs.mul(in parentRoot.boneTransform, childLocal.boneTransform);
-                    childRoot.boneTransform.context32 = context32;
+                    ref var childLocal = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                    ref var childRoot  = ref bones[currentRootBaseIndex + parentChild.child];
+                    if (parentChild.parent > 0)
+                    {
+                        ref var parentRoot                = ref bones[currentRootBaseIndex + parentChild.parent];
+                        var     context32                 = childRoot.boneTransform.context32;
+                        childRoot.boneTransform           = qvvs.mul(in parentRoot.boneTransform, childLocal.boneTransform);
+                        childRoot.boneTransform.context32 = context32;
+                    }
+                    else
+                    {
+                        var newBone             = childLocal.boneTransform;
+                        newBone.context32       = childRoot.boneTransform.context32;
+                        childRoot.boneTransform = newBone;
+                    }
+
                     socketUpdater.SetTransform(childRoot.boneTransform.context32, childRoot.boneTransform);
+                    queue.TryDequeue(out _);
                     queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
                 }
                 else if (nextChildIndex > nextTransformBoneIndex)
@@ -612,16 +637,20 @@ namespace Latios.Kinemation
                     }
                     else
                     {
-                        // Recompute the local transform
-                        ref var childLocal                 = ref bones[currentRootBaseIndex + m_boneCount + nextTransformBoneIndex];
-                        ref var childRoot                  = ref bones[currentRootBaseIndex + nextTransformBoneIndex];
-                        ref var parentRoot                 = ref bones[currentRootBaseIndex + parentIndicesBlob[nextTransformBoneIndex]];
-                        var     context32                  = childRoot.boneTransform.context32;
-                        childRoot.boneTransform            = rootTransformsWithIndices[transformSpanIndex];
-                        childRoot.boneTransform.context32  = context32;
-                        childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
-                        childLocal.boneTransform.context32 = math.asint(1f);
-                        socketUpdater.SetTransform(childRoot.boneTransform.context32, childRoot.boneTransform);
+                        var parentIndex = parentIndicesBlob[nextTransformBoneIndex];
+                        if (parentIndex > 0)
+                        {
+                            // Recompute the local transform
+                            ref var childLocal                 = ref bones[currentRootBaseIndex + m_boneCount + nextTransformBoneIndex];
+                            ref var childRoot                  = ref bones[currentRootBaseIndex + nextTransformBoneIndex];
+                            ref var parentRoot                 = ref bones[currentRootBaseIndex + parentIndicesBlob[nextTransformBoneIndex]];
+                            var     context32                  = childRoot.boneTransform.context32;
+                            childRoot.boneTransform            = rootTransformsWithIndices[transformSpanIndex];
+                            childRoot.boneTransform.context32  = context32;
+                            childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
+                            childLocal.boneTransform.context32 = math.asint(1f);
+                            socketUpdater.SetTransform(childRoot.boneTransform.context32, childRoot.boneTransform);
+                        }
                         queue.EnqueueChildren(nextTransformBoneIndex, ref childrenIndicesBlob);
                     }
                     transformSpanIndex++;
@@ -629,15 +658,19 @@ namespace Latios.Kinemation
                 else
                 {
                     // The changed bone is the same as the next propagated child
-                    ref var childLocal                 = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
-                    ref var childRoot                  = ref bones[currentRootBaseIndex + parentChild.child];
-                    ref var parentRoot                 = ref bones[currentRootBaseIndex + parentChild.parent];
-                    var     context32                  = childRoot.boneTransform.context32;
-                    childRoot.boneTransform            = rootTransformsWithIndices[transformSpanIndex];
-                    childRoot.boneTransform.context32  = context32;
-                    childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
-                    childLocal.boneTransform.context32 = math.asint(1f);
+                    ref var childLocal                = ref bones[currentRootBaseIndex + m_boneCount + parentChild.child];
+                    ref var childRoot                 = ref bones[currentRootBaseIndex + parentChild.child];
+                    var     context32                 = childRoot.boneTransform.context32;
+                    childRoot.boneTransform           = rootTransformsWithIndices[transformSpanIndex];
+                    childRoot.boneTransform.context32 = context32;
+                    if (parentChild.parent > 0)
+                    {
+                        ref var parentRoot                 = ref bones[currentRootBaseIndex + parentChild.parent];
+                        childLocal.boneTransform           = qvvs.inversemulqvvs(in parentRoot.boneTransform, in childRoot.boneTransform);
+                        childLocal.boneTransform.context32 = math.asint(1f);
+                    }
                     socketUpdater.SetTransform(childRoot.boneTransform.context32, childRoot.boneTransform);
+                    queue.TryDequeue(out _);
                     queue.EnqueueChildren(parentChild.child, ref childrenIndicesBlob);
                     transformSpanIndex++;
                 }

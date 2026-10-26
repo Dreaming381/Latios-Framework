@@ -334,7 +334,7 @@ namespace Latios.Kinemation.Systems
                 {
                     bool hasCurrent       = (classification & DeformClassification.CurrentDeform) != DeformClassification.None;
                     bool hasLegacyCompute = (classification & DeformClassification.LegacyCompute) != DeformClassification.None;
-                    bool hasLegacyDots    = (classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None;
+                    bool hasLegacyDots    = (classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None;
 
                     NativeArray<uint>  current       = hasCurrent ? chunk.GetNativeArray(ref currentDeformHandle).Reinterpret<uint>() : default;
                     NativeArray<uint>  legacyCompute = hasLegacyCompute ? chunk.GetNativeArray(ref legacyComputeDeformHandle).Reinterpret<uint>() : default;
@@ -358,8 +358,8 @@ namespace Latios.Kinemation.Systems
 
                 if ((classification & DeformClassification.AnyPreviousDeform) != DeformClassification.None)
                 {
-                    bool hasPrevious   = (classification & DeformClassification.CurrentDeform) != DeformClassification.None;
-                    bool hasLegacyDots = (classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None;
+                    bool hasPrevious   = (classification & DeformClassification.PreviousDeform) != DeformClassification.None;
+                    bool hasLegacyDots = (classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None;
 
                     NativeArray<uint>  previous   = hasPrevious ? chunk.GetNativeArray(ref previousDeformHandle).Reinterpret<uint>() : default;
                     NativeArray<uint4> legacyDots = hasLegacyDots ? chunk.GetNativeArray(ref legacyDotsDeformHandle).Reinterpret<uint4>() : default;
@@ -538,7 +538,7 @@ namespace Latios.Kinemation.Systems
                         lower |= propertyTypeMasks[20];
                         upper |= propertyTypeMasks[21];
                     }
-                    if ((classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None)
+                    if ((classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None)
                     {
                         lower |= propertyTypeMasks[22];
                         upper |= propertyTypeMasks[23];

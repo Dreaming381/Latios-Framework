@@ -747,10 +747,10 @@ namespace Latios.Kinemation.Systems
                     var distance = ndot / vdot;
                     var isBest   = distance < maxDistances & distance > 0f;
                     maxDistances = math.select(maxDistances, distance, isBest);
-                    planeNumbers = math.select(-1, i * 4 + new int4(0, 1, 2, 3), isBest);
+                    planeNumbers = math.select(planeNumbers, i * 4 + new int4(0, 1, 2, 3), isBest);
                 }
                 var maxDistance = math.cmin(maxDistances);
-                planeNumber     = math.cmax(planeNumbers);
+                planeNumber     = math.cmax(math.select(-1, planeNumbers, maxDistances == maxDistance));
 
                 return planeNumber != -1 ? maxDistance : -1.0f;
             }

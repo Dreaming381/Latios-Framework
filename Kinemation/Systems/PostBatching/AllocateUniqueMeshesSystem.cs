@@ -45,8 +45,8 @@ namespace Latios.Kinemation.Systems
             var newMeshesCount   = m_newMeshesQuery.CalculateEntityCountWithoutFiltering();
             var deadMeshesCount  = m_deadMeshesQuery.CalculateEntityCountWithoutFiltering();
             var deadMeshesCount2 = m_deadMeshesQuery2.CalculateEntityCountWithoutFiltering();
-            var neededMeshes     = newMeshesCount - deadMeshesCount - deadMeshesCount2;
             var meshPool         = api.worldBlackboardEntity.GetCollectionComponent<UniqueMeshPool>(false);
+            var neededMeshes     = newMeshesCount - deadMeshesCount - deadMeshesCount2 - meshPool.unusedMeshes.Length;
             if (neededMeshes > 0)
             {
                 var newAllocatedMeshes = CollectionHelper.CreateNativeArray<UnityObjectRef<UnityEngine.Mesh> >(neededMeshes,

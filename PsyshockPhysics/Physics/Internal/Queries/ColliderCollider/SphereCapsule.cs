@@ -21,8 +21,8 @@ namespace Latios.Psyshock
                                           in RigidTransform sphereTransform,
                                           float maxDistance)
         {
-            var    sphereInCapSpaceTransfrom = math.InverseTransformFast(in capsuleTransform, in sphereTransform);
-            float3 sphereCenterInCapSpace    = math.transform(sphereInCapSpaceTransfrom, sphere.center);
+            var    sphereInCapSpaceTransform = math.InverseTransformFast(in capsuleTransform, in sphereTransform);
+            float3 sphereCenterInCapSpace    = math.transform(sphereInCapSpaceTransform, sphere.center);
             return PointRayCapsule.PointCapsuleWithin(sphereCenterInCapSpace, in capsule, sphere.radius + maxDistance);
         }
 
@@ -33,19 +33,19 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var            sphereInCapSpaceTransfrom = math.InverseTransformFast(in capsuleTransform, in sphereTransform);
-            float3         sphereCenterInCapSpace    = math.transform(sphereInCapSpaceTransfrom, sphere.center);
-            SphereCollider sphereInCapSpace          = new SphereCollider(sphereCenterInCapSpace, sphere.radius);
-            bool           hit                       = CapsuleSphereDistance(capsule,
-                                                                   sphereInCapSpace,
-                                                                   maxDistance,
-                                                                   out ColliderDistanceResultInternal localResult);
-            result = new ColliderDistanceResult
+            // Transform everything into the world-space relative to the capsule
+            var transformedCapsule = new CapsuleCollider(math.rotate(capsuleTransform.rot, capsule.pointA),
+                                                         math.rotate(capsuleTransform.rot, capsule.pointB),
+                                                         capsule.radius);
+            var transformedSphere = new SphereCollider(sphereTransform.pos - capsuleTransform.pos + math.rotate(sphereTransform.rot, sphere.center),
+                                                       sphere.radius);
+            bool hit = CapsuleSphereDistance(transformedCapsule, transformedSphere, maxDistance, out var localResult);
+            result   = new ColliderDistanceResult
             {
-                hitpointA         = math.transform(capsuleTransform, localResult.hitpointA),
-                hitpointB         = math.transform(capsuleTransform, localResult.hitpointB),
-                normalA           = math.rotate(capsuleTransform, localResult.normalA),
-                normalB           = math.rotate(capsuleTransform, localResult.normalB),
+                hitpointA         = localResult.hitpointA + capsuleTransform.pos,
+                hitpointB         = localResult.hitpointB + capsuleTransform.pos,
+                normalA           = localResult.normalA,
+                normalB           = localResult.normalB,
                 distance          = localResult.distance,
                 subColliderIndexA = 0,
                 subColliderIndexB = 0,
@@ -62,24 +62,25 @@ namespace Latios.Psyshock
                                         in RigidTransform targetCapsuleTransform,
                                         out ColliderCastResult result)
         {
-            var cso     = targetCapsule;
-            cso.radius += sphereToCast.radius;
-            var  start  = math.transform(castStart, sphereToCast.center);
-            var  ray    = new Ray(start, start + castEnd - castStart.pos);
-            bool hit    = PointRayCapsule.Raycast(in ray, in cso, in targetCapsuleTransform, out var raycastResult);
+            // Evaluate in world-space relative to the target
+            var rayStart        = castStart.pos - targetCapsuleTransform.pos + math.rotate(castStart.rot, sphereToCast.center);
+            var rayDisplacement = castEnd - castStart.pos;
+            var cso             = new CapsuleCollider(math.rotate(targetCapsuleTransform.rot, targetCapsule.pointA),
+                                                      math.rotate(targetCapsuleTransform.rot, targetCapsule.pointB),
+                                                      targetCapsule.radius + sphereToCast.radius);
+            bool hit = PointRayCapsule.RaycastCapsule(rayStart, rayDisplacement, in cso, out var fraction, out var normal);
             if (hit)
             {
-                var hitTransform  = castStart;
-                hitTransform.pos += raycastResult.position - start;
-                DistanceBetween(in targetCapsule, in targetCapsuleTransform, in sphereToCast, in hitTransform, 1f, out var distanceResult);
-                result = new ColliderCastResult
+                var rayHitpointRelative = rayStart + rayDisplacement * fraction;
+                var hitpointRelative    = rayHitpointRelative - normal * sphereToCast.radius;  // Subtract the sphere from the CSO
+                result                  = new ColliderCastResult
                 {
-                    hitpoint                 = distanceResult.hitpointB,
-                    normalOnCaster           = distanceResult.normalB,
-                    normalOnTarget           = distanceResult.normalA,
-                    subColliderIndexOnCaster = distanceResult.subColliderIndexB,
-                    subColliderIndexOnTarget = distanceResult.subColliderIndexA,
-                    distance                 = math.distance(hitTransform.pos, castStart.pos)
+                    hitpoint                 = hitpointRelative + targetCapsuleTransform.pos,
+                    normalOnCaster           = -normal,
+                    normalOnTarget           = normal,
+                    subColliderIndexOnCaster = 0,
+                    subColliderIndexOnTarget = 0,
+                    distance                 = fraction * math.length(rayDisplacement)
                 };
                 return true;
             }
@@ -94,25 +95,24 @@ namespace Latios.Psyshock
                                         in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
-            var cso           = capsuleToCast;
-            cso.radius       += targetSphere.radius;
-            var  castReverse  = castStart.pos - castEnd;
-            var  start        = math.transform(targetSphereTransform, targetSphere.center);
-            var  ray          = new Ray(start, start + castReverse);
-            bool hit          = PointRayCapsule.Raycast(in ray, in cso, in castStart, out var raycastResult);
+            // Evaluate in world-space relative to the caster and reverse the cast direction
+            var rayStart        = targetSphereTransform.pos - castStart.pos + math.rotate(targetSphereTransform.rot, targetSphere.center);
+            var rayDisplacement = castStart.pos - castEnd;
+            var cso             = new CapsuleCollider(math.rotate(castStart.rot, capsuleToCast.pointA),
+                                                      math.rotate(castStart.rot, capsuleToCast.pointB),
+                                                      targetSphere.radius + capsuleToCast.radius);
+            bool hit = PointRayCapsule.RaycastCapsule(rayStart, rayDisplacement, in cso, out var fraction, out var normal);
             if (hit)
             {
-                var hitTransform  = castStart;
-                hitTransform.pos -= raycastResult.position - start;
-                DistanceBetween(in capsuleToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
-                result = new ColliderCastResult
+                var hitpoint = (rayStart - normal * targetSphere.radius) + castStart.pos;
+                result       = new ColliderCastResult
                 {
-                    hitpoint                 = distanceResult.hitpointA,
-                    normalOnCaster           = distanceResult.normalA,
-                    normalOnTarget           = distanceResult.normalB,
-                    subColliderIndexOnCaster = distanceResult.subColliderIndexA,
-                    subColliderIndexOnTarget = distanceResult.subColliderIndexB,
-                    distance                 = math.distance(hitTransform.pos, castStart.pos)
+                    hitpoint                 = hitpoint,
+                    normalOnCaster           = normal,
+                    normalOnTarget           = -normal,
+                    subColliderIndexOnCaster = 0,
+                    subColliderIndexOnTarget = 0,
+                    distance                 = fraction * math.length(rayDisplacement)
                 };
                 return true;
             }
@@ -177,11 +177,12 @@ namespace Latios.Psyshock
             var hit = PointRayCapsule.PointCapsuleDistance(sphere.center, in capsule, maxDistance + sphere.radius, out var pointResult);
             result  = new ColliderDistanceResultInternal
             {
-                hitpointA    = pointResult.hitpoint,
-                hitpointB    = sphere.center - pointResult.normal * sphere.radius,
-                normalA      = pointResult.normal,
-                normalB      = -pointResult.normal,
-                distance     = pointResult.distance - sphere.radius,
+                hitpointA = pointResult.hitpoint,
+                hitpointB = sphere.center - pointResult.normal * sphere.radius,
+                normalA   = pointResult.normal,
+                normalB   = -pointResult.normal,
+                // In case of a rounding error, distance might still be too far after subtracting the radius, so just clamp it
+                distance     = math.min(maxDistance, pointResult.distance - sphere.radius),
                 featureCodeA = pointResult.featureCode,
                 featureCodeB = 0,
             };

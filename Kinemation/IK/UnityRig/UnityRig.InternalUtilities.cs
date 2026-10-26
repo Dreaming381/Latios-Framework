@@ -24,7 +24,7 @@ namespace Latios.Kinemation
                 if (math.lengthsq(axis) == 0f)
                     axis = math.cross(from, math.up());
 
-                return quaternion.AxisAngle(axis, math.PI);
+                return quaternion.AxisAngle(math.normalize(axis), math.PI);
             }
 
             return quaternion.AxisAngle(math.normalizesafe(math.cross(from, to)), math.acos(teta));

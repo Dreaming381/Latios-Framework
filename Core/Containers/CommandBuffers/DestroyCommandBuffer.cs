@@ -295,7 +295,7 @@ namespace Latios
                 sBatchEntities.Begin();
                 var rootsWithInfo = new NativeArray<EntityWithInfo>(entities.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
                 var legPrefixSum  = new NativeArray<int>(entities.Length, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
-
+                em.CompleteDependencyBeforeRW<LinkedEntityGroup>();
                 var rootsJh = new FindRootsJob
                 {
                     roots         = entities,
@@ -316,7 +316,7 @@ namespace Latios
                 }.Schedule(rootsJh);
                 var legsJh = new FindLegsJob
                 {
-                    roots         = rootsWithInfo,
+                    roots         = entities,
                     esil          = esil,
                     legLookup     = legLookup,
                     legsWithInfo  = legsWithInfo.AsDeferredJobArray(),
@@ -600,7 +600,7 @@ namespace Latios
             [BurstCompile]
             struct FindLegsJob : IJobFor
             {
-                [ReadOnly] public NativeArray<EntityWithInfo>                                roots;
+                [ReadOnly] public NativeArray<Entity>                                        roots;
                 [ReadOnly] public EntityStorageInfoLookup                                    esil;
                 [ReadOnly] public NativeArray<int>                                           legPrefixSums;
                 [NativeDisableParallelForRestriction] public BufferLookup<LinkedEntityGroup> legLookup;
@@ -620,14 +620,14 @@ namespace Latios
                         if (count == 0)
                             return;
                     }
-                    if (roots[index].entity == Entity.Null)
+                    if (roots[index] == Entity.Null)
                         return;
 
                     // Todo: We already have the chunk and index, so use that instead.
-                    var buffer = legLookup[roots[index].entity];
+                    var buffer = legLookup[roots[index]];
                     var start  = legPrefixSums[index];
                     var legs   = buffer.AsNativeArray();
-                    CheckFirstLegIsRoot(roots[index].entity, legs[0].Value);
+                    CheckFirstLegIsRoot(roots[index], legs[0].Value);
                     for (int i = 1; i < legs.Length; i++)
                     {
                         var entity = legs[i].Value;

@@ -8,14 +8,14 @@ namespace Latios.Psyshock
         //Formerly getFactoredLength
         public static float GetLengthAndNormal(float3 v, out float3 normal)
         {
-            float lengthSq  = math.lengthsq(v);
-            float invLength = math.rsqrt(lengthSq);
-            normal          = v * invLength;
-            return lengthSq * invLength;
+            float length = math.length(v);
+            normal       = v / length;
+            return length;
         }
 
         public static float4 GetLengthAndNormal(in simdFloat3 v, out simdFloat3 normal)
         {
+            // Different from the singular instance because the 3 divides aren't packed.
             float4 lengthSq  = simd.lengthsq(v);
             float4 invLength = math.rsqrt(lengthSq);
             normal           = v * invLength;

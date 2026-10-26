@@ -20,12 +20,14 @@ namespace Latios.Psyshock
 
         public static bool DistanceBetween(float3 point, in CapsuleCollider capsule, in RigidTransform capsuleTransform, float maxDistance, out PointDistanceResult result)
         {
-            var  pointInCapSpace = math.InverseTransformFast(in capsuleTransform, point);
-            bool hit             = PointCapsuleDistance(pointInCapSpace, in capsule, maxDistance, out var localResult);
-            result               = new PointDistanceResult
+            var capsuleInWorldPositionRelativeSpace = new CapsuleCollider(math.rotate(capsuleTransform.rot, capsule.pointA),
+                                                                          math.rotate(capsuleTransform.rot, capsule.pointB),
+                                                                          capsule.radius);
+            bool hit = PointCapsuleDistance(point - capsuleTransform.pos, in capsuleInWorldPositionRelativeSpace, maxDistance, out var localResult);
+            result   = new PointDistanceResult
             {
-                hitpoint = math.transform(capsuleTransform, localResult.hitpoint),
-                normal   = math.rotate(capsuleTransform, localResult.normal),
+                hitpoint = localResult.hitpoint + capsuleTransform.pos,
+                normal   = localResult.normal,
                 distance = localResult.distance
             };
             return hit;
@@ -33,11 +35,18 @@ namespace Latios.Psyshock
 
         public static bool Raycast(in Ray ray, in CapsuleCollider capsule, in RigidTransform capsuleTransform, out RaycastResult result)
         {
-            var  rayInCapsuleSpace  = Ray.TransformRay(math.inverse(capsuleTransform), ray);
-            bool hit                = RaycastCapsule(rayInCapsuleSpace, capsule, out float fraction, out float3 normal);
-            result.position         = math.lerp(ray.start, ray.end, fraction);
-            result.normal           = math.rotate(capsuleTransform, normal);
-            result.distance         = math.distance(ray.start, result.position);
+            // Faster to transform the capsule than transform the ray.
+            var capsuleInWorldPositionRelativeSpace = new CapsuleCollider(math.rotate(capsuleTransform.rot, capsule.pointA),
+                                                                          math.rotate(capsuleTransform.rot, capsule.pointB),
+                                                                          capsule.radius);
+            bool hit = RaycastCapsule(ray.start - capsuleTransform.pos,
+                                      ray.displacement,
+                                      capsuleInWorldPositionRelativeSpace,
+                                      out float fraction,
+                                      out float3 normal);
+            result.position         = ray.start + ray.displacement * fraction;
+            result.normal           = normal;
+            result.distance         = fraction * math.length(ray.displacement);
             result.subColliderIndex = 0;
             return hit;
         }
@@ -67,174 +76,125 @@ namespace Latios.Psyshock
             float  abLengthSq = math.lengthsq(ab);
             dot               = math.clamp(dot, 0f, abLengthSq);
             ushort featureCode;
-            float3 pointOnSegment;
+            float3 segmentToPoint;
             if (dot == 0f)
             {
                 featureCode    = 0;
-                pointOnSegment = capsule.pointA;
+                segmentToPoint = ap;
             }
             else if (dot == abLengthSq)
             {
                 featureCode    = 1;
-                pointOnSegment = capsule.pointB;
+                segmentToPoint = point - capsule.pointB;
             }
             else
             {
-                featureCode = 0x4000;
-                var factor  = dot / abLengthSq;
-                // If the division fails, that means we somehow weren't closest to an endpoint, but the numbers are too small to calculate where inbetween, so we just use the exact middle.
-                factor         = math.select(0.5f, factor, math.isfinite(factor));
-                pointOnSegment = capsule.pointA + ab * factor;
+                featureCode    = 0x4000;
+                var factor     = dot / abLengthSq;  // Guaranteed to be valid due to branches above
+                segmentToPoint = ap - ab * factor;
+                // The above isn't sufficiently accurate at computing where we are on the segment, which matters a lot when the point is very close to the segment.
+                // We reduce the error by projecting our new segmentToPoint onto the segment again and subtracting that error.
+                var errorAlongAxis  = math.dot(segmentToPoint, ab) / abLengthSq;
+                errorAlongAxis      = math.select(0f, errorAlongAxis, math.isfinite(errorAlongAxis));
+                segmentToPoint     -= ab * errorAlongAxis;
             }
-            SphereCollider sphere = new SphereCollider(pointOnSegment, capsule.radius);
-            var            hit    = PointRaySphere.PointSphereDistance(point, in sphere, maxDistance, out result, out bool degenerate);
-            result.featureCode    = featureCode;
-            if (Hint.Likely(!degenerate))
-                return hit;
-
-            if (ab.Equals(float3.zero))
-                return hit;
-
-            mathex.GetDualPerpendicularNormalized(ab, out var capsuleNormal, out _);
-            result.normal   = capsuleNormal;
-            result.hitpoint = pointOnSegment + capsule.radius * capsuleNormal;
-            return hit;
+            var segmentToPointDistanceSq = math.lengthsq(segmentToPoint);
+            var segmentToPointDistance   = math.sqrt(segmentToPointDistanceSq);
+            var normal                   = segmentToPoint / segmentToPointDistance;
+            if (Hint.Unlikely(segmentToPointDistanceSq < PointRaySphere.kUnmeasurableLengthSqThreshold))
+            {
+                if (ab.Equals(float3.zero))
+                    normal = new float3(0f, 1f, 0f);
+                else
+                    mathex.GetDualPerpendicularNormalized(ab, out normal, out _);
+            }
+            result = new PointDistanceResultInternal
+            {
+                hitpoint    = point - segmentToPoint + normal * capsule.radius,
+                distance    = segmentToPointDistance - capsule.radius,
+                normal      = normal,
+                featureCode = featureCode,
+            };
+            return result.distance <= maxDistance;
         }
 
+        // Todo: Phase out.
         internal static bool RaycastCapsule(in Ray ray, in CapsuleCollider capsule, out float fraction, out float3 normal)
         {
-            float          axisLength = mathex.GetLengthAndNormal(capsule.pointB - capsule.pointA, out float3 axis);
-            SphereCollider sphere1    = new SphereCollider(capsule.pointA, capsule.radius);
-
-            // Ray vs infinite cylinder
-            {
-                float  directionDotAxis  = math.dot(ray.displacement, axis);
-                float  originDotAxis     = math.dot(ray.start - capsule.pointA, axis);
-                float3 rayDisplacement2D = ray.displacement - axis * directionDotAxis;
-                float3 rayOrigin2D       = ray.start - axis * originDotAxis;
-                Ray    rayIn2d           = new Ray(rayOrigin2D, rayOrigin2D + rayDisplacement2D);
-
-                if (PointRaySphere.RaycastSphere(in rayIn2d, in sphere1, out float cylinderFraction, out normal))
-                {
-                    float t = originDotAxis + cylinderFraction * directionDotAxis;  // distance of the hit from pointA along axis
-                    if (t >= 0.0f && t <= axisLength)
-                    {
-                        fraction = cylinderFraction;
-                        return true;
-                    }
-                }
-            }
-
-            //Ray vs caps
-            SphereCollider sphere2 = new SphereCollider(capsule.pointB, capsule.radius);
-            bool           hit1    = PointRaySphere.RaycastSphere(in ray, in sphere1, out float fraction1, out float3 normal1);
-            bool           hit2    = PointRaySphere.RaycastSphere(in ray, in sphere2, out float fraction2, out float3 normal2);
-            fraction1              = math.select(2f, fraction1, hit1);
-            fraction2              = math.select(2f, fraction2, hit2);
-            fraction               = math.select(fraction2, fraction1, fraction1 < fraction2);
-            normal                 = math.select(normal2, normal1, fraction1 < fraction2);
-            return hit1 | hit2;
+            return RaycastCapsule(ray.start, ray.displacement, in capsule, out fraction, out normal);
         }
 
+        internal static bool RaycastCapsule(float3 rayStart, float3 rayDisplacement, in CapsuleCollider capsule, out float fraction, out float3 normal)
+        {
+            // Todo: We rely on axis being either a zero vector or NaN here when the capsule is degenerate.
+            float          axisLength = mathex.GetLengthAndNormal(capsule.pointB - capsule.pointA, out float3 axis);
+            SphereCollider cap        = new SphereCollider(capsule.pointA, capsule.radius);
+
+            // Ray vs infinite cylinder
+            float  directionDotAxis  = math.dot(rayDisplacement, axis);
+            float  originDotAxis     = math.dot(rayStart - capsule.pointA, axis);
+            float3 rayDisplacement2D = rayDisplacement - axis * directionDotAxis;
+            float3 rayOrigin2D       = rayStart - axis * originDotAxis;
+            bool   hitCylinder       = PointRaySphere.RaycastSphere(rayOrigin2D, rayDisplacement2D, in cap, out float cylinderFraction, out normal);
+            // Distance from either the start of the ray or the hitpoint projected onto the axis from pointA.
+            // If this value is between [0, axisLength], then either we hit the cylinder or missed the whole capsule.
+            float t       = math.select(originDotAxis, originDotAxis + cylinderFraction * directionDotAxis, hitCylinder);
+            bool  useCapB = t > axisLength;
+            if (t >= 0f && !useCapB)
+            {
+                fraction = math.select(2f, cylinderFraction, hitCylinder);
+                return hitCylinder;
+            }
+
+            // Ray vs caps
+            cap.center = math.select(capsule.pointA, capsule.pointB, useCapB);
+            return PointRaySphere.RaycastSphere(rayStart, rayDisplacement, in cap, out fraction, out normal);
+        }
+
+        // Todo: Phase out.
         internal static bool4 Raycast4Capsules(in Ray ray, in simdFloat3 capA, in simdFloat3 capB, float4 capRadius, out float4 fraction, out simdFloat3 normal)
+        {
+            return Raycast4Capsules(ray.start, ray.displacement, in capA, in capB, capRadius, out fraction, out normal);
+        }
+
+        internal static bool4 Raycast4Capsules(float3 rayStart,
+                                               float3 rayDisplacement,
+                                               in simdFloat3 capA,
+                                               in simdFloat3 capB,
+                                               float4 capRadius,
+                                               out float4 fraction,
+                                               out simdFloat3 normal)
         {
             float4 axisLength = mathex.GetLengthAndNormal(capB - capA, out simdFloat3 axis);
             // Ray vs infinite cylinder
-            float4     directionDotAxis  = simd.dot(ray.displacement, axis);
-            float4     originDotAxis     = simd.dot(ray.start - capA, axis);
-            simdFloat3 rayDisplacement2D = ray.displacement - axis * directionDotAxis;
-            simdFloat3 rayOrigin2D       = ray.start - axis * originDotAxis;
+            float4     directionDotAxis  = simd.dot(rayDisplacement, axis);
+            float4     originDotAxis     = simd.dot(rayStart - capA, axis);
+            simdFloat3 rayDisplacement2D = rayDisplacement - axis * directionDotAxis;
+            simdFloat3 rayOrigin2D       = rayStart - axis * originDotAxis;
             bool4      hitCylinder       = PointRaySphere.Raycast4Spheres(in rayOrigin2D,
                                                                      in rayDisplacement2D,
                                                                      in capA,
                                                                      capRadius,
                                                                      out float4 cylinderFraction,
                                                                      out simdFloat3 cylinderNormal);
-            float4 t     = originDotAxis + cylinderFraction * directionDotAxis;
-            hitCylinder &= t >= 0f & t <= axisLength;
+            float4 t              = math.select(originDotAxis, originDotAxis + cylinderFraction * directionDotAxis, hitCylinder);
+            bool4  useCapB        = t > axisLength;
+            bool4  useCylinderHit = (t >= 0f) & (!useCapB);
 
             // Ray vs caps
-            bool4 hitCapA = PointRaySphere.Raycast4Spheres(new simdFloat3(ray.start),
-                                                           new simdFloat3(ray.displacement),
-                                                           in capA,
-                                                           capRadius,
-                                                           out float4 capAFraction,
-                                                           out simdFloat3 capANormal);
-            bool4 hitCapB = PointRaySphere.Raycast4Spheres(new simdFloat3(ray.start),
-                                                           new simdFloat3(ray.displacement),
-                                                           in capB,
-                                                           capRadius,
-                                                           out float4 capBFraction,
-                                                           out simdFloat3 capBNormal);
+            var   cap    = simd.select(capA, capB, useCapB);
+            bool4 hitCap = PointRaySphere.Raycast4Spheres(new simdFloat3(rayStart),
+                                                          new simdFloat3(rayDisplacement),
+                                                          in cap,
+                                                          capRadius,
+                                                          out float4 capFraction,
+                                                          out simdFloat3 capNormal);
 
             // Find best result
-            cylinderFraction = math.select(2f, cylinderFraction, hitCylinder);
-            capAFraction     = math.select(2f, capAFraction, hitCapA);
-            capBFraction     = math.select(2f, capBFraction, hitCapB);
-
-            normal   = simd.select(cylinderNormal, capANormal, capAFraction < cylinderFraction);
-            fraction = math.select(cylinderFraction, capAFraction, capAFraction < cylinderFraction);
-            normal   = simd.select(normal, capBNormal, capBFraction < fraction);
-            fraction = math.select(fraction, capBFraction, capBFraction < fraction);
-            return fraction <= 1f;
+            fraction = math.select(capFraction, cylinderFraction, useCylinderHit);
+            normal   = simd.select(capNormal, cylinderNormal, useCylinderHit);
+            return math.select(hitCap, hitCylinder, useCylinderHit);
         }
-
-        /*public static bool PointCylinderDistance(float3 point, CylinderCollider cylinder, float maxDistance, out PointDistanceResultInternal result)
-           {
-            //Strategy: Project p onto the capsule's line.
-            //If on the segment, do point vs sphere.
-            //Otherwise do point vs disk
-            float3 edge = cylinder.pointB - cylinder.pointA;
-            float3 ap = point - cylinder.pointA;
-            float3 unitEdge = math.normalize(edge);
-            float dot = math.dot(ap, unitEdge);  //dot is distance of projected point from pointA
-            float3 pointOnLine = cylinder.pointA + unitEdge * dot;
-            if (dot < 0f)
-            {
-                //Todo: Optimize math
-                float3 pointOnLineToPoint = point - pointOnLine;  //This gives us our direction from the center of the cap to the edge towards the query point.
-                if (math.lengthsq(pointOnLineToPoint) > cylinder.radius * cylinder.radius)
-                {
-                    float3 roundNormal = math.normalize(pointOnLineToPoint);
-                    float3 capNormal = -unitEdge;
-                    result.normal = (roundNormal + capNormal) / math.SQRT2;  //Summing orthogonal unit vectors has a length of sqrt2
-                    result.hitpoint = cylinder.pointA + roundNormal * cylinder.radius;
-                    result.distance = math.distance(point, result.hitpoint);
-                }
-                else
-                {
-                    result.normal = -unitEdge;
-                    result.distance = -dot;
-                    result.hitpoint = point + unitEdge * result.distance;
-                }
-                return result.distance <= maxDistance;
-            }
-            if (dot * dot > math.lengthsq(edge))
-            {
-                //Todo: Optimize math
-                float3 pointOnLineToPoint = point - pointOnLine;  //This gives us our direction from the center of the cap to the edge towards the query point.
-                if (math.lengthsq(pointOnLineToPoint) > cylinder.radius * cylinder.radius)
-                {
-                    float3 roundNormal = math.normalize(pointOnLineToPoint);
-                    float3 capNormal = unitEdge;
-                    result.normal = (roundNormal + capNormal) / math.SQRT2;  //Summing orthogonal unit vectors has a length of sqrt2
-                    result.hitpoint = cylinder.pointB + roundNormal * cylinder.radius;
-                    result.distance = math.distance(point, result.hitpoint);
-                }
-                else
-                {
-                    result.normal = unitEdge;
-                    result.distance = math.distance(pointOnLine, cylinder.pointB);
-                    result.hitpoint = point - unitEdge * result.distance;
-                }
-                return result.distance <= maxDistance;
-            }
-            else
-            {
-                SphereCollider sphere = new SphereCollider(pointOnLine, cylinder.radius);
-                return DistanceBetween(point, sphere, maxDistance, out result);
-            }
-           }*/
 
         internal static float3 CapsuleNormalFromFeatureCode(ushort featureCode, in CapsuleCollider capsule, float3 csoOutwardDir)
         {

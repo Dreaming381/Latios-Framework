@@ -326,9 +326,8 @@ namespace Latios.Kinemation.Systems
                                     matMeshIndexRange.length  = newLength;
                                 }
 
-                                int              hiResMask        = 0;
-                                int              lowResMask       = 0;
-                                MmiRangeLodFlags mmiRangeLodFlags = default;
+                                int hiResMask  = 0;
+                                int lowResMask = 0;
                                 if (useMmiRangeLod)
                                 {
                                     materialMeshInfo.GetCurrentLodRegion(out var hiResLodIndex, out var isMmiCrossfading);
@@ -351,6 +350,7 @@ namespace Latios.Kinemation.Systems
 
                                     if (mmiRangeLodFlagsArray != null)
                                     {
+                                        var mmiRangeLodFlags = mmiRangeLodFlagsArray[entityIndex];
                                         if ((mmiRangeLodFlags.disableLod1MotionVectors && hiResMask == 2) || (mmiRangeLodFlags.disableLod2MotionVectors && hiResMask == 4))
                                         {
                                             drawCommandFlags                 &= ~BatchDrawCommandFlags.HasMotion;
@@ -404,6 +404,7 @@ namespace Latios.Kinemation.Systems
                                     if (isMeshLodCrossfade)
                                     {
                                         drawCommandSettings.meshLod++;
+                                        entityDrawSettings.complementLodCrossfade = !complementLod;
                                         DrawCommandOutput.Emit(ref drawCommandSettings, in entityDrawSettings);
                                     }
                                 }

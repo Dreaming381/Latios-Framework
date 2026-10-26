@@ -1043,14 +1043,14 @@ namespace Latios.Kinemation
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         void CheckTriangleIndex(int triangleIndex)
         {
-            if (math.clamp(triangleIndex, 0, triangleCount) != triangleIndex)
+            if ((uint)triangleIndex >= triangleCount)
                 throw new ArgumentOutOfRangeException($"Triangle index {triangleIndex} is out of range of MeshNormalizationBlob with {triangleCount} triangles.");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         void CheckDuplicateIndex(int rawDuplicate, int duplicateCount)
         {
-            if (math.clamp(rawDuplicate, 0, duplicateCount) != rawDuplicate)
+            if ((uint)rawDuplicate >= duplicateCount)
                 throw new ArgumentOutOfRangeException($"Duplicate index {rawDuplicate} is out of range of MeshNormalizationBlob with {duplicateCount} duplicate vertices.");
         }
 

@@ -408,7 +408,7 @@ namespace Latios.Kinemation
                 areaScale2  = meshMetric.meshLocalBounds.y * math.max(meshMetric.meshLocalBounds.x, meshMetric.meshLocalBounds.z);
             areaScale      /= math.max(1e-6f, areaScale2);
 
-            var distributionMetric = meshMetric.uv0Metric * areaScale / (textureScale.x * textureScale.y);
+            var distributionMetric = meshMetric.uv0Metric * areaScale / math.abs(textureScale.x * textureScale.y);
 
             var v      = (texelCount * distanceSq) / math.max(distributionMetric * cameraMipMapFactor, math.EPSILON);
             var result = 0.5f * math.log2(math.abs(v));

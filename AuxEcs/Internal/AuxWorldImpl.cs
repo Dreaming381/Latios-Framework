@@ -109,7 +109,7 @@ namespace Latios.AuxEcs
                 componentStore->Remove(indexInStore);
                 var removeOp = archetype.Remove(location.indexInArchetype);
                 entityStore.Remove(entity);
-                UpdateStoreWithRemoval(removeOp, location.indexInArchetype);
+                UpdateStoreWithRemoval(removeOp, location.archetypeIndex);
                 return;
             }
 
@@ -151,7 +151,7 @@ namespace Latios.AuxEcs
             }
             var removeOp = archetype.Remove(location.indexInArchetype);
             entityStore.Remove(entity);
-            UpdateStoreWithRemoval(removeOp, location.indexInArchetype);
+            UpdateStoreWithRemoval(removeOp, location.archetypeIndex);
             return;
         }
 
@@ -178,7 +178,8 @@ namespace Latios.AuxEcs
 
         public AuxComponentEnumerator<T> AllOf<T>() where T : unmanaged
         {
-            allComponentsStore.TryGetStore<T>(out var typeId);
+            if (allComponentsStore.TryGetStore<T>(out var typeId) == null)
+                return new AuxComponentEnumerator<T>(null, 0);
             fixed (AllComponentsStore* comps = &allComponentsStore)
             return new AuxComponentEnumerator<T>(comps, typeId);
         }
@@ -286,12 +287,12 @@ namespace Latios.AuxEcs
             entityStore.SetLocation(entity, new EntityStore.Location { archetypeIndex = archetypeIndex, indexInArchetype = entityIndexInArchetype });
         }
 
-        void UpdateStoreWithRemoval(ArchetypeStore.RemoveOperation removeOp, int removedIndex)
+        void UpdateStoreWithRemoval(ArchetypeStore.RemoveOperation removeOp, int removedArchetpyeIndex)
         {
             if (removeOp.swappedBackEntity != Entity.Null)
                 entityStore.SetLocation(removeOp.swappedBackEntity, new EntityStore.Location
                 {
-                    archetypeIndex   = removedIndex,
+                    archetypeIndex   = removedArchetpyeIndex,
                     indexInArchetype = removeOp.newIndex
                 });
         }

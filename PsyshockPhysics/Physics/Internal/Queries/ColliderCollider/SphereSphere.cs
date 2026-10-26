@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using Unity.Burst;
 using Unity.Mathematics;
 
@@ -11,7 +12,10 @@ namespace Latios.Psyshock
                                           in SphereCollider sphereB,
                                           in RigidTransform bTransform)
         {
-            return WithinDistance(in sphereA, in aTransform, in sphereB, in bTransform, 0f);
+            // Evaluate in world-space shifted to A's position.
+            var aCenter = math.rotate(aTransform.rot, sphereA.center);
+            var bCenter = bTransform.pos - aTransform.pos + math.rotate(bTransform.rot, sphereB.center);
+            return math.distancesq(aCenter, bCenter) <= math.square(sphereA.radius + sphereB.radius);
         }
 
         public static bool WithinDistance(in SphereCollider sphereA,
@@ -20,8 +24,11 @@ namespace Latios.Psyshock
                                           in RigidTransform bTransform,
                                           float maxDistance)
         {
-            var bInASpaceTransform = math.InverseTransformFast(aTransform, bTransform);
-            return PointRaySphere.WithinDistance(sphereA.center, in sphereB, in bInASpaceTransform, maxDistance + sphereA.radius);
+            // Evaluate in world-space shifted to A's position.
+            var aCenter   = math.rotate(aTransform.rot, sphereA.center);
+            var bCenter   = bTransform.pos - aTransform.pos + math.rotate(bTransform.rot, sphereB.center);
+            var threshold = sphereA.radius + sphereB.radius + maxDistance;
+            return math.distancesq(aCenter, bCenter) <= math.square(threshold) && threshold >= 0f;
         }
 
         public static bool DistanceBetween(in SphereCollider sphereA,
@@ -31,15 +38,16 @@ namespace Latios.Psyshock
                                            float maxDistance,
                                            out ColliderDistanceResult result)
         {
-            var            bInASpaceTransform = math.InverseTransformFast(aTransform, bTransform);
-            SphereCollider bInASpace          = new SphereCollider(math.transform(bInASpaceTransform, sphereB.center), sphereB.radius);
-            bool           hit                = SphereSphereDistance(in sphereA, in bInASpace, maxDistance, out ColliderDistanceResultInternal localResult, out _);
-            result                            = new ColliderDistanceResult
+            // Evaluate in world-space shifted to A's position.
+            var  aWorldRelative = new SphereCollider(math.rotate(aTransform.rot, sphereA.center), sphereA.radius);
+            var  bWorldRelative = new SphereCollider(bTransform.pos - aTransform.pos + math.rotate(bTransform.rot, sphereB.center), sphereB.radius);
+            bool hit            = SphereSphereDistance(in aWorldRelative, in bWorldRelative, maxDistance, out ColliderDistanceResultInternal localResult, out _);
+            result              = new ColliderDistanceResult
             {
-                hitpointA         = math.transform(aTransform, localResult.hitpointA),
-                hitpointB         = math.transform(aTransform, localResult.hitpointB),
-                normalA           = math.rotate(aTransform, localResult.normalA),
-                normalB           = math.rotate(aTransform, localResult.normalB),
+                hitpointA         = localResult.hitpointA + aTransform.pos,
+                hitpointB         = localResult.hitpointB + aTransform.pos,
+                normalA           = localResult.normalA,
+                normalB           = localResult.normalB,
                 distance          = localResult.distance,
                 subColliderIndexA = 0,
                 subColliderIndexB = 0,
@@ -56,24 +64,23 @@ namespace Latios.Psyshock
                                         in RigidTransform targetSphereTransform,
                                         out ColliderCastResult result)
         {
-            var cso     = targetSphere;
-            cso.radius += sphereToCast.radius;
-            var  start  = math.transform(castStart, sphereToCast.center);
-            var  ray    = new Ray(start, start + castEnd - castStart.pos);
-            bool hit    = PointRaySphere.Raycast(in ray, in cso, in targetSphereTransform, out var raycastResult);
+            // Shift everything relative to target's position in world-space
+            var  castCenter   = castStart.pos - targetSphereTransform.pos + math.rotate(castStart.rot, sphereToCast.center);
+            var  targetCenter = math.rotate(targetSphereTransform.rot, targetSphere.center);
+            var  cso          = new SphereCollider(targetCenter, sphereToCast.radius + targetSphere.radius);
+            var  displacement = castEnd - castStart.pos;
+            bool hit          = PointRaySphere.RaycastSphere(castCenter, displacement, in cso, out var fraction, out var normal);
             if (hit)
             {
-                var hitTransform  = castStart;
-                hitTransform.pos += raycastResult.position - start;
-                DistanceBetween(in sphereToCast, in hitTransform, in targetSphere, in targetSphereTransform, 1f, out var distanceResult);
-                result = new ColliderCastResult
+                var hitpoint = targetSphereTransform.pos + targetCenter + normal * targetSphere.radius;
+                result       = new ColliderCastResult
                 {
-                    hitpoint                 = distanceResult.hitpointA,
-                    normalOnCaster           = distanceResult.normalA,
-                    normalOnTarget           = distanceResult.normalB,
-                    subColliderIndexOnCaster = distanceResult.subColliderIndexA,
-                    subColliderIndexOnTarget = distanceResult.subColliderIndexB,
-                    distance                 = math.distance(hitTransform.pos, castStart.pos)
+                    hitpoint                 = hitpoint,
+                    normalOnCaster           = -normal,
+                    normalOnTarget           = normal,
+                    subColliderIndexOnCaster = 0,
+                    subColliderIndexOnTarget = 0,
+                    distance                 = fraction * math.length(displacement),
                 };
                 return true;
             }
@@ -139,16 +146,20 @@ namespace Latios.Psyshock
                                                   out ColliderDistanceResultInternal result,
                                                   out bool degenerate)
         {
-            var hit = PointRaySphere.PointSphereDistance(sphereA.center, in sphereB, maxDistance + sphereA.radius, out var pointResult, out degenerate);
-            result  = new ColliderDistanceResultInternal
+            float3 delta                    = sphereB.center - sphereA.center;
+            float  distanceSqBetweenCenters = math.lengthsq(delta);  //point center distance
+            float  distanceBetweenCenters   = math.sqrt(distanceSqBetweenCenters);
+            degenerate                      = distanceSqBetweenCenters < PointRaySphere.kUnmeasurableLengthSqThreshold;
+            float3 normalA                  = math.select(delta / distanceBetweenCenters, new float3(0, 1, 0), degenerate);  // choose an arbitrary normal when the distance is zero
+            result                          = new ColliderDistanceResultInternal
             {
-                hitpointA = sphereA.center - pointResult.normal * sphereA.radius,
-                hitpointB = pointResult.hitpoint,
-                normalA   = -pointResult.normal,
-                normalB   = pointResult.normal,
-                distance  = pointResult.distance - sphereA.radius
+                hitpointA = sphereA.center + normalA * sphereA.radius,
+                hitpointB = sphereB.center - normalA * sphereB.radius,
+                normalA   = normalA,
+                normalB   = -normalA,
+                distance  = distanceBetweenCenters - sphereA.radius - sphereB.radius
             };
-            return hit;
+            return result.distance <= maxDistance;
         }
     }
 }

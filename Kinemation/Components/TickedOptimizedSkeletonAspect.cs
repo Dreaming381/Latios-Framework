@@ -4,6 +4,7 @@ using System.Diagnostics;
 using Latios.Transforms;
 using Unity.Burst.CompilerServices;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 
@@ -42,6 +43,7 @@ namespace Latios.Kinemation
             m_skeletonState            = optimizedSkeletonState;
             m_boneTransforms           = optimizedBoneTransformBuffer;
             m_bonesInertialBlendStates = optimizedBoneInertialBlendStateBuffer;
+            m_boneCount                = (short)skeletonHierarchyBlob.parentIndices.Length;
 
             {
                 var requiredBones = m_skeletonHierarchyBlobRef.ValueRO.blob.Value.parentIndices.Length;
@@ -65,8 +67,6 @@ namespace Latios.Kinemation
                     m_skeletonState.ValueRW.state |= OptimizedSkeletonState.Flags.NeedsHistorySync;
                 }
             }
-
-            m_boneCount = (short)skeletonHierarchyBlob.parentIndices.Length;
 
             {
                 var worldTransformBones = m_boneTransforms.AsNativeArray().GetSubArray(m_currentBaseRootIndexWrite, boneCount);
@@ -247,7 +247,7 @@ namespace Latios.Kinemation
                 transforms[i]           = qvvs.inversemulqvvs(in skeletonTransform, in transforms[i]);
                 transforms[i].context32 = boneIndices[i];
             }
-            bones[0].ApplyRootTransformChanges(transforms, m_currentBaseRootIndexWrite);
+            bones[0].ApplyRootTransformChanges(transforms);
         }
 
         /// <summary>
@@ -262,7 +262,7 @@ namespace Latios.Kinemation
             {
                 transforms[i].context32 = boneIndices[i];
             }
-            bones[0].ApplyRootTransformChanges(transforms, m_currentBaseRootIndexWrite);
+            bones[0].ApplyRootTransformChanges(transforms);
         }
 
         /// <summary>
@@ -347,11 +347,16 @@ namespace Latios.Kinemation
         /// <summary>
         /// Copies the tick's initial transforms into the current pose buffer.
         /// </summary>
-        public void CopyFromPrevious()
+        public unsafe void CopyFromPrevious()
         {
-            var array = m_boneTransforms.AsNativeArray();
+            var array       = m_boneTransforms.AsNativeArray();
+            var previousPtr = (TickedOptimizedBoneTransform*)array.GetUnsafePtr() + m_previousBaseRootIndex;
+            for (int i = 0; i < boneCount; i++)
+            {
+                previousPtr[i].boneTransform.context32 = array[m_currentBaseRootIndexWrite + i].boneTransform.context32;
+            }
             array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).CopyFrom(array.GetSubArray(m_previousBaseRootIndex, boneCount * 2));
-            InitWeights(array.GetSubArray(m_currentBaseRootIndexWrite, boneCount * 2).Reinterpret<TransformQvvs>());
+            InitWeights(array.GetSubArray(m_currentBaseRootIndexWrite + boneCount, boneCount).Reinterpret<TransformQvvs>());
             ref var state  = ref m_skeletonState.ValueRW.state;
             state         |= OptimizedSkeletonState.Flags.IsDirty;
             state         &= ~(OptimizedSkeletonState.Flags.NeedsSync | OptimizedSkeletonState.Flags.NextSampleShouldAdd);
@@ -566,7 +571,7 @@ namespace Latios.Kinemation
                 if (m_index > 0)
                 {
                     var socketUpdater = new SocketUpdater(m_skeletonWorldTransform, m_socketCount);
-                    socketUpdater.SetPosition(root.boneTransform.context32, value);
+                    socketUpdater.SetPosition(root.boneTransform.context32, root.boneTransform.position);
                     PropagatePositionChangeToChildren(ref m_allChildrenIndices, ref socketUpdater, currentRootIndex - m_index, m_index);
                     socketUpdater.ApplyAndDispose();
                 }
@@ -593,7 +598,7 @@ namespace Latios.Kinemation
                 if (m_index > 0)
                 {
                     var socketUpdater = new SocketUpdater(m_skeletonWorldTransform, m_socketCount);
-                    socketUpdater.SetRotation(root.boneTransform.context32, value);
+                    socketUpdater.SetRotation(root.boneTransform.context32, root.boneTransform.rotation);
                     PropagateRotationChangeToChildren(ref m_allChildrenIndices, ref socketUpdater, currentRootIndex - m_index, m_index);
                     socketUpdater.ApplyAndDispose();
                 }
@@ -620,7 +625,7 @@ namespace Latios.Kinemation
                 if (m_index > 0)
                 {
                     var socketUpdater = new SocketUpdater(m_skeletonWorldTransform, m_socketCount);
-                    socketUpdater.SetScale(root.boneTransform.context32, value);
+                    socketUpdater.SetScale(root.boneTransform.context32, root.boneTransform.scale);
                     PropagateScaleChangeToChildren(ref m_allChildrenIndices, ref socketUpdater, currentRootIndex - m_index, m_index);
                     socketUpdater.ApplyAndDispose();
                 }
@@ -713,7 +718,7 @@ namespace Latios.Kinemation
                 if (m_index > 0)
                 {
                     var socketUpdater = new SocketUpdater(m_skeletonWorldTransform, m_socketCount);
-                    socketUpdater.SetTransform(root.boneTransform.context32, value);
+                    socketUpdater.SetTransform(root.boneTransform.context32, root.boneTransform);
                     PropagateTransformChangeToChildren(ref m_allChildrenIndices, ref socketUpdater, currentRootIndex - m_index, m_index);
                     socketUpdater.ApplyAndDispose();
                 }

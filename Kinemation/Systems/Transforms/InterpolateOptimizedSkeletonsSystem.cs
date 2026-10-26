@@ -111,7 +111,7 @@ namespace Latios.Kinemation.Systems
                     for (int j = 0; j < dstBones.Length; j++)
                     {
                         var prev      = previousBones[j];
-                        var curr      = tickedBones[j];
+                        var curr      = currentBones[j];
                         var rot       = math.nlerp(prev.boneTransform.rotation, curr.boneTransform.rotation, factor);
                         var pos       = math.lerp(prev.boneTransform.position, curr.boneTransform.position, factor);
                         var scale     = math.lerp(prev.boneTransform.scale, curr.boneTransform.scale, factor);
@@ -220,7 +220,7 @@ namespace Latios.Kinemation.Systems
                     for (int j = 0; j < dstBones.Length; j++)
                     {
                         var prev      = previousBones[j];
-                        var curr      = tickedBones[j];
+                        var curr      = currentBones[j];
                         var rot       = math.nlerp(prev.boneTransform.rotation, curr.boneTransform.rotation, factor);
                         var pos       = math.lerp(prev.boneTransform.position, curr.boneTransform.position, factor);
                         var scale     = math.lerp(prev.boneTransform.scale, curr.boneTransform.scale, factor);

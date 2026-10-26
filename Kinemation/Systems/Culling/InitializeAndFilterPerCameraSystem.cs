@@ -151,7 +151,7 @@ namespace Latios.Kinemation.Systems
                 var chunkHeaders        = metaChunk.GetComponentDataPtrRO(ref headerHandle);
                 for (int i = 0; i < metaChunk.Count; i++)
                 {
-                    if (chunkPerCameraMasks[i].lower.Value == 0)
+                    if (chunkPerCameraMasks[i].lower.Value == 0 && chunkPerCameraMasks[i].upper.Value == 0)
                         continue;
 
                     ref var chunk                 = ref chunkHeaders[i].ArchetypeChunk;

@@ -477,7 +477,7 @@ namespace Latios.Kinemation.Systems
                     upper                            |= propertyTypeMasks[21];
                     context.legacyComputeDeformArray  = chunk.GetNativeArray(ref legacyComputeDeformHandle).Reinterpret<uint>();
                 }
-                if ((classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None)
+                if ((classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None)
                 {
                     lower                         |= propertyTypeMasks[22];
                     upper                         |= propertyTypeMasks[23];
@@ -511,7 +511,7 @@ namespace Latios.Kinemation.Systems
                 context.legacyLbsArray[indexInChunk] = legacyLbsLookup[srcEntity].firstMatrixIndex;
             if ((context.classification & DeformClassification.LegacyCompute) != DeformClassification.None)
                 context.legacyComputeDeformArray[indexInChunk] = legacyComputeDeformLookup[srcEntity].firstVertexIndex;
-            if ((context.classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None)
+            if ((context.classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None)
                 context.legacyDotsDeformArray[indexInChunk] = legacyDotsDeformLookup[srcEntity].parameters;
         }
     }

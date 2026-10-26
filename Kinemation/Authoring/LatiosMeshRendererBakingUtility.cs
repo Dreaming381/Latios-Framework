@@ -259,7 +259,7 @@ namespace Latios.Kinemation.Authoring
             if (material.HasProperty(s_legacyComputeDeformProperty))
                 classification |= DeformClassification.LegacyCompute;
             if (material.HasProperty(s_legacyDotsDeformProperty))
-                classification |= DeformClassification.LegacyDotsDefom;
+                classification |= DeformClassification.LegacyDotsDeform;
             if (material.HasProperty(s_currentVertexMatrixProperty))
                 classification |= DeformClassification.CurrentVertexMatrix;
             if (material.HasProperty(s_previousVertexMatrixProperty))
@@ -354,7 +354,7 @@ namespace Latios.Kinemation.Authoring
                 materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyLinearBlendSkinningShaderIndex>());
             if ((classification & DeformClassification.LegacyCompute) != DeformClassification.None)
                 materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyComputeDeformShaderIndex>());
-            if ((classification & DeformClassification.LegacyDotsDefom) != DeformClassification.None)
+            if ((classification & DeformClassification.LegacyDotsDeform) != DeformClassification.None)
                 materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<LegacyDotsDeformParamsShaderIndex>());
             if ((classification & DeformClassification.CurrentVertexMatrix) != DeformClassification.None)
                 materialPropertyTypesToAdd.Add(ComponentType.ReadWrite<CurrentMatrixVertexSkinningShaderIndex>());

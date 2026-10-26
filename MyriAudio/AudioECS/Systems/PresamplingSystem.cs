@@ -38,7 +38,7 @@ namespace Latios.Myri.AudioEcsBuiltin
             }
 
             // Read updates
-            for (int i = context.visualFrameUpdates.length - 1; i >= 0; i--)
+            for (int i = 0; i < context.visualFrameUpdates.length; i++)
             {
                 var update = context.visualFrameUpdates[i];
                 foreach (var message in update.pipeReader.Each<PresampledListenerMessage>())

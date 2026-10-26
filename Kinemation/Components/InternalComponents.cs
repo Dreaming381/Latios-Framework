@@ -388,13 +388,13 @@ namespace Latios.Kinemation
         TwoAgoVertexDqs = 1 << 8,
         LegacyLbs = 1 << 9,
         LegacyCompute = 1 << 10,
-        LegacyDotsDefom = 1 << 11,
+        LegacyDotsDeform = 1 << 11,
         RequiresUploadDynamicMesh = 1 << 12,
         RequiresGpuComputeBlendShapes = 1 << 13,
         RequiresGpuComputeMatrixSkinning = 1 << 14,
         RequiresGpuComputeDqsSkinning = 1 << 15,
-        AnyCurrentDeform = CurrentDeform | LegacyCompute | LegacyDotsDefom,
-        AnyPreviousDeform = PreviousDeform | LegacyDotsDefom,
+        AnyCurrentDeform = CurrentDeform | LegacyCompute | LegacyDotsDeform,
+        AnyPreviousDeform = PreviousDeform | LegacyDotsDeform,
     }
 
     internal partial struct DeformClassificationMap : ICollectionComponent

@@ -83,9 +83,11 @@ namespace Latios.Kinemation.Systems
             public void Execute(in ArchetypeChunk chunk, int unfilteredChunkIndex, bool useEnabledMask, in v128 chunkEnabledMask)
             {
                 var worldTransformChanged = worldTransformHandle.DidChange(in chunk, lastSystemVersion);
-                var renderBoundsChanged   = chunk.DidChange(ref renderBoundsHandle, lastSystemVersion);
-                var skeletonDependents    = chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
-                var copyDeforms           = chunk.GetComponentDataPtrRO(ref copyDeformFromEntityHandle);
+                var renderBoundsChanged   = chunk.DidChange(ref renderBoundsHandle, lastSystemVersion) ||
+                                            chunk.DidChange(ref postProcessMatrixHandle, lastSystemVersion) ||
+                                            chunk.DidChange(ref shaderEffectRadialBoundsHandle, lastSystemVersion);
+                var skeletonDependents = chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
+                var copyDeforms        = chunk.GetComponentDataPtrRO(ref copyDeformFromEntityHandle);
                 if (disableComputeChecker[chunk])
                 {
                     skeletonDependents = null;
@@ -166,7 +168,8 @@ namespace Latios.Kinemation.Systems
                             var dependents    = dependentInfo.Chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
                             if (dependents == null)
                                 tempSkeletonOffsetsBuffer[i] = default; // We are missing the dependent, so ignore the offset.
-                            tempSkeletonOffsetsBuffer[i]     = skeletonWorldBoundsOffsetsFromPositionLookup[dependents[dependentInfo.IndexInChunk].root];
+                            else
+                                tempSkeletonOffsetsBuffer[i] = skeletonWorldBoundsOffsetsFromPositionLookup[dependents[dependentInfo.IndexInChunk].root];
                         }
                     }
                     skeletonBufferFilled = true;
@@ -229,7 +232,7 @@ namespace Latios.Kinemation.Systems
 
             bool DidOtherTransformChange(ref WorldTransformReadOnlyAspect.TypeHandle handle, Entity entity)
             {
-                return handle.DidChange(esil[entity].Chunk, lastSystemVersion);
+                return handle.DidChange(esil[entity].Chunk, lastSystemVersion) || skeletonWorldBoundsOffsetsFromPositionLookup.DidChange(entity, lastSystemVersion);
             }
 
             bool DidOtherDependentsTransformChange(ref WorldTransformReadOnlyAspect.TypeHandle handle, Entity dependent)
@@ -238,7 +241,7 @@ namespace Latios.Kinemation.Systems
                 var dependents    = dependentInfo.Chunk.GetComponentDataPtrRO(ref skeletonDependentHandle);
                 if (dependents == null)
                     return false; // We are missing the dependent, so just keep things as-is.
-                return DidOtherDependentsTransformChange(ref handle, dependents[dependentInfo.IndexInChunk].root);
+                return DidOtherTransformChange(ref handle, dependents[dependentInfo.IndexInChunk].root);
             }
 
             void ComputeChunkAabbOnly(in ArchetypeChunk chunk)

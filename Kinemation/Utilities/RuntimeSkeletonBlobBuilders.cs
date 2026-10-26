@@ -216,8 +216,9 @@ namespace Latios.Kinemation.RuntimeBlobBuilders
 
         public TransformQvvs SampleBone(int clipIndex, int boneIndex, int sampleIndex)
         {
-            var clip   = clips[clipIndex];
-            var target = clip.boneTransformStart + boneIndex * clip.boneTransformCount + sampleIndex;
+            var clip        = clips[clipIndex];
+            int sampleCount = clip.boneTransformCount / boneCount;
+            var target      = clip.boneTransformStart + boneIndex * sampleCount + sampleIndex;
             return boneSamplesBuffer[target];
         }
 

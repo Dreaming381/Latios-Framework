@@ -308,9 +308,10 @@ namespace Latios.Kinemation
                     Debug.LogWarning("Attempted to allocate a persistent graphics buffer over 1 GB. Rendering artifacts may occur.");
                     requiredSize = m_currentSize;
                 }
-                ulong size       = math.select(math.ceilpow2(requiredSize), kMaxBufferSize / m_stride, requiredSize * m_stride == kMaxBufferSize);
-                var   prevBuffer = m_currentBuffer;
-                m_currentBuffer  = new GraphicsBufferUnmanaged(m_bindingTarget, GraphicsBuffer.UsageFlags.None, (int)size, (int)m_stride);
+                var   roundedSize = math.ceilpow2(requiredSize) * m_stride;
+                ulong size        = math.select(roundedSize, kMaxBufferSize / m_stride, roundedSize > kMaxBufferSize);
+                var   prevBuffer  = m_currentBuffer;
+                m_currentBuffer   = new GraphicsBufferUnmanaged(m_bindingTarget, GraphicsBuffer.UsageFlags.None, (int)size, (int)m_stride);
                 if (m_copyShader.IsValid())
                 {
                     m_copyShader.GetKernelThreadGroupSizes(0, out var threadGroupSize, out _, out _);

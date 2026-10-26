@@ -157,8 +157,8 @@ namespace Latios.Kinemation.Systems
                                             haveNewMeshes | haveDeadMeshes | haveNewPreviousPostProcessMatrix | haveDeadPreviousPostProcessMatrix |
                                             haveNewCopyMeshes | haveDeadCopyMeshes;
 
-            bool requiresManagers = haveNewExposedSkeletons | haveDeadExposedSkeletons | haveDeadExposedSkeletons2 | haveNewDeformMeshes | haveDeadDeformMeshes |
-                                    haveBindableMeshes;
+            bool requiresManagers = haveNewExposedSkeletons | haveDeadExposedSkeletons | haveDeadExposedSkeletons2 | haveSyncableExposedSkeletons | haveNewDeformMeshes |
+                                    haveDeadDeformMeshes | haveBindableMeshes;
 
             var allocator = state.WorldUpdateAllocator;
 
@@ -371,9 +371,11 @@ namespace Latios.Kinemation.Systems
                 optimizedTypes.Add(ComponentType.ReadWrite<OptimizedBoneBounds>());
                 optimizedTypes.Add(ComponentType.ReadWrite<SkeletonWorldBoundsOffsetsFromPosition>());
 
-                state.EntityManager.RemoveComponent( m_deadOptimizedSkeletonsQuery, new ComponentTypeSet(optimizedTypes));
-                state.EntityManager.RemoveComponent( m_deadExposedSkeletonsQuery,   new ComponentTypeSet(ComponentType.ReadWrite<ExposedSkeletonCullingIndex>()));
-                state.EntityManager.RemoveComponent( m_deadSkeletonsQuery,          new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>()));
+                state.EntityManager.RemoveComponent( m_deadOptimizedSkeletonsQuery,  new ComponentTypeSet(optimizedTypes));
+                state.EntityManager.RemoveComponent( m_deadOptimizedSkeletonsQuery2, new ComponentTypeSet(optimizedTypes));
+                state.EntityManager.RemoveComponent( m_deadExposedSkeletonsQuery,    new ComponentTypeSet(ComponentType.ReadWrite<ExposedSkeletonCullingIndex>()));
+                state.EntityManager.RemoveComponent( m_deadExposedSkeletonsQuery2,   new ComponentTypeSet(ComponentType.ReadWrite<ExposedSkeletonCullingIndex>()));
+                state.EntityManager.RemoveComponent( m_deadSkeletonsQuery,           new ComponentTypeSet(ComponentType.ReadWrite<DependentSkinnedMesh>()));
 
                 optimizedTypes.Add(ComponentType.ReadWrite<DependentSkinnedMesh>());
 
@@ -1162,6 +1164,7 @@ namespace Latios.Kinemation.Systems
                 {
                     var op = skinnedRemoveOps[i];
 
+                    if (op.oldDependentState.root != Entity.Null)
                     {
                         ref var entry = ref boneManager.entries.ElementAt(op.oldDependentState.boneOffsetEntryIndex);
                         if (op.oldDependentState.meshBindingBlob != BlobAssetReference<MeshBindingPathsBlob>.Null)
@@ -1849,6 +1852,7 @@ namespace Latios.Kinemation.Systems
                         boundsBuffer.Resize(boneTransformLookup[skeletonEntity].Length, NativeArrayOptions.ClearMemory);
                     }
                     var boundsArray = boundsBuffer.Reinterpret<float>().AsNativeArray();
+                    boundsArray.AsSpan().Clear();
 
                     bool needsCollapse = true;
                     for (int i = 0; i < depsBuffer.Length; i++)

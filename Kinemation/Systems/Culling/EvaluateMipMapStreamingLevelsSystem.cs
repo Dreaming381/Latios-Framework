@@ -540,9 +540,10 @@ namespace Latios.Kinemation
                     {
                         for (int i = rangeStart, rangeEnd = rangeStart + rangeCount; i < rangeEnd; i++)
                         {
-                            var   bounds     = worldBoundsArray[i];
-                            var   distanceSq = math.distancesq(bounds.Value.Center, camera.position);
-                            var   extents    = bounds.Value.Extents;
+                            var bounds     = worldBoundsArray[i];
+                            var distanceSq = math.distancesq(bounds.Value.Center, camera.position);
+                            distanceSq     = math.select(1f, distanceSq, camera.isPerspective);
+                            var   extents  = bounds.Value.Extents;
                             float area;
                             if (extents.x > extents.y)
                                 area = extents.x * math.max(extents.y, extents.z);

@@ -75,7 +75,7 @@ namespace Latios.Kinemation
             var loopCycleTransitions = clip.CountLoopCycleTransitions(currentLoopingTime, previousLoopingTime);
             var currentClipTime      = clip.LoopToClipTime(currentLoopingTime);
             var previousClipTime     = clip.LoopToClipTime(previousLoopingTime);
-            var current              = clip.SampleBone(0, currentClipTime);
+            var current              = clip.SampleBone(0, currentClipTime, keyframeInterpolationMode);
             Accumulate(in current, weight, ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
         }
 
@@ -115,8 +115,8 @@ namespace Latios.Kinemation
                 }
                 else
                 {
-                    var h = RootMotionTools.DeltaBetween(endRoot, current);
-                    var t = RootMotionTools.DeltaBetween(previousRoot, beginRoot);
+                    var h = RootMotionTools.DeltaBetween(beginRoot, previousRoot);
+                    var t = RootMotionTools.DeltaBetween(current, endRoot);
                     if (Hint.Unlikely(loopCycleTransitions < -1.5f))
                     {
                         var middleDelta = RootMotionTools.DeltaBetween(beginRoot, endRoot);

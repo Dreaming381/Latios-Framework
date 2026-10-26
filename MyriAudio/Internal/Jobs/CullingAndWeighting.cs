@@ -89,12 +89,12 @@ namespace Latios.Myri
                     int listenerChannelCount      = 1;
                     for (int listenerIndex = 0; listenerIndex < listenersWithTransforms.Length; listenerIndex++, listenerFirstChannelIndex += listenerChannelCount)
                     {
-                        var listener = listenersWithTransforms[listenerIndex];
-                        if (listener.channelIDsRange.y == 0 || listener.listener.volume <= 0f)
-                            continue;
-
+                        var     listener     = listenersWithTransforms[listenerIndex];
                         ref var blob         = ref listener.listener.ildProfile.Value;
                         listenerChannelCount = blob.anglesPerLeftChannel.Length + blob.anglesPerRightChannel.Length;
+
+                        if (listener.channelIDsRange.y == 0 || listener.listener.volume <= 0f)
+                            continue;
 
                         var rangeSq = math.square(e.outerRange * listener.listener.rangeMultiplier);
                         if (isSpatial && math.distancesq(e.transform.pos, listener.transform.pos) >= rangeSq)
@@ -158,7 +158,7 @@ namespace Latios.Myri
                                 var toAdd = new ExportableSource
                                 {
                                     source      = channelSource,
-                                    channel     = i,
+                                    channel     = listenerFirstChannelIndex + i,
                                     stableIndex = sourceIndex
                                 };
                                 toAdd.source.sourceHeader.volume *= w.channelWeights[i];

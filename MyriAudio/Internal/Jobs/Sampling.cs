@@ -152,13 +152,12 @@ namespace Latios.Myri
             void SampleMismatchedRateLooped(ThreadStackAllocator tsa, ref AudioClipBlob clip, double clipStart, double clipSampleStride, bool isRightChannel, float weight,
                                             Span<float> output)
             {
-                var clipLengthInOutputSamples = clip.sampleCountPerChannel * clipSampleStride;
                 while (clipStart < 0.0)
                 {
                     clipStart += clip.sampleCountPerChannel;
                 }
                 clipStart %= clip.sampleCountPerChannel;
-                if (clipStart + output.Length * clipSampleStride + 1 < clipLengthInOutputSamples)
+                if (clipStart + output.Length * clipSampleStride + 1 < clip.sampleCountPerChannel)
                 {
                     // No wrapping.
                     SampleMismatchedRateOneshot(tsa, ref clip, clipStart, clipSampleStride, isRightChannel, weight, output);
@@ -193,8 +192,10 @@ namespace Latios.Myri
                 int remainingClipSamples   = clip.sampleCountPerChannel - clipStart;
                 int remainingOutputSamples = math.min(output.Length, math.select(0, remainingClipSamples, remainingClipSamples > 0));
                 int inputSampleCount       = remainingOutputSamples - outputStartIndex;
-                int inputSampleStart       = math.max(clipStart, 0);
-                var context                = new CodecContext
+                if (inputSampleCount <= 0)
+                    return;
+                int inputSampleStart = math.max(clipStart, 0);
+                var context          = new CodecContext
                 {
                     sampleRate           = frameState.Value.format.sampleRate,
                     threadStackAllocator = tsa.CreateChildAllocator()
@@ -250,7 +251,7 @@ namespace Latios.Myri
                 {
                     double pos                    = clipStart + clipSampleStride * i;
                     var    posLeft                = (int)pos;
-                    var    posRight               = posLeft + 1;
+                    var    posRight               = math.min(posLeft + 1, inputSampleCount - 1);
                     var    leftSample             = input[posLeft];
                     var    rightSample            = input[posRight];
                     output[outputStartIndex + i] += math.lerp(leftSample, rightSample, (float)math.frac(pos)) * weight;

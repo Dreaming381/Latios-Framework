@@ -38,9 +38,9 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         public unsafe void OnUpdate(ref SystemState state)
         {
-            var api                = this.GetApi(ref state);
-            var lastSystemVersion = state.LastSystemVersion;
-            var allocator         = state.WorldUpdateAllocator;
+            var api                        = this.GetApi(ref state);
+            var lastSystemVersion          = state.LastSystemVersion;
+            var allocator                  = state.WorldUpdateAllocator;
             var exposedCullingIndexManager = api.worldBlackboardEntity.GetCollectionComponent<ExposedCullingIndexManager>(true);
             var inputJh                    = state.Dependency;
 
@@ -53,10 +53,10 @@ namespace Latios.Kinemation.Systems
                 perThreadBitArrays = CollectionHelper.CreateNativeArray<UnsafeBitArray>(JobsUtility.ThreadIndexCount, allocator);
                 exposedJh          = new UpdateExposedBoneWorldBoundsJob
                 {
-                    allocator             = allocator,
-                    perThreadBitArrays    = perThreadBitArrays,
-                    maxBitIndex           = exposedCullingIndexManager.maxIndex,
-                    lastSystemVersion     = lastSystemVersion
+                    allocator          = allocator,
+                    perThreadBitArrays = perThreadBitArrays,
+                    maxBitIndex        = exposedCullingIndexManager.maxIndex,
+                    lastSystemVersion  = lastSystemVersion
                 }.Inject(api).ScheduleParallel(m_exposedBonesQuery, inputJh);
 
                 m_exposedSkeletonsQuery.AddWorldTranformChangeFilter();
@@ -94,7 +94,7 @@ namespace Latios.Kinemation.Systems
 
             var optimizedJh = new OptimizedBoneBoundsJob
             {
-                lastSystemVersion    = lastSystemVersion
+                lastSystemVersion = lastSystemVersion
             }.Inject(api).ScheduleParallel(m_optimizedSkeletonsQuery, inputJh);
 
             if (hasExposed)
@@ -113,12 +113,12 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct UpdateExposedBoneWorldBoundsJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] ComponentTypeHandle<BoneBounds>       boneBoundsHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<BoneCullingIndex> indexHandle;
-            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle      worldTransformHandle;
-            [ReadOnly] public NativeReference<int>                  maxBitIndex;
+            [ReadOnly, Inject] ComponentTypeHandle<BoneBounds>         boneBoundsHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<BoneCullingIndex>   indexHandle;
+            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle worldTransformHandle;
+            [ReadOnly] public NativeReference<int>                     maxBitIndex;
 
-            [Inject] ComponentTypeHandle<BoneWorldBounds>                              boneWorldBoundsHandle;
+            [Inject] ComponentTypeHandle<BoneWorldBounds>                            boneWorldBoundsHandle;
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeBitArray> perThreadBitArrays;
             public Allocator                                                         allocator;
 
@@ -160,7 +160,7 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct FlagDirtyExposedSkeletonRootsJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] ComponentTypeHandle<ExposedSkeletonCullingIndex>       indexHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<ExposedSkeletonCullingIndex>      indexHandle;
             [ReadOnly] public NativeReference<int>                                   maxBitIndex;
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeBitArray> perThreadBitArrays;
             public Allocator                                                         allocator;
@@ -201,10 +201,13 @@ namespace Latios.Kinemation.Systems
                 {
                     if (perThreadBitArrays[i].IsCreated)
                     {
-                        startFrom             = i + 1;
-                        perThreadBitArrays[0] = perThreadBitArrays[i];
-                        perThreadBitArrays[i] = default;
-                        ulongCount.Value      = (perThreadBitArrays[0].Length + 63) / 64;
+                        startFrom = i + 1;
+                        if (i > 0)
+                        {
+                            perThreadBitArrays[0] = perThreadBitArrays[i];
+                            perThreadBitArrays[i] = default;
+                        }
+                        ulongCount.Value = (perThreadBitArrays[0].Length + 63) / 64;
                         break;
                     }
                 }
@@ -235,8 +238,8 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct CombineExposedBoneBoundsPerThreadJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] ComponentTypeHandle<BoneWorldBounds>                      boundsHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<BoneCullingIndex>                     indexHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<BoneWorldBounds>                     boundsHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<BoneCullingIndex>                    indexHandle;
             [ReadOnly] public NativeReference<int>                                      maxBitIndex;
             [ReadOnly] public NativeArray<UnsafeBitArray>                               perThreadBitArrays;
             [NativeDisableParallelForRestriction] public NativeArray<UnsafeList<Aabb> > perThreadBoundsArrays;
@@ -320,10 +323,10 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct GatherExposedSkeletonBoundsJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle                 worldTransformHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<ExposedSkeletonCullingIndex> indexHandle;
-            [ReadOnly] public NativeArray<UnsafeBitArray>                      perThreadBitArrays;
-            [ReadOnly] public NativeArray<UnsafeList<Aabb> >                   perThreadBoundsArrays;
+            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle           worldTransformHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<ExposedSkeletonCullingIndex>  indexHandle;
+            [ReadOnly] public NativeArray<UnsafeBitArray>                        perThreadBitArrays;
+            [ReadOnly] public NativeArray<UnsafeList<Aabb> >                     perThreadBoundsArrays;
             [Inject] ComponentTypeHandle<SkeletonWorldBoundsOffsetsFromPosition> skeletonBoundsHandle;
 
             int oneBelowBoundsArrayIndex;
@@ -382,10 +385,10 @@ namespace Latios.Kinemation.Systems
         [BurstCompile]
         partial struct OptimizedBoneBoundsJob : IJobChunk, IInjectable
         {
-            [ReadOnly, Inject] BufferTypeHandle<OptimizedBoneBounds>            boneBoundsHandle;
-            [ReadOnly, Inject] BufferTypeHandle<OptimizedBoneTransform>         boneTransformHandle;
-            [ReadOnly, Inject] ComponentTypeHandle<OptimizedSkeletonState>      stateHandle;
-            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle                 worldTransformHandle;
+            [ReadOnly, Inject] BufferTypeHandle<OptimizedBoneBounds>             boneBoundsHandle;
+            [ReadOnly, Inject] BufferTypeHandle<OptimizedBoneTransform>          boneTransformHandle;
+            [ReadOnly, Inject] ComponentTypeHandle<OptimizedSkeletonState>       stateHandle;
+            [ReadOnly, Inject] WorldTransformReadOnlyAspect.TypeHandle           worldTransformHandle;
             [Inject] ComponentTypeHandle<SkeletonWorldBoundsOffsetsFromPosition> skeletonBoundsHandle;
 
             public uint lastSystemVersion;
