@@ -254,6 +254,8 @@ namespace Latios.Kinemation.Authoring
         internal static DeformClassification GetDeformClassificationFromMaterial(Material material)
         {
             DeformClassification classification = DeformClassification.None;
+            if (material == null)
+                return classification;
             if (material.HasProperty(s_legacyLbsProperty))
                 classification |= DeformClassification.LegacyLbs;
             if (material.HasProperty(s_legacyComputeDeformProperty))

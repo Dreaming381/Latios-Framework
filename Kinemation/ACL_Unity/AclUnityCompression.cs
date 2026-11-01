@@ -76,6 +76,7 @@ namespace AclUnity
                                                                    )
         {
             CheckParentIndicesIsValid(parentIndices);
+            CheckTrackCount(parentIndices.Length);
             CheckClipDataIsValid(aosClipData, parentIndices.Length);
             CheckSampleRateIsValid(sampleRate);
             CheckSkeletonSettingsIsValid(settings);
@@ -187,6 +188,7 @@ namespace AclUnity
                                                                   )
         {
             CheckErrorsByTrackIsValid(maxErrorsByTrack);
+            CheckTrackCount(maxErrorsByTrack.Length);
             CheckClipDataIsValid(clipData, maxErrorsByTrack.Length);
             CheckSampleRateIsValid(sampleRate);
             CheckCompressionLevelIsValid(compressionLevel);
@@ -301,6 +303,13 @@ namespace AclUnity
         {
             if (!maxErrorsByTrack.IsCreated || maxErrorsByTrack.Length == 0)
                 throw new ArgumentException("maxErrorsByTrack is invalid");
+        }
+
+        [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
+        static void CheckTrackCount(int trackCount)
+        {
+            if (trackCount > short.MaxValue)
+                throw new ArgumentOutOfRangeException(nameof(trackCount), $"ACL supports at most {short.MaxValue} tracks per clip, but {trackCount} were provided.");
         }
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]

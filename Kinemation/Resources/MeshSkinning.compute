@@ -436,11 +436,11 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex++;
 
                     Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     bindposeReal += dqs.r * weight;
                     bindposeDual += dqs.d * weight;
-                    localScale += dqs.scale.xyz * weight;
                 }
 
                 {
@@ -453,7 +453,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     bpQvvs.rotation = bindposeReal;
                     bindposeReal.xyz = -bindposeReal.xyz;
                     bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                    bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                     float3x4 deform = qvvsToMatrix(bpQvvs);
                     float3x4 scale = float3x4(
@@ -527,11 +527,11 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex++;
 
                     Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     bindposeReal += dqs.r * weight;
                     bindposeDual += dqs.d * weight;
-                    localScale += dqs.scale.xyz * weight;
                 }
 
                 {
@@ -544,7 +544,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     bpQvvs.rotation = bindposeReal;
                     bindposeReal.xyz = -bindposeReal.xyz;
                     bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                    bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                     float3x4 deform = qvvsToMatrix(bpQvvs);
                     float3x4 scale = float3x4(
@@ -627,11 +627,11 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex++;
 
                     Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     bindposeReal += dqs.r * weight;
                     bindposeDual += dqs.d * weight;
-                    localScale += dqs.scale.xyz * weight;
                 }
 
                 {
@@ -644,7 +644,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     bpQvvs.rotation = bindposeReal;
                     bindposeReal.xyz = -bindposeReal.xyz;
                     bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                    bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                     float3x4 deform = qvvsToMatrix(bpQvvs);
                     float3x4 scale = float3x4(
@@ -718,11 +718,11 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     nextWeightIndex++;
 
                     Dqs dqs = transformUnionDqsToDqs(_bindPoses[meshBindposesStart + boneIndex]);
+                    localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     bindposeReal += dqs.r * weight;
                     bindposeDual += dqs.d * weight;
-                    localScale += dqs.scale.xyz * weight;
                 }
 
                 {
@@ -735,7 +735,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     bpQvvs.rotation = bindposeReal;
                     bindposeReal.xyz = -bindposeReal.xyz;
                     bpQvvs.position.xyz = mulQuatQuat(2 * bindposeDual, bindposeReal).xyz;
-                    bpQvvs.stretchScale = float4(0, 0, 0, 1);
+                    bpQvvs.stretchScale = float4(1, 1, 1, 1);
 
                     float3x4 deform = qvvsToMatrix(bpQvvs);
                     float3x4 scale = float3x4(
@@ -823,7 +823,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     worldReal += dqs.r * weight;
                     worldDual += dqs.d * weight;
                 }
@@ -908,7 +908,7 @@ void MeshSkinning (uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                     Dqs dqs = transformUnionDqsToDqs(readBone(bonesStartIndex + boneIndex));
                     localScale += dqs.scale.xyz * weight;
                     if (dot(dqs.r, firstBoneRot) < 0)
-                        dqs.r.w = -dqs.r.w;
+                        weight = -weight;
                     worldReal += dqs.r * weight;
                     worldDual += dqs.d * weight;
                 }

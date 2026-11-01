@@ -9,6 +9,9 @@ using Unity.Entities;
 using Unity.Jobs.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.TextCore.LowLevel;
+#if UNITY_ANDROID && !UNITY_EDITOR
+using UnityEngine.Networking;
+#endif
 
 using Font = Latios.Calligraphics.HarfBuzz.Font;
 

@@ -73,7 +73,7 @@ namespace Latios.Kinemation.Authoring
                 Transform exportTransform = null;
                 {
                     if (bone.TryGetComponent<HideThis.ShadowCloneTracker>(out var export))
-                        exportTransform = export.transform;
+                        exportTransform = export.source.transform;
                 }
                 m_bones.Add(new OptimizedBoneDescription
                 {

@@ -59,7 +59,7 @@ namespace Latios.Systems
                 newState.previousEvaluatedTick = oldState.tick;
                 api.worldBlackboardEntity.SetComponentData(newState);
             }
-            else if (snapInputToTick || oldState.finalTickFraction > 0.9999f)
+            else if (snapInputToTick || oldState.finalTickFraction > 0.9999f || oldState.tick < 0)
             {
                 var newState                       = oldState;
                 newState.tick                      = math.max(newState.tick, 0);

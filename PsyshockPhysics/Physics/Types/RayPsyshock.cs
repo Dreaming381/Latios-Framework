@@ -81,6 +81,7 @@ namespace Latios.Psyshock
         /// <returns>A new Ray in the new coordinate space</returns>
         public static Ray TransformRay(in RigidTransform transform, in Ray ray)
         {
+            // This version is better when going from small coordinates to larger coordinates.
             var disp   = math.rotate(transform, ray.m_displacement);
             Ray newRay = new Ray
             {
@@ -89,6 +90,19 @@ namespace Latios.Psyshock
                 m_reciprocalDisplacement = math.select(math.rcp(disp), math.sqrt(float.MaxValue), disp == float3.zero),
             };
             return newRay;
+        }
+
+        /// <summary>
+        /// Creates a new Ray by reorienting an existing ray in a new inverse coordinate space
+        /// </summary>
+        /// <param name="transform">The position and rotation of the old coordinate space to undo to get the new coordinate space</param>
+        /// <param name="ray">The original Ray</param>
+        /// <returns>A new Ray in the new coordinate space</returns>
+        public static Ray InverseTransformRay(in RigidTransform transform, in Ray ray)
+        {
+            // Transforming the start and endpoints is slightly more precise, at the cost of a few cycles,
+            // because this method is typically used to move from large coordinates to smaller coordinates.
+            return new Ray(math.InverseTransformFast(in transform, ray.start), math.InverseTransformFast(in transform, ray.end));
         }
 
         /// <summary>

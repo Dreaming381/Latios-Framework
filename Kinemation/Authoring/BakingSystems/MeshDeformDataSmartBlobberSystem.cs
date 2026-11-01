@@ -839,25 +839,26 @@ namespace Latios.Kinemation.Authoring.Systems
 
                     if (normalizationIsValid)
                     {
-                        blobRoot.normalizationData.triangleCount = indicesCount / 3;
+                        var triangleCount                        = indicesCount / 3;
+                        blobRoot.normalizationData.triangleCount = triangleCount / 3;
                         int indicesUintToAllocate                = 0;
                         switch (blobRoot.normalizationData.packMode)
                         {
                             case MeshNormalizationBlob.IndicesPackMode.Bits10:
-                                indicesUintToAllocate = indicesCount;
+                                indicesUintToAllocate = triangleCount;
                                 break;
                             case MeshNormalizationBlob.IndicesPackMode.Bits16:
-                                indicesUintToAllocate = indicesCount * 3 / 2 + (indicesCount * 3 / 2) % 2;
+                                indicesUintToAllocate = triangleCount * 3 / 2 + (triangleCount * 3) % 2;
                                 break;
                             case MeshNormalizationBlob.IndicesPackMode.Bits21:
-                                indicesUintToAllocate = indicesCount * 2;
+                                indicesUintToAllocate = triangleCount * 2;
                                 break;
                             case MeshNormalizationBlob.IndicesPackMode.Bits32:
-                                indicesUintToAllocate = indicesCount * 3;
+                                indicesUintToAllocate = triangleCount * 3;
                                 break;
                         }
                         var packedIndices = builder.Allocate(ref blobRoot.normalizationData.packedIndicesByTriangle, indicesUintToAllocate);
-                        for (int i = 0; i < indicesCount / 3; i++)
+                        for (int i = 0; i < triangleCount; i++)
                         {
                             int indexA = context.intCache[3 * i];
                             int indexB = context.intCache[3 * i + 1];

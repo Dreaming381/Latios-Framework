@@ -1154,7 +1154,7 @@ namespace Latios.Psyshock
                     var bSupportOinB = math.select(bSupportPinB, -bSupportPinB, maskB);
                     var bSupportP    = math.transform(bInASpace, bSupportPinB);
                     var bSupportO    = math.transform(bInASpace, bSupportOinB);
-                    CapsuleCapsule.SegmentSegment(aSupportP, aSupportO, bSupportP, bSupportO, out var closestA, out var closestB, out _);
+                    CapsuleCapsule.SegmentSegment(aSupportP, aSupportO, bSupportP, bSupportO, out var closestA, out var closestB, out _, out _);
                     var closestAinB = math.transform(aInBSpace, closestA);
                     // The two points should be on or inside each other's boxes, or else we picked up the wrong edges
                     // (edges of parallel faces could have multiple valid support points)

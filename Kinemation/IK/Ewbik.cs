@@ -231,12 +231,14 @@ namespace Latios.Kinemation
                 solveList            = solveList.Slice(0, solveListLength);
                 expandedTargetsCount = runningStart;
             }
+            if (solveList.Length == 0)
+                return;
             int         maxPairCount        = 0;
             Span<short> targetIndicesByBone = stackalloc short[expandedTargetsCount];
             {
                 int   currentIndexInSolveList = 0;
                 short currentTargetIndex      = (short)(targets.Length - 1);
-                for (int boneIndex = solveList[0].boneIndex; boneIndex >= 0; boneIndex--)
+                for (int boneIndex = math.max(solveList[0].boneIndex, targets[currentTargetIndex].boneIndex); boneIndex >= 0; boneIndex--)
                 {
                     while (currentIndexInSolveList < solveList.Length && solveList[currentIndexInSolveList].boneIndex > boneIndex)
                         currentIndexInSolveList++;

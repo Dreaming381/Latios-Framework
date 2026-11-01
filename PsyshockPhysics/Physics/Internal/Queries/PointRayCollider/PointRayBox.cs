@@ -1,5 +1,6 @@
 using Latios.Calci;
 using Unity.Burst;
+using Unity.Burst.CompilerServices;
 using Unity.Mathematics;
 
 namespace Latios.Psyshock
@@ -35,11 +36,11 @@ namespace Latios.Psyshock
 
         public static bool Raycast(in Ray ray, in BoxCollider box, in RigidTransform boxTransform, out RaycastResult result)
         {
-            var  rayInBoxSpace      = Ray.TransformRay(math.inverse(boxTransform), ray);
+            var  rayInBoxSpace      = Ray.InverseTransformRay(in boxTransform, ray);
             bool hit                = RaycastBox(in rayInBoxSpace, in box, out float fraction, out float3 normal);
-            result.position         = math.lerp(ray.start, ray.end, fraction);
+            result.position         = ray.start + ray.displacement * fraction;
             result.normal           = math.rotate(boxTransform, normal);
-            result.distance         = math.distance(ray.start, result.position);
+            result.distance         = fraction * math.length(ray.displacement);
             result.subColliderIndex = 0;
             return hit;
         }
@@ -54,108 +55,50 @@ namespace Latios.Psyshock
 
         internal static bool PointBoxDistance(float3 point, in BoxCollider box, float maxDistance, out PointDistanceResultInternal result)
         {
-            // Idea: The positive octant of the box contains 7 feature regions: 3 faces, 3 edges, and inside.
-            // The other octants are identical except with flipped signs. So if we unflip signs,
-            // calculate the distance for these 7 regions, and then flip signs again, we get a valid result.
-            // We use feature regions rather than feature types to avoid swizzling since that would require a second branch.
-            float3 osPoint    = point - box.center;  //os = origin space
-            bool3  isNegative = osPoint < 0f;
-            float3 ospPoint   = math.select(osPoint, -osPoint, isNegative);  //osp = origin space positive
-            int    region     = math.bitmask(new bool4(ospPoint >= box.halfSize, false));
-            switch (region)
+            // Idea: The positive octant of the box contains 8 feature regions: inside, 3 faces, 3 edges, and a corner.
+            // The other octants are identical except with flipped signs. So if we unflip signs, calculate the result
+            // in the positive octant, and then flip signs again, we get a valid result.
+            float3 osPoint      = point - box.center;  //os = origin space
+            bool3  isNegative   = osPoint < 0f;
+            float3 ospPoint     = math.select(osPoint, -osPoint, isNegative);  //osp = origin space positive
+            bool3  outside      = ospPoint >= box.halfSize;
+            int    outsideMask  = math.bitmask(new bool4(outside, false));
+            int    outsideCount = math.countbits(outsideMask);
+            bool3  axesMask;
+            int    axesBitmask;
+            int    axesCount;
+            float3 hitpoint;
+            if (outsideCount == 0)
             {
-                case 0:
-                {
-                    // Inside the box. Get the closest wall.
-                    float3 delta   = box.halfSize - ospPoint;
-                    float  min     = math.cmin(delta);
-                    bool3  minMask = min == delta;
-                    // Prioritize y first, then z, then x if multiple distances perfectly match.
-                    // Todo: Should this be configurabe?
-                    minMask.xz         &= !minMask.y;
-                    minMask.x          &= !minMask.z;
-                    result.hitpoint     = math.select(ospPoint, box.halfSize, minMask);
-                    result.distance     = -min;
-                    result.normal       = math.select(0f, 1f, minMask);
-                    result.featureCode  = (ushort)(0x8000 | (math.tzcnt(math.bitmask(new bool4(minMask, false))) + math.select(0, 3, math.any(minMask & isNegative))));
-                    break;
-                }
-                case 1:
-                {
-                    // yz in box, x outside
-                    // Closest feature is the x-face
-                    result.distance    = ospPoint.x - box.halfSize.x;
-                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.yz);
-                    result.normal      = new float3(1f, 0f, 0f);
-                    result.featureCode = (ushort)(0x8000 + math.select(0, 3, isNegative.x));
-                    break;
-                }
-                case 2:
-                {
-                    // xz in box, y outside
-                    // Closest feature is the y-face
-                    result.distance    = ospPoint.y - box.halfSize.y;
-                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.y, ospPoint.z);
-                    result.normal      = new float3(0f, 1f, 0f);
-                    result.featureCode = (ushort)(0x8001 + math.select(0, 3, isNegative.y));
-                    break;
-                }
-                case 3:
-                {
-                    // z in box, xy outside
-                    // Closest feature is the z-axis edge
-                    result.distance    = math.distance(ospPoint.xy, box.halfSize.xy);
-                    result.hitpoint    = new float3(box.halfSize.xy, ospPoint.z);
-                    result.normal      = new float3(math.SQRT2 / 2f, math.SQRT2 / 2f, 0f);
-                    result.featureCode = (ushort)(0x4008 + math.bitmask(new bool4(isNegative.xy, false, false)));
-                    break;
-                }
-                case 4:
-                {
-                    // xy in box, z outside
-                    // Closest feature is the z-face
-                    result.distance    = ospPoint.z - box.halfSize.z;
-                    result.hitpoint    = new float3(ospPoint.xy, box.halfSize.z);
-                    result.normal      = new float3(0f, 0f, 1f);
-                    result.featureCode = (ushort)(0x8002 + math.select(0, 3, isNegative.z));
-                    break;
-                }
-                case 5:
-                {
-                    // y in box, xz outside
-                    // Closest feature is the y-axis edge
-                    result.distance    = math.distance(ospPoint.xz, box.halfSize.xz);
-                    result.hitpoint    = new float3(box.halfSize.x, ospPoint.y, box.halfSize.z);
-                    result.normal      = new float3(math.SQRT2 / 2f, 0f, math.SQRT2 / 2f);
-                    result.featureCode = (ushort)(0x4004 + math.bitmask(new bool4(isNegative.xz, false, false)));
-                    break;
-                }
-                case 6:
-                {
-                    // x in box, yz outside
-                    // Closest feature is the x-axis edge
-                    result.distance    = math.distance(ospPoint.yz, box.halfSize.yz);
-                    result.hitpoint    = new float3(ospPoint.x, box.halfSize.yz);
-                    result.normal      = new float3(0f, math.SQRT2 / 2f, math.SQRT2 / 2f);
-                    result.featureCode = (ushort)(0x4000 + math.bitmask(new bool4(isNegative.yz, false, false)));
-                    break;
-                }
-                default:
-                {
-                    // xyz outside box
-                    // Closest feature is the osp corner
-                    result.distance    = math.distance(ospPoint, box.halfSize);
-                    result.hitpoint    = box.halfSize;
-                    result.normal      = math.normalize(math.float3(1f));
-                    result.featureCode = (ushort)math.bitmask(new bool4(isNegative, false));
-                    break;
-                }
+                // Inside the box. Get the closest wall.
+                float3 delta   = box.halfSize - ospPoint;
+                float  min     = math.cmin(delta);
+                bool3  minMask = min == delta;
+                // Prioritize y first, then z, then x if multiple distances perfectly match.
+                minMask.xz      &= !minMask.y;
+                minMask.x       &= !minMask.z;
+                axesMask         = minMask;
+                axesBitmask      = math.bitmask(new bool4(minMask, false));
+                axesCount        = 1;
+                hitpoint         = math.select(ospPoint, box.halfSize, minMask);
+                result.distance  = -min;
             }
-            result.hitpoint = math.select(result.hitpoint, -result.hitpoint, isNegative) + box.center;
-            result.normal   = math.select(result.normal, -result.normal, isNegative);
+            else
+            {
+                // The closest feature is the face, edge, or corner based on which axes are outside the box.
+                axesMask        = outside;
+                axesBitmask     = outsideMask;
+                axesCount       = outsideCount;
+                hitpoint        = math.select(ospPoint, box.halfSize, outside);
+                result.distance = math.length(ospPoint - hitpoint);
+            }
+            result.normal      = BoxNormalFromSurfaceAxes(axesCount, isNegative, axesMask);
+            result.featureCode = FeatureCodeFromSurfaceAxes(axesBitmask, axesCount, isNegative, axesMask);
+            result.hitpoint    = math.select(hitpoint, -hitpoint, isNegative) + box.center;
             return result.distance <= maxDistance;
         }
 
+        // Note: Returns true for inside hit
         internal static bool RaycastAabb(in Ray ray, in Aabb aabb, out float fraction)
         {
             //slab clipping method
@@ -179,19 +122,14 @@ namespace Latios.Psyshock
         private static bool RaycastBox(in Ray ray, in BoxCollider box, out float fraction, out float3 normal)
         {
             Aabb aabb = new Aabb(box.center - box.halfSize, box.center + box.halfSize);
-            if (RaycastAabb(in ray, in aabb, out fraction))
+            if (RaycastAabb(in ray, in aabb, out fraction) && fraction > 0f)
             {
-                // Idea: Calculate the distance from the hitpoint to each plane of the AABB.
-                // The smallest distance is what we consider the plane we actually hit.
-                // Also, mask out planes whose normal does not face against the ray.
-                // Todo: Is that last step necessary?
-                float3 hitpoint            = ray.start + ray.displacement * fraction;
-                bool3  signPositive        = ray.displacement > 0f;
-                bool3  signNegative        = ray.displacement < 0f;
-                float3 alignedFaces        = math.select(aabb.min, aabb.max, signNegative);
-                float3 faceDistances       = math.abs(alignedFaces - hitpoint) + math.select(float.MaxValue, 0f, signNegative | signPositive);  //mask out faces the ray is parallel with
-                float  closestFaceDistance = math.cmin(faceDistances);
-                normal                     = math.select(float3.zero, new float3(1f), closestFaceDistance == faceDistances) * math.select(-1f, 1f, signNegative);  //The normal should be opposite to the ray direction
+                // The ray entered through one or more faces that resulted in the hit fraction.
+                // That means that `near` inside RaycastAabb() must be the fraction for every face hit.
+                // Burst will reuse the following entryFractions from the inlined RaycastAabb().
+                float3 entryFractions = math.min((aabb.min - ray.start) * ray.reciprocalDisplacement, (aabb.max - ray.start) * ray.reciprocalDisplacement);
+                var    signs          = math.select(1f, -1f, ray.displacement > 0f);
+                normal                = math.normalize(math.select(0f, signs, entryFractions == fraction));
                 return true;
             }
             else
@@ -201,85 +139,102 @@ namespace Latios.Psyshock
             }
         }
 
-        internal static bool RaycastRoundedBox(in Ray ray, in BoxCollider box, float radius, out float fraction, out float3 normal)
+        internal static bool RaycastRoundedBox(in Ray ray, in BoxCollider box, float radius, out float fraction, out float3 roundedNormal, out float3 featureNormal)
         {
-            // Early out if inside hit
-            if (PointBoxDistance(ray.start, in box, radius, out _))
+            // Shift the ray and box so that the box center is at the origin
+            float3 rayStart = ray.start - box.center;
+            // Early out if the ray starts inside
+            if (math.lengthsq(math.max(math.abs(rayStart) - box.halfSize, 0f)) <= radius * radius)
             {
-                fraction = default;
-                normal   = default;
+                fraction      = default;
+                roundedNormal = default;
+                featureNormal = default;
                 return false;
             }
 
-            var outerBox       = box;
-            outerBox.halfSize += radius;
-            bool hitOuter      = RaycastBox(in ray, in outerBox, out fraction, out normal);
-            var  hitPoint      = math.lerp(ray.start, ray.end, fraction);
-
-            if (hitOuter && math.all(math.abs(normal) > 0.9f | (hitPoint >= box.center - box.halfSize & hitPoint <= box.center + box.halfSize)))
+            // Figure out where the ray enters the AABB of the rounded box. If it misses, early out.
+            var boxAabb = new Aabb(box.center - box.halfSize - radius, box.center + box.halfSize + radius);
+            if (!RaycastAabb(in ray, in boxAabb, out float aabbFraction))
             {
-                // We hit a flat surface of the box. We have our result already.
-                return true;
-            }
-            else if (!hitOuter && !math.all(ray.start >= outerBox.center - outerBox.halfSize & ray.start <= outerBox.center + outerBox.halfSize))
-            {
-                // Our ray missed the outer box.
+                fraction      = default;
+                roundedNormal = default;
+                featureNormal = default;
                 return false;
             }
+            float3 aabbHitPosition = rayStart + ray.displacement * aabbFraction;
 
-            // Our ray either hit near an edge of the outer box or started inside the box. From this point it must hit a capsule surrounding an edge.
-            simdFloat3 bTopPoints     = default;
-            simdFloat3 bBottomPoints  = default;
-            bTopPoints.x              = math.select(-box.halfSize.x, box.halfSize.x, new bool4(true, true, false, false));
-            bBottomPoints.x           = bTopPoints.x;
-            bBottomPoints.y           = -box.halfSize.y;
-            bTopPoints.y              = box.halfSize.y;
-            bTopPoints.z              = math.select(-box.halfSize.z, box.halfSize.z, new bool4(true, false, true, false));
-            bBottomPoints.z           = bTopPoints.z;
-            bTopPoints               += box.center;
-            bBottomPoints            += box.center;
+            // If two axes are within the real box extents, then we hit a flat part.
+            bool3 withinHalfSize      = math.abs(aabbHitPosition) <= box.halfSize;
+            int   withinHalfSizeCount = math.countbits(math.bitmask(new bool4(withinHalfSize, false)));
+            if (withinHalfSizeCount == 2)
+            {
+                fraction      = aabbFraction;
+                var signs     = math.select(1f, -1f, aabbHitPosition < 0f);
+                roundedNormal = math.select(signs, float3.zero, withinHalfSize);
+                featureNormal = roundedNormal;
+                return aabbFraction > 0f;
+            }
+            else if (Hint.Unlikely(withinHalfSizeCount == 3))
+            {
+                fraction              = aabbFraction;
+                float3 entryFractions = math.min((boxAabb.min - ray.start) * ray.reciprocalDisplacement, (boxAabb.max - ray.start) * ray.reciprocalDisplacement);
+                var    signs          = math.select(1f, -1f, ray.displacement > 0f);
+                roundedNormal         = math.normalize(math.select(0f, signs, entryFractions == aabbFraction));
+                featureNormal         = roundedNormal;
+                return aabbFraction > 0f;
+            }
 
-            simdFloat3 bLeftPoints = simd.shuffle(bTopPoints,
-                                                  bBottomPoints,
-                                                  math.ShuffleComponent.LeftZ,
-                                                  math.ShuffleComponent.LeftW,
-                                                  math.ShuffleComponent.RightZ,
-                                                  math.ShuffleComponent.RightW);
-            simdFloat3 bRightPoints = simd.shuffle(bTopPoints,
-                                                   bBottomPoints,
-                                                   math.ShuffleComponent.LeftX,
-                                                   math.ShuffleComponent.LeftY,
-                                                   math.ShuffleComponent.RightX,
-                                                   math.ShuffleComponent.RightY);
-            simdFloat3 bFrontPoints = simd.shuffle(bTopPoints,
-                                                   bBottomPoints,
-                                                   math.ShuffleComponent.LeftY,
-                                                   math.ShuffleComponent.LeftW,
-                                                   math.ShuffleComponent.RightY,
-                                                   math.ShuffleComponent.RightW);
-            simdFloat3 bBackPoints = simd.shuffle(bTopPoints,
-                                                  bBottomPoints,
-                                                  math.ShuffleComponent.LeftX,
-                                                  math.ShuffleComponent.LeftZ,
-                                                  math.ShuffleComponent.RightX,
-                                                  math.ShuffleComponent.RightZ);
+            // Take any given point along the ray, and compare it to the interval of each axis covered by the interior box.
+            // If the point is within 3 intervals, it is inside the interior box. If it is within 2 intervals, it is outside the interior
+            // but inside the rounded box near a face. If the point is within 1 interval, it is near an interior edge. And if the point
+            // is outside all intervals, it is nearest to a corner.
+            float3 negativeIntervalFractions = (-box.halfSize - rayStart) * ray.reciprocalDisplacement;
+            float3 positiveIntervalFractions = (box.halfSize - rayStart) * ray.reciprocalDisplacement;
+            // Note: The enter and exit fractions are clamped to the AABB entrypoint, which is effectively clamping the intervals to where
+            // the ray starts.
+            float3 intervalEnterFractions = math.max(math.min(negativeIntervalFractions, positiveIntervalFractions), aabbFraction);
+            float3 intervalExitFractions  = math.max(math.max(negativeIntervalFractions, positiveIntervalFractions), aabbFraction);
+            // Fetch the sphere in the octant where the ray hit the AABB, along with the sphere in the octant where the ray exits each interval.
+            // Replicate each ray and shift it so that each sphere is at the origin.
+            simdFloat3 cornerRayStarts         = default;
+            float4     cornerIntervalFractions = new float4(aabbFraction, intervalExitFractions);
+            cornerRayStarts.x                  = rayStart.x - math.select(box.halfSize.x, -box.halfSize.x, rayStart.x + ray.displacement.x * cornerIntervalFractions < 0f);
+            cornerRayStarts.y                  = rayStart.y - math.select(box.halfSize.y, -box.halfSize.y, rayStart.y + ray.displacement.y * cornerIntervalFractions < 0f);
+            cornerRayStarts.z                  = rayStart.z - math.select(box.halfSize.z, -box.halfSize.z, rayStart.z + ray.displacement.z * cornerIntervalFractions < 0f);
+            simdFloat3 cornerRayDisplacements  = new simdFloat3(ray.displacement);
+            bool4      cornerHits              = PointRaySphere.Raycast4OriginSpheres(in cornerRayStarts, in cornerRayDisplacements, radius, out float4 cornerFractions);
+            cornerFractions                    = math.select(2f, cornerFractions, cornerHits);
 
-            var topBottomHits = PointRayCapsule.Raycast4Capsules(in ray, in bTopPoints, in bBottomPoints, radius, out float4 topBottomFractions, out simdFloat3 topBottomNormals);
-            var leftRightHits = PointRayCapsule.Raycast4Capsules(in ray, in bLeftPoints, in bRightPoints, radius, out float4 leftRightFractions, out simdFloat3 leftRightNormals);
-            var frontBackHits = PointRayCapsule.Raycast4Capsules(in ray, in bFrontPoints, in bBackPoints, radius, out float4 frontBackFractions, out simdFloat3 frontBackNormals);
+            // Fetch the sphere in the octant when the ray enters each interval. D duplicates A.
+            // Replicate each ray and shift it so that each sphere is at the origin.
+            simdFloat3 edgeRayStarts         = default;
+            float4     edgeIntervalFractions = intervalEnterFractions.xyzx;
+            edgeRayStarts.x                  = rayStart.x - math.select(box.halfSize.x, -box.halfSize.x, rayStart.x + ray.displacement.x * edgeIntervalFractions < 0f);
+            edgeRayStarts.y                  = rayStart.y - math.select(box.halfSize.y, -box.halfSize.y, rayStart.y + ray.displacement.y * edgeIntervalFractions < 0f);
+            edgeRayStarts.z                  = rayStart.z - math.select(box.halfSize.z, -box.halfSize.z, rayStart.z + ray.displacement.z * edgeIntervalFractions < 0f);
+            // Zero out the interval's axis.
+            edgeRayStarts.x = new float4(0f, edgeRayStarts.x.yz, 0f);
+            edgeRayStarts.y = new float4(edgeRayStarts.y.x, 0f, edgeRayStarts.y.zw);
+            edgeRayStarts.z = new float4(edgeRayStarts.z.xy, 0f, edgeRayStarts.z.w);
+            // Zero out the interval axes for displacements too.
+            simdFloat3 edgeRayDisplacements = cornerRayDisplacements;
+            edgeRayDisplacements.x          = new float4(0f, edgeRayDisplacements.x.yz, 0f);
+            edgeRayDisplacements.y          = new float4(edgeRayDisplacements.y.x, 0f, edgeRayDisplacements.y.zw);
+            edgeRayDisplacements.z          = new float4(edgeRayDisplacements.z.xy, 0f, edgeRayDisplacements.z.w);
+            bool4 edgeHits                  = PointRaySphere.Raycast4OriginSpheres(in edgeRayStarts, in edgeRayDisplacements, radius, out float4 edgeFractions);
+            // Only count hits if the hitpoint on the axis is within the interval (the ray hit the cylinder).
+            var hitAxesLocations  = rayStart.xyzx + ray.displacement.xyzx * edgeFractions;
+            edgeHits             &= math.abs(hitAxesLocations) <= box.halfSize.xyzx;
+            edgeFractions         = math.select(2f, edgeFractions, edgeHits);
 
-            topBottomFractions = math.select(2f, topBottomFractions, topBottomHits);
-            leftRightFractions = math.select(2f, leftRightFractions, leftRightHits);
-            frontBackFractions = math.select(2f, frontBackFractions, frontBackHits);
-
-            simdFloat3 bestNormals   = simd.select(topBottomNormals, leftRightNormals, leftRightFractions < topBottomFractions);
-            float4     bestFractions = math.select(topBottomFractions, leftRightFractions, leftRightFractions < topBottomFractions);
-            bestNormals              = simd.select(bestNormals, frontBackNormals, frontBackFractions < bestFractions);
-            bestFractions            = math.select(bestFractions, frontBackFractions, frontBackFractions < bestFractions);
-            bestNormals              = simd.select(bestNormals, bestNormals.badc, bestFractions.yxwz < bestFractions);
-            bestFractions            = math.select(bestFractions, bestFractions.yxwz, bestFractions.yxwz < bestFractions);
-            normal                   = math.select(bestNormals.a, bestNormals.c, bestFractions.z < bestFractions.x);
-            fraction                 = math.select(bestFractions.x, bestFractions.z, bestFractions.z < bestFractions.x);
+            // Reduce
+            fraction                 = math.cmin(math.min(cornerFractions, edgeFractions));
+            float3 rayHitpoint       = rayStart + ray.displacement * fraction;
+            float3 innerBoxHitpoint  = math.clamp(rayHitpoint, -box.halfSize, box.halfSize);
+            roundedNormal            = math.normalizesafe(rayHitpoint - innerBoxHitpoint, -math.normalizesafe(ray.displacement));
+            featureNormal            = math.select(0f, 1f, innerBoxHitpoint == box.halfSize);
+            featureNormal           += math.select(0f, -1f, innerBoxHitpoint == -box.halfSize);
+            featureNormal            = math.normalizesafe(featureNormal, roundedNormal);
             return fraction <= 1f;
         }
 
@@ -297,6 +252,25 @@ namespace Latios.Psyshock
             featureCodeEdge             += math.select(0, math.bitmask(new bool4(isNegative.xy, false, false)), edgeDirectionIndex == 2);
             var featureCodeVertex        = math.bitmask(new bool4(isNegative, false));
             return (ushort)math.select(featureCodeFace, math.select(featureCodeEdge, featureCodeVertex, normalsNotZeroCount == 3), normalsNotZeroCount > 1);
+        }
+
+        static ushort FeatureCodeFromSurfaceAxes(int axesBitmask, int axesCount, bool3 isNegative, bool3 axesMask)
+        {
+            int negativeBits = math.bitmask(new bool4(isNegative, false));
+            int faceCode     = 0x8000 + math.tzcnt(axesBitmask) + math.select(0, 3, math.any(axesMask & isNegative));
+            // An edge runs along the one axis not in the mask, and its code holds the signs of the other two axes in order.
+            int edgeAxis      = math.tzcnt(~axesBitmask & 7);
+            int belowAxisBits = negativeBits & ((1 << edgeAxis) - 1);
+            int aboveAxisBits = (negativeBits >> (edgeAxis + 1)) << edgeAxis;
+            int edgeCode      = 0x4000 + edgeAxis * 4 + (belowAxisBits | aboveAxisBits);
+            return (ushort)math.select(math.select(faceCode, edgeCode, axesCount == 2), negativeBits, axesCount == 3);
+        }
+
+        static float3 BoxNormalFromSurfaceAxes(int axesCount, bool3 isNegative, bool3 axesMask)
+        {
+            float  componentScale = math.select(math.select(1f, math.SQRT2 / 2f, axesCount == 2), math.normalize(math.float3(1f)).x, axesCount == 3);
+            float3 normal         = math.select(0f, componentScale, axesMask);
+            return math.select(normal, -normal, isNegative);
         }
 
         internal static float3 BoxNormalFromFeatureCode(ushort featureCode)

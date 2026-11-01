@@ -127,6 +127,18 @@ namespace Latios.Psyshock
             normal                 = simd.select(normal, fallbackNormal, entryRadiusSq < kUnmeasurableLengthSqThreshold);
             return (entryClosestDistSq >= 0f) & (fraction > 0f) & (fraction <= 1f);
         }
+
+        public static bool4 Raycast4OriginSpheres(in simdFloat3 rayStart, in simdFloat3 rayDisplacement, float4 radius, out float4 fraction)
+        {
+            var radiusSq           = radius * radius;
+            var rayLengthSq        = simd.lengthsq(rayDisplacement);
+            var projectionScalar   = -simd.dot(rayDisplacement, rayStart) / rayLengthSq;
+            var projection         = projectionScalar * rayDisplacement;
+            var closestToCenter    = rayStart + projection;
+            var entryClosestDistSq = radiusSq - simd.lengthsq(closestToCenter);
+            fraction               = projectionScalar - math.sqrt(entryClosestDistSq / rayLengthSq);
+            return (entryClosestDistSq >= 0f) & (fraction > 0f) & (fraction <= 1f);
+        }
     }
 }
 

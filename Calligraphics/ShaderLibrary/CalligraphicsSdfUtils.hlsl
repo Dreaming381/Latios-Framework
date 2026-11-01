@@ -83,7 +83,7 @@ float getSdfPixelCoverage(float screenSpaceRatio, float texelsInDilationDomain, 
 {
 	softness *= screenSpaceRatio * texelsInDilationDomain;
 	float d = (sampledSignedDistance - 0.5) * texelsInDilationDomain; // Signed distance to edge in texels
-	return saturate((d * 2.0 * screenSpaceRatio + 0.5 + dilation * sampledSignedDistance * screenSpaceRatio + softness * 0.5) / (1.0 + softness)); // Screen pixel coverage (alpha)
+	return saturate((d * 2.0 * screenSpaceRatio + 0.5 + dilation * texelsInDilationDomain * screenSpaceRatio + softness * 0.5) / (1.0 + softness)); // Screen pixel coverage (alpha)
 }
 
 /// Computes the fractions of the pixel covered by the glyph (alpha) for multiple glyph regions
@@ -134,7 +134,7 @@ float4 mergeFaceAndOutlineColorAndAlpha(float2 alpha, float4 faceColor, float4 o
     faceColor.rgb *= faceColor.a;
     outlineColor.rgb *= outlineColor.a;
     float4 outColor = lerp(outlineColor, faceColor, alpha.x);
-    outColor.rgb /= outColor.a;
+    outColor.rgb = outColor.a > 0 ? outColor.rgb / outColor.a : 0;
     return outColor;
 }
 // Face + 3 Outline
@@ -164,7 +164,7 @@ float4 mergeOverlayAndUnderlay(float4 overlayColor, float4 underlayColor)
     underlayColor.rgb *= underlayColor.a;
     float3 blended = overlayColor.rgb + ((1 - overlayColor.a) * underlayColor.rgb);
     float alpha = underlayColor.a + (1 - underlayColor.a) * overlayColor.a;
-    return float4(blended / alpha, alpha);
+    return float4(alpha > 0 ? blended / alpha : 0, alpha);
 }
 
 float3 getSurfaceNormal(

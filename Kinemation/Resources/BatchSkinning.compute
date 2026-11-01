@@ -835,11 +835,11 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         nextWeightIndex++;
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
+                        localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
                             weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
-                        localScale += dqs.scale.xyz * weight;
                     }
 
                     {
@@ -926,11 +926,11 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         nextWeightIndex++;
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
+                        localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
                             weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
-                        localScale += dqs.scale.xyz * weight;
                     }
 
                     {
@@ -1030,11 +1030,11 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         nextWeightIndex++;
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
+                        localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
                             weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
-                        localScale += dqs.scale.xyz * weight;
                     }
 
                     {
@@ -1121,11 +1121,11 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
                         nextWeightIndex++;
 
                         Dqs dqs = transformUnionDqsToDqs(gs_transforms[skeletonOffsetInGs + boneIndex]);
+                        localScale += dqs.scale.xyz * weight;
                         if (dot(dqs.r, firstBoneRot) < 0)
                             weight = -weight;
                         bindposeReal += dqs.r * weight;
                         bindposeDual += dqs.d * weight;
-                        localScale += dqs.scale.xyz * weight;
                     }
 
                     {

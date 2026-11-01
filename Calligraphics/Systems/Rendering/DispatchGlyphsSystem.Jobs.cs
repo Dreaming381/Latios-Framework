@@ -68,9 +68,9 @@ namespace Latios.Calligraphics.Systems
                         var materials     = materialLookup[worldBlackboardEntity].AsNativeArray().Reinterpret<ComponentType>();
                         var materialIndex = materials.IndexOf(ComponentType.ReadOnly<TextShaderIndex>());
                         if (materialIndex < 64)
-                            materialPropertyMaskLower = 1u << materialIndex;
+                            materialPropertyMaskLower = 1ul << materialIndex;
                         else
-                            materialPropertyMaskUpper = 1u << (materialIndex - 64);
+                            materialPropertyMaskUpper = 1ul << (materialIndex - 64);
                     }
                     var materialMask          = chunk.GetChunkComponentRefRW(ref chunkMaterialMaskHandle);
                     materialMask.lower.Value |= materialPropertyMaskLower;
@@ -423,8 +423,8 @@ namespace Latios.Calligraphics.Systems
                 else if (glyphEntry.key.format == RenderFormat.Bitmap8888)
                 {
                     PaintUtils.rasterizeCOLRMarker.Begin();
-                    var foreground = new ColorBGRA(0, 0, 0, 255);
-                    var paint      = new Paint(true);
+                    var       foreground = new ColorBGRA(0, 0, 0, 255);
+                    using var paint      = new Paint(true);
                     paint.SetScaleFactor(1, 1);
                     paint.SetTransform(1f, 0f, 0f, 1f, 0f, 0f);
                     paint.SetForeground(foreground);

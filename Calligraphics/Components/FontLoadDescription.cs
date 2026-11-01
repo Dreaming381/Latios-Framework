@@ -63,13 +63,13 @@ namespace Latios.Calligraphics
             }
             return false;
         }
-        bool IEquatable<FontLoadDescription>.Equals(FontLoadDescription other)
+        public bool Equals(FontLoadDescription other)
         {
             return fontLookupKey == other.fontLookupKey;
         }
         public override int GetHashCode()
         {
-             return fontLookupKey.GetHashCode();
+            return fontLookupKey.GetHashCode();
         }
 
         public static bool operator ==(FontLoadDescription target, FontLoadDescription other) {

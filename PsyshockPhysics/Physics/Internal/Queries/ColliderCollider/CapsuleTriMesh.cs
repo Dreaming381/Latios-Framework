@@ -209,7 +209,7 @@ namespace Latios.Psyshock
             public bool Execute(int index)
             {
                 var triangle = Physics.ScaleStretchCollider(blob.Value.triangles[index], 1f, scale);
-                if (CapsuleTriangle.TriangleCapsuleDistance(in triangle, in capsule, maxDistance, out var hit))
+                if (CapsuleTriangle.TriangleCapsuleDistance(triangle.AsSimdFloat3(), in capsule, maxDistance, out var hit))
                 {
                     if (!found || hit.distance < bestDistance)
                     {

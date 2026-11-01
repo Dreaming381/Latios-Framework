@@ -71,7 +71,17 @@ namespace Latios.Transforms
                 // Self-hosted
                 if (enableTransformSyncing)
                 {
-                    entityManager.AddComponent(entity, Abstract.QueryExtensions.GetAbstractWorldTransformRWComponentType());
+                    transform.GetPositionAndRotation(out var position, out var rotation);
+                    float3        goScale = transform.lossyScale;
+                    float         scale   = math.select(1f, math.cmax(goScale), useUniformScale);
+                    float3        stretch = math.select(goScale, 1f, useUniformScale);
+                    TransformQvvs t       = new TransformQvvs(position, rotation, scale, stretch);
+#if LATIOS_TRANSFORMS_UNITY
+                    entityManager.AddComponentData(entity, new Unity.Transforms.LocalToWorld { Value = qvvs.ToMatrix4x4(t) });
+#else
+                    entityManager.AddComponentData(entity, new WorldTransform { worldTransform = t });
+#endif
+                    entityManager.AddComponent<CopyTransformFromEntityTag>(entity);
                 }
 
                 s_initializeCache.Clear();

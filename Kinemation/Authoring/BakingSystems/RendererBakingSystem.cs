@@ -66,7 +66,8 @@ namespace Latios.Kinemation.Authoring.Systems
 
             m_lightmapBakingContext.ProcessLightMapsForConversion(uniqueIndicesSorted.AsArray(), lightmaps);
 
-            var lightmapsSCD = new LightMaps();
+            var lightmapsSCD        = new LightMaps();
+            var lightmapMaterialMap = new NativeHashMap<UnityObjectRef<Material>, UnityObjectRef<Material> >(128, WorldUpdateAllocator);
 
             foreach ((var lightmapIndex, var lightmapProperty, var buffer) in Query<RefRO<BakingLightmapIndex>,
                                                                                     RefRW<BuiltinMaterialPropertyUnity_LightmapIndex>,
@@ -81,9 +82,9 @@ namespace Latios.Kinemation.Authoring.Systems
                     for (int i = 0; i < buffer.Length; i++)
                     {
                         ref var element  = ref buffer.ElementAt(i);
-                        var     mat      = element.material.Value;
-                        var     newMat   = m_lightmapBakingContext.GetLightMappedMaterial(mat, lightmapRef);
-                        element.material = newMat;
+                        var     oldMat   = element.material;
+                        element.material = m_lightmapBakingContext.GetLightMappedMaterial(oldMat, lightmapRef);
+                        lightmapMaterialMap.TryAdd(oldMat, element.material);
                     }
                     lightmapsSCD = lightmapRef.lightMaps;
                 }
@@ -105,6 +106,7 @@ namespace Latios.Kinemation.Authoring.Systems
             var streamingTexturesList = new NativeList<StreamingMipMapArray.StreamingTextureInMaterial>(WorldUpdateAllocator);
             if (!renderablesWithLightmapsQuery.IsEmptyIgnoreFilter)
             {
+                new RemapLightmapStreamingMaterialsJob { map = lightmapMaterialMap }.Run();
                 new CollectUniqueMeshesAndMaterialsJob
                 {
                     meshMap      = meshMap,
@@ -268,6 +270,26 @@ namespace Latios.Kinemation.Authoring.Systems
                 foreach (var index in src)
                     dst.Add(index);
                 dst.Sort();
+            }
+        }
+
+        [BurstCompile]
+        partial struct RemapLightmapStreamingMaterialsJob : IJobEntity
+        {
+            [ReadOnly] public NativeHashMap<UnityObjectRef<Material>, UnityObjectRef<Material> > map;
+
+            public void Execute(ref DynamicBuffer<BakingStreamingTexture> buffer)
+            {
+                var arr = buffer.AsNativeArray();
+                for (int i = 0; i < arr.Length; i++)
+                {
+                    var element = arr[i];
+                    if (map.TryGetValue(element.material, out var replaced))
+                    {
+                        element.material = replaced;
+                        arr[i]           = element;
+                    }
+                }
             }
         }
 

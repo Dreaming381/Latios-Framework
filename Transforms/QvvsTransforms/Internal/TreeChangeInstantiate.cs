@@ -631,14 +631,15 @@ namespace Latios.Transforms
 
                 Entity root;
                 bool   rootIsAlive;
-                var    firstClassification = childWorkStates[rootChildrenIndices[0]].parentClassification;
+                var    firstChildWorkState = childWorkStates[rootChildrenIndices[0]];
+                var    firstClassification = firstChildWorkState.parentClassification;
                 if (firstClassification.role == TreeKernels.TreeClassification.TreeRole.Solo || firstClassification.role == TreeKernels.TreeClassification.TreeRole.Root)
                 {
-                    root        = childWorkStates[rootChildrenIndices[0]].parent;
-                    rootIsAlive = true;
                     // If the parent was destroyed, skip.
-                    if (root == Entity.Null)
+                    if (firstChildWorkState.parentIsDead)
                         return;
+                    rootIsAlive = true;
+                    root        = firstChildWorkState.parent;
                 }
                 else
                 {

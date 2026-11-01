@@ -168,11 +168,11 @@ namespace Latios.Systems
                     {
                         var entities = typePairState.missingReferenceQuery.ToEntityArray(state.WorldUpdateAllocator);
                         state.EntityManager.AddComponent(typePairState.missingReferenceQuery, typePairState.referenceType);
-                        typePairState.referenceHandle.Update(ref state);
-                        typePairState.tickingHandle.Update(ref state);
                         var writeHandle = typePairState.referenceHandle;
                         var readHandle  = typePairState.tickingHandle.CopyToReadOnly();
-                        var typeSize    = TypeManager.GetTypeInfo(typePairState.tickingType.TypeIndex).ElementSize;
+                        writeHandle.Update(ref state);
+                        readHandle.Update(ref state);
+                        var typeSize = TypeManager.GetTypeInfo(typePairState.tickingType.TypeIndex).ElementSize;
                         if (typePairState.tickingType.IsBuffer)
                         {
                             foreach (var entity in entities)

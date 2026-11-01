@@ -70,7 +70,7 @@ namespace Latios.Calligraphics.RichText
                             if (tag.tagType == TagType.Unknown)
                             {
                                 calliStringRaw.GetSubString(ref m_htmlTag, startByteIndex, tagByteCount);
-                                if (m_htmlTag[0] == 35)  //special handling of tags that specify color without any prefix
+                                if (tagByteCount > 0 && m_htmlTag[0] == 35)  //special handling of tags that specify color without any prefix
                                 {
                                     tag.tagType         = TagType.Color;
                                     tagValue.type       = TagValueType.ColorValue;

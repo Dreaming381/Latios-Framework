@@ -59,19 +59,18 @@ namespace Latios.Calligraphics.Systems
                     for (int i = 0; i < xmlTagCount; i++)
                         xmlTags[i] = xmlTagStream.Read<XMLTag>();
 
+                    var renderGlyphs = renderGlyphBuffers[indexInChunk];
+                    renderGlyphs.Clear();
+
                     var header = glyphOTFStream.Read<GlyphOTFStreamHeader>();
                     if (header.glyphCount == 0)
                         continue;
 
                     var calliBytes                = calliBytesBuffers[indexInChunk];
-                    var renderGlyphs              = renderGlyphBuffers[indexInChunk];
                     var previousRenderGlyphBuffer = previousRenderGlyphBuffers[indexInChunk];
                     var textBaseConfiguration     = textBaseConfigurations[indexInChunk];
 
-                    renderGlyphs.Clear();
-                    previousRenderGlyphBuffer.Clear();
-
-                    previousRenderGlyphBuffer.Capacity = header.glyphCount;  //allocating here make this job 2x slower but UpdateChangedGlyphsJob 10x faster
+                    previousRenderGlyphBuffer.EnsureCapacity(header.glyphCount);  //allocating here make this job 2x slower but UpdateChangedGlyphsJob 10x faster
                     //renderGlyphs.Capacity = glyphCount; //not needed when done via single threaded pre-allocationjob
                     CreateRenderGlyphs(ref renderGlyphs,
                                        in calliBytes,

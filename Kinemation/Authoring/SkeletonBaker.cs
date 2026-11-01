@@ -87,7 +87,7 @@ namespace Latios.Kinemation.Authoring
                     {
                         var child = GetChild(bone, i);
                         if (GetComponent<SkinnedMeshRenderer>(child) == null && GetComponent<ExcludeFromSkeletonAuthoring>(child) == null &&
-                            GetComponent<BakingOnlyEntityAuthoring>() == null && GetComponentInParent<Animator>(child) == authoring)
+                            GetComponent<BakingOnlyEntityAuthoring>(child) == null && GetComponentInParent<Animator>(child) == authoring)
                             m_breadthQueue.Enqueue((child, currentIndex));
                     }
                 }

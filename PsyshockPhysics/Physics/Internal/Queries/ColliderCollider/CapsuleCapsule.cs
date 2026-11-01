@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Latios.Calci;
 using Unity.Burst;
 using Unity.Burst.CompilerServices;
@@ -25,9 +26,9 @@ namespace Latios.Psyshock
             var bInASpaceA         = math.transform(BinASpaceTransform, capsuleB.pointA);
             var bInASpaceB         = math.transform(BinASpaceTransform, capsuleB.pointB);
 
-            SegmentSegment(capsuleA.pointA, capsuleA.pointB, bInASpaceA, bInASpaceB, out var closestAOut, out var closestBOut, out _);
+            SegmentSegment(capsuleA.pointA, capsuleA.pointB, bInASpaceA, bInASpaceB, out _, out _, out _, out var closestAToBPrecise);
             var threshold = capsuleA.radius + capsuleB.radius + maxDistance;
-            return math.distancesq(closestAOut, closestBOut) <= threshold * threshold && threshold >= 0f;
+            return math.lengthsq(closestAToBPrecise) <= threshold * threshold && threshold >= 0f;
         }
 
         public static bool DistanceBetween(in CapsuleCollider capsuleA,
@@ -85,9 +86,16 @@ namespace Latios.Psyshock
             if (hit)
             {
                 var hitDisplacement = fraction * displacement;
-                SegmentSegment(casterA + hitDisplacement, casterB + hitDisplacement, targetA, targetB, out var closestOnCaster, out var closestOnTarget, out _);
+                SegmentSegment(casterA + hitDisplacement,
+                               casterB + hitDisplacement,
+                               targetA,
+                               targetB,
+                               out _,
+                               out var closestOnTarget,
+                               out _,
+                               out var casterToTargetPrecise);
                 // Taking the difference in segment points is more accurate than using the raycast normal, except for when the radii are both 0.
-                normal = math.normalizesafe(closestOnTarget - closestOnCaster, normal);
+                normal = math.normalizesafe(casterToTargetPrecise, normal);
                 result = new ColliderCastResult
                 {
                     hitpoint                 = closestOnTarget - normal * targetCapsule.radius + targetCapsuleTransform.pos,
@@ -116,16 +124,25 @@ namespace Latios.Psyshock
 
         internal static bool CapsuleCapsuleDistance(in CapsuleCollider capsuleA, in CapsuleCollider capsuleB, float maxDistance, out ColliderDistanceResultInternal result)
         {
-            SegmentSegment(capsuleA.pointA, capsuleA.pointB, capsuleB.pointA, capsuleB.pointB, out float3 closestA, out float3 closestB, out var isStartEndAB);
-            SphereCollider sphereA = new SphereCollider(closestA, capsuleA.radius);
-            SphereCollider sphereB = new SphereCollider(closestB, capsuleB.radius);
-            var            hit     = SphereSphere.SphereSphereDistance(in sphereA, in sphereB, maxDistance, out result, out bool degenerate);
-            result.featureCodeA    = 0x4000;
-            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 1, isStartEndAB.y);
-            result.featureCodeA    = (ushort)math.select(result.featureCodeA, 0, isStartEndAB.x);
-            result.featureCodeB    = 0x4000;
-            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 1, isStartEndAB.w);
-            result.featureCodeB    = (ushort)math.select(result.featureCodeB, 0, isStartEndAB.z);
+            SegmentSegment(capsuleA.pointA,
+                           capsuleA.pointB,
+                           capsuleB.pointA,
+                           capsuleB.pointB,
+                           out float3 closestA,
+                           out float3 closestB,
+                           out var isStartEndAB,
+                           out var closestAToBPrecise);
+            SphereCollider sphereA  = new SphereCollider(float3.zero, capsuleA.radius);
+            SphereCollider sphereB  = new SphereCollider(closestAToBPrecise, capsuleB.radius);
+            var            hit      = SphereSphere.SphereSphereDistance(in sphereA, in sphereB, maxDistance, out result, out bool degenerate);
+            result.hitpointA       += closestA;
+            result.hitpointB       += closestA;
+            result.featureCodeA     = 0x4000;
+            result.featureCodeA     = (ushort)math.select(result.featureCodeA, 1, isStartEndAB.y);
+            result.featureCodeA     = (ushort)math.select(result.featureCodeA, 0, isStartEndAB.x);
+            result.featureCodeB     = 0x4000;
+            result.featureCodeB     = (ushort)math.select(result.featureCodeB, 1, isStartEndAB.w);
+            result.featureCodeB     = (ushort)math.select(result.featureCodeB, 0, isStartEndAB.z);
             if (Hint.Likely(!degenerate))
                 return hit;
 
@@ -167,14 +184,18 @@ namespace Latios.Psyshock
             }
         }
 
-        internal static void SegmentSegmentNew(float3 startSegmentA,
-                                               float3 endSegmentA,
-                                               float3 startSegmentB,
-                                               float3 endSegmentB,
-                                               out float3 closestAOut,
-                                               out float3 closestBOut,
-                                               out bool4 isStartEndAB,
-                                               out float3 closestAToBPrecise)
+        // Currently 12 ULP per component, which when measured as a distance is ~21 ULP. We round up to 32 (16f).
+        // If the SegmentSegment kernel is ever updated, this constant should also be updated.
+        internal const float kSegmentSegmentPreciseMaxUlpErrorTolerance = 16f * math.EPSILON;
+
+        internal static void SegmentSegment(float3 startSegmentA,
+                                            float3 endSegmentA,
+                                            float3 startSegmentB,
+                                            float3 endSegmentB,
+                                            out float3 closestAOut,
+                                            out float3 closestBOut,
+                                            out bool4 isStartEndAB,
+                                            out float3 closestAToBPrecise)
         {
             float3 edgeA                     = endSegmentA - startSegmentA;
             float3 edgeB                     = endSegmentB - startSegmentB;
@@ -266,97 +287,104 @@ namespace Latios.Psyshock
             }
         }
 
-        internal static void SegmentSegment(float3 startSegmentA,
-                                            float3 endSegmentA,
-                                            float3 startSegmentB,
-                                            float3 endSegmentB,
-                                            out float3 closestAOut,
-                                            out float3 closestBOut,
-                                            out bool4 isStartEndAB)
+        internal static void SegmentSegment(in simdFloat3 startSegmentA,
+                                            in simdFloat3 endSegmentA,
+                                            in simdFloat3 startSegmentB,
+                                            in simdFloat3 endSegmentB,
+                                            out simdFloat3 closestAOut,
+                                            out simdFloat3 closestBOut,
+                                            out int isStartEndABx4,  // 16-bit bitfield
+                                            out simdFloat3 closestAToBPrecise)
         {
-            float3 edgeA = endSegmentA - startSegmentA;
-            float3 edgeB = endSegmentB - startSegmentB;
+            simdFloat3 edgeA                     = endSegmentA - startSegmentA;
+            simdFloat3 edgeB                     = endSegmentB - startSegmentB;
+            simdFloat3 perpendicularUnnormalized = simd.cross(edgeA, edgeB);
+            simdFloat3 startAToStartB            = startSegmentB - startSegmentA;
+            // This is the derivation for the optimized implementation
+            // edgeB x perpendicular creates a plane. The closest points on the infinite edges is based on where edgeA crosses that plane.
+            //float3 bPlaneUnnormal = math.cross(edgeB, perpendicularUnnormalized);
+            // Project startSegmentA onto the plane normal to get the distance of startSegmentA to the plane.
+            // We use startSegmentB as a reference point.
+            //float  startADistanceToPlane = math.dot(startAToStartB, bPlaneUnnormal);
+            // Project edgeA onto the plane normal to determine how much distance it travels relative to the plane normal.
+            //float edgeAProjectionDistance = math.dot(edgeA, bPlaneUnnormal);
+            // We never had to normalize bPlaneUnnormal because is magnitude is canceled out by this division.
+            //float fractionAlongA = startADistanceToPlane / edgeAProjectionDistance;
+            // Find the clamped point along segment A using the original distances rather than the fraction to avoid precision loss from the division.
+            //float3 pointOnA = startSegmentA + edgeA * fractionAlongA;
+            //pointOnA        = math.select(pointOnA, endSegmentA, startADistanceToPlane >= edgeAProjectionDistance);
+            // Note: For parallel edges, this picks startSegmentA, and for degenerate edges, it prefers startSegmentA over endSegmentA.
+            //pointOnA = math.select(startSegmentA, pointOnA, startADistanceToPlane > 0f);
 
-            // The following algorithm is copied from Unity Physics, and is quite robust at handling various degenerate cases.
-            // Todo: I don't fully understand it yet, though I've analyzed all the endpoint cases which are the most critical.
-            // If startSegmentA = startSegmentB, then diff, s1, and s2 all become zero, which results in fracA and fracB becoming exactly 0.
-            // If endSegmentA = startSegmentB, then diff = edgeA, and therefore r = s2 and s1 = lengthASq. Therefore fracA numerator = denominator,
-            // and fracA becomes exactly 1f, while fracB becomes exactly 0f. (r - s2 = 0).
-            // If startSegmentA = endSegmentB, then diff = -edgeB, and therefore r = -s1 and s2 = -lengthBSq. Therefore, fracA numerator is 0.
-            // fracB is s2 / (-lengthBSq) which is 1f exactly.
-            // We only need to watch out for when endSegmentA = endSegmentB, as there is no perfect floating point in that scenario.
-            float3 diff      = startSegmentB - startSegmentA;
-            float  r         = math.dot(edgeA, edgeB);
-            float  s1        = math.dot(edgeA, diff);
-            float  s2        = math.dot(edgeB, diff);
-            float  lengthASq = math.lengthsq(edgeA);
-            float  lengthBSq = math.lengthsq(edgeB);
+            // The issue with the above is that we don't detect coincidence of endpoints cleanly across the segments.
+            // However, we can recognize that startADistanceToPlane is really: dot(startAToStartB, cross(edgeB, perpendicularUnnormalized)).
+            // Using the triple product rule, we can rearrange that as dot(perpendicularUnnormalized, cross(startAToStartB, edgeB)).
+            // The benefit of this approach is that the cross product is exactly zero if startSegmentA is either of B's endpoints.
+            // We can then apply the trick for endSegmentA. The difference of these signed distances results in the total edgeAProjectionDistance.
+            simdFloat3 endAToStartB           = startSegmentB - endSegmentA;
+            float4     startADistanceToPlane  = simd.dot(perpendicularUnnormalized, simd.cross(startAToStartB, edgeB));
+            float4     endADistanceToPlane    = simd.dot(perpendicularUnnormalized, simd.cross(endAToStartB, edgeB));
+            float4     edgeProjectionDistance = startADistanceToPlane - endADistanceToPlane;
+            float4     fractionAlongA         = startADistanceToPlane / edgeProjectionDistance;
+            simdFloat3 pointOnA               = startSegmentA + edgeA * fractionAlongA;
+            // For there to be an intersection, the signed distance from the start should be positive and from the end should be negative.
+            // If either is violated, we clamp.
+            pointOnA = simd.select(pointOnA, endSegmentA, endADistanceToPlane >= 0f);
+            pointOnA = simd.select(pointOnA, startSegmentA, startADistanceToPlane <= 0f);
 
-            float invDenom, invLengthASq, invLengthBSq;
-            {
-                float  denom = lengthASq * lengthBSq - r * r;
-                float3 inv   = 1.0f / new float3(denom, lengthASq, lengthBSq);
-                invDenom     = inv.x;
-                invLengthASq = inv.y;
-                invLengthBSq = inv.z;
-            }
+            // Find the closest point on segment B by projecting pointOnA onto edgeB.
+            float4     edgeBLengthSq  = simd.lengthsq(edgeB);
+            float4     aAlongB        = simd.dot(pointOnA - startSegmentB, edgeB);
+            float4     fractionAlongB = aAlongB / edgeBLengthSq;
+            simdFloat3 pointOnB       = startSegmentB + edgeB * fractionAlongB;
+            bool4      isStartB       = aAlongB <= 0f;
+            bool4      isEndB         = aAlongB >= edgeBLengthSq;
+            pointOnB                  = simd.select(pointOnB, endSegmentB, isEndB);
+            pointOnB                  = simd.select(startSegmentB, pointOnB, !isStartB);
 
-            // Find the closest point on edge A to the line containing edge B
-            float fracA = (s1 * lengthBSq - s2 * r) * invDenom;
-            fracA       = math.clamp(fracA, 0.0f, 1.0f);
+            // Re-find the closest point on segment A.
+            float4 edgeALengthSq  = simd.lengthsq(edgeA);
+            float4 bAlongA        = simd.dot(pointOnB - startSegmentA, edgeA);
+            fractionAlongA        = bAlongA / edgeALengthSq;
+            pointOnA              = startSegmentA + edgeA * fractionAlongA;
+            bool4 isStartA        = bAlongA <= 0f;
+            bool4 isEndA          = bAlongA >= edgeALengthSq;
+            pointOnA              = simd.select(pointOnA, endSegmentA, isEndA);
+            pointOnA              = simd.select(startSegmentA, pointOnA, !isStartA);
+            int4 bitmask          = math.select(0, new int4(0x1, 0x10, 0x100, 0x1000), isStartA);
+            bitmask              += math.select(0, new int4(0x2, 0x20, 0x200, 0x2000), isEndA);
+            bitmask              += math.select(0, new int4(0x4, 0x40, 0x400, 0x4000), isStartB);
+            bitmask              += math.select(0, new int4(0x8, 0x80, 0x800, 0x8000), isEndB);
+            isStartEndABx4        = math.csum(bitmask);
 
-            // Find the closest point on edge B to the point on A just found
-            float fracB = fracA * (invLengthBSq * r) - invLengthBSq * s2;
-            fracB       = math.clamp(fracB, 0.0f, 1.0f);
+            closestAOut        = pointOnA;
+            closestBOut        = pointOnB;
+            closestAToBPrecise = closestBOut - closestAOut;
 
-            // If the point on B was clamped then there may be a closer point on A to the edge
-            fracA = fracB * (invLengthASq * r) + invLengthASq * s1;
-            fracA = math.clamp(fracA, 0.0f, 1.0f);
+            // Refine results by projecting the errors
+            bool4 aNotEndpoint = !(isStartA | isEndA);
+            bool4 bNotEndpoint = !(isStartB | isEndB);
 
-            isStartEndAB = new float4(fracA, fracA, fracB, fracB) == new float4(0f, 1f, 0f, 1f);
-            closestAOut  = math.select(startSegmentA + fracA * edgeA, endSegmentA, isStartEndAB.y);
-            closestBOut  = math.select(startSegmentB + fracB * edgeB, endSegmentB, isStartEndAB.w);
-        }
+            // See PointRayCapsule.PointCapsuleDistance() for explanation of what we are doing here.
+            float4 distanceSq = simd.lengthsq(closestAToBPrecise);
 
-        // Todo: Copied from Unity.Physics. I still don't fully understand this, but it is working correctly for degenerate segments somehow.
-        // I tested with parallel segments, segments with 0-length edges and a few other weird things. It holds up with pretty good accuracy.
-        // I'm not sure where the NaNs or infinities disappear. But they do.
-        // Find the closest points on a pair of line segments
-        internal static void SegmentSegmentOld(float3 pointA, float3 edgeA, float3 pointB, float3 edgeB, out float3 closestAOut, out float3 closestBOut, out bool4 isStartEndAB)
-        {
-            // Find the closest point on edge A to the line containing edge B
-            float3 diff = pointB - pointA;
-
-            float r         = math.dot(edgeA, edgeB);
-            float s1        = math.dot(edgeA, diff);
-            float s2        = math.dot(edgeB, diff);
-            float lengthASq = math.lengthsq(edgeA);
-            float lengthBSq = math.lengthsq(edgeB);
-
-            float invDenom, invLengthASq, invLengthBSq;
-            {
-                float  denom = lengthASq * lengthBSq - r * r;
-                float3 inv   = 1.0f / new float3(denom, lengthASq, lengthBSq);
-                invDenom     = inv.x;
-                invLengthASq = inv.y;
-                invLengthBSq = inv.z;
-            }
-
-            float fracA = (s1 * lengthBSq - s2 * r) * invDenom;
-            fracA       = math.clamp(fracA, 0.0f, 1.0f);
-
-            // Find the closest point on edge B to the point on A just found
-            float fracB = fracA * (invLengthBSq * r) - invLengthBSq * s2;
-            fracB       = math.clamp(fracB, 0.0f, 1.0f);
-
-            // If the point on B was clamped then there may be a closer point on A to the edge
-            fracA = fracB * (invLengthASq * r) + invLengthASq * s1;
-            fracA = math.clamp(fracA, 0.0f, 1.0f);
-
-            closestAOut = pointA + fracA * edgeA;
-            closestBOut = pointB + fracB * edgeB;
-
-            isStartEndAB = new float4(fracA, fracA, fracB, fracB) == new float4(0f, 1f, 0f, 1f);
+            simdFloat3 zero = default;
+            // only bNotEndpoint is true
+            bool4 bNotEndpointOnly  = !aNotEndpoint & bNotEndpoint;
+            closestAToBPrecise     -= simd.select(zero, edgeB * (simd.dot(closestAToBPrecise, edgeB) / edgeBLengthSq), bNotEndpointOnly);
+            // both aNotEndpoint and bNotEndpoint are true
+            bool4  aNorBEndpoint   = aNotEndpoint & bNotEndpoint;
+            float4 perpendicularSq = simd.lengthsq(perpendicularUnnormalized);
+            // The precision of the perpendicular is determined by the splay. We use a conservative metric here.
+            bool4 safePerpendicular = perpendicularSq > 2f * distanceSq * (edgeALengthSq + edgeBLengthSq);
+            // Project closest onto the perpendicular
+            closestAToBPrecise = simd.select(closestAToBPrecise,
+                                             perpendicularUnnormalized * (simd.dot(closestAToBPrecise, perpendicularUnnormalized) / perpendicularSq),
+                                             safePerpendicular & aNorBEndpoint);
+            // only aNotEndpoint is true or ...
+            bool4 aNotEndpointOnly = aNotEndpoint & !bNotEndpoint;
+            // The perpendicular itself is too noisy, likely because the segments are nearly parallel. Clean based on A
+            closestAToBPrecise -= simd.select(zero, edgeA * (simd.dot(closestAToBPrecise, edgeA) / edgeALengthSq), aNotEndpointOnly | (!safePerpendicular & aNorBEndpoint));
         }
 
         internal static void SegmentSegment(in simdFloat3 startSegmentA,
@@ -431,47 +459,6 @@ namespace Latios.Psyshock
 
             closestAOut = pointA + fracA * edgeA;
             closestBOut = pointB + fracB * edgeB;
-        }
-
-        // Returns true for each segment pair whose result does not include an endpoint on either segment of the pair.
-        public static bool4 SegmentSegmentInvalidateEndpoints(in simdFloat3 startSegmentA,
-                                                              in simdFloat3 endSegmentA,
-                                                              in simdFloat3 startSegmentB,
-                                                              in simdFloat3 endSegmentB,
-                                                              out simdFloat3 closestAOut,
-                                                              out simdFloat3 closestBOut)
-        {
-            simdFloat3 edgeA = endSegmentA - startSegmentA;
-            simdFloat3 edgeB = endSegmentB - startSegmentB;
-            simdFloat3 diff  = startSegmentB - startSegmentA;
-
-            float4 r         = simd.dot(edgeA, edgeB);
-            float4 s1        = simd.dot(edgeA, diff);
-            float4 s2        = simd.dot(edgeB, diff);
-            float4 lengthASq = simd.lengthsq(edgeA);
-            float4 lengthBSq = simd.lengthsq(edgeB);
-
-            float4 invDenom, invLengthASq, invLengthBSq;
-            {
-                float4 denom = lengthASq * lengthBSq - r * r;
-                invDenom     = 1.0f / denom;
-                invLengthASq = 1.0f / lengthASq;
-                invLengthBSq = 1.0f / lengthBSq;
-            }
-
-            float4 fracA = (s1 * lengthBSq - s2 * r) * invDenom;
-            fracA        = math.clamp(fracA, 0.0f, 1.0f);
-
-            float4 fracB = fracA * (invLengthBSq * r) - invLengthBSq * s2;
-            fracB        = math.clamp(fracB, 0.0f, 1.0f);
-
-            fracA = fracB * invLengthASq * r + invLengthASq * s1;
-            fracA = math.clamp(fracA, 0.0f, 1.0f);
-
-            closestAOut = simd.select(startSegmentA + fracA * edgeA, endSegmentA, fracA == 1f);
-            closestBOut = simd.select(startSegmentB + fracB * edgeB, endSegmentB, fracB == 1f);
-
-            return fracA != 0f & fracA != 1f & fracB != 0f & fracB != 1f;
         }
 
         // Returns true for each segment pair whose result does not include an endpoint on either segment of the pair.
