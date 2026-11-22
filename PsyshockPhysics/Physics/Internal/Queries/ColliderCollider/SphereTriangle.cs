@@ -25,7 +25,7 @@ namespace Latios.Psyshock
             // Todo: Is it faster to transform the sphere into triangle space? It is less instructions, but a larger latency chain.
             float3     sphereCenterInWorldTriangleRelative = sphereTransform.pos - triangleTransform.pos + math.rotate(sphereTransform.rot, sphere.center);
             simdFloat3 triPointsLocal                      = triangle.AsSimdFloat3();
-            simdFloat3 triPointsTransformed                = simd.mul(triangleTransform.rot, triPointsLocal);
+            simdFloat3 triPointsTransformed                = simd.rotate(triangleTransform.rot, triPointsLocal);
             return PointRayTriangle.PointTriangleWithin(sphereCenterInWorldTriangleRelative, in triPointsTransformed, maxDistance + sphere.radius);
         }
 
@@ -39,7 +39,7 @@ namespace Latios.Psyshock
             // Transform to world-space relative to the triangle
             float3         sphereCenterInWorldTriangleRelative = sphereTransform.pos - triangleTransform.pos + math.rotate(sphereTransform.rot, sphere.center);
             simdFloat3     triPointsLocal                      = triangle.AsSimdFloat3();
-            simdFloat3     triPointsTransformed                = simd.mul(triangleTransform.rot, triPointsLocal);
+            simdFloat3     triPointsTransformed                = simd.rotate(triangleTransform.rot, triPointsLocal);
             SphereCollider sphereTransformed                   = new SphereCollider(sphereCenterInWorldTriangleRelative, sphere.radius);
             bool           hit                                 = TriangleSphereDistance(in triPointsTransformed,
                                                                               in sphereTransformed,
@@ -68,7 +68,7 @@ namespace Latios.Psyshock
                                         out ColliderCastResult result)
         {
             // Transform into world-space relative to the triangle
-            var  triPoints        = simd.mul(targetTriangleTransform.rot, targetTriangle.AsSimdFloat3());
+            var  triPoints        = simd.rotate(targetTriangleTransform.rot, targetTriangle.AsSimdFloat3());
             var  sphereCenter     = castStart.pos - targetTriangleTransform.pos + math.rotate(castStart.rot, sphereToCast.center);
             var  castDisplacement = castEnd - castStart.pos;
             var  ray              = new Ray(sphereCenter, sphereCenter + castDisplacement);
@@ -100,7 +100,7 @@ namespace Latios.Psyshock
                                         out ColliderCastResult result)
         {
             // Transform to world-space relative to the triangle and reverse-cast
-            var  triPoints          = simd.mul(castStart.rot, triangleToCast.AsSimdFloat3());
+            var  triPoints          = simd.rotate(castStart.rot, triangleToCast.AsSimdFloat3());
             var  sphereCenterOffset = math.rotate(targetSphereTransform.rot, targetSphere.center);
             var  sphereCenter       = targetSphereTransform.pos - castStart.pos + sphereCenterOffset;
             var  castReverse        = castStart.pos - castEnd;

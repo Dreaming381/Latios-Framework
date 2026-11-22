@@ -207,7 +207,7 @@ namespace Latios.Kinemation
         bool Ewbik.IConstraintSolver.ApplyConstraintsToBone(OptimizedBone bone, in RigidTransform proposedTransformDelta, in Ewbik.BoneSolveState boneSolveState)
         {
             var newLocalRotation   = math.mul(proposedTransformDelta.rot, bone.rootRotation);
-            var parentRootRotation = bone.index > 0 ? bone.parent.rootRotation : quaternion.identity;
+            var parentRootRotation = bone.parentIndex > 0 ? bone.parent.rootRotation : quaternion.identity;
             newLocalRotation       = math.InverseRotateFast(parentRootRotation, newLocalRotation);
             newLocalRotation       = constraints[bone.index].ApplyConstraint(newLocalRotation);
             var oldLocalRotation   = bone.localRotation;

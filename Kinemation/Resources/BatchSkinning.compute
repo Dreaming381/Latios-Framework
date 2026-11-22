@@ -324,7 +324,7 @@ void BatchSkinning(uint threadId : SV_GroupIndex, uint3 groupIds : SV_GroupID)
         {
             // Convert skeleton Qvvs in groupshared to skeleton Matrices and overwrite in groupshared.
             GroupMemoryBarrierWithGroupSync();
-            for (uint i = threadId; i < meshBonesCount; i += THREAD_GROUP_SIZE)
+            for (uint i = threadId; i < skeletonCount; i += THREAD_GROUP_SIZE)
             {
                 Qvvs qvvs = transformUnionQvvsToQvvs(gs_transforms[i]);
                 float3x4 mat = qvvsToMatrix(qvvs);

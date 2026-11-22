@@ -23,7 +23,7 @@ namespace Latios.Psyshock
         {
             // Transform everything into world-space relative to the triangle
             var triPointsLocal       = triangle.AsSimdFloat3();
-            var transformedTriPoints = simd.mul(triangleTransform.rot, triPointsLocal);
+            var transformedTriPoints = simd.rotate(triangleTransform.rot, triPointsLocal);
             var transformedCapsule   = new CapsuleCollider(capsuleTransform.pos - triangleTransform.pos + math.rotate(capsuleTransform.rot, capsule.pointA),
                                                            capsuleTransform.pos - triangleTransform.pos + math.rotate(capsuleTransform.rot, capsule.pointB),
                                                            capsule.radius);
@@ -39,7 +39,7 @@ namespace Latios.Psyshock
         {
             // Transform everything into world-space relative to the triangle
             var triPointsLocal       = triangle.AsSimdFloat3();
-            var transformedTriPoints = simd.mul(triangleTransform.rot, triPointsLocal);
+            var transformedTriPoints = simd.rotate(triangleTransform.rot, triPointsLocal);
             var transformedCapsule   = new CapsuleCollider(    capsuleTransform.pos - triangleTransform.pos + math.rotate(capsuleTransform.rot, capsule.pointA),
                                                                capsuleTransform.pos - triangleTransform.pos + math.rotate(capsuleTransform.rot, capsule.pointB),
                                                                capsule.radius);
@@ -73,7 +73,7 @@ namespace Latios.Psyshock
             }
 
             // Transform into world-space relative to the triangle.
-            var triPoints           = simd.mul(targetTriangleTransform.rot, targetTriangle.AsSimdFloat3());
+            var triPoints           = simd.rotate(targetTriangleTransform.rot, targetTriangle.AsSimdFloat3());
             var shiftedCastStartPos = castStart.pos - targetTriangleTransform.pos;
             var capStartA           = shiftedCastStartPos + math.rotate(castStart.rot, capsuleToCast.pointA);
             var capStartB           = shiftedCastStartPos + math.rotate(castStart.rot, capsuleToCast.pointB);
@@ -134,7 +134,7 @@ namespace Latios.Psyshock
             }
 
             // Transform into world-space relative to the triangle and reverse cast.
-            var triPoints        = simd.mul(castStart.rot, triangleToCast.AsSimdFloat3());
+            var triPoints        = simd.rotate(castStart.rot, triangleToCast.AsSimdFloat3());
             var shiftedTargetPos = targetCapsuleTransform.pos - castStart.pos;
             var capStartA        = shiftedTargetPos + math.rotate(targetCapsuleTransform.rot, targetCapsule.pointA);
             var capStartB        = shiftedTargetPos + math.rotate(targetCapsuleTransform.rot, targetCapsule.pointB);

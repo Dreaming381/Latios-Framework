@@ -207,6 +207,7 @@ namespace Latios.Kinemation.Authoring
                 if (clip.sampleRate <= 0f)
                 {
                     Debug.LogError("Kinemation failed to bake the parameter clip set. A clip had a sample rate less or equal to 0f. This is not allowed.");
+                    return false;
                 }
 
                 if (clip.events.IsCreated)

@@ -5,6 +5,11 @@ namespace Latios.Psyshock
 {
     internal static partial class mathex
     {
+        public static float3 InverseRotate(simdFloat3 matrixColumns, float3 vector)
+        {
+            return simd.dot(matrixColumns, vector).xyz;
+        }
+
         //Formerly getFactoredLength
         public static float GetLengthAndNormal(float3 v, out float3 normal)
         {

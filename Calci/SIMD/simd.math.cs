@@ -129,6 +129,26 @@ namespace Latios.Calci
             return result;
         }
 
+        public static simdFloat3 rotate(quaternion rotation, simdFloat3 directions) => mul(rotation, directions);
+
+        public static simdFloat3 mul(quaternion rotation, simdFloat3 directions)
+        {
+            simdFloat3 t = 2 * cross(rotation.value.xyz, directions);
+            return directions + rotation.value.w * t + cross(rotation.value.xyz, t);
+        }
+
+        public static simdFloat3 rotate(float3x3 matrix, simdFloat3 directions) => mul(matrix, directions);
+
+        public static simdFloat3 mul(float3x3 matrix, simdFloat3 directions)
+        {
+            return new simdFloat3(matrix.c0) * directions.x + new simdFloat3(matrix.c1) * directions.y + new simdFloat3(matrix.c2) * directions.z;
+        }
+
+        public static simdFloat3 inverseRotate(float3x3 matrixToInverse, simdFloat3 directions)
+        {
+            return new simdFloat3(dot(matrixToInverse.c0, directions), dot(matrixToInverse.c1, directions), dot(matrixToInverse.c2, directions));
+        }
+
         public static simdFloat3 transform(RigidTransform transform, simdFloat3 positions)
         {
             simdFloat3 t       = 2 * cross(transform.rot.value.xyz, positions);
@@ -136,10 +156,14 @@ namespace Latios.Calci
             return rotated + transform.pos;
         }
 
-        public static simdFloat3 mul(quaternion rotation, simdFloat3 directions)
+        public static simdFloat3 transform(AffineTransform transform, simdFloat3 positions)
         {
-            simdFloat3 t = 2 * cross(rotation.value.xyz, directions);
-            return directions + rotation.value.w * t + cross(rotation.value.xyz, t);
+            return mul(transform.rs, positions) + transform.t;
+        }
+
+        public static simdFloat3 inverseTransformIdentityScale(AffineTransform transformToInverse, simdFloat3 positions)
+        {
+            return inverseRotate(transformToInverse.rs, positions - transformToInverse.t);
         }
 
         public static float3 cminabcd(simdFloat3 s)
@@ -185,6 +209,57 @@ namespace Latios.Calci
         public static simdFloat3 clamp(simdFloat3 s, float3 min, float3 max)
         {
             return new simdFloat3(math.clamp(s.x, min.x, max.x), math.clamp(s.y, min.y, max.y), math.clamp(s.z, min.z, max.z));
+        }
+
+        public static simdFloat3 chgsign(float3 a, simdFloat3 b)
+        {
+            return new simdFloat3(math.chgsign(a.x, b.x), math.chgsign(a.y, b.y), math.chgsign(a.z, b.z));
+        }
+
+        public static simdFloat3 chgsign(simdFloat3 a, float4 b)
+        {
+            return new simdFloat3(math.chgsign(a.x, b), math.chgsign(a.y, b), math.chgsign(a.z, b));
+        }
+
+        public static simdFloat3 chgsign0Positive(float3 a, simdFloat3 b)
+        {
+            return new simdFloat3(math.chgsign0Positive(a.x, b.x), math.chgsign0Positive(a.y, b.y), math.chgsign0Positive(a.z, b.z));
+        }
+
+        public static simdFloat3 chgsign0Positive(simdFloat3 a, float4 b)
+        {
+            return new simdFloat3(math.chgsign0Positive(a.x, b), math.chgsign0Positive(a.y, b), math.chgsign0Positive(a.z, b));
+        }
+
+        public static simdFloat3 extractSigns(simdFloat3 s)
+        {
+            return chgsign(1f, s);
+        }
+
+        public static simdFloat3 extractSigns0IsPositive(simdFloat3 s)
+        {
+            return new simdFloat3(math.select(1f, -1f, s.x < 0f), math.select(1f, -1f, s.y < 0f), math.select(1f, -1f, s.z < 0f));
+            // Todo: Alternate implementation that is maybe faster?
+            // return extractSigns(s - (-0f));
+        }
+
+        public static simdFloat3 rightCross(simdFloat3 b) => new simdFloat3(float4.zero, -b.z, b.y);  // (1,0,0) x b
+        public static simdFloat3 upCross(simdFloat3 b) => new simdFloat3(b.z, float4.zero, -b.x);  // (0,1,0) x b
+        public static simdFloat3 forwardCross(simdFloat3 b) => new simdFloat3(-b.y, b.x, float4.zero);  // (0,0,1) x b
+
+        public static simdFloat3 crossRightUpForwardRight(float3 a)
+        {
+            // return new simdFloat3 { m_float3s = new float4x3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x) };
+            float4 x = new float4(0f, -a.z, a.y, 0f);
+            float4 y = new float4(a.z, 0f, -a.x, a.z);
+            float4 z = new float4(-a.y, a.x, 0f, -a.y);
+            return new simdFloat3(x, y, z);
+        }
+
+        public static simdFloat3 inverseRotateRightUpForwardRight(float3x3 matrixToInverse)
+        {
+            // return new simdFloat3(dot(matrixToInverse.c0, directions), dot(matrixToInverse.c1, directions), dot(matrixToInverse.c2, directions));
+            return new simdFloat3(matrixToInverse.c0.xyzx, matrixToInverse.c1.xyzx, matrixToInverse.c2.xyzx);
         }
     }
 }

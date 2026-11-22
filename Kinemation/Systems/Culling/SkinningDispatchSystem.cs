@@ -1308,7 +1308,7 @@ namespace Latios.Kinemation.Systems
                                 // We know we just dispatched a DQS world deform, so we can immediately write out the world DQS
                                 skinningStream.Write(new SkinningStreamMeshCommand
                                 {
-                                    batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst,
+                                    batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst | SkinningStreamMeshCommand.BatchOp.UseSkeletonCountAsGsBaseAddress,
                                     indexInDependentBuffer = indexInDependentBuffer,
                                     gpuDstStart            = requests[nextRequest].shaderDstIndex
                                 });
@@ -1325,7 +1325,7 @@ namespace Latios.Kinemation.Systems
                                 header.meshCommandCount++;
                                 skinningStream.Write(new SkinningStreamMeshCommand
                                 {
-                                    batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst,
+                                    batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst | SkinningStreamMeshCommand.BatchOp.UseSkeletonCountAsGsBaseAddress,
                                     indexInDependentBuffer = indexInDependentBuffer,
                                     gpuDstStart            = requests[nextRequest].shaderDstIndex
                                 });
@@ -1718,7 +1718,7 @@ namespace Latios.Kinemation.Systems
                         header.meshCommandCount++;
                         skinningStream.Write(new SkinningStreamMeshCommand
                         {
-                            batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst | SkinningStreamMeshCommand.BatchOp.UseSkeletonCountAsGsBaseAddress,
+                            batchOp                = SkinningStreamMeshCommand.BatchOp.GsTfStoreDst,
                             indexInDependentBuffer = (int)requests[i].indexInSkeletonBuffer,
                             gpuDstStart            = requests[i].shaderDstIndex
                         });

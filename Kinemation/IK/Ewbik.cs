@@ -202,7 +202,7 @@ namespace Latios.Kinemation
                     }
                     targetCountsByBone[i] += count;
                     var optimizedBone      = skeleton.bones[i];
-                    if (optimizedBone.index > 0)
+                    if (optimizedBone.parentIndex > 0)
                         targetCountsByBone[optimizedBone.parentIndex] += targetCountsByBone[i];
                     if (constraintSolver.IsFixedToParent(optimizedBone))
                         targetCountsByBone[i] = 0;

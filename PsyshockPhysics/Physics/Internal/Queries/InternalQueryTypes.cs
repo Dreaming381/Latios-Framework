@@ -35,10 +35,12 @@ namespace Latios.Psyshock
     {
         public static ColliderDistanceResult BinAResultToWorld(in ColliderDistanceResultInternal bInAResult, in RigidTransform aTransform)
         {
+            float3 hitpointA = math.transform(aTransform, bInAResult.hitpointA);
             return new ColliderDistanceResult
             {
-                hitpointA         = math.transform(aTransform, bInAResult.hitpointA),
-                hitpointB         = math.transform(aTransform, bInAResult.hitpointB),
+                hitpointA = hitpointA,
+                // Slightly more accurate directionally than just transforming the point
+                hitpointB         = math.rotate(aTransform.rot, bInAResult.hitpointB - bInAResult.hitpointA) + hitpointA,
                 normalA           = math.rotate(aTransform, bInAResult.normalA),
                 normalB           = math.rotate(aTransform, bInAResult.normalB),
                 distance          = bInAResult.distance,

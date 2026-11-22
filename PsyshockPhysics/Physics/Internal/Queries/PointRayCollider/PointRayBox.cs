@@ -254,6 +254,16 @@ namespace Latios.Psyshock
             return (ushort)math.select(featureCodeFace, math.select(featureCodeEdge, featureCodeVertex, normalsNotZeroCount == 3), normalsNotZeroCount > 1);
         }
 
+        internal static ushort FeatureCodeAndNormalFromCenterRelativeSurfacePoint(float3 surfacePoint, float3 halfSize, out float3 normal)
+        {
+            bool3 axesMask    = math.abs(surfacePoint) == halfSize;
+            bool3 isNegative  = surfacePoint < 0f;
+            int   axesBitmask = math.bitmask(new bool4(axesMask, false));
+            int   axesCount   = math.countbits(axesBitmask);
+            normal            = BoxNormalFromSurfaceAxes(axesCount, isNegative, axesMask);
+            return FeatureCodeFromSurfaceAxes(axesBitmask, axesCount, isNegative, axesMask);
+        }
+
         static ushort FeatureCodeFromSurfaceAxes(int axesBitmask, int axesCount, bool3 isNegative, bool3 axesMask)
         {
             int negativeBits = math.bitmask(new bool4(isNegative, false));
@@ -271,6 +281,14 @@ namespace Latios.Psyshock
             float  componentScale = math.select(math.select(1f, math.SQRT2 / 2f, axesCount == 2), math.normalize(math.float3(1f)).x, axesCount == 3);
             float3 normal         = math.select(0f, componentScale, axesMask);
             return math.select(normal, -normal, isNegative);
+        }
+
+        internal static ushort FeatureCodeAndNormalFromCenterRelativeVertex(float3 vertex, out float3 normal)
+        {
+            float root3  = 1f / math.sqrt(3f);
+            int   result = math.bitmask(new bool4(vertex < 0f, false));
+            normal       = math.chgsign(root3, vertex);
+            return (ushort)result;
         }
 
         internal static float3 BoxNormalFromFeatureCode(ushort featureCode)

@@ -199,7 +199,7 @@ namespace Latios.Calci
         {
             var cps    = curve.ToSimdFloat3();
             var relCps = cps - referencePoint;
-            cps        = referencePoint + simd.mul(rotation, relCps);
+            cps        = referencePoint + simd.rotate(rotation, relCps);
             return new BezierCurve(cps);
         }
 

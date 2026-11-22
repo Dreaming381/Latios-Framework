@@ -351,6 +351,280 @@ namespace Latios.Kinemation
                                                                   mode);
         }
 
+        #region Deterministic
+        // The Deterministic variants produce bit-identical results on every platform and CPU for bit-identical inputs, and are suitable
+        // for jobs using FloatMode.Deterministic. They are slower than the regular variants, and their results are not bit-identical to them.
+
+        /// <summary>
+        /// Samples the animation clip for the given bone index at the given time.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="boneIndex">The bone index to sample. This value is automatically clamped to a valid value.</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        /// <returns>A bone transform sampled from the clip in local space of the bone, with its weight set to 1f</returns>
+        public unsafe TransformQvvs SampleBoneDeterministic(int boneIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode  = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            boneIndex = math.clamp(boneIndex, 0, boneCount - 1);
+
+            var qvv = AclUnity.Decompression.SampleBoneDeterministic(compressedClipDataAligned16.GetUnsafePtr(), boneIndex, time, mode);
+            return new TransformQvvs
+            {
+                rotation  = qvv.rotation,
+                position  = qvv.translation.xyz,
+                context32 = math.asint(1f),
+                stretch   = qvv.stretchScale.xyz,
+                scale     = qvv.stretchScale.w
+            };
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the entire skeleton at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="optimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref OptimizedSkeletonAspect optimizedSkeletonAspect,
+                                                   float time,
+                                                   float blendWeight,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckSkeletonIsBigEnoughForClip(in optimizedSkeletonAspect, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (optimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
+                AclUnity.Decompression.SamplePoseBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
+        }
+
+#if !LATIOS_TRANSFORMS_UNITY
+        /// <summary>
+        /// Samples the animation clip for the entire skeleton at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="tickedOptimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref TickedOptimizedSkeletonAspect tickedOptimizedSkeletonAspect,
+                                                   float time,
+                                                   float blendWeight,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckSkeletonIsBigEnoughForClip(in tickedOptimizedSkeletonAspect, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (tickedOptimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
+                AclUnity.Decompression.SamplePoseBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, blendWeight, time, mode);
+        }
+#endif
+
+        /// <summary>
+        /// Samples the animation clip for parts of the skeleton specified by the mask at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="optimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref OptimizedSkeletonAspect optimizedSkeletonAspect,
+                                                   ReadOnlySpan<ulong>         mask,
+                                                   float time,
+                                                   float blendWeight,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckSkeletonIsBigEnoughForClip(in optimizedSkeletonAspect, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (optimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
+                AclUnity.Decompression.SamplePoseMaskedBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
+        }
+
+#if !LATIOS_TRANSFORMS_UNITY
+        /// <summary>
+        /// Samples the animation clip for parts of the skeleton specified by the mask at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="tickedOptimizedSkeletonAspect">The skeleton aspect on which to apply the animation</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref TickedOptimizedSkeletonAspect tickedOptimizedSkeletonAspect,
+                                                   ReadOnlySpan<ulong>               mask,
+                                                   float time,
+                                                   float blendWeight,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckSkeletonIsBigEnoughForClip(in tickedOptimizedSkeletonAspect, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (tickedOptimizedSkeletonAspect.BeginSampleTrueIfAdditive(out var buffer))
+                AclUnity.Decompression.SamplePoseMaskedBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
+            else
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), buffer, mask, blendWeight, time, mode);
+        }
+#endif
+
+        /// <summary>
+        /// Samples the animation clip for the entire set of transforms at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="blender">The blender which contains context information about previous sampling operations</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref BufferPoseBlender blender,
+                                                   float time,
+                                                   float blendWeight               = 1f,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBlenderIsBigEnoughForClip(in blender, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (blender.sampledFirst)
+                AclUnity.Decompression.SamplePoseBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, blendWeight, time, mode);
+            else
+            {
+                AclUnity.Decompression.SamplePoseBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, blendWeight, time, mode);
+                blender.sampledFirst = true;
+            }
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the transforms selected by the mask at the given time weighted by the blendWeight.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="blender">The blender which contains context information about previous sampling operations</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref BufferPoseBlender blender,
+                                                   ReadOnlySpan<ulong>       mask,
+                                                   float time,
+                                                   float blendWeight               = 1f,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBlenderIsBigEnoughForClip(in blender, boneCount);
+
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+
+            if (blender.sampledFirst)
+                AclUnity.Decompression.SamplePoseMaskedBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, mask, blendWeight, time, mode);
+            else
+            {
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(), blender.bufferAsQvvs, mask, blendWeight, time, mode);
+                blender.sampledFirst = true;
+            }
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the entire set of transforms at the given time raw into a buffer without any blending.
+        /// context32 values are undefined. The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref NativeArray<TransformQvvs> localTransforms,
+                                                   float time,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SamplePoseDeterministic(compressedClipDataAligned16.GetUnsafePtr(), localTransforms.Reinterpret<AclUnity.Qvvs>(), time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the entire set of transforms at the given time raw into a buffer with blending.
+        /// New transforms can be specified to either overwrite existing values or be added via weighting.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="overwrite">If true, the existing transforms and accumulated weights are overwritten.
+        /// If false, the new transform values are added to the existing values.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref NativeArray<TransformQvvs> localTransforms,
+                                                   float time,
+                                                   float blendWeight,
+                                                   bool overwrite,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            if (overwrite)
+                AclUnity.Decompression.SamplePoseBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                           localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                           blendWeight,
+                                                                           time,
+                                                                           mode);
+            else
+                AclUnity.Decompression.SamplePoseBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                         localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                         blendWeight,
+                                                                         time,
+                                                                         mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the transforms selected by the mask at the given time raw into a buffer with blending.
+        /// New transforms can be specified to either overwrite existing values or be added via weighting.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="localTransforms">The raw local transforms array to overwrite with the sampled data.</param>
+        /// <param name="mask">A bit array where each bit specifies if the bone at that index should be sampled</param>
+        /// <param name="time">The time value to sample the the clip in seconds.</param>
+        /// <param name="blendWeight">A weight factor to use for blending in the range of (0f, 1f]</param>
+        /// <param name="overwrite">If true, the existing transforms and accumulated weights are overwritten.
+        /// If false, the new transform values are added to the existing values.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SamplePoseDeterministic(ref NativeArray<TransformQvvs> localTransforms,
+                                                   ReadOnlySpan<ulong>            mask,
+                                                   float time,
+                                                   float blendWeight,
+                                                   bool overwrite,
+                                                   KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            if (overwrite)
+                AclUnity.Decompression.SamplePoseMaskedBlendedFirstDeterministic(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                                 localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                                 mask,
+                                                                                 blendWeight,
+                                                                                 time,
+                                                                                 mode);
+            else
+                AclUnity.Decompression.SamplePoseMaskedBlendedAddDeterministic(compressedClipDataAligned16.GetUnsafePtr(),
+                                                                               localTransforms.Reinterpret<AclUnity.Qvvs>(),
+                                                                               mask,
+                                                                               blendWeight,
+                                                                               time,
+                                                                               mode);
+        }
+        #endregion
+
         /// <summary>
         /// The size the clip would be if uncompressed, ignoring padding bytes
         /// </summary>
@@ -515,6 +789,66 @@ namespace Latios.Kinemation
             var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
             AclUnity.Decompression.SampleFloatsMasked(compressedClipDataAligned16.GetUnsafePtr(), destination, mask, time, mode);
         }
+
+        #region Deterministic
+        // The Deterministic variants produce bit-identical results on every platform and CPU for bit-identical inputs, and are suitable
+        // for jobs using FloatMode.Deterministic. They are slower than the regular variants, and their results are not bit-identical to them.
+
+        /// <summary>
+        /// Samples the animation clip for the given parameter index at the given time.
+        /// The result is bit-identical on every platform. A denormal value is flushed to zero.
+        /// </summary>
+        /// <param name="parameterIndex">The parameter index to sample. This value is automatically clamped to a valid value.</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        /// <returns>A parameter sampled from the clip</returns>
+        public unsafe float SampleParameterDeterministic(int parameterIndex, float time, KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var mode       = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            parameterIndex = math.clamp(parameterIndex, 0, parameterCount - 1);
+            return AclUnity.Decompression.SampleFloatDeterministic(compressedClipDataAligned16.GetUnsafePtr(), parameterIndex, time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for all parameters at the given time at once.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="destination">The array of floats where the parameters should be stored. If the array is not large enough, a safety exception is thrown.</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SampleAllParametersDeterministic(NativeArray<float>        destination,
+                                                            float time,
+                                                            KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBufferIsBigEnoughForClip(destination, parameterCount);
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SampleFloatsDeterministic(compressedClipDataAligned16.GetUnsafePtr(), destination, time, mode);
+        }
+
+        /// <summary>
+        /// Samples the animation clip for the selected set of parameters specified by the mask at the given time at once.
+        /// The result is bit-identical on every platform. Denormal values are flushed to zero.
+        /// </summary>
+        /// <param name="destination">The array of floats where the parameters should be stored. If the array is not large enough, a safety exception is thrown.</param>
+        /// <param name="mask">A bit array where each bit specifies if the parameter at that index should be sampled</param>
+        /// <param name="time">
+        /// The time value to sample the the clip in seconds.
+        /// This value is automatically clamped to a value between 0f and the clip's duration.</param>
+        /// <param name="keyframeInterpolationMode">The mechanism used to sample a time value between two keyframes</param>
+        public unsafe void SampleSelectedParametersDeterministic(NativeArray<float>        destination,
+                                                                 ReadOnlySpan<ulong>       mask,
+                                                                 float time,
+                                                                 KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            CheckBufferIsBigEnoughForClip(destination, parameterCount);
+            var mode = (AclUnity.Decompression.KeyframeInterpolationMode)keyframeInterpolationMode;
+            AclUnity.Decompression.SampleFloatsMaskedDeterministic(compressedClipDataAligned16.GetUnsafePtr(), destination, mask, time, mode);
+        }
+        #endregion
 
         [Conditional("ENABLE_UNITY_COLLECTIONS_CHECKS"), Conditional("UNITY_DOTS_DEBUG")]
         void CheckBufferIsBigEnoughForClip(NativeArray<float> buffer, short parameterCount)

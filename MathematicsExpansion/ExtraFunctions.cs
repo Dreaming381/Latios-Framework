@@ -108,6 +108,16 @@ namespace Unity.Mathematics
             var inverseRot = conjugate(a.rot);
             return new RigidTransform(mul(inverseRot, b.rot), rotate(inverseRot, b.pos - a.pos));
         }
+
+        public static float3 chgsign0Positive(float3 a, float3 b)
+        {
+            return asfloat(asuint(a) ^ ((asuint(b) - 1u) & asuint(b) & 0x80000000u));
+        }
+
+        public static float4 chgsign0Positive(float4 a, float4 b)
+        {
+            return asfloat(asuint(a) ^ ((asuint(b) - 1u) & asuint(b) & 0x80000000u));
+        }
     }
 
     public partial struct float3x4

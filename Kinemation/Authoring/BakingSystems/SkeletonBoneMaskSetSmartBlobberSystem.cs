@@ -77,16 +77,21 @@ namespace Latios.Kinemation.Authoring
             {
                 if (mask.GetHashCode() == 0)
                 {
-                    Debug.LogError($"Kinemation failed to bake mask set set on animator {animator.gameObject.name}. Mask at index {i} was null.");
+                    Debug.LogError($"Kinemation failed to bake mask set on animator {animator.gameObject.name}. Mask at index {i} was null.");
                 }
-                i++;
+                else
+                    i++;
             }
+            if (i == 0)
+                return false;
 
             baker.DependsOn(animator.avatar);
             var masksBuffer = baker.AddBuffer<AvatarMaskToBake>(blobBakingEntity);
             i               = 0;
             foreach (var mask in masks)
             {
+                if (mask.GetHashCode() == 0)
+                    continue;
                 baker.DependsOn(mask.Value);
                 masksBuffer.Add(new AvatarMaskToBake
                 {

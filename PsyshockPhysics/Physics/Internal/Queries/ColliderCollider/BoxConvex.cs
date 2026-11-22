@@ -173,7 +173,7 @@ namespace Latios.Psyshock
                 PointRayBox.BestFacePlanesAndVertices(in box, bLocalContactNormal, out var bEdgePlaneNormals, out _, out var bPlane, out var bVertices);
                 bPlane                                 = mathex.TransformPlane(bInATransform, bPlane);
                 bVertices                              = simd.transform(bInATransform, bVertices);
-                bEdgePlaneNormals                      = simd.mul(bInATransform.rot, bEdgePlaneNormals);
+                bEdgePlaneNormals                      = simd.rotate(bInATransform.rot, bEdgePlaneNormals);
                 var  bEdgePlaneDistances               = simd.dot(bEdgePlaneNormals, bVertices.bcda);
                 bool needsClosestPoint                 = true;
                 var  distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));
@@ -313,7 +313,7 @@ namespace Latios.Psyshock
                 PointRayBox.BestFacePlanesAndVertices(in box, bLocalContactNormal, out var bEdgePlaneNormals, out _, out var bPlane, out var bVertices);
                 bPlane                                 = mathex.TransformPlane(bInATransform, bPlane);
                 bVertices                              = simd.transform(bInATransform, bVertices);
-                bEdgePlaneNormals                      = simd.mul(bInATransform.rot, bEdgePlaneNormals);
+                bEdgePlaneNormals                      = simd.rotate(bInATransform.rot, bEdgePlaneNormals);
                 var  bEdgePlaneDistances               = simd.dot(bEdgePlaneNormals, bVertices.bcda);
                 bool needsClosestPoint                 = true;
                 var  distanceScalarAlongContactNormalB = math.rcp(math.dot(-aLocalContactNormal, bPlane.normal));

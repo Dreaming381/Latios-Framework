@@ -23,7 +23,7 @@ namespace Latios.Psyshock
         {
             var  shiftedPoint         = point - triangleTransform.pos;
             var  triPointsLocal       = triangle.AsSimdFloat3();
-            var  triPointsTransformed = simd.mul(triangleTransform.rot, triPointsLocal);
+            var  triPointsTransformed = simd.rotate(triangleTransform.rot, triPointsLocal);
             bool hit                  = PointTriangleDistance(shiftedPoint, in triPointsTransformed, maxDistance, out var localResult);
             result                    = new PointDistanceResult
             {

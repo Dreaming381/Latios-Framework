@@ -32,7 +32,30 @@ namespace Latios.Kinemation
             blender.buffer[0]         = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
-            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, false);
+        }
+
+        /// <summary>
+        /// Accumulate the weighted root transform after sampling a clip into a BufferPoseBlender, using the clip's deterministic sampling methods.
+        /// Use this if the blender was populated with SamplePoseDeterministic().
+        /// </summary>
+        /// <param name="blender">A BufferPoseBlender which should contain the sampled root transform at index 0. Index 0 is cleared after reading.</param>
+        /// <param name="clip">The clip that was sampled, and from which more samples can be taken.</param>
+        /// <param name="previousClipTime">The previous clip time, obtained via LoopToClipTime(), prior to the current sample in index 0.</param>
+        /// <param name="loopCycleTransitions">The signed number of times the clip "wrapped" between the previous time and the current time.
+        /// Backwards playback will result in negative values. Use SkeletonClip.CountLoopCycleTransitions() to obtain this value.</param>
+        /// <param name="keyframeInterpolationMode">The interpolation mode used when sampling the clip.</param>
+        public void AccumulateDeterministic(ref BufferPoseBlender blender,
+                                            ref SkeletonClip clip,
+                                            float previousClipTime,
+                                            float loopCycleTransitions,
+                                            KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var sampledRoot           = blender.buffer[0];
+            blender.buffer[0]         = default;
+            var normalizedSampledRoot = sampledRoot;
+            normalizedSampledRoot.NormalizeBone();
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, true);
         }
 
         /// <summary>
@@ -55,7 +78,31 @@ namespace Latios.Kinemation
             array[0]                  = default;
             var normalizedSampledRoot = sampledRoot;
             normalizedSampledRoot.NormalizeBone();
-            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, false);
+        }
+
+        /// <summary>
+        /// Accumulate the weighted root transform after sampling a clip into an optimized skeleton, using the clip's deterministic sampling methods.
+        /// Use this if the skeleton was populated with SamplePoseDeterministic().
+        /// </summary>
+        /// <param name="skeleton">An optimized skeleton which should contain the sampled root transform at bone index 0. The bone is cleared after reading.</param>
+        /// <param name="clip">The clip that was sampled, and from which more samples can be taken.</param>
+        /// <param name="previousClipTime">The previous clip time, obtained via LoopToClipTime(), prior to the current sample in index 0.</param>
+        /// <param name="loopCycleTransitions">The signed number of times the clip "wrapped" between the previous time and the current time.
+        /// Backwards playback will result in negative values. Use SkeletonClip.CountLoopCycleTransitions() to obtain this value.</param>
+        /// <param name="keyframeInterpolationMode">The interpolation mode used when sampling the clip.</param>
+        public void AccumulateDeterministic(ref OptimizedSkeletonAspect skeleton,
+                                            ref SkeletonClip clip,
+                                            float previousClipTime,
+                                            float loopCycleTransitions,
+                                            KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var array                 = skeleton.rawLocalTransformsRW;
+            var sampledRoot           = array[0];
+            array[0]                  = default;
+            var normalizedSampledRoot = sampledRoot;
+            normalizedSampledRoot.NormalizeBone();
+            Accumulate(in normalizedSampledRoot, math.asfloat(sampledRoot.context32), ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, true);
         }
 
         /// <summary>
@@ -76,7 +123,35 @@ namespace Latios.Kinemation
             var currentClipTime      = clip.LoopToClipTime(currentLoopingTime);
             var previousClipTime     = clip.LoopToClipTime(previousLoopingTime);
             var current              = clip.SampleBone(0, currentClipTime, keyframeInterpolationMode);
-            Accumulate(in current, weight, ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode);
+            Accumulate(in current, weight, ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, false);
+        }
+
+        /// <summary>
+        /// Sample and accumulate the root transform using the specified clip's deterministic sampling methods.
+        /// </summary>
+        /// <param name="clip">The clip to sample</param>
+        /// <param name="currentLoopingTime">The current time in the clip, including loop multiples of the clip's duration</param>
+        /// <param name="previousLoopingTime">The previous time in the clip, including loop multiples of the clip's duration</param>
+        /// <param name="weight">The weight factor that should be applied for this sample when blending the root delta</param>
+        /// <param name="keyframeInterpolationMode">The interpolation mode to use when sampling the clip</param>
+        public void SampleAccumulateDeterministic(ref SkeletonClip clip,
+                                                  float currentLoopingTime,
+                                                  float previousLoopingTime,
+                                                  float weight,
+                                                  KeyframeInterpolationMode keyframeInterpolationMode = KeyframeInterpolationMode.Interpolate)
+        {
+            var loopCycleTransitions = clip.CountLoopCycleTransitions(currentLoopingTime, previousLoopingTime);
+            var currentClipTime      = clip.LoopToClipTime(currentLoopingTime);
+            var previousClipTime     = clip.LoopToClipTime(previousLoopingTime);
+            var current              = clip.SampleBoneDeterministic(0, currentClipTime, keyframeInterpolationMode);
+            Accumulate(in current, weight, ref clip, previousClipTime, loopCycleTransitions, keyframeInterpolationMode, true);
+        }
+
+        private static TransformQvvs SampleRoot(ref SkeletonClip clip, float time, KeyframeInterpolationMode keyframeInterpolationMode, bool deterministic)
+        {
+            if (deterministic)
+                return clip.SampleBoneDeterministic(0, time, keyframeInterpolationMode);
+            return clip.SampleBone(0, time, keyframeInterpolationMode);
         }
 
         private void Accumulate(in TransformQvvs current,
@@ -84,9 +159,10 @@ namespace Latios.Kinemation
                                 ref SkeletonClip clip,
                                 float previousClipTime,
                                 float loopCycleTransitions,
-                                KeyframeInterpolationMode keyframeInterpolationMode)
+                                KeyframeInterpolationMode keyframeInterpolationMode,
+                                bool deterministic)
         {
-            var previousRoot = clip.SampleBone(0, previousClipTime, keyframeInterpolationMode);
+            var previousRoot = SampleRoot(ref clip, previousClipTime, keyframeInterpolationMode, deterministic);
             if (Hint.Likely(math.abs(loopCycleTransitions) < 0.5f))
             {
                 var newDelta = RootMotionTools.DeltaBetween(current, previousRoot);
@@ -95,8 +171,8 @@ namespace Latios.Kinemation
             }
             else
             {
-                var           beginRoot = clip.SampleBone(0, 0f);
-                var           endRoot   = clip.SampleBone(0, clip.duration);
+                var           beginRoot = SampleRoot(ref clip, 0f, KeyframeInterpolationMode.Interpolate, deterministic);
+                var           endRoot   = SampleRoot(ref clip, clip.duration, KeyframeInterpolationMode.Interpolate, deterministic);
                 TransformQvvs newDelta;
                 if (Hint.Likely(loopCycleTransitions > 0f))
                 {

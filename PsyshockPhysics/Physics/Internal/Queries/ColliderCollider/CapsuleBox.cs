@@ -305,8 +305,7 @@ namespace Latios.Psyshock
             float3 pointDistancesToBoxMax = box.halfSize - math.min(osPointA, osPointB);
             float3 bestPointDistances     = math.min(pointDistancesToBoxMin, pointDistancesToBoxMax);  // positive is penetrating
 
-            simdFloat3 boxEdgeDirections = new simdFloat3(new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), new float3(1f, 0f, 0f));
-            simdFloat3 crosses           = simd.cross(capsuleEdge, boxEdgeDirections);
+            simdFloat3 crosses = simd.crossRightUpForwardRight(capsuleEdge);
             // The capsule edge is perpendicular to the crosses, so pointA and pointB have equal projections. We use pointA.
             float4 capsuleSupportProjections = simd.dot(osPointA, crosses);
             // The box support point has the same signs as the direction vector, which cancels during projection, so we can just use absolute values.
@@ -409,8 +408,7 @@ namespace Latios.Psyshock
             float3 pointDistancesToBoxMax = box.halfSize - math.min(osPointA, osPointB);
             float3 bestPointDistances     = math.min(pointDistancesToBoxMin, pointDistancesToBoxMax);  // positive is penetrating
 
-            simdFloat3 boxEdgeDirections = new simdFloat3(new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), new float3(1f, 0f, 0f));
-            simdFloat3 crosses           = simd.cross(capsuleEdge, boxEdgeDirections);
+            simdFloat3 crosses = simd.crossRightUpForwardRight(capsuleEdge);
             // The capsule edge is perpendicular to the crosses, so pointA and pointB have equal projections. We use pointA.
             float4 capsuleSupportProjections = simd.dot(osPointA, crosses);
             // The box support point has the same signs as the direction vector, which cancels during projection, so we can just use absolute values.
@@ -425,6 +423,7 @@ namespace Latios.Psyshock
             float  bestSignedDistanceSq;
             float3 segmentPenetrationNormal = default;
             float3 segmentToBoxPrecise;
+            bool   segmentIntersectingOverhangsFaceEdge = false;
             if (segmentIsIntersecting)
             {
                 // The internal capsule segment is penetrating the box.
@@ -466,6 +465,7 @@ namespace Latios.Psyshock
                     bool3 aIsGreater       = osPointA > osPointB;
                     bool  useB             = math.any((useMin ^ aIsGreater) & bestAxisMask);
                     closestPointOnSegment  = math.select(osPointA, osPointB, useB);
+                    int overhangEdgeAxis   = 0;
                     if (math.any((osPointA == osPointB) & bestAxisMask))
                     {
                         // The capsule is parallel to the face along our axis.
@@ -508,7 +508,9 @@ namespace Latios.Psyshock
                             float3 boxPointClosestToCapsuleEndpoint = math.clamp(math.select(closestPointOnSegment, boxSignedExtents, bestAxisMask), -box.halfSize, box.halfSize);
                             bool   crossingIsBetter                 = math.distancesq(segmentEdgeCrossingPoint, boxPointClosestToCrossing) < math.distancesq(closestPointOnSegment,
                                                                                                                                                            boxPointClosestToCapsuleEndpoint);
-                            closestPointOnSegment = math.select(closestPointOnSegment, segmentEdgeCrossingPoint, crossingIsBetter);
+                            closestPointOnSegment                = math.select(closestPointOnSegment, segmentEdgeCrossingPoint, crossingIsBetter);
+                            segmentIntersectingOverhangsFaceEdge = crossingIsBetter && math.countbits(math.bitmask(new bool4(isOverhangAxes, false))) == 1;
+                            overhangEdgeAxis                     = math.tzcnt(math.bitmask(new bool4(!(isOverhangAxes | bestAxisMask), false)));
                         }
                     }
                     closestPointOnBox            = math.select(closestPointOnSegment, math.select(box.halfSize, -box.halfSize, useMin), bestAxisMask);
@@ -516,6 +518,10 @@ namespace Latios.Psyshock
                     float faceDepth              = math.csum(math.select(0f, math.abs(closestPointOnBox - closestPointOnSegment), bestAxisMask));
                     bestSignedDistanceSq         = -faceDepth * faceDepth;
                     separatingAxisTowardsCapsule = math.select(0f, math.select(1f, -1f, useMin), bestAxisMask);
+                    if (segmentIntersectingOverhangsFaceEdge)
+                    {
+                        separatingAxisTowardsCapsule = math.chgsign(crosses[overhangEdgeAxis], capsuleSupportProjections[overhangEdgeAxis]) / crossEdgeLengths[overhangEdgeAxis];
+                    }
                 }
                 segmentPenetrationNormal = -separatingAxisTowardsCapsule;
                 segmentToBoxPrecise      = closestPointOnBox - closestPointOnSegment;
@@ -602,7 +608,7 @@ namespace Latios.Psyshock
             float3 capsuleNormal     = math.normalizesafe(segmentToBoxPrecise);
             bool   capsuleDegenerate = capsuleNormal.Equals(float3.zero);
             capsuleNormal            = math.select(capsuleNormal, -capsuleNormal, bestSignedDistanceSq < 0f);
-            capsuleNormal            = math.select(capsuleNormal, segmentPenetrationNormal, segmentIsIntersecting && !capsuleDegenerate);
+            capsuleNormal            = math.select(capsuleNormal, segmentPenetrationNormal, segmentIsIntersecting && (!capsuleDegenerate || segmentIntersectingOverhangsFaceEdge));
             result                   = new ColliderDistanceResultInternal
             {
                 hitpointA    = closestPointOnBox + box.center,
@@ -614,7 +620,7 @@ namespace Latios.Psyshock
                 featureCodeB = PointRayCapsule.FeatureCodeFromSegmentHitpoint(closestPointOnSegment, osPointA, osPointB)
             };
 
-            if (Hint.Likely(!capsuleDegenerate))
+            if (Hint.Likely(!capsuleDegenerate || segmentIntersectingOverhangsFaceEdge))
                 return result.distance <= maxDistance;
 
             if (capsuleEdge.Equals(float3.zero))
